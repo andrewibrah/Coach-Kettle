@@ -87,8 +87,6 @@ export default function HomeScreen() {
   const [draftBodyParts, setDraftBodyParts] = useState<BodyPart[]>([]);
   const BODY_PARTS: BodyPart[] = useMemo(
     () => [
-      "Push",
-      "Pull",
       "Legs",
       "Abs",
       "Chest",
