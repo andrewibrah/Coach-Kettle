@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   AppState,
-  Button,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,6 +12,7 @@ import {
   Text,
   TextInput,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -62,6 +62,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const { width } = useWindowDimensions();
+  const compact = width < 380;
   // Session header state
   const [sessionDate, setSessionDate] = useState<string>(getTodayMMDD());
   const [bodyParts, setBodyParts] = useState<BodyPart[]>([]);
@@ -80,8 +82,9 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Body part picker (single select on start)
+  // Body part picker (multi-select draft on start)
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftBodyParts, setDraftBodyParts] = useState<BodyPart[]>([]);
   const BODY_PARTS: BodyPart[] = useMemo(
     () => [
       "Push",
@@ -170,7 +173,32 @@ export default function HomeScreen() {
       Alert.alert("Workout already started", "End the current workout to start a new one.");
       return;
     }
+    setDraftBodyParts([]);
     setPickerOpen(true);
+  };
+
+  const startWorkoutWithParts = (parts: BodyPart[]) => {
+    setBodyParts(parts);
+    setWorkoutActive(true);
+    setWorkoutId(makeId());
+    setWorkoutCreatedAt(Date.now());
+    setWorkoutDateISO(todayISO());
+    setRows([]);
+    setMessageInput("");
+    setError(null);
+    setPickerOpen(false);
+  };
+
+  const onClearRows = () => {
+    if (!rows.length) return;
+    Alert.alert(
+      "Clear table?",
+      "This will remove all sets in the current session.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Clear", style: "destructive", onPress: () => setRows([]) },
+      ]
+    );
   };
 
   const onEndWorkout = async () => {
@@ -182,6 +210,18 @@ export default function HomeScreen() {
       Alert.alert("Nothing to save", "Log at least one set first.");
       return;
     }
+
+    const proceed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        "End workout?",
+        "This will save to History.",
+        [
+          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+          { text: "Save", style: "default", onPress: () => resolve(true) },
+        ]
+      );
+    });
+    if (!proceed) return;
 
     const storedRows: StoredWorkoutRow[] = rows.map((row) => ({
       exercise: row.exercise,
@@ -203,6 +243,7 @@ export default function HomeScreen() {
     setWorkoutId(null);
     setWorkoutCreatedAt(null);
     setWorkoutDateISO(null);
+    setBodyParts([]);
     setRows([]);
     setMessageInput("");
   };
@@ -276,7 +317,7 @@ export default function HomeScreen() {
               isDark ? styles.headerCellDark : styles.headerCellLight,
             ]}
           >
-            Exercise
+            {compact ? "Ex" : "Exercise"}
           </ThemedText>
           <ThemedText
             style={[
@@ -286,7 +327,7 @@ export default function HomeScreen() {
               isDark ? styles.headerCellDark : styles.headerCellLight,
             ]}
           >
-            Set
+            {compact ? "Set" : "Set"}
           </ThemedText>
           <ThemedText
             style={[
@@ -296,7 +337,7 @@ export default function HomeScreen() {
               isDark ? styles.headerCellDark : styles.headerCellLight,
             ]}
           >
-            Weight (lbs)
+            {compact ? "Wt" : "Weight (lbs)"}
           </ThemedText>
           <ThemedText
             style={[
@@ -306,7 +347,7 @@ export default function HomeScreen() {
               isDark ? styles.headerCellDark : styles.headerCellLight,
             ]}
           >
-            Reps
+            {compact ? "Reps" : "Reps"}
           </ThemedText>
           <ThemedText
             style={[
@@ -316,7 +357,7 @@ export default function HomeScreen() {
               isDark ? styles.headerCellDark : styles.headerCellLight,
             ]}
           >
-            Notes
+            {compact ? "Note" : "Notes"}
           </ThemedText>
         </View>
 
@@ -349,52 +390,77 @@ export default function HomeScreen() {
         </ScrollView>
       </ThemedView>
 
-      {/* Message input */}
-      <View style={styles.inputWrap}>
-        <View style={styles.inputGrid}>
+      {/* Bottom bar */}
+      <View style={styles.bottomWrap}>
+        <View style={[styles.inputRow, !workoutActive && styles.inputRowDisabled]}>
           <TextInput
             value={messageInput}
             onChangeText={setMessageInput}
-            placeholder="e.g. Leg press 4 plates 10 reps"
+            placeholder={
+              workoutActive
+                ? "e.g. Leg press 4 plates 10 reps"
+                : "Start a workout to log sets"
+            }
             style={[styles.input, styles.messageInput]}
             returnKeyType="send"
             onSubmitEditing={sendMessage}
+            editable={workoutActive && !loading}
           />
-        </View>
 
-        <View style={styles.actionsRow}>
-          <Button
-            title={loading ? "Sending..." : "Send"}
+          <Pressable
             onPress={sendMessage}
-            disabled={loading || !messageInput.trim()}
-          />
-          <Button title="Clear" onPress={() => setRows([])} />
+            disabled={!workoutActive || loading || !messageInput.trim()}
+            style={({ pressed }) => [
+              styles.sendButton,
+              (!workoutActive || loading || !messageInput.trim()) && styles.sendButtonDisabled,
+              pressed && !(!workoutActive || loading || !messageInput.trim()) && styles.sendButtonPressed,
+            ]}
+          >
+            <Text style={styles.sendButtonText}>{loading ? "..." : "Send"}</Text>
+          </Pressable>
         </View>
 
-        <View style={styles.sessionRow}>
-          <Pressable onPress={() => router.push("/history")} style={styles.sessionButton}>
-            <Text style={styles.sessionButtonText}>History</Text>
-          </Pressable>
+        <View style={styles.bottomButtons}>
           <Pressable
-            onPress={onStartWorkout}
-            style={[styles.sessionButton, workoutActive && styles.sessionButtonDisabled]}
-            disabled={workoutActive}
+            onPress={() => router.push("/history")}
+            style={({ pressed }) => [styles.pillButton, pressed && styles.pillPressed]}
           >
-            <Text style={styles.sessionButtonText}>Start workout</Text>
+            <Text style={styles.pillText}>History</Text>
           </Pressable>
+
           <Pressable
-            onPress={onEndWorkout}
-            style={[styles.sessionButton, !workoutActive && styles.sessionButtonDisabled]}
-            disabled={!workoutActive}
+            onPress={workoutActive ? onEndWorkout : onStartWorkout}
+            style={({ pressed }) => [
+              styles.pillButton,
+              styles.pillPrimary,
+              workoutActive && styles.pillDanger,
+              pressed && styles.pillPressed,
+            ]}
           >
-            <Text style={styles.sessionButtonText}>End workout</Text>
+            <Text style={[styles.pillText, styles.pillPrimaryText]}>
+              {workoutActive ? "End" : "Start"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={onClearRows}
+            disabled={!rows.length}
+            style={({ pressed }) => [
+              styles.pillButton,
+              !rows.length && styles.pillDisabled,
+              pressed && rows.length > 0 && styles.pillPressed,
+            ]}
+          >
+            <Text style={styles.pillText}>Clear</Text>
           </Pressable>
         </View>
 
         {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
 
         <ThemedText style={styles.hint}>
-          {`Tip: include exercise, weight, reps, and notes in one message.`}
+          {workoutActive
+            ? "Tip: include exercise, weight, reps, and notes in one message."
+            : "Pick a body part, then log sets fast."}
         </ThemedText>
       </View>
 
@@ -422,21 +488,21 @@ export default function HomeScreen() {
 
             <ScrollView contentContainerStyle={styles.modalList}>
               {BODY_PARTS.map((bp) => {
+                const selected = draftBodyParts.includes(bp);
                 return (
                   <Pressable
                     key={bp}
                     onPress={() => {
-                      setBodyParts([bp]);
-                      setWorkoutActive(true);
-                      setWorkoutId(makeId());
-                      setWorkoutCreatedAt(Date.now());
-                      setWorkoutDateISO(todayISO());
-                      setRows([]);
-                      setMessageInput("");
-                      setError(null);
-                      setPickerOpen(false);
+                      setDraftBodyParts((prev) =>
+                        prev.includes(bp) ? prev.filter((x) => x !== bp) : [...prev, bp]
+                      );
                     }}
-                    style={[styles.modalItem, isDark && styles.modalItemDark]}
+                    style={[
+                      styles.modalItem,
+                      isDark && styles.modalItemDark,
+                      selected && styles.modalItemSelected,
+                      selected && isDark && styles.modalItemSelectedDark,
+                    ]}
                   >
                     <View style={styles.modalItemRow}>
                       <ThemedText
@@ -447,10 +513,37 @@ export default function HomeScreen() {
                       >
                         {bp}
                       </ThemedText>
+                      <View style={[styles.checkDot, selected && styles.checkDotOn]}>
+                        {selected ? <Text style={styles.checkMark}>✓</Text> : null}
+                      </View>
                     </View>
                   </Pressable>
                 );
               })}
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={() => setPickerOpen(false)}
+                  style={({ pressed }) => [styles.modalActionBtn, pressed && styles.pillPressed]}
+                >
+                  <Text style={styles.modalActionText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => startWorkoutWithParts(draftBodyParts)}
+                  disabled={draftBodyParts.length === 0}
+                  style={({ pressed }) => [
+                    styles.modalActionBtn,
+                    styles.modalActionPrimary,
+                    draftBodyParts.length === 0 && styles.modalActionDisabled,
+                    pressed && draftBodyParts.length !== 0 && styles.sendButtonPressed,
+                  ]}
+                >
+                  <Text style={[styles.modalActionText, styles.modalActionPrimaryText]}>
+                    Start workout
+                  </Text>
+                </Pressable>
+              </View>
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -469,10 +562,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   headerImage: {
-    height: 100,
-    width: 200,
+    height: 56,
+    width: 160,
     alignSelf: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   titleRow: {
     gap: 10,
@@ -496,7 +589,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#EFEFEF",
@@ -554,50 +647,18 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 
-  inputWrap: {
-    marginTop: 10,
-    gap: 10,
-  },
-  inputGrid: {
-    flexDirection: "row",
-    gap: 8,
-  },
   input: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#D6D6D6",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     backgroundColor: "#FFFFFF",
     fontSize: 14,
   },
   messageInput: {
     flex: 1,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "flex-end",
-  },
-  sessionRow: {
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sessionButton: {
-    borderWidth: 1,
-    borderColor: "#D0D0D0",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#FFFFFF",
-  },
-  sessionButtonDisabled: {
-    opacity: 0.5,
-  },
-  sessionButtonText: {
-    fontSize: 14,
   },
   errorText: {
     color: "#B00020",
@@ -655,5 +716,128 @@ const styles = StyleSheet.create({
   },
   modalTextDark: {
     color: "#F9FAFB",
+  },
+  bottomWrap: {
+    marginTop: 10,
+    gap: 10,
+  },
+  inputRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  inputRowDisabled: {
+    opacity: 0.7,
+  },
+  sendButton: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#111827",
+    minWidth: 68,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonDisabled: {
+    backgroundColor: "#9CA3AF",
+  },
+  sendButtonPressed: {
+    opacity: 0.85,
+  },
+  sendButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  bottomButtons: {
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  pillButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 999,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  pillPrimary: {
+    backgroundColor: "#111827",
+    borderColor: "#111827",
+  },
+  pillDanger: {
+    backgroundColor: "#B91C1C",
+    borderColor: "#B91C1C",
+  },
+  pillDisabled: {
+    opacity: 0.45,
+  },
+  pillPressed: {
+    opacity: 0.9,
+  },
+  pillText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  pillPrimaryText: {
+    color: "#FFFFFF",
+  },
+
+  checkDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  checkDotOn: {
+    borderColor: "#111827",
+    backgroundColor: "#111827",
+  },
+  checkMark: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+  },
+  modalItemSelected: {
+    borderColor: "#111827",
+  },
+  modalItemSelectedDark: {
+    borderColor: "#60A5FA",
+  },
+  modalActions: {
+    marginTop: 12,
+    flexDirection: "row",
+    gap: 10,
+  },
+  modalActionBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  modalActionPrimary: {
+    backgroundColor: "#111827",
+    borderColor: "#111827",
+  },
+  modalActionDisabled: {
+    opacity: 0.5,
+  },
+  modalActionText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  modalActionPrimaryText: {
+    color: "#FFFFFF",
   },
 });
