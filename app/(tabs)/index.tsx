@@ -82,6 +82,25 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // UX toast: prompt user to start workout before logging
+  const [startToastOpen, setStartToastOpen] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showStartToast = () => {
+    setStartToastOpen(true);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      setStartToastOpen(false);
+      toastTimerRef.current = null;
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
   // Body part picker (multi-select draft on start)
   const [pickerOpen, setPickerOpen] = useState(false);
   const [draftBodyParts, setDraftBodyParts] = useState<BodyPart[]>([]);
@@ -391,6 +410,14 @@ export default function HomeScreen() {
       {/* Bottom bar */}
       <View style={styles.bottomWrap}>
         <View style={[styles.inputRow, !workoutActive && styles.inputRowDisabled]}>
+          {!workoutActive ? (
+            <Pressable
+              onPress={showStartToast}
+              style={styles.inputTapCatcher}
+              accessibilityRole="button"
+              accessibilityLabel="Start a workout to send your first set"
+            />
+          ) : null}
           <TextInput
             value={messageInput}
             onChangeText={setMessageInput}
@@ -452,6 +479,14 @@ export default function HomeScreen() {
             <Text style={styles.pillText}>Clear</Text>
           </Pressable>
         </View>
+
+        {startToastOpen ? (
+          <View style={styles.toastWrap} pointerEvents="none">
+            <View style={styles.toastCard}>
+              <Text style={styles.toastText}>Start a workout to send your first set</Text>
+            </View>
+          </View>
+        ) : null}
 
         {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
 
@@ -720,9 +755,34 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   inputRow: {
+    position: "relative",
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
+  },
+  inputTapCatcher: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 10,
+  },
+  toastWrap: {
+    alignItems: "center",
+  },
+  toastCard: {
+    backgroundColor: "#111827",
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#111827",
+  },
+  toastText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
   },
   inputRowDisabled: {
     opacity: 0.7,
