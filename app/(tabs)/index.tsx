@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useColorScheme,
   View,
 } from "react-native";
 
@@ -59,6 +60,8 @@ function makeId() {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   // Session header state
   const [sessionDate, setSessionDate] = useState<string>(getTodayMMDD());
   const [bodyParts, setBodyParts] = useState<BodyPart[]>([]);
@@ -264,20 +267,55 @@ export default function HomeScreen() {
 
       {/* Table */}
       <ThemedView style={styles.tableWrap}>
-        <View style={[styles.row, styles.headerRow]}>
-          <ThemedText style={[styles.cell, styles.exerciseCol, styles.headerCell]}>
+        <View style={[styles.row, styles.headerRow, isDark && styles.headerRowDark]}>
+          <ThemedText
+            style={[
+              styles.cell,
+              styles.exerciseCol,
+              styles.headerCell,
+              isDark ? styles.headerCellDark : styles.headerCellLight,
+            ]}
+          >
             Exercise
           </ThemedText>
-          <ThemedText style={[styles.cell, styles.setCol, styles.headerCell]}>
+          <ThemedText
+            style={[
+              styles.cell,
+              styles.setCol,
+              styles.headerCell,
+              isDark ? styles.headerCellDark : styles.headerCellLight,
+            ]}
+          >
             Set
           </ThemedText>
-          <ThemedText style={[styles.cell, styles.weightCol, styles.headerCell]}>
+          <ThemedText
+            style={[
+              styles.cell,
+              styles.weightCol,
+              styles.headerCell,
+              isDark ? styles.headerCellDark : styles.headerCellLight,
+            ]}
+          >
             Weight (lbs)
           </ThemedText>
-          <ThemedText style={[styles.cell, styles.repsCol, styles.headerCell]}>
+          <ThemedText
+            style={[
+              styles.cell,
+              styles.repsCol,
+              styles.headerCell,
+              isDark ? styles.headerCellDark : styles.headerCellLight,
+            ]}
+          >
             Reps
           </ThemedText>
-          <ThemedText style={[styles.cell, styles.notesCol, styles.headerCell]}>
+          <ThemedText
+            style={[
+              styles.cell,
+              styles.notesCol,
+              styles.headerCell,
+              isDark ? styles.headerCellDark : styles.headerCellLight,
+            ]}
+          >
             Notes
           </ThemedText>
         </View>
@@ -368,8 +406,17 @@ export default function HomeScreen() {
         onRequestClose={() => setPickerOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <ThemedText type="title" style={styles.modalTitle}>
+          <Pressable
+            style={[styles.modalCard, isDark && styles.modalCardDark]}
+            onPress={() => {}}
+          >
+            <ThemedText
+              type="title"
+              style={[
+                styles.modalTitle,
+                isDark ? styles.modalTextDark : styles.modalTextLight,
+              ]}
+            >
               What body part are you training
             </ThemedText>
 
@@ -389,10 +436,17 @@ export default function HomeScreen() {
                       setError(null);
                       setPickerOpen(false);
                     }}
-                    style={styles.modalItem}
+                    style={[styles.modalItem, isDark && styles.modalItemDark]}
                   >
                     <View style={styles.modalItemRow}>
-                      <ThemedText style={styles.modalItemText}>{bp}</ThemedText>
+                      <ThemedText
+                        style={[
+                          styles.modalItemText,
+                          isDark ? styles.modalTextDark : styles.modalTextLight,
+                        ]}
+                      >
+                        {bp}
+                      </ThemedText>
                     </View>
                   </Pressable>
                 );
@@ -451,6 +505,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F6F6F6",
     borderBottomColor: "#E6E6E6",
   },
+  headerRowDark: {
+    backgroundColor: "#111827",
+    borderBottomColor: "#374151",
+  },
   evenRow: {
     backgroundColor: "#FFFFFF",
   },
@@ -463,7 +521,13 @@ const styles = StyleSheet.create({
   },
   headerCell: {
     fontSize: 12,
-    opacity: 0.9,
+    fontWeight: "700",
+  },
+  headerCellLight: {
+    color: "#111827",
+  },
+  headerCellDark: {
+    color: "#F9FAFB",
   },
   exerciseCol: {
     flex: 2.4,
@@ -554,6 +618,11 @@ const styles = StyleSheet.create({
     padding: 14,
     maxHeight: "70%",
   },
+  modalCardDark: {
+    backgroundColor: "#0B1220",
+    borderWidth: 1,
+    borderColor: "#1F2937",
+  },
   modalTitle: {
     marginBottom: 10,
     textAlign: "center",
@@ -569,6 +638,10 @@ const styles = StyleSheet.create({
     borderColor: "#E6E6E6",
     borderRadius: 12,
   },
+  modalItemDark: {
+    borderColor: "#334155",
+    backgroundColor: "#111827",
+  },
   modalItemRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -576,5 +649,11 @@ const styles = StyleSheet.create({
   },
   modalItemText: {
     fontSize: 16,
+  },
+  modalTextLight: {
+    color: "#111827",
+  },
+  modalTextDark: {
+    color: "#F9FAFB",
   },
 });

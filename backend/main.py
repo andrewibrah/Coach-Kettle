@@ -8,11 +8,22 @@ from openai import OpenAI
 
 app = FastAPI()
 
-# Allow your mobile app to call this API (simple dev setup)
+# Allow Expo dev origins; keep explicit (no wildcard) by default.
+cors_env = os.getenv("CORS_ORIGINS", "").strip()
+allow_origins = (
+    [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+    if cors_env
+    else [
+        "http://localhost:19006",
+        "http://127.0.0.1:19006",
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+    ]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # dev only
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
