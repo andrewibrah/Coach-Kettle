@@ -19,6 +19,7 @@ import {
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { api, type ApiWorkoutRow } from "@/lib/api";
+import { decideAndParse } from "@/lib/structuredGate";
 import { saveWorkout, type WorkoutRow as StoredWorkoutRow } from "@/lib/workoutStorage";
 import { useRouter } from "expo-router";
 
@@ -56,6 +57,28 @@ function todayISO() {
 
 function makeId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function getLastExerciseFromRows(rows: LogRow[]): string | undefined {
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const ex = rows[i]?.exercise?.trim();
+    if (ex) return ex;
+  }
+  return undefined;
+}
+
+function nextSetNumberForExercise(rows: LogRow[], exercise: string): number {
+  const target = exercise.trim().toLowerCase();
+  let maxSet = 0;
+  for (const row of rows) {
+    if (!row?.exercise) continue;
+    const normalized = row.exercise.trim().toLowerCase();
+    if (normalized === target) {
+      const setVal = Number.isFinite(row.set) ? row.set : 0;
+      if (setVal > maxSet) maxSet = setVal;
+    }
+  }
+  return maxSet + 1;
 }
 
 export default function HomeScreen() {
@@ -112,8 +135,7 @@ export default function HomeScreen() {
       "Back",
       "Bis",
       "Tris",
-      "Shoulders",
-      "Cardio",
+      "Shoulders",  
     ],
     []
   );
@@ -273,9 +295,58 @@ export default function HomeScreen() {
       return;
     }
 
-    setLoading(true);
     setError(null);
 
+    const gateDecision = decideAndParse(message, { lastExercise: getLastExerciseFromRows(rows) });
+
+    if (gateDecision.kind === "fast") {
+      setRows((prev) => {
+        const normalizedExercise = gateDecision.row.exercise.trim().toLowerCase();
+        for (let i = prev.length - 1; i >= 0; i -= 1) {
+          const candidate = prev[i];
+          if (!candidate?.exercise) continue;
+          if (candidate.exercise.trim().toLowerCase() !== normalizedExercise) continue;
+
+          const missingWeight = !candidate.weightLbs;
+          const missingReps = !candidate.reps;
+          const missingNotes = !candidate.notes;
+          const canFillWeight = missingWeight && !!gateDecision.row.weightLbs;
+          const canFillReps = missingReps && !!gateDecision.row.reps;
+          const canFillNotes = missingNotes && !!gateDecision.row.notes;
+
+          if (canFillWeight || canFillReps || canFillNotes) {
+            const updated = { ...candidate };
+            if (canFillWeight) updated.weightLbs = gateDecision.row.weightLbs;
+            if (canFillReps) updated.reps = gateDecision.row.reps;
+            if (canFillNotes) updated.notes = gateDecision.row.notes;
+            const nextRows = [...prev];
+            nextRows[i] = updated;
+            return nextRows;
+          }
+
+          // Found the latest set for this exercise and it is already filled; stop searching older ones.
+          break;
+        }
+
+        const nextSet = nextSetNumberForExercise(prev, gateDecision.row.exercise);
+        return [
+          ...prev,
+          {
+            id: makeId(),
+            exercise: gateDecision.row.exercise,
+            set: nextSet,
+            weightLbs: gateDecision.row.weightLbs,
+            reps: gateDecision.row.reps,
+            notes: gateDecision.row.notes,
+          },
+        ];
+      });
+      setMessageInput("");
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+      return;
+    }
+
+    setLoading(true);
     try {
       const contextRows: ApiWorkoutRow[] = rows.map((row) => ({
         exercise: row.exercise,
