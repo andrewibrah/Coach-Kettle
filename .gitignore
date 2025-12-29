@@ -46,3 +46,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# database files
+*.db
+*.sqlite
+*.sqlite3
+backend/workouts.db

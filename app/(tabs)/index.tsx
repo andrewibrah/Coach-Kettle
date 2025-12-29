@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -16,11 +15,16 @@ import {
   View,
 } from "react-native";
 
+import { BlurView } from "expo-blur";
+
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { api, type ApiWorkoutRow } from "@/lib/api";
-import { saveWorkout, type WorkoutRow as StoredWorkoutRow } from "@/lib/workoutStorage";
+import {
+  saveWorkout,
+  type WorkoutRow as StoredWorkoutRow,
+} from "@/lib/workoutStorage";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type BodyPart =
   | "Push"
@@ -29,8 +33,8 @@ type BodyPart =
   | "Abs"
   | "Chest"
   | "Back"
-  | "Bis"
-  | "Tris"
+  | "Biceps"
+  | "Triceps"
   | "Shoulders"
   | "Cardio";
 
@@ -41,6 +45,7 @@ type LogRow = {
   weightLbs: string; // keep as string for input friendliness; display as-is
   reps: string;
   notes: string;
+  loggedAt: number; // timestamp when this set was logged
 };
 
 function getTodayMMDD(): string {
@@ -51,11 +56,50 @@ function getTodayMMDD(): string {
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  // Use local date, not UTC (toISOString returns UTC which can be a day off)
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function makeId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12; // 0 should be 12
+  return `${hours}:${String(minutes).padStart(2, "0")} ${ampm}`;
+}
+
+type ExerciseGroup = {
+  exercise: string;
+  sets: LogRow[];
+  startedAt?: number; // timestamp of first set in group
+};
+
+// Group consecutive rows by exercise name
+function groupByExercise(rows: LogRow[]): ExerciseGroup[] {
+  const groups: ExerciseGroup[] = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.exercise.toLowerCase() === row.exercise.toLowerCase()) {
+      last.sets.push(row);
+    } else {
+      groups.push({
+        exercise: row.exercise,
+        sets: [row],
+        startedAt: row.loggedAt,
+      });
+    }
+  }
+  return groups;
 }
 
 export default function HomeScreen() {
@@ -64,6 +108,8 @@ export default function HomeScreen() {
   const isDark = colorScheme === "dark";
   const { width } = useWindowDimensions();
   const compact = width < 380;
+  const insets = useSafeAreaInsets();
+  const topPadding = insets?.top ?? 0;
   // Session header state
   const [sessionDate, setSessionDate] = useState<string>(getTodayMMDD());
   const [bodyParts, setBodyParts] = useState<BodyPart[]>([]);
@@ -104,15 +150,18 @@ export default function HomeScreen() {
   // Body part picker (multi-select draft on start)
   const [pickerOpen, setPickerOpen] = useState(false);
   const [draftBodyParts, setDraftBodyParts] = useState<BodyPart[]>([]);
+
+  // Menu state
+  const [menuOpen, setMenuOpen] = useState(false);
   const BODY_PARTS: BodyPart[] = useMemo(
     () => [
-      "Legs",
-      "Abs",
       "Chest",
+      "Triceps",
       "Back",
-      "Bis",
-      "Tris",
+      "Biceps",
       "Shoulders",
+      "Abs",
+      "Legs",
       "Cardio",
     ],
     []
@@ -121,9 +170,8 @@ export default function HomeScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const title = useMemo(() => {
-    const bp = bodyParts.length ? `${bodyParts.join(" + ")} ` : "";
-    return `${sessionDate} ${bp}Workout`;
-  }, [sessionDate, bodyParts]);
+    return bodyParts.length ? bodyParts.join(" + ") : "";
+  }, [bodyParts]);
 
   const selectedPart = useMemo(
     () => (bodyParts.length ? bodyParts.join(" + ") : ""),
@@ -173,21 +221,26 @@ export default function HomeScreen() {
   }, [sessionDate]);
 
   const buildRowsFromApi = (apiRows: ApiWorkoutRow[]): LogRow[] => {
+    const now = Date.now();
     return apiRows
       .filter((row) => row.exercise && row.exercise.trim())
-      .map((row) => ({
-        id: `${Date.now()}-${Math.random()}`,
+      .map((row, idx) => ({
+        id: `${now}-${idx}-${Math.random()}`,
         exercise: row.exercise.trim(),
         set: Number.isFinite(row.set) ? row.set : 1,
         weightLbs: String(row.weightLbs ?? "").trim(),
         reps: String(row.reps ?? "").trim(),
         notes: String(row.notes ?? "").trim(),
+        loggedAt: now,
       }));
   };
 
   const onStartWorkout = () => {
     if (workoutActive) {
-      Alert.alert("Workout already started", "End the current workout to start a new one.");
+      Alert.alert(
+        "Workout already started",
+        "End the current workout to start a new one."
+      );
       return;
     }
     setDraftBodyParts([]);
@@ -223,39 +276,84 @@ export default function HomeScreen() {
       Alert.alert("No active workout", "Start a workout first.");
       return;
     }
-    if (!rows.length) {
-      Alert.alert("Nothing to save", "Log at least one set first.");
-      return;
-    }
 
     const proceed = await new Promise<boolean>((resolve) => {
-      Alert.alert(
-        "End workout?",
-        "This will save to History.",
-        [
-          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-          { text: "Save", style: "default", onPress: () => resolve(true) },
-        ]
-      );
+      const message = rows.length
+        ? "This will save to History."
+        : "End workout without saving any sets?";
+      Alert.alert("End workout?", message, [
+        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+        {
+          text: rows.length ? "Save" : "End",
+          style: "default",
+          onPress: () => resolve(true),
+        },
+      ]);
     });
     if (!proceed) return;
+
+    // If no sets were logged, just end the workout without saving
+    if (rows.length === 0) {
+      Alert.alert("Workout ended", "No sets were logged.");
+      setWorkoutActive(false);
+      setWorkoutId(null);
+      setWorkoutCreatedAt(null);
+      setWorkoutDateISO(null);
+      setBodyParts([]);
+      setRows([]);
+      setMessageInput("");
+      return;
+    }
 
     const storedRows: StoredWorkoutRow[] = rows.map((row) => ({
       exercise: row.exercise,
       weightLbs: row.weightLbs,
       reps: row.reps,
       notes: row.notes,
+      loggedAt: row.loggedAt,
     }));
 
-    await saveWorkout({
+    const workoutSession = {
       id: workoutId ?? makeId(),
       dateISO: workoutDateISO ?? todayISO(),
       part: selectedPart.trim() || "Workout",
       rows: storedRows,
       createdAt: workoutCreatedAt ?? Date.now(),
-    });
+    };
 
-    Alert.alert("Saved", "Workout added to History.");
+    // Save to backend database
+    let backendSaved = false;
+    try {
+      const apiRows = rows.map((row) => ({
+        exercise: row.exercise,
+        set: row.set,
+        weightLbs: row.weightLbs,
+        reps: row.reps,
+        notes: row.notes,
+      }));
+
+      await api.saveWorkout({
+        ...workoutSession,
+        rows: apiRows,
+      });
+      backendSaved = true;
+      console.log("✅ Workout saved to backend database");
+    } catch (error) {
+      console.error("❌ Failed to save workout to backend:", error);
+      // Continue to save locally even if backend fails
+    }
+
+    // Also save locally for offline access
+    await saveWorkout(workoutSession);
+
+    if (backendSaved) {
+      Alert.alert("Saved", "Workout saved to database and History.");
+    } else {
+      Alert.alert(
+        "Saved Locally",
+        "Workout saved to History. Backend save failed - check connection."
+      );
+    }
     setWorkoutActive(false);
     setWorkoutId(null);
     setWorkoutCreatedAt(null);
@@ -297,9 +395,13 @@ export default function HomeScreen() {
       }
 
       setMessageInput("");
-      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
-    } catch (e) {
-      setError("Failed to reach API");
+      requestAnimationFrame(() =>
+        scrollRef.current?.scrollToEnd({ animated: true })
+      );
+    } catch (e: unknown) {
+      const err = e as Error;
+      console.error("[sendMessage] Error:", err);
+      setError(err.message || "Failed to reach API");
     } finally {
       setLoading(false);
     }
@@ -308,108 +410,111 @@ export default function HomeScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.screen}
+      style={[styles.screen, { paddingTop: Math.max(topPadding, 8) }]}
     >
-      <ThemedView style={styles.header}>
-        <Image
-          source={require("@/assets/images/partial-react-logo.png")}
-          style={styles.headerImage}
-        />
-
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => setMenuOpen(true)}
+          style={({ pressed }) => [
+            styles.menuButton,
+            pressed && styles.menuButtonPressed,
+          ]}
+        >
+          <Text style={styles.menuButtonText}>☰</Text>
+        </Pressable>
         <View style={styles.titleRow}>
           <ThemedText type="title" style={styles.titleText}>
             {title}
           </ThemedText>
         </View>
-      </ThemedView>
+        <View style={styles.headerSpacer} />
+      </View>
 
-      {/* Table */}
-      <ThemedView style={styles.tableWrap}>
-        <View style={[styles.row, styles.headerRow, isDark && styles.headerRowDark]}>
-          <ThemedText
-            style={[
-              styles.cell,
-              styles.exerciseCol,
-              styles.headerCell,
-              isDark ? styles.headerCellDark : styles.headerCellLight,
-            ]}
-          >
-            {compact ? "Ex" : "Exercise"}
-          </ThemedText>
-          <ThemedText
-            style={[
-              styles.cell,
-              styles.setCol,
-              styles.headerCell,
-              isDark ? styles.headerCellDark : styles.headerCellLight,
-            ]}
-          >
-            {compact ? "Set" : "Set"}
-          </ThemedText>
-          <ThemedText
-            style={[
-              styles.cell,
-              styles.weightCol,
-              styles.headerCell,
-              isDark ? styles.headerCellDark : styles.headerCellLight,
-            ]}
-          >
-            {compact ? "Wt" : "Weight (lbs)"}
-          </ThemedText>
-          <ThemedText
-            style={[
-              styles.cell,
-              styles.repsCol,
-              styles.headerCell,
-              isDark ? styles.headerCellDark : styles.headerCellLight,
-            ]}
-          >
-            {compact ? "Reps" : "Reps"}
-          </ThemedText>
-          <ThemedText
-            style={[
-              styles.cell,
-              styles.notesCol,
-              styles.headerCell,
-              isDark ? styles.headerCellDark : styles.headerCellLight,
-            ]}
-          >
-            {compact ? "Note" : "Notes"}
-          </ThemedText>
-        </View>
-
-        <ScrollView
-          ref={scrollRef}
-          style={styles.tableBody}
-          contentContainerStyle={styles.tableBodyContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {rows.length === 0 ? (
-            <View style={styles.emptyState}>
-              <ThemedText style={styles.emptyText}>
-                Add your first set below.
-              </ThemedText>
-            </View>
-          ) : (
-            rows.map((r, idx) => (
-              <View
-                key={r.id}
-                style={[styles.row, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}
-              >
-                <ThemedText style={[styles.cell, styles.exerciseCol]}>{r.exercise}</ThemedText>
-                <ThemedText style={[styles.cell, styles.setCol]}>{String(r.set)}</ThemedText>
-                <ThemedText style={[styles.cell, styles.weightCol]}>{r.weightLbs || "—"}</ThemedText>
-                <ThemedText style={[styles.cell, styles.repsCol]}>{r.reps || "—"}</ThemedText>
-                <ThemedText style={[styles.cell, styles.notesCol]}>{r.notes || ""}</ThemedText>
+      {/* Workout Cards */}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.cardList}
+        contentContainerStyle={styles.cardListContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {rows.length === 0 ? (
+          <View style={styles.emptyState}>
+            <ThemedText style={styles.emptyText}>No sets logged yet</ThemedText>
+          </View>
+        ) : (
+          groupByExercise(rows).map((group, gIdx) => (
+            <View
+              key={`group_${gIdx}_${group.sets[0]?.id}`}
+              style={[styles.exerciseGroup, isDark && styles.exerciseGroupDark]}
+            >
+              <View style={styles.exerciseGroupHeader}>
+                <ThemedText style={styles.exerciseGroupName} numberOfLines={1}>
+                  {group.exercise}
+                </ThemedText>
+                {group.startedAt && (
+                  <Text
+                    style={[
+                      styles.exerciseTime,
+                      isDark && styles.exerciseTimeDark,
+                    ]}
+                  >
+                    {formatTime(group.startedAt)}
+                  </Text>
+                )}
               </View>
-            ))
-          )}
-        </ScrollView>
-      </ThemedView>
+              <View style={styles.setsContainer}>
+                {group.sets.map((r) => (
+                  <View key={r.id} style={styles.setRow}>
+                    <View
+                      style={[
+                        styles.setIndicator,
+                        isDark && styles.setIndicatorDark,
+                      ]}
+                    >
+                      <Text style={styles.setIndicatorText}>{r.set}</Text>
+                    </View>
+                    <View style={styles.statsRow}>
+                      <Text
+                        style={[
+                          styles.statValue,
+                          isDark && styles.statValueDark,
+                        ]}
+                      >
+                        {r.weightLbs || "—"}
+                      </Text>
+                      <Text
+                        style={[styles.statUnit, isDark && styles.statUnitDark]}
+                      >
+                        lb
+                      </Text>
+                      <Text
+                        style={[styles.statSep, isDark && styles.statSepDark]}
+                      >
+                        ×
+                      </Text>
+                      <Text
+                        style={[
+                          styles.statValue,
+                          isDark && styles.statValueDark,
+                        ]}
+                      >
+                        {r.reps || "—"}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
 
       {/* Bottom bar */}
       <View style={styles.bottomWrap}>
-        <View style={[styles.inputRow, !workoutActive && styles.inputRowDisabled]}>
+        <View
+          style={[styles.inputRow, !workoutActive && styles.inputRowDisabled]}
+        >
           {!workoutActive ? (
             <Pressable
               onPress={showStartToast}
@@ -423,8 +528,8 @@ export default function HomeScreen() {
             onChangeText={setMessageInput}
             placeholder={
               workoutActive
-                ? "e.g. Leg press 4 plates 10 reps"
-                : "Start a workout to log sets"
+                ? "e.g. bench press 135 x 8"
+                : "e.g. bench press 135 x 8"
             }
             style={[styles.input, styles.messageInput]}
             returnKeyType="send"
@@ -437,22 +542,20 @@ export default function HomeScreen() {
             disabled={!workoutActive || loading || !messageInput.trim()}
             style={({ pressed }) => [
               styles.sendButton,
-              (!workoutActive || loading || !messageInput.trim()) && styles.sendButtonDisabled,
-              pressed && !(!workoutActive || loading || !messageInput.trim()) && styles.sendButtonPressed,
+              (!workoutActive || loading || !messageInput.trim()) &&
+                styles.sendButtonDisabled,
+              pressed &&
+                !(!workoutActive || loading || !messageInput.trim()) &&
+                styles.sendButtonPressed,
             ]}
           >
-            <Text style={styles.sendButtonText}>{loading ? "..." : "Send"}</Text>
+            <Text style={styles.sendButtonText}>
+              {loading ? "..." : "Send"}
+            </Text>
           </Pressable>
         </View>
 
         <View style={styles.bottomButtons}>
-          <Pressable
-            onPress={() => router.push("/history")}
-            style={({ pressed }) => [styles.pillButton, pressed && styles.pillPressed]}
-          >
-            <Text style={styles.pillText}>History</Text>
-          </Pressable>
-
           <Pressable
             onPress={workoutActive ? onEndWorkout : onStartWorkout}
             style={({ pressed }) => [
@@ -480,15 +583,9 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {startToastOpen ? (
-          <View style={styles.toastWrap} pointerEvents="none">
-            <View style={styles.toastCard}>
-              <Text style={styles.toastText}>Start a workout to send your first set</Text>
-            </View>
-          </View>
+        {error ? (
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
         ) : null}
-
-        {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
 
         <ThemedText style={styles.hint}>
           {workoutActive
@@ -504,7 +601,10 @@ export default function HomeScreen() {
         animationType="fade"
         onRequestClose={() => setPickerOpen(false)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setPickerOpen(false)}
+        >
           <Pressable
             style={[styles.modalCard, isDark && styles.modalCardDark]}
             onPress={() => {}}
@@ -516,10 +616,13 @@ export default function HomeScreen() {
                 isDark ? styles.modalTextDark : styles.modalTextLight,
               ]}
             >
-              What body part are you training
+              Select body part
             </ThemedText>
 
-            <ScrollView contentContainerStyle={styles.modalList}>
+            <ScrollView
+              contentContainerStyle={styles.modalList}
+              showsVerticalScrollIndicator={true}
+            >
               {BODY_PARTS.map((bp) => {
                 const selected = draftBodyParts.includes(bp);
                 return (
@@ -527,7 +630,9 @@ export default function HomeScreen() {
                     key={bp}
                     onPress={() => {
                       setDraftBodyParts((prev) =>
-                        prev.includes(bp) ? prev.filter((x) => x !== bp) : [...prev, bp]
+                        prev.includes(bp)
+                          ? prev.filter((x) => x !== bp)
+                          : [...prev, bp]
                       );
                     }}
                     style={[
@@ -546,8 +651,12 @@ export default function HomeScreen() {
                       >
                         {bp}
                       </ThemedText>
-                      <View style={[styles.checkDot, selected && styles.checkDotOn]}>
-                        {selected ? <Text style={styles.checkMark}>✓</Text> : null}
+                      <View
+                        style={[styles.checkDot, selected && styles.checkDotOn]}
+                      >
+                        {selected ? (
+                          <Text style={styles.checkMark}>✓</Text>
+                        ) : null}
                       </View>
                     </View>
                   </Pressable>
@@ -557,7 +666,10 @@ export default function HomeScreen() {
               <View style={styles.modalActions}>
                 <Pressable
                   onPress={() => setPickerOpen(false)}
-                  style={({ pressed }) => [styles.modalActionBtn, pressed && styles.pillPressed]}
+                  style={({ pressed }) => [
+                    styles.modalActionBtn,
+                    pressed && styles.pillPressed,
+                  ]}
                 >
                   <Text style={styles.modalActionText}>Cancel</Text>
                 </Pressable>
@@ -569,10 +681,17 @@ export default function HomeScreen() {
                     styles.modalActionBtn,
                     styles.modalActionPrimary,
                     draftBodyParts.length === 0 && styles.modalActionDisabled,
-                    pressed && draftBodyParts.length !== 0 && styles.sendButtonPressed,
+                    pressed &&
+                      draftBodyParts.length !== 0 &&
+                      styles.sendButtonPressed,
                   ]}
                 >
-                  <Text style={[styles.modalActionText, styles.modalActionPrimaryText]}>
+                  <Text
+                    style={[
+                      styles.modalActionText,
+                      styles.modalActionPrimaryText,
+                    ]}
+                  >
                     Start workout
                   </Text>
                 </Pressable>
@@ -581,6 +700,45 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Menu Modal */}
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <BlurView intensity={80} style={styles.menuBackdrop}>
+          <Pressable
+            style={styles.menuBackdropPressable}
+            onPress={() => setMenuOpen(false)}
+          >
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                router.push("/(tabs)/history");
+              }}
+              style={({ pressed }) => [
+                styles.menuItem,
+                pressed && styles.menuItemPressed,
+              ]}
+            >
+              <Text style={styles.menuItemText}>History</Text>
+            </Pressable>
+          </Pressable>
+        </BlurView>
+      </Modal>
+
+      {/* Toast message - centered */}
+      {startToastOpen ? (
+        <View style={styles.toastWrap} pointerEvents="none">
+          <View style={styles.toastCard}>
+            <Text style={styles.toastText}>
+              Start a workout to send your first set
+            </Text>
+          </View>
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -588,107 +746,162 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    paddingTop: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    backgroundColor: "#FFFFFF",
   },
   header: {
-    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingTop: 8,
+    backgroundColor: "transparent",
   },
-  headerImage: {
-    height: 56,
-    width: 160,
-    alignSelf: "center",
-    marginBottom: 6,
+  menuButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+  },
+  menuButtonPressed: {
+    backgroundColor: "#F3F4F6",
+  },
+  menuButtonText: {
+    fontSize: 24,
+    color: "#111827",
+    fontWeight: "300",
+  },
+  headerSpacer: {
+    width: 40,
   },
   titleRow: {
-    gap: 10,
+    flex: 1,
+    alignItems: "center",
   },
   titleText: {
     textAlign: "center",
+    fontSize: 24,
+    fontWeight: "700",
+    letterSpacing: -0.5,
   },
-  tableWrap: {
+  cardList: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+  },
+  cardListContent: {
+    paddingVertical: 4,
+    gap: 10,
+  },
+  exerciseGroup: {
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    overflow: "hidden",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
   },
-  tableBody: {
-    flex: 1,
+  exerciseGroupDark: {
+    backgroundColor: "#1F2937",
+    borderColor: "#374151",
   },
-  tableBodyContent: {
-    paddingBottom: 6,
-  },
-  row: {
+  exerciseGroupHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  headerRow: {
-    backgroundColor: "#F6F6F6",
-    borderBottomColor: "#E6E6E6",
+  exerciseGroupName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
+    flex: 1,
   },
-  headerRowDark: {
-    backgroundColor: "#111827",
-    borderBottomColor: "#374151",
+  exerciseTime: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#9CA3AF",
+    marginLeft: 8,
   },
-  evenRow: {
-    backgroundColor: "#FFFFFF",
+  exerciseTimeDark: {
+    color: "#6B7280",
   },
-  oddRow: {
-    backgroundColor: "#FAFAFA",
+  setsContainer: {
+    gap: 6,
   },
-  cell: {
-    fontSize: 13,
-    paddingRight: 8,
+  setRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 4,
   },
-  headerCell: {
+  setIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  setIndicatorDark: {
+    backgroundColor: "#374151",
+  },
+  setIndicatorText: {
+    color: "#6B7280",
     fontSize: 12,
     fontWeight: "700",
   },
-  headerCellLight: {
+  statsRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 3,
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: "600",
     color: "#111827",
   },
-  headerCellDark: {
+  statValueDark: {
     color: "#F9FAFB",
   },
-  exerciseCol: {
-    flex: 2.4,
+  statUnit: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#9CA3AF",
+    marginRight: 2,
   },
-  setCol: {
-    flex: 0.8,
-    textAlign: "center",
+  statUnitDark: {
+    color: "#6B7280",
   },
-  weightCol: {
-    flex: 1.2,
-    textAlign: "center",
+  statSep: {
+    fontSize: 13,
+    color: "#D1D5DB",
+    marginHorizontal: 2,
   },
-  repsCol: {
-    flex: 1.1,
-    textAlign: "center",
-  },
-  notesCol: {
-    flex: 1.5,
+  statSepDark: {
+    color: "#4B5563",
   },
   emptyState: {
-    padding: 16,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: 120,
+    paddingHorizontal: 32,
   },
   emptyText: {
-    opacity: 0.7,
+    fontSize: 15,
+    opacity: 0.5,
+    textAlign: "center",
   },
 
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: "#D6D6D6",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: "500",
   },
   messageInput: {
     flex: 1,
@@ -697,7 +910,10 @@ const styles = StyleSheet.create({
     color: "#B00020",
   },
   hint: {
-    opacity: 0.7,
+    opacity: 0.65,
+    fontSize: 13,
+    textAlign: "center",
+    paddingHorizontal: 8,
   },
 
   modalBackdrop: {
@@ -708,9 +924,14 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 14,
-    maxHeight: "70%",
+    borderRadius: 20,
+    padding: 20,
+    maxHeight: "85%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalCardDark: {
     backgroundColor: "#0B1220",
@@ -722,15 +943,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   modalList: {
-    gap: 8,
-    paddingBottom: 6,
+    gap: 10,
+    paddingBottom: 10,
   },
   modalItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "#E6E6E6",
-    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
   },
   modalItemDark: {
     borderColor: "#334155",
@@ -751,8 +972,9 @@ const styles = StyleSheet.create({
     color: "#F9FAFB",
   },
   bottomWrap: {
-    marginTop: 10,
-    gap: 10,
+    marginTop: 16,
+    gap: 12,
+    paddingBottom: 8,
   },
   inputRow: {
     position: "relative",
@@ -769,7 +991,14 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   toastWrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
   },
   toastCard: {
     backgroundColor: "#111827",
@@ -788,13 +1017,18 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   sendButton: {
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: "#111827",
-    minWidth: 68,
+    minWidth: 72,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#111827",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sendButtonDisabled: {
     backgroundColor: "#9CA3AF",
@@ -815,20 +1049,29 @@ const styles = StyleSheet.create({
   },
   pillButton: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
     borderRadius: 999,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: "center",
     backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   pillPrimary: {
     backgroundColor: "#111827",
     borderColor: "#111827",
+    shadowColor: "#111827",
+    shadowOpacity: 0.2,
   },
   pillDanger: {
-    backgroundColor: "#B91C1C",
-    borderColor: "#B91C1C",
+    backgroundColor: "#DC2626",
+    borderColor: "#DC2626",
+    shadowColor: "#DC2626",
+    shadowOpacity: 0.2,
   },
   pillDisabled: {
     opacity: 0.45,
@@ -897,5 +1140,36 @@ const styles = StyleSheet.create({
   },
   modalActionPrimaryText: {
     color: "#FFFFFF",
+  },
+  menuBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  menuBackdropPressable: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  menuItemPressed: {
+    opacity: 0.6,
+  },
+  menuItemText: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111827",
+    letterSpacing: -0.3,
+    textShadowColor: "rgba(255, 255, 255, 0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 });
