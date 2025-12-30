@@ -1,270 +1,258 @@
+type ParsedRowKind = "normal" | "warmup" | "dropset" | "superset" | "cardio";
+
+export type ParsedRow = {
+  exercise: string;
+  weightLbs: string;
+  reps: string;
+  notes: string;
+  kind?: ParsedRowKind;
+};
+
+export type GateDecisionReason =
+  | "empty_message"
+  | "multiple_entries_or_sets"
+  | "ambiguous_same_as_previous"
+  | "unsupported_units"
+  | "non_lift_units"
+  | "missing_exercise"
+  | "missing_reps"
+  | "success";
+
+type FastPattern = "single" | "multi" | "dropset" | "superset" | "cardio" | "warmup";
+
 export type GateDecision =
   | {
       kind: "fast";
-      row: { exercise: string; weightLbs: string; reps: string; notes: string };
+      reason: "success";
+      rows: ParsedRow[];
+      meta?: { pattern?: FastPattern };
     }
-  | { kind: "ai"; reason: string };
+  | { kind: "ai"; reason: GateDecisionReason; userHint?: string };
 
 type GateContext = { lastExercise?: string };
 
-const MULTI_REASON = "multiple_entries_or_sets";
-
-const MULTI_SEPARATORS = [";", "/"];
-const LIST_KEYWORDS = ["then", "next", "also"];
+const MULTI_REASON: GateDecisionReason = "multiple_entries_or_sets";
+const KG_TO_LB = 2.20462;
+const PLATE_WEIGHT = 45; // per plate
+const BAR_WEIGHT = 45;
 
 const numberRegex = /\d/;
 
-const stripPunctuation = (value: string) => value.replace(/^[\s\-,:;/]+|[\s\-,:;/]+$/g, "");
-
 const normalizeSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
 
-function hasMultipleSets(normalized: string, lower: string): boolean {
-  if (MULTI_SEPARATORS.some((sep) => normalized.includes(sep))) return true;
-  if (normalized.includes(" + ")) return true;
-  if (LIST_KEYWORDS.some((kw) => lower.includes(` ${kw} `))) return true;
-
-  // "and" before the first number is a strong sign of multiple exercises
-  const firstDigitIdx = normalized.search(/\d/);
-  if (firstDigitIdx > 0) {
-    const prefix = lower.slice(0, firstDigitIdx);
-    if (/\band\b/.test(prefix)) return true;
-  }
-
-  const commaParts = normalized.split(",");
-  const numericCommaParts = commaParts.filter((part) => numberRegex.test(part));
-  if (commaParts.length > 1 && numericCommaParts.length >= 2) return true;
-
-  const andParts = normalized.split(/\band\b/i).map((p) => p.trim());
-  const andPartsWithNumbers = andParts.filter((p) => numberRegex.test(p));
-  if (andParts.length >= 2 && andPartsWithNumbers.length >= 2) return true;
-
-  const pairMatches = [...lower.matchAll(/\b\d+(?:\.\d+)?\s*x\s*\d+(?:\.\d+)?\b/gi)];
-  if (pairMatches.length >= 2) return true;
-
-  const rawNumbers = [...lower.matchAll(/\b\d+(?:\.\d+)?\b/g)];
-  if (rawNumbers.length >= 4) return true;
-
-  return false;
-}
-
-type ParsedNumbers = {
-  weight?: string;
-  reps?: string;
-  usedIndices: Set<number>;
-  leftoverNumericCount: number;
+const formatWeight = (num: number) => {
+  if (!Number.isFinite(num)) return "";
+  const rounded = Math.round(num * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 };
 
-function extractNumbers(tokens: string[], lowerTokens: string[]): ParsedNumbers {
-  let weight: string | undefined;
-  let reps: string | undefined;
-  const usedIndices = new Set<number>();
+const normalizeWeightToLbs = (value: string, unit?: string) => {
+  const raw = parseFloat(value);
+  if (!Number.isFinite(raw)) return "";
+  if (!unit) return formatWeight(raw);
+  const u = unit.toLowerCase();
+  if (u.startsWith("kg")) return formatWeight(raw * KG_TO_LB);
+  if (u.startsWith("plate")) return formatWeight(raw * PLATE_WEIGHT * 2 + BAR_WEIGHT);
+  return formatWeight(raw);
+};
 
-  // 1) Attached x-notation (e.g., 135x8 or 135lbsx8)
-  for (let i = 0; i < tokens.length; i++) {
-    const cleaned = tokens[i].replace(/[.,]$/, "");
-    const attached = cleaned.match(/^(\d+(?:\.\d+)?)(?:lbs?|lb)?[xX](\d+(?:\.\d+)?)(?:reps?)?$/);
-    if (attached) {
-      weight = attached[1];
-      reps = attached[2];
-      usedIndices.add(i);
-      break;
-    }
+const makeAiDecision = (reason: GateDecisionReason): GateDecision => ({
+  kind: "ai",
+  reason,
+  userHint: userHintForReason(reason),
+});
+
+const userHintForReason = (reason: GateDecisionReason): string | undefined => {
+  switch (reason) {
+    case "empty_message":
+      return 'Try something like "Bench 185 x 8".';
+    case "multiple_entries_or_sets":
+      return "One exercise per message. Format: Exercise Weight Reps.";
+    case "ambiguous_same_as_previous":
+      return "Say the exercise name or repeat the full set.";
+    case "unsupported_units":
+      return "Use lbs or kg (we convert). Skip plate math if unsure.";
+    case "non_lift_units":
+      return 'If cardio, try "Elliptical 15 min". Otherwise log weight/reps.';
+    case "missing_exercise":
+      return 'What exercise? Try "Bench 185 8" or just "135 10".';
+    case "missing_reps":
+      return "Add reps. Example: Exercise Weight Reps.";
+    default:
+      return undefined;
   }
+};
 
-  // 2) Split x notation: "135 x 8" or "135 x8"
-  if (!weight || !reps) {
-    for (let i = 0; i < tokens.length - 1; i++) {
-      if (usedIndices.has(i)) continue;
-      const currentClean = tokens[i].replace(/[.,]$/, "");
-      const currentMatch = currentClean.match(/^(\d+(?:\.\d+)?)(?:lbs?|lb)?$/i);
-      if (!currentMatch) continue;
+type NumberPair = { weight: string; reps: string };
+type ParsedPairs = { pairs: NumberPair[]; leftoverNumericCount: number; numberCount: number };
 
-      const nextLower = lowerTokens[i + 1] ?? "";
-      const nextToken = tokens[i + 1] ?? "";
-      const nextClean = nextToken.replace(/[.,]$/, "");
-      const nextAttached = nextClean.match(/^[xX](\d+(?:\.\d+)?)(?:reps?)?$/);
-      const nextNumber = nextClean.match(/^(\d+(?:\.\d+)?)(?:reps?)?$/);
-
-      if ((nextLower === "x" || nextLower === "×") && tokens[i + 2]) {
-        const afterNextClean = tokens[i + 2].replace(/[.,]$/, "");
-        const afterNext = afterNextClean.match(/^(\d+(?:\.\d+)?)(?:reps?)?$/);
-        if (afterNext) {
-          weight = weight ?? currentMatch[1];
-          reps = reps ?? afterNext[1];
-          usedIndices.add(i);
-          usedIndices.add(i + 1);
-          usedIndices.add(i + 2);
-          break;
-        }
-      }
-
-      if (nextAttached) {
-        weight = weight ?? currentMatch[1];
-        reps = reps ?? nextAttached[1];
-        usedIndices.add(i);
-        usedIndices.add(i + 1);
-        break;
-      }
-
-      if (nextNumber && nextLower.startsWith("x")) {
-        weight = weight ?? currentMatch[1];
-        reps = reps ?? nextNumber[1];
-        usedIndices.add(i);
-        usedIndices.add(i + 1);
-        break;
-      }
-    }
+const parsePairsFromTail = (tail: string): ParsedPairs => {
+  const pairs: NumberPair[] = [];
+  const pairRegex =
+    /(\d+(?:\.\d+)?)(?:\s*(kg|kgs?|lb|lbs?|plates?|plate))?\s*(?:x|×)?\s*(\d+(?:\.\d+)?)(?:\s*reps?)?/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pairRegex.exec(tail))) {
+    pairs.push({
+      weight: normalizeWeightToLbs(match[1], match[2]),
+      reps: match[3],
+    });
   }
+  const numberCount = (tail.match(/\d+(?:\.\d+)?/g) ?? []).length;
+  const leftoverNumericCount = Math.max(0, numberCount - pairs.length * 2);
+  return { pairs, leftoverNumericCount, numberCount };
+};
 
-  // 3) General numeric scan
-  let leftoverNumericCount = 0;
-  for (let i = 0; i < tokens.length; i++) {
-    if (usedIndices.has(i)) continue;
-    const cleaned = tokens[i].replace(/[.,]$/, "");
-    const match = cleaned.match(/^(\d+(?:\.\d+)?)([a-zA-Z]*)$/);
-    if (!match) continue;
-    const value = match[1];
-    const suffix = match[2].toLowerCase();
-    const nextLower = lowerTokens[i + 1] ?? "";
+const extractExercises = (segment: string, allowMultiple: boolean): string[] => {
+  const cleaned = segment.replace(/\bsuperset\b/gi, "").replace(/\bss\b/gi, "").trim();
+  if (!cleaned) return [];
+  if (!allowMultiple) return [cleaned];
+  const parts = cleaned
+    .split(/\band\b|\/|,/i)
+    .map((p) => normalizeSpaces(p))
+    .filter(Boolean);
+  if (parts.length) return parts;
+  return [cleaned];
+};
 
-    const markedAsReps =
-      suffix.startsWith("rep") || nextLower.startsWith("rep") || suffix === "r";
-    const markedAsWeight =
-      suffix.startsWith("lb") || nextLower === "lb" || nextLower === "lbs" || suffix === "lbs";
+const hasMultipleExerciseSignals = (segment: string) =>
+  /\b(and|&)\b/.test(segment) || /[,/]/.test(segment);
 
-    if (markedAsReps && !reps) {
-      reps = value;
-      usedIndices.add(i);
-      if (nextLower.startsWith("rep")) usedIndices.add(i + 1);
-      continue;
-    }
-    if (markedAsWeight && !weight) {
-      weight = value;
-      usedIndices.add(i);
-      if (nextLower === "lb" || nextLower === "lbs") usedIndices.add(i + 1);
-      continue;
-    }
+const hasCardioSignals = (lower: string) =>
+  /\bcardio\b|\belliptical\b|\btreadmill\b|\bbike\b|\brow(er)?\b|\brun\b|\bjog\b/.test(lower) ||
+  /\bmins?\b|\bminutes?\b|\bmiles?\b|\bkm\b/.test(lower);
 
-    if (!weight) {
-      weight = value;
-      usedIndices.add(i);
-      continue;
-    }
-    if (!reps) {
-      reps = value;
-      usedIndices.add(i);
-      continue;
-    }
-  }
-
-  // Any remaining numeric tokens that were not captured are ambiguous.
-  for (let i = 0; i < tokens.length; i++) {
-    if (usedIndices.has(i)) continue;
-    if (numberRegex.test(tokens[i])) {
-      leftoverNumericCount += 1;
-    }
-  }
-
-  return { weight, reps, usedIndices, leftoverNumericCount };
-}
-
-function buildNotes(
-  tokens: string[],
-  usedIndices: Set<number>,
-  exerciseTokenEndExclusive: number
-): string {
-  const notesTokens: string[] = [];
-  for (let i = 0; i < tokens.length; i++) {
-    if (i < exerciseTokenEndExclusive) continue;
-    if (usedIndices.has(i)) continue;
-    notesTokens.push(tokens[i]);
-  }
-  return notesTokens.join(" ").trim();
-}
+const buildFastDecision = (rows: ParsedRow[], pattern?: FastPattern): GateDecision => ({
+  kind: "fast",
+  reason: "success",
+  rows,
+  meta: pattern ? { pattern } : undefined,
+});
 
 export function decideAndParse(message: string, context: GateContext): GateDecision {
   const trimmed = message.trim();
-  if (!trimmed) return { kind: "ai", reason: "empty_message" };
-  if (trimmed.includes("\n")) return { kind: "ai", reason: MULTI_REASON };
+  if (!trimmed) return makeAiDecision("empty_message");
+  if (trimmed.includes("\n")) return makeAiDecision(MULTI_REASON);
 
   const normalized = normalizeSpaces(trimmed);
   const lower = normalized.toLowerCase();
 
-  if (hasMultipleSets(normalized, lower)) {
-    return { kind: "ai", reason: MULTI_REASON };
-  }
-
-  if (/\bsame as\b/.test(lower)) {
-    return { kind: "ai", reason: "ambiguous_same_as_previous" };
-  }
-
-  if (/\bplates?\b/.test(lower)) {
-    return { kind: "ai", reason: "unsupported_units" };
-  }
-
-  if (/\d+(?:\.\d+)?\s*kg\b/i.test(normalized) || /\bkgs?\b/.test(lower)) {
-    return { kind: "ai", reason: "unsupported_units" };
-  }
-
-  if (/\bmins?\b|\bminutes?\b|\bmiles?\b|\bkm\b/.test(lower)) {
-    return { kind: "ai", reason: "non_lift_units" };
-  }
-
   const tokens = normalized.split(" ");
-  const lowerTokens = tokens.map((t) => t.toLowerCase());
   const firstNumberIdx = tokens.findIndex((tok) => numberRegex.test(tok));
+  const warmupFlag = /\bwarm\s*-?\s*up\b/.test(lower);
+  const isSuperset = /\bsuperset\b/.test(lower) || /\bss\b/.test(lower);
+  const isDropset = /\bdrops?et\b/.test(lower) || /\bdrop set\b/.test(lower);
+  const isCardio = hasCardioSignals(lower);
 
-  let exercise = "";
-  let exerciseTokenEnd = 0;
+  if (/\bsame as\b/.test(lower)) return makeAiDecision("ambiguous_same_as_previous");
 
-  if (firstNumberIdx > 0) {
-    const candidate = tokens.slice(0, firstNumberIdx).join(" ");
-    const cleaned = stripPunctuation(candidate);
-    if (cleaned && /[a-z]/i.test(cleaned)) {
-      exercise = cleaned;
-      exerciseTokenEnd = firstNumberIdx;
-    }
+  const exerciseSegment =
+    firstNumberIdx > -1 ? tokens.slice(0, firstNumberIdx).join(" ") : normalized;
+
+  if (!isSuperset && exerciseSegment && hasMultipleExerciseSignals(exerciseSegment)) {
+    return makeAiDecision(MULTI_REASON);
   }
 
-  if (!exercise && context.lastExercise) {
-    const last = context.lastExercise.trim();
-    if (last) {
-      exercise = last;
-      exerciseTokenEnd = 0;
-    }
+  const exercises = extractExercises(exerciseSegment, isSuperset);
+
+  if (!exercises.length && context.lastExercise) {
+    exercises.push(context.lastExercise.trim());
+  }
+  if (!exercises.length) return makeAiDecision("missing_exercise");
+  if (!isSuperset && exercises.length > 1) return makeAiDecision(MULTI_REASON);
+
+  const tail = firstNumberIdx > -1 ? tokens.slice(firstNumberIdx).join(" ") : "";
+  const { pairs, leftoverNumericCount, numberCount } = parsePairsFromTail(tail);
+
+  if (isCardio) {
+    const minutesMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:min|mins|minutes)/);
+    const distanceMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mile|miles|km)/);
+    const hrMatch = lower.match(/hr\s*(\d+(?:\.\d+)?)/);
+    const reps = minutesMatch?.[1] ?? distanceMatch?.[1] ?? pairs[0]?.reps ?? pairs[0]?.weight ?? "";
+    const intensity = pairs[0]?.weight ?? "";
+    const notesParts = ["cardio"];
+    if (hrMatch?.[1]) notesParts.push(`HR ${hrMatch[1]}`);
+    return buildFastDecision(
+      [
+        {
+          exercise: exercises[0],
+          weightLbs: intensity,
+          reps: reps || "",
+          notes: notesParts.join(" "),
+          kind: "cardio",
+        },
+      ],
+      "cardio"
+    );
   }
 
-  if (!exercise) {
-    return { kind: "ai", reason: "missing_exercise" };
+  if (isSuperset) {
+    if (exercises.length < 2) return makeAiDecision(MULTI_REASON);
+    if (pairs.length < 2) return makeAiDecision("missing_reps");
+    const rows: ParsedRow[] = [
+      { exercise: exercises[0], weightLbs: pairs[0].weight, reps: pairs[0].reps, notes: "SS", kind: "superset" },
+      { exercise: exercises[1], weightLbs: pairs[1].weight, reps: pairs[1].reps, notes: "SS", kind: "superset" },
+    ];
+    if (rows.some((r) => !r.reps)) return makeAiDecision("missing_reps");
+    if (leftoverNumericCount > 0 && pairs.length < 2) return makeAiDecision(MULTI_REASON);
+    return buildFastDecision(rows, "superset");
   }
 
-  const { weight, reps, usedIndices, leftoverNumericCount } = extractNumbers(tokens, lowerTokens);
-
-  if (!reps) {
-    return { kind: "ai", reason: "missing_reps" };
+  if (isDropset && exercises.length === 1) {
+    if (pairs.length < 2) return makeAiDecision(MULTI_REASON);
+    const rows: ParsedRow[] = pairs.map((pair) => ({
+      exercise: exercises[0],
+      weightLbs: pair.weight,
+      reps: pair.reps,
+      notes: "DS",
+      kind: "dropset",
+    }));
+    if (rows.some((r) => !r.reps)) return makeAiDecision("missing_reps");
+    return buildFastDecision(rows, "dropset");
   }
-  if (leftoverNumericCount > 0) {
-    return { kind: "ai", reason: MULTI_REASON };
+
+  if (pairs.length > 1) {
+    const rows: ParsedRow[] = pairs.map((pair) => ({
+      exercise: exercises[0],
+      weightLbs: pair.weight,
+      reps: pair.reps,
+      notes: "",
+      kind: "normal",
+    }));
+    if (rows.some((r) => !r.reps)) return makeAiDecision("missing_reps");
+    if (leftoverNumericCount > 0) return makeAiDecision(MULTI_REASON);
+    return buildFastDecision(rows, "multi");
   }
 
-  const weightLbs = weight ?? "";
-  const notes = buildNotes(tokens, usedIndices, exerciseTokenEnd);
+  if (pairs.length === 1) {
+    const baseNotes: string[] = [];
+    if (warmupFlag) baseNotes.push("warmup");
+    return buildFastDecision(
+      [
+        {
+          exercise: exercises[0],
+          weightLbs: pairs[0].weight,
+          reps: pairs[0].reps,
+          notes: baseNotes.join(" "),
+          kind: warmupFlag ? "warmup" : "normal",
+        },
+      ],
+      warmupFlag ? "warmup" : "single"
+    );
+  }
 
-  return {
-    kind: "fast",
-    row: {
-      exercise,
-      weightLbs,
-      reps,
-      notes,
-    },
-  };
+  if (numberCount > 0) {
+    return makeAiDecision("missing_reps");
+  }
+
+  return makeAiDecision("missing_reps");
 }
 
 type DevTestCase = {
   message: string;
   context?: GateContext;
   expectKind: GateDecision["kind"];
+  expectRowCount?: number;
+  expectPattern?: string;
   expectExercise?: string;
   expectWeight?: string;
   expectReps?: string;
@@ -275,6 +263,7 @@ function runDevStructuredGateTests() {
     {
       message: "Bench 135 8",
       expectKind: "fast",
+      expectRowCount: 1,
       expectExercise: "Bench",
       expectWeight: "135",
       expectReps: "8",
@@ -282,6 +271,7 @@ function runDevStructuredGateTests() {
     {
       message: "Lat pulldown 120x10",
       expectKind: "fast",
+      expectRowCount: 1,
       expectExercise: "Lat pulldown",
       expectWeight: "120",
       expectReps: "10",
@@ -290,21 +280,48 @@ function runDevStructuredGateTests() {
       message: "100 10",
       context: { lastExercise: "Bench" },
       expectKind: "fast",
+      expectRowCount: 1,
       expectExercise: "Bench",
       expectWeight: "100",
       expectReps: "10",
     },
     {
-      message: "Hack squat 2 plates 10",
-      expectKind: "ai",
+      message: "Bench 135 8, 155 6",
+      expectKind: "fast",
+      expectRowCount: 2,
+      expectPattern: "multi",
     },
-    { message: "", expectKind: "ai" },
-    { message: "Bench 135 8, 155 6", expectKind: "ai" },
+    {
+      message: "Bench 185 8 then 165 10 dropset",
+      expectKind: "fast",
+      expectRowCount: 2,
+      expectPattern: "dropset",
+    },
+    {
+      message: "Bench and Push Ups superset 135 10 0 15",
+      expectKind: "fast",
+      expectRowCount: 2,
+      expectPattern: "superset",
+    },
+    {
+      message: "Elliptical 15 min HR 150",
+      expectKind: "fast",
+      expectRowCount: 1,
+      expectPattern: "cardio",
+    },
+    {
+      message: "Curls 20 10 warmup",
+      expectKind: "fast",
+      expectRowCount: 1,
+      expectPattern: "warmup",
+    },
+    {
+      message: "Squat 100kg 5",
+      expectKind: "fast",
+      expectRowCount: 1,
+    },
     { message: "Bench and Leg press 135 8", expectKind: "ai" },
-    { message: "100", expectKind: "ai" },
-    { message: "Leg press 4 plates 10 reps", expectKind: "ai" },
-    { message: "same as above 8", expectKind: "ai" },
-    { message: "Squat 100kg 5", expectKind: "ai" },
+    { message: "", expectKind: "ai" },
   ];
 
   const failures: string[] = [];
@@ -316,19 +333,27 @@ function runDevStructuredGateTests() {
       continue;
     }
     if (res.kind === "fast") {
-      if (test.expectExercise && res.row.exercise !== test.expectExercise) {
+      if (test.expectRowCount !== undefined && res.rows.length !== test.expectRowCount) {
+        failures.push(`"${test.message}" rows mismatch: expected ${test.expectRowCount}, got ${res.rows.length}`);
+      }
+      if (test.expectExercise && res.rows[0]?.exercise !== test.expectExercise) {
         failures.push(
-          `"${test.message}" exercise mismatch: expected "${test.expectExercise}" got "${res.row.exercise}"`
+          `"${test.message}" exercise mismatch: expected "${test.expectExercise}" got "${res.rows[0]?.exercise}"`
         );
       }
-      if (test.expectWeight !== undefined && res.row.weightLbs !== test.expectWeight) {
+      if (test.expectWeight !== undefined && res.rows[0]?.weightLbs !== test.expectWeight) {
         failures.push(
-          `"${test.message}" weight mismatch: expected "${test.expectWeight}" got "${res.row.weightLbs}"`
+          `"${test.message}" weight mismatch: expected "${test.expectWeight}" got "${res.rows[0]?.weightLbs}"`
         );
       }
-      if (test.expectReps && res.row.reps !== test.expectReps) {
+      if (test.expectReps && res.rows[0]?.reps !== test.expectReps) {
         failures.push(
-          `"${test.message}" reps mismatch: expected "${test.expectReps}" got "${res.row.reps}"`
+          `"${test.message}" reps mismatch: expected "${test.expectReps}" got "${res.rows[0]?.reps}"`
+        );
+      }
+      if (test.expectPattern && res.meta?.pattern !== test.expectPattern) {
+        failures.push(
+          `"${test.message}" pattern mismatch: expected "${test.expectPattern}" got "${res.meta?.pattern}"`
         );
       }
     }

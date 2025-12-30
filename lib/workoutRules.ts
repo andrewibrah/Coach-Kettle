@@ -31,7 +31,8 @@ export function nextSetNumberForExercise(rows: LogRow[], exercise: string): numb
     const normalized = row.exercise.trim().toLowerCase();
     if (normalized === target) {
       const setVal = Number.isFinite(row.set) ? row.set : 0;
-      if (setVal > maxSet) maxSet = setVal;
+      const base = Math.floor(setVal);
+      if (base > maxSet) maxSet = base;
     }
   }
   return maxSet + 1;

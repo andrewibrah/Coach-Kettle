@@ -1,12 +1,33 @@
-import React, { useEffect, useState } from "react";
-import { FlatList, Text, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { listWorkouts, type WorkoutSession } from "@/lib/workoutStorage";
+import { listWorkouts, type WorkoutRow, type WorkoutSession } from "@/lib/workoutStorage";
+
+type ExerciseGroup = {
+  exercise: string;
+  sets: { row: WorkoutRow; setNum: number }[];
+};
+
+function groupByExercise(rows: WorkoutRow[]): ExerciseGroup[] {
+  const groups: ExerciseGroup[] = [];
+  rows.forEach((row) => {
+    const last = groups[groups.length - 1];
+    if (last && last.exercise.toLowerCase() === row.exercise.toLowerCase()) {
+      last.sets.push({ row, setNum: last.sets.length + 1 });
+    } else {
+      groups.push({ exercise: row.exercise, sets: [{ row, setNum: 1 }] });
+    }
+  });
+  return groups;
+}
 
 export default function WorkoutDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     (async () => {
@@ -15,34 +36,196 @@ export default function WorkoutDetail() {
     })();
   }, [id]);
 
+  const groups = useMemo(() => {
+    if (!workout) return [];
+    return groupByExercise(workout.rows);
+  }, [workout]);
+
+  const formatDate = (dateISO: string) => {
+    const parts = dateISO.split("-");
+    if (parts.length !== 3) return dateISO;
+    const [year, month, day] = parts;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    const weekday = date.toLocaleDateString(undefined, { weekday: "long" });
+    const monthName = date.toLocaleDateString(undefined, { month: "long" });
+    return `${weekday}, ${monthName} ${day}`;
+  };
+
   if (!workout) {
     return (
-      <View style={{ flex: 1, padding: 16 }}>
-        <Text>Workout not found.</Text>
+      <View style={[styles.screen, { paddingTop: Math.max(insets.top, 16) }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+        >
+          <Text style={styles.backButtonText}>← Back</Text>
+        </Pressable>
+        <Text style={styles.notFound}>Workout not found.</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
-      <Text style={{ fontSize: 18, fontWeight: "700" }}>
-        {workout.dateISO} / {workout.part}
-      </Text>
+    <View style={[styles.screen, { paddingTop: Math.max(insets.top, 16) }]}>
+      <Pressable
+        onPress={() => router.back()}
+        style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+      >
+        <Text style={styles.backButtonText}>← Back</Text>
+      </Pressable>
 
-      <FlatList
-        style={{ marginTop: 12 }}
-        data={workout.rows}
-        keyExtractor={(_, i) => `${workout.id}_${i}`}
-        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-        renderItem={({ item }) => (
-          <View style={{ padding: 12, borderWidth: 1, borderRadius: 10 }}>
-            <Text style={{ fontWeight: "700" }}>{item.exercise}</Text>
-            <Text>Weight: {item.weightLbs}</Text>
-            <Text>Reps: {item.reps}</Text>
-            {item.notes ? <Text>Notes: {item.notes}</Text> : null}
-          </View>
+      <View style={styles.headerSection}>
+        <Text style={styles.title}>{formatDate(workout.dateISO)}</Text>
+        <Text style={styles.date}>{workout.part}</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {groups.length === 0 ? (
+          <Text style={styles.emptyText}>No exercises logged.</Text>
+        ) : (
+          groups.map((group, gIdx) => (
+            <View key={`group_${gIdx}`} style={styles.exerciseGroup}>
+              <View style={styles.exerciseHeader}>
+                <Text style={styles.exerciseGroupName}>{group.exercise}</Text>
+                <Text style={styles.setCount}>{group.sets.length} sets</Text>
+              </View>
+              <View style={styles.setsContainer}>
+                {group.sets.map(({ row, setNum }, sIdx) => (
+                  <View key={`set_${sIdx}`} style={styles.setRow}>
+                    <View style={styles.setIndicator}>
+                      <Text style={styles.setIndicatorText}>{setNum}</Text>
+                    </View>
+                    <View style={styles.statsRow}>
+                      <Text style={styles.statValue}>{row.weightLbs || "—"}</Text>
+                      <Text style={styles.statUnit}>lb</Text>
+                      <Text style={styles.statSep}>×</Text>
+                      <Text style={styles.statValue}>{row.reps || "—"}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))
         )}
-      />
+      </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    paddingHorizontal: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 8,
+  },
+  backButtonPressed: {
+    opacity: 0.6,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#3B82F6",
+  },
+  headerSection: {
+    marginBottom: 20,
+    paddingTop: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.5,
+  },
+  date: {
+    fontSize: 15,
+    color: "#6B7280",
+    marginTop: 4,
+  },
+  listContent: {
+    paddingBottom: 32,
+    gap: 10,
+  },
+  exerciseGroup: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+  },
+  exerciseHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  exerciseGroupName: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 4,
+    color: "#111827",
+  },
+  setCount: {
+    fontSize: 13,
+    color: "#6B7280",
+    fontWeight: "700",
+  },
+  setsContainer: {
+    gap: 6,
+  },
+  setRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 4,
+  },
+  setIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  setIndicatorText: {
+    color: "#6B7280",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  statsRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 3,
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  statUnit: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#9CA3AF",
+    marginRight: 2,
+  },
+  statSep: {
+    fontSize: 13,
+    color: "#D1D5DB",
+    marginHorizontal: 2,
+  },
+  notFound: {
+    fontSize: 16,
+    color: "#6B7280",
+    marginTop: 20,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+    marginTop: 40,
+  },
+});
