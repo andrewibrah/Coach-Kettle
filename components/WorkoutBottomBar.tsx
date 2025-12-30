@@ -1,5 +1,7 @@
 import { Dispatch, SetStateAction } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/themed-text";
 
@@ -17,6 +19,7 @@ type Props = {
   startToastOpen: boolean;
   showStartToast: () => void;
   error: string | null;
+  aiReason?: string;
 };
 
 export function WorkoutBottomBar({
@@ -33,8 +36,31 @@ export function WorkoutBottomBar({
   startToastOpen,
   showStartToast,
   error,
+  aiReason,
 }: Props) {
   const disabledSend = !workoutActive || loading || !messageInput.trim();
+
+  const handleSend = () => {
+    if (disabledSend) return;
+    if (Platform.OS === "ios") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    sendMessage();
+  };
+
+  const handleStartWorkout = () => {
+    if (Platform.OS === "ios") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    onStartWorkout();
+  };
+
+  const handleEndWorkout = () => {
+    if (Platform.OS === "ios") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    }
+    onEndWorkout();
+  };
 
   return (
     <View style={styles.bottomWrap}>
@@ -53,12 +79,12 @@ export function WorkoutBottomBar({
           placeholder={workoutActive ? "e.g. Leg press 4 plates 10 reps" : "Start a workout to log sets"}
           style={[styles.input, styles.messageInput]}
           returnKeyType="send"
-          onSubmitEditing={sendMessage}
+          onSubmitEditing={handleSend}
           editable={workoutActive && !loading}
         />
 
         <Pressable
-          onPress={sendMessage}
+          onPress={handleSend}
           disabled={disabledSend}
           style={({ pressed }) => [
             styles.sendButton,
@@ -66,7 +92,7 @@ export function WorkoutBottomBar({
             pressed && !disabledSend && styles.sendButtonPressed,
           ]}
         >
-          <Text style={styles.sendButtonText}>{loading ? "..." : "Send"}</Text>
+          {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.sendButtonText}>Send</Text>}
         </Pressable>
       </View>
 
@@ -76,7 +102,7 @@ export function WorkoutBottomBar({
         </Pressable>
 
         <Pressable
-          onPress={workoutActive ? onEndWorkout : onStartWorkout}
+          onPress={workoutActive ? handleEndWorkout : handleStartWorkout}
           style={({ pressed }) => [
             styles.pillButton,
             styles.pillPrimary,
@@ -111,10 +137,11 @@ export function WorkoutBottomBar({
       ) : null}
 
       {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
+      {aiReason ? <ThemedText style={styles.errorHint}>{aiReason}</ThemedText> : null}
 
       <ThemedText style={styles.hint}>
         {workoutActive
-          ? "Tip: include exercise, weight, reps, and notes in one message."
+          ? 'Tip: "Exercise Weight Reps" — e.g., Bench 185x8 or Lat Pulldown 120 10.'
           : "Pick a body part, then log sets fast."}
       </ThemedText>
     </View>
@@ -231,6 +258,10 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#B00020",
+  },
+  errorHint: {
+    color: "#6B7280",
+    fontStyle: "italic",
   },
   hint: {
     opacity: 0.7,

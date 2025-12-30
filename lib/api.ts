@@ -46,6 +46,10 @@ export type ApiWorkoutRow = {
   notes: string;
 };
 
+export type CoachResponse = {
+  answer: string;
+};
+
 export const api = {
   chat: async (message: string, rows: ApiWorkoutRow[]) => {
     const url = `${API_BASE}/chat`;
@@ -73,5 +77,32 @@ export const api = {
     }
 
     return (await res.json()) as { rows: ApiWorkoutRow[] };
+  },
+  askCoach: async (question: string, rows: ApiWorkoutRow[]) => {
+    const url = `${API_BASE}/coach`;
+    let res: Response;
+
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, rows }),
+      });
+    } catch (error) {
+      throw new Error(
+        [
+          `Network request failed for ${url}.`,
+          "Make sure FastAPI is running on 0.0.0.0:8000, your phone is on the same Wi-Fi,",
+          "and macOS firewall allows inbound on port 8000.",
+        ].join(" ")
+      );
+    }
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`HTTP ${res.status} from ${url}: ${body}`);
+    }
+
+    return (await res.json()) as CoachResponse;
   },
 };

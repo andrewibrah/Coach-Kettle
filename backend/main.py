@@ -49,6 +49,15 @@ class ChatResponse(BaseModel):
     rows: list[WorkoutRow]
 
 
+class CoachRequest(BaseModel):
+    question: str
+    rows: list[WorkoutRow] = []
+
+
+class CoachResponse(BaseModel):
+    answer: str
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -92,6 +101,47 @@ Do not include extra keys, text, or markdown.
 
         return parsed.model_dump()
 
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="OpenAI request failed")
+
+
+@app.post("/coach")
+def coach(req: CoachRequest):
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not set on the server")
+
+    system_prompt = """
+You are Coach, a concise strength trainer.
+Use the workout table as context when answering the user's question.
+- If rows are present, reference trends, gaps, or next steps based on them.
+- If no rows are provided, give a short, actionable answer without making up data.
+Keep answers under 120 words and prioritize clear, numbered or bulleted guidance when helpful.
+"""
+
+    try:
+        context = {
+            "question": req.question,
+            "rows": [row.model_dump() for row in req.rows],
+        }
+
+        resp = client.responses.parse(
+            model="gpt-4o-mini",
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": json.dumps(context)},
+            ],
+            text_format=CoachResponse,
+        )
+
+        parsed = resp.output_parsed
+        if parsed is None:
+            raise HTTPException(status_code=500, detail="Model did not return structured output")
+
+        return parsed.model_dump()
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=500, detail="OpenAI request failed")
 
