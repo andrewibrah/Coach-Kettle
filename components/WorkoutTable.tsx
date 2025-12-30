@@ -1,17 +1,12 @@
-import { RefObject } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { RefObject, useRef } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import type { LogRow } from "@/types/workout";
 
-type EditDraft = {
-  exercise: string;
-  set: string;
-  weightLbs: string;
-  reps: string;
-  notes: string;
-};
+type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
 type MoveDirection = "up" | "down";
 
@@ -20,12 +15,11 @@ type Props = {
   compact: boolean;
   isDark: boolean;
   scrollRef: RefObject<ScrollView | null>;
-  editingRowId: string | null;
-  editDraft: EditDraft | null;
-  onStartEdit: (rowId: string) => void;
-  onChangeDraft: (field: keyof EditDraft, value: string) => void;
-  onSaveEdit: () => void;
-  onCancelEdit: () => void;
+  editingCell: { rowId: string; field: EditableField } | null;
+  editValue: string;
+  onBeginEditCell: (rowId: string, field: EditableField, currentValue: string) => void;
+  onChangeEditValue: (value: string) => void;
+  onCommitEditCell: () => void;
   onDeleteRow: (rowId: string) => void;
   onDuplicateRow: (rowId: string) => void;
   onMoveRow: (rowId: string, direction: MoveDirection) => void;
@@ -36,12 +30,11 @@ export function WorkoutTable({
   compact,
   isDark,
   scrollRef,
-  editingRowId,
-  editDraft,
-  onStartEdit,
-  onChangeDraft,
-  onSaveEdit,
-  onCancelEdit,
+  editingCell,
+  editValue,
+  onBeginEditCell,
+  onChangeEditValue,
+  onCommitEditCell,
   onDeleteRow,
   onDuplicateRow,
   onMoveRow,
@@ -51,6 +44,71 @@ export function WorkoutTable({
     const hasSameAbove = rows.slice(0, idx).some((candidate) => candidate.exercise.trim().toLowerCase() === normalized);
     const hasSameBelow = rows.slice(idx + 1).some((candidate) => candidate.exercise.trim().toLowerCase() === normalized);
     return { up: hasSameAbove, down: hasSameBelow };
+  };
+
+  const lastTapRef = useRef<Record<string, number>>({});
+
+  const handleCellPress = (rowId: string, field: EditableField, value: string) => {
+    if (editingCell && (editingCell.rowId !== rowId || editingCell.field !== field)) {
+      onCommitEditCell();
+    }
+    const key = `${rowId}-${field}`;
+    const now = Date.now();
+    const last = lastTapRef.current[key] ?? 0;
+    if (now - last < 300) {
+      onBeginEditCell(rowId, field, value);
+    }
+    lastTapRef.current[key] = now;
+  };
+
+  const renderCell = (row: LogRow, field: EditableField, text: string, style: object, textAlign?: "center") => {
+    const isEditing = editingCell?.rowId === row.id && editingCell.field === field;
+
+    if (isEditing) {
+      return (
+        <TextInput
+          style={[
+            styles.cell,
+            style,
+            styles.input,
+            textAlign ? { textAlign } : null,
+          ]}
+          value={editValue}
+          onChangeText={onChangeEditValue}
+          autoFocus
+          onBlur={onCommitEditCell}
+          onSubmitEditing={onCommitEditCell}
+          blurOnSubmit
+          keyboardType={field === "set" || field === "reps" ? "number-pad" : field === "weightLbs" ? "decimal-pad" : "default"}
+          placeholder={field === "notes" ? "Notes" : field === "exercise" ? "Exercise" : field === "set" ? "Set" : field === "weightLbs" ? "Weight" : "Reps"}
+        />
+      );
+    }
+
+    return (
+      <Pressable
+        style={[styles.cell, style]}
+        accessibilityRole="button"
+        onPress={() => handleCellPress(row.id, field, text)}
+        hitSlop={6}
+      >
+        <ThemedText style={[textAlign ? { textAlign } : null]} numberOfLines={field === "notes" ? 2 : 1}>
+          {text || (field === "notes" ? "" : "—")}
+        </ThemedText>
+      </Pressable>
+    );
+  };
+
+  const openRowMenu = (rowId: string, canMoveUp: boolean, canMoveDown: boolean) => {
+    const actions: Array<{ text: string; onPress?: () => void; style?: "default" | "cancel" | "destructive" }> = [
+      { text: "Duplicate", onPress: () => onDuplicateRow(rowId) },
+    ];
+    if (canMoveUp) actions.unshift({ text: "Move up", onPress: () => onMoveRow(rowId, "up") });
+    if (canMoveDown) actions.push({ text: "Move down", onPress: () => onMoveRow(rowId, "down") });
+    actions.push({ text: "Delete", onPress: () => onDeleteRow(rowId), style: "destructive" });
+    actions.push({ text: "Cancel", style: "cancel" });
+
+    Alert.alert("Row actions", "Move within exercise or duplicate/delete.", actions);
   };
 
   return (
@@ -106,16 +164,6 @@ export function WorkoutTable({
         >
           {compact ? "Note" : "Notes"}
         </ThemedText>
-        <ThemedText
-          style={[
-            styles.cell,
-            styles.actionCol,
-            styles.headerCell,
-            isDark ? styles.headerCellDark : styles.headerCellLight,
-          ]}
-        >
-          {compact ? "Act" : "Actions"}
-        </ThemedText>
       </View>
 
       <ScrollView
@@ -123,6 +171,8 @@ export function WorkoutTable({
         style={styles.tableBody}
         contentContainerStyle={styles.tableBodyContent}
         keyboardShouldPersistTaps="handled"
+        onTouchStart={onCommitEditCell}
+        onScrollBeginDrag={onCommitEditCell}
       >
         {rows.length === 0 ? (
           <View style={styles.emptyState}>
@@ -132,113 +182,36 @@ export function WorkoutTable({
           </View>
         ) : (
           rows.map((r, idx) => {
-            const isEditing = editingRowId === r.id;
             const moveAvail = moveAvailability(r, idx);
-
-            if (isEditing && editDraft) {
-              return (
-                <View
-                  key={r.id}
-                  style={[styles.row, styles.editRow, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}
+            const renderRightActions = () => (
+              <View style={styles.swipeActions}>
+                <Pressable
+                  onPress={() => onDuplicateRow(r.id)}
+                  style={({ pressed }) => [styles.swipeButton, styles.swipeDuplicate, pressed && styles.swipePressed]}
                 >
-                  <TextInput
-                    style={[styles.cell, styles.exerciseCol, styles.input]}
-                    value={editDraft.exercise}
-                    onChangeText={(val) => onChangeDraft("exercise", val)}
-                    placeholder="Exercise"
-                  />
-                  <TextInput
-                    style={[styles.cell, styles.setCol, styles.input]}
-                    value={editDraft.set}
-                    onChangeText={(val) => onChangeDraft("set", val)}
-                    placeholder="Set"
-                    keyboardType="number-pad"
-                  />
-                  <TextInput
-                    style={[styles.cell, styles.weightCol, styles.input]}
-                    value={editDraft.weightLbs}
-                    onChangeText={(val) => onChangeDraft("weightLbs", val)}
-                    placeholder="Weight"
-                    keyboardType="decimal-pad"
-                  />
-                  <TextInput
-                    style={[styles.cell, styles.repsCol, styles.input]}
-                    value={editDraft.reps}
-                    onChangeText={(val) => onChangeDraft("reps", val)}
-                    placeholder="Reps"
-                    keyboardType="number-pad"
-                  />
-                  <TextInput
-                    style={[styles.cell, styles.notesCol, styles.input]}
-                    value={editDraft.notes}
-                    onChangeText={(val) => onChangeDraft("notes", val)}
-                    placeholder="Notes"
-                  />
-
-                  <View style={[styles.cell, styles.actionCol, styles.actionButtons]}>
-                    <Pressable onPress={onSaveEdit} style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}>
-                      <ThemedText style={styles.actionText}>Save</ThemedText>
-                    </Pressable>
-                    <Pressable onPress={onCancelEdit} style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}>
-                      <ThemedText style={styles.actionText}>Cancel</ThemedText>
-                    </Pressable>
-                  </View>
-                </View>
-              );
-            }
-
+                  <ThemedText style={styles.swipeText}>Duplicate</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => onDeleteRow(r.id)}
+                  style={({ pressed }) => [styles.swipeButton, styles.swipeDelete, pressed && styles.swipePressed]}
+                >
+                  <ThemedText style={styles.swipeText}>Delete</ThemedText>
+                </Pressable>
+              </View>
+            );
             return (
-              <Pressable
-                key={r.id}
-                style={[styles.row, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}
-                onPress={() => onStartEdit(r.id)}
-              >
-                <ThemedText style={[styles.cell, styles.exerciseCol]} numberOfLines={1}>{r.exercise}</ThemedText>
-                <ThemedText style={[styles.cell, styles.setCol]}>{String(r.set)}</ThemedText>
-                <ThemedText style={[styles.cell, styles.weightCol]}>{r.weightLbs || "—"}</ThemedText>
-                <ThemedText style={[styles.cell, styles.repsCol]}>{r.reps || "—"}</ThemedText>
-                <ThemedText style={[styles.cell, styles.notesCol]} numberOfLines={2}>{r.notes || ""}</ThemedText>
-                <View style={[styles.cell, styles.actionCol, styles.actionButtons]}>
-                  <Pressable
-                    onPress={() => onMoveRow(r.id, "up")}
-                    disabled={!moveAvail.up}
-                    style={({ pressed }) => [
-                      styles.actionButton,
-                      !moveAvail.up && styles.actionDisabled,
-                      pressed && moveAvail.up && styles.actionPressed,
-                    ]}
-                    accessibilityLabel="Move row up within exercise"
-                  >
-                    <ThemedText style={[styles.actionText, !moveAvail.up && styles.actionTextDisabled]}>Up</ThemedText>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => onMoveRow(r.id, "down")}
-                    disabled={!moveAvail.down}
-                    style={({ pressed }) => [
-                      styles.actionButton,
-                      !moveAvail.down && styles.actionDisabled,
-                      pressed && moveAvail.down && styles.actionPressed,
-                    ]}
-                    accessibilityLabel="Move row down within exercise"
-                  >
-                    <ThemedText style={[styles.actionText, !moveAvail.down && styles.actionTextDisabled]}>Down</ThemedText>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => onDuplicateRow(r.id)}
-                    style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}
-                    accessibilityLabel="Duplicate row"
-                  >
-                    <ThemedText style={styles.actionText}>Dup</ThemedText>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => onDeleteRow(r.id)}
-                    style={({ pressed }) => [styles.actionButton, styles.deleteButton, pressed && styles.actionPressed]}
-                    accessibilityLabel="Delete row"
-                  >
-                    <ThemedText style={[styles.actionText, styles.deleteText]}>Del</ThemedText>
-                  </Pressable>
-                </View>
-              </Pressable>
+              <Swipeable key={r.id} renderRightActions={renderRightActions} overshootRight={false}>
+                <Pressable
+                  style={[styles.row, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}
+                  onLongPress={() => openRowMenu(r.id, moveAvail.up, moveAvail.down)}
+                >
+                  {renderCell(r, "exercise", r.exercise, styles.exerciseCol)}
+                  {renderCell(r, "set", String(r.set), styles.setCol, "center")}
+                  {renderCell(r, "weightLbs", r.weightLbs, styles.weightCol, "center")}
+                  {renderCell(r, "reps", r.reps, styles.repsCol, "center")}
+                  {renderCell(r, "notes", r.notes, styles.notesCol)}
+                </Pressable>
+              </Swipeable>
             );
           })
         )}
@@ -315,19 +288,11 @@ const styles = StyleSheet.create({
   notesCol: {
     flex: 1.5,
   },
-  actionCol: {
-    flex: 1.4,
-    alignItems: "flex-end",
-    textAlign: "right",
-  },
   emptyState: {
     padding: 16,
   },
   emptyText: {
     opacity: 0.7,
-  },
-  editRow: {
-    backgroundColor: "#F2F7FF",
   },
   input: {
     borderWidth: 1,
@@ -338,40 +303,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     backgroundColor: "#FFFFFF",
   },
-  actionButtons: {
+  swipeActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
+    height: "100%",
+    alignItems: "stretch",
   },
-  actionButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-    marginLeft: 6,
-    marginBottom: 6,
+  swipeButton: {
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    minWidth: 92,
   },
-  actionPressed: {
-    opacity: 0.85,
+  swipeDuplicate: {
+    backgroundColor: "#16A34A",
   },
-  actionDisabled: {
-    opacity: 0.45,
+  swipeDelete: {
+    backgroundColor: "#DC2626",
   },
-  actionText: {
-    fontSize: 12,
+  swipeText: {
+    color: "#FFFFFF",
     fontWeight: "700",
-    color: "#111827",
+    fontSize: 12,
   },
-  actionTextDisabled: {
-    color: "#9CA3AF",
-  },
-  deleteButton: {
-    borderColor: "#FECACA",
-    backgroundColor: "#FEF2F2",
-  },
-  deleteText: {
-    color: "#B91C1C",
+  swipePressed: {
+    opacity: 0.9,
   },
 });

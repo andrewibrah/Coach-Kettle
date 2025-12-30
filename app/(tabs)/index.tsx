@@ -29,6 +29,7 @@ import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import type { BodyPart, LogRow } from "@/types/workout";
 
 const BODY_PARTS: BodyPart[] = ["Legs", "Abs", "Chest", "Back", "Bis", "Tris", "Shoulders"];
+type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -40,14 +41,8 @@ export default function HomeScreen() {
   const scrollRef = useRef<ScrollView | null>(null);
 
   const [rows, setRows] = useState<LogRow[]>([]);
-  const [editingRowId, setEditingRowId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<{
-    exercise: string;
-    set: string;
-    weightLbs: string;
-    reps: string;
-    notes: string;
-  } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ rowId: string; field: EditableField } | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
   const [undoState, setUndoState] = useState<{ row: LogRow; index: number } | null>(null);
   const [messageInput, setMessageInput] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -70,8 +65,8 @@ export default function HomeScreen() {
     setMessageInput("");
     setLoading(false);
     setError(null);
-    setEditingRowId(null);
-    setEditDraft(null);
+    setEditingCell(null);
+    setEditValue("");
     setUndoState(null);
     if (undoTimerRef.current) {
       clearTimeout(undoTimerRef.current);
@@ -100,6 +95,7 @@ export default function HomeScreen() {
   }, []);
 
   const openCoach = () => {
+    commitPendingAndGet();
     setCoachError(null);
     setCoachOpen(true);
   };
@@ -172,8 +168,8 @@ export default function HomeScreen() {
     setRows([]);
     setMessageInput("");
     setError(null);
-    setEditingRowId(null);
-    setEditDraft(null);
+    setEditingCell(null);
+    setEditValue("");
     setUndoState(null);
     if (undoTimerRef.current) {
       clearTimeout(undoTimerRef.current);
@@ -183,6 +179,7 @@ export default function HomeScreen() {
   };
 
   const onClearRows = () => {
+    commitPendingAndGet();
     if (!rows.length) return;
     Alert.alert(
       "Clear table?",
@@ -194,8 +191,8 @@ export default function HomeScreen() {
           style: "destructive",
           onPress: () => {
             setRows([]);
-            setEditingRowId(null);
-            setEditDraft(null);
+            setEditingCell(null);
+            setEditValue("");
             setUndoState(null);
             if (undoTimerRef.current) {
               clearTimeout(undoTimerRef.current);
@@ -205,50 +202,6 @@ export default function HomeScreen() {
         },
       ]
     );
-  };
-
-  const onEndWorkout = async () => {
-    if (!workoutActive) {
-      Alert.alert("No active workout", "Start a workout first.");
-      return;
-    }
-    if (!rows.length) {
-      Alert.alert("Nothing to save", "Log at least one set first.");
-      return;
-    }
-
-    const proceed = await new Promise<boolean>((resolve) => {
-      Alert.alert(
-        "End workout?",
-        "This will save to History.",
-        [
-          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-          { text: "Save", style: "default", onPress: () => resolve(true) },
-        ]
-      );
-    });
-    if (!proceed) return;
-
-    const storedRows: StoredWorkoutRow[] = rows.map((row) => ({
-      exercise: row.exercise,
-      weightLbs: row.weightLbs,
-      reps: row.reps,
-      notes: row.notes,
-    }));
-
-    await saveWorkout(buildWorkoutToSave(storedRows));
-
-    Alert.alert("Saved", "Workout added to History.");
-    endWorkoutSession();
-    setRows([]);
-    setMessageInput("");
-    setEditingRowId(null);
-    setEditDraft(null);
-    setUndoState(null);
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
   };
 
   const normalizeExercise = (value: string) => value.trim().toLowerCase();
@@ -263,50 +216,69 @@ export default function HomeScreen() {
     });
   };
 
-  const startEditRow = (rowId: string) => {
-    if (editingRowId === rowId) return;
-    const target = rows.find((r) => r.id === rowId);
-    if (!target) return;
-    setEditingRowId(rowId);
-    setEditDraft({
-      exercise: target.exercise,
-      set: String(target.set),
-      weightLbs: target.weightLbs,
-      reps: target.reps,
-      notes: target.notes,
-    });
-  };
-
-  const updateDraft = (field: keyof NonNullable<typeof editDraft>, value: string) => {
-    setEditDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
-  };
-
-  const cancelEdit = () => {
-    setEditingRowId(null);
-    setEditDraft(null);
-  };
-
-  const saveEdit = () => {
-    if (!editingRowId || !editDraft) return;
-    const trimmedExercise = editDraft.exercise.trim();
-    if (!trimmedExercise) {
-      Alert.alert("Exercise required", "Exercise name cannot be empty.");
-      return;
+  const beginCellEdit = (rowId: string, field: EditableField, value: string) => {
+    if (editingCell && (editingCell.rowId !== rowId || editingCell.field !== field)) {
+      const { nextRows, changed } = applyPendingEdit(rows);
+      if (changed) setRows(nextRows);
     }
-    const desiredSet = Number.parseInt(editDraft.set, 10);
-    setRows((prev) => {
-      const idx = prev.findIndex((r) => r.id === editingRowId);
-      if (idx === -1) return prev;
-      const updated: LogRow = {
-        ...prev[idx],
-        exercise: trimmedExercise,
-        set: Number.isFinite(desiredSet) && desiredSet > 0 ? desiredSet : prev[idx].set,
-        weightLbs: editDraft.weightLbs.trim(),
-        reps: editDraft.reps.trim(),
-        notes: editDraft.notes.trim(),
-      };
+    setEditingCell({ rowId, field });
+    setEditValue(value ?? "");
+  };
 
-      const without = [...prev];
+  const applyPendingEdit = useCallback(
+    (list: LogRow[]): { nextRows: LogRow[]; changed: boolean } => {
+      if (!editingCell) return { nextRows: list, changed: false };
+      const idx = list.findIndex((r) => r.id === editingCell.rowId);
+      if (idx === -1) return { nextRows: list, changed: false };
+
+      const current = list[idx];
+      const trimmed = editingCell.field === "notes" ? editValue : editValue.trim();
+      let updated: LogRow = { ...current };
+      let changed = false;
+
+      if (editingCell.field === "exercise") {
+        if (!trimmed) return { nextRows: list, changed: false };
+        if (trimmed !== current.exercise) {
+          updated.exercise = trimmed;
+          changed = true;
+        }
+      } else if (editingCell.field === "set") {
+        const parsed = Number.parseInt(trimmed, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) return { nextRows: list, changed: false };
+        if (parsed !== current.set) {
+          updated.set = parsed;
+          changed = true;
+        }
+      } else if (editingCell.field === "weightLbs") {
+        if (trimmed !== current.weightLbs) {
+          updated.weightLbs = trimmed;
+          changed = true;
+        }
+      } else if (editingCell.field === "reps") {
+        if (!trimmed) {
+          if (current.reps) {
+            updated.reps = "";
+            changed = true;
+          }
+        } else {
+          const parsedReps = Number.parseInt(trimmed, 10);
+          if (!Number.isFinite(parsedReps) || parsedReps <= 0) return { nextRows: list, changed: false };
+          const asString = String(parsedReps);
+          if (asString !== current.reps) {
+            updated.reps = asString;
+            changed = true;
+          }
+        }
+      } else if (editingCell.field === "notes") {
+        if (editValue !== current.notes) {
+          updated.notes = editValue;
+          changed = true;
+        }
+      }
+
+      if (!changed) return { nextRows: list, changed: false };
+
+      const without = [...list];
       without.splice(idx, 1);
 
       const normTarget = normalizeExercise(updated.exercise);
@@ -315,35 +287,61 @@ export default function HomeScreen() {
         .filter(({ norm }) => norm === normTarget)
         .map(({ position }) => position);
 
-      const relativeIndex = sameExercisePositions.length
-        ? Math.min(
-            Math.max((Number.isFinite(desiredSet) ? desiredSet - 1 : sameExercisePositions.length), 0),
-            sameExercisePositions.length
-          )
-        : 0;
+      let insertionIndex = Math.min(idx, without.length);
 
-      const insertionIndex = sameExercisePositions.length
-        ? sameExercisePositions[0] + relativeIndex
-        : Math.min(idx, without.length);
+      if (editingCell.field === "set") {
+        const desiredIdx = Math.max((Number.parseInt(trimmed, 10) || 1) - 1, 0);
+        insertionIndex = sameExercisePositions.length
+          ? Math.min(sameExercisePositions[0] + desiredIdx, without.length)
+          : Math.min(idx, without.length);
+      } else if (normalizeExercise(current.exercise) !== normTarget) {
+        insertionIndex = sameExercisePositions.length
+          ? sameExercisePositions[sameExercisePositions.length - 1] + 1
+          : Math.min(idx, without.length);
+      }
 
       const nextRows = [...without];
       nextRows.splice(insertionIndex, 0, updated);
 
-      return resequenceSets(nextRows);
-    });
-    setEditingRowId(null);
-    setEditDraft(null);
+      return { nextRows: resequenceSets(nextRows), changed: true };
+    },
+    [editValue, editingCell]
+  );
+
+  const commitCellEdit = useCallback(() => {
+    if (!editingCell) return;
+    setRows((prev) => applyPendingEdit(prev).nextRows);
+    setEditingCell(null);
+    setEditValue("");
+  }, [applyPendingEdit, editingCell]);
+
+  const withPendingRows = useCallback(
+    (mutator: (rowsList: LogRow[]) => LogRow[]) => {
+      setRows((prev) => {
+        const { nextRows } = applyPendingEdit(prev);
+        return mutator(nextRows);
+      });
+      if (editingCell) {
+        setEditingCell(null);
+        setEditValue("");
+      }
+    },
+    [applyPendingEdit, editingCell]
+  );
+
+  const commitPendingAndGet = () => {
+    if (!editingCell) return rows;
+    const { nextRows } = applyPendingEdit(rows);
+    setRows(nextRows);
+    setEditingCell(null);
+    setEditValue("");
+    return nextRows;
   };
 
   const deleteRow = (rowId: string) => {
-    setRows((prev) => {
+    withPendingRows((prev) => {
       const idx = prev.findIndex((r) => r.id === rowId);
       if (idx === -1) return prev;
-
-      if (editingRowId === rowId) {
-        setEditingRowId(null);
-        setEditDraft(null);
-      }
 
       const deletedRow = prev[idx];
       const nextRows = prev.filter((r) => r.id !== rowId);
@@ -374,7 +372,7 @@ export default function HomeScreen() {
   };
 
   const duplicateRow = (rowId: string) => {
-    setRows((prev) => {
+    withPendingRows((prev) => {
       const idx = prev.findIndex((r) => r.id === rowId);
       if (idx === -1) return prev;
       const source = prev[idx];
@@ -390,7 +388,7 @@ export default function HomeScreen() {
   };
 
   const moveRow = (rowId: string, direction: "up" | "down") => {
-    setRows((prev) => {
+    withPendingRows((prev) => {
       const idx = prev.findIndex((r) => r.id === rowId);
       if (idx === -1) return prev;
       const norm = normalizeExercise(prev[idx].exercise);
@@ -418,6 +416,51 @@ export default function HomeScreen() {
     });
   };
 
+  const onEndWorkout = async () => {
+    const committedRows = commitPendingAndGet();
+    if (!workoutActive) {
+      Alert.alert("No active workout", "Start a workout first.");
+      return;
+    }
+    if (!committedRows.length) {
+      Alert.alert("Nothing to save", "Log at least one set first.");
+      return;
+    }
+
+    const proceed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        "End workout?",
+        "This will save to History.",
+        [
+          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+          { text: "Save", style: "default", onPress: () => resolve(true) },
+        ]
+      );
+    });
+    if (!proceed) return;
+
+    const storedRows: StoredWorkoutRow[] = committedRows.map((row) => ({
+      exercise: row.exercise,
+      weightLbs: row.weightLbs,
+      reps: row.reps,
+      notes: row.notes,
+    }));
+
+    await saveWorkout(buildWorkoutToSave(storedRows));
+
+    Alert.alert("Saved", "Workout added to History.");
+    endWorkoutSession();
+    setRows([]);
+    setMessageInput("");
+    setEditingCell(null);
+    setEditValue("");
+    setUndoState(null);
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+  };
+
   const sendMessage = async () => {
     const message = messageInput.trim();
     if (!message || loading) return;
@@ -426,16 +469,19 @@ export default function HomeScreen() {
       return;
     }
 
+    const currentRows = commitPendingAndGet();
     setError(null);
 
-    const gateDecision = decideAndParse(message, { lastExercise: getLastExerciseFromRows(rows) });
+    const gateDecision = decideAndParse(message, { lastExercise: getLastExerciseFromRows(currentRows) });
+
+    if (gateDecision.kind === "ai" && gateDecision.userHint) {
+      setError({ message: gateDecision.userHint });
+    }
 
     if (gateDecision.kind === "fast") {
-      setRows((prev) => {
-        let next = [...prev];
-        const parsedRows = gateDecision.rows ?? [];
-        if (!parsedRows.length) return next;
-
+      let next = [...currentRows];
+      const parsedRows = gateDecision.rows ?? [];
+      if (parsedRows.length) {
         const addOrFillRow = (rowData: ParsedRow, setOverride?: number) => {
           const normalizedExercise = rowData.exercise.trim().toLowerCase();
           for (let i = next.length - 1; i >= 0; i -= 1) {
@@ -485,12 +531,11 @@ export default function HomeScreen() {
         if (gateDecision.meta?.pattern === "dropset" && parsedRows.length) {
           const baseSet = nextSetNumberForExercise(next, parsedRows[0].exercise);
           parsedRows.forEach((row, idx) => addOrFillRow(row, baseSet + (idx + 1) / 10));
-          return next;
+        } else {
+          parsedRows.forEach((row) => addOrFillRow(row));
         }
-
-        parsedRows.forEach((row) => addOrFillRow(row));
-        return next;
-      });
+      }
+      setRows(next);
       setMessageInput("");
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
       return;
@@ -506,19 +551,16 @@ export default function HomeScreen() {
 
     setLoading(true);
     try {
-      const contextRows: ApiWorkoutRow[] = toApiRows(rows);
+      const contextRows: ApiWorkoutRow[] = toApiRows(currentRows);
       const res = await api.chat(message, contextRows);
-      let newRows: LogRow[] = [];
-      setRows((prev) => {
-        newRows = buildRowsFromApi(res.rows);
-        return newRows.length ? [...prev, ...newRows] : prev;
-      });
+      const newRows = buildRowsFromApi(res.rows);
 
-      if (newRows.length === 0) {
+      if (!newRows.length) {
         setError({ message: "No rows returned", reason: "Try Exercise Weight Reps format." });
         return;
       }
 
+      setRows((prev) => [...prev, ...newRows]);
       setMessageInput("");
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
     } catch (e) {
@@ -560,12 +602,11 @@ export default function HomeScreen() {
         compact={compact}
         isDark={isDark}
         scrollRef={scrollRef}
-        editingRowId={editingRowId}
-        editDraft={editDraft}
-        onStartEdit={startEditRow}
-        onChangeDraft={updateDraft}
-        onSaveEdit={saveEdit}
-        onCancelEdit={cancelEdit}
+        editingCell={editingCell}
+        editValue={editValue}
+        onBeginEditCell={beginCellEdit}
+        onChangeEditValue={setEditValue}
+        onCommitEditCell={commitCellEdit}
         onDeleteRow={deleteRow}
         onDuplicateRow={duplicateRow}
         onMoveRow={moveRow}
