@@ -134,10 +134,10 @@ export default function HistoryScreen() {
 
             <View style={styles.metaRow}>
               <View style={styles.metaChip}>
-                <Text style={styles.metaChipText}>{stats.exercises} ex</Text>
+                <Text style={styles.metaChipText}>{stats.exercises} Exercises</Text>
               </View>
               <View style={styles.metaChip}>
-                <Text style={styles.metaChipText}>{stats.sets} sets</Text>
+                <Text style={styles.metaChipText}>{stats.sets} Sets</Text>
               </View>
             </View>
           </View>

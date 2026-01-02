@@ -1,254 +1,469 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from typing import List, Optional, Set
+import math
+from dataclasses import dataclass, field
+from typing import List, Optional, Union, Dict, Literal
 
-MULTI_REASON = "multiple_entries_or_sets"
+# --- Types ---
 
-MULTI_SEPARATORS = [";", "/"]
-LIST_KEYWORDS = ["then", "next", "also"]
-
+ParsedRowKind = Literal["normal", "warmup", "dropset", "superset", "cardio"]
+GateDecisionReason = Literal[
+    "empty_message",
+    "multiple_entries_or_sets",
+    "ambiguous_same_as_previous",
+    "unsupported_units",
+    "non_lift_units",
+    "missing_exercise",
+    "missing_reps",
+    "success",
+]
+FastPattern = Literal["single", "multi", "dropset", "superset", "cardio", "warmup"]
 
 @dataclass
-class GateRow:
-  exercise: str
-  weightLbs: str
-  reps: str
-  notes: str
-
+class ParsedRow:
+    exercise: str
+    weightLbs: str
+    reps: str
+    notes: str
+    kind: ParsedRowKind = "normal"
 
 @dataclass
 class FastDecision:
-  kind: str
-  row: GateRow
-
+    kind: Literal["fast"]
+    reason: Literal["success"]
+    rows: List[ParsedRow]
+    meta: Optional[Dict[str, FastPattern]] = None
 
 @dataclass
 class AiDecision:
-  kind: str
-  reason: str
+    kind: Literal["ai"]
+    reason: GateDecisionReason
+    userHint: Optional[str] = None
 
+GateDecision = Union[FastDecision, AiDecision]
 
-GateDecision = FastDecision | AiDecision
+@dataclass
+class GateContext:
+    lastExercise: Optional[str] = None
 
+# --- Constants & Helpers ---
 
-def _strip_punctuation(value: str) -> str:
-  return re.sub(r"^[\s\-,:;/]+|[\s\-,:;/]+$", "", value)
+MULTI_REASON: GateDecisionReason = "multiple_entries_or_sets"
+KG_TO_LB = 2.20462
+PLATE_WEIGHT = 45
+BAR_WEIGHT = 45
 
+NUMBER_REGEX = re.compile(r"\d")
 
-def _normalize_spaces(value: str) -> str:
-  return " ".join(value.split()).strip()
+def normalize_spaces(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
 
+def format_weight(num: float) -> str:
+    if not math.isfinite(num):
+        return ""
+    rounded = round(num, 1)
+    # Check if integer
+    if rounded.is_integer():
+        return str(int(rounded))
+    return str(rounded)
 
-def _has_multiple_sets(normalized: str, lower: str) -> bool:
-  if any(sep in normalized for sep in MULTI_SEPARATORS):
-    return True
-  if " + " in normalized:
-    return True
-  if any(f" {kw} " in lower for kw in LIST_KEYWORDS):
-    return True
+def normalize_weight_to_lbs(value: str, unit: Optional[str] = None) -> str:
+    try:
+        raw = float(value)
+    except ValueError:
+        return ""
+    
+    if not math.isfinite(raw):
+        return ""
+    
+    if not unit:
+        return format_weight(raw)
+    
+    u = unit.lower()
+    if u.startswith("kg"):
+        return format_weight(raw * KG_TO_LB)
+    if u.startswith("plate"):
+        return format_weight(raw * PLATE_WEIGHT * 2 + BAR_WEIGHT)
+    
+    return format_weight(raw)
 
-  first_digit_idx = next((i for i, ch in enumerate(normalized) if ch.isdigit()), -1)
-  if first_digit_idx > 0 and re.search(r"\band\b", lower[:first_digit_idx]):
-    return True
+def user_hint_for_reason(reason: GateDecisionReason) -> Optional[str]:
+    if reason == "empty_message":
+        return 'Try something like "Bench 185 x 8".'
+    elif reason == "multiple_entries_or_sets":
+        return "One exercise per message. Format: Exercise Weight Reps."
+    elif reason == "ambiguous_same_as_previous":
+        return "Say the exercise name or repeat the full set."
+    elif reason == "unsupported_units":
+        return "Use lbs or kg (we convert). Skip plate math if unsure."
+    elif reason == "non_lift_units":
+        return 'If cardio, try "Elliptical 15 min". Otherwise log weight/reps.'
+    elif reason == "missing_exercise":
+        return 'What exercise? Try "Bench 185 8" or just "135 10".'
+    elif reason == "missing_reps":
+        return "Add reps. Example: Exercise Weight Reps."
+    else:
+        return None
 
-  comma_parts = normalized.split(",")
-  numeric_comma_parts = [part for part in comma_parts if re.search(r"\d", part)]
-  if len(comma_parts) > 1 and len(numeric_comma_parts) >= 2:
-    return True
+def make_ai_decision(reason: GateDecisionReason) -> AiDecision:
+    return AiDecision(
+        kind="ai",
+        reason=reason,
+        userHint=user_hint_for_reason(reason)
+    )
 
-  and_parts = re.split(r"\band\b", normalized, flags=re.I)
-  and_numeric_parts = [part for part in and_parts if re.search(r"\d", part)]
-  if len(and_parts) >= 2 and len(and_numeric_parts) >= 2:
-    return True
+@dataclass
+class NumberPair:
+    weight: str
+    reps: str
 
-  pair_matches = re.findall(r"\b\d+(?:\.\d+)?\s*x\s*\d+(?:\.\d+)?\b", lower, flags=re.I)
-  if len(pair_matches) >= 2:
-    return True
+@dataclass
+class ParsedPairs:
+    pairs: List[NumberPair]
+    leftoverNumericCount: int
+    numberCount: int
 
-  raw_numbers = re.findall(r"\b\d+(?:\.\d+)?\b", lower)
-  if len(raw_numbers) >= 4:
-    return True
+def parse_pairs_from_tail(tail: str) -> ParsedPairs:
+    pairs: List[NumberPair] = []
+    # Regular expression to match weight/reps pairs similarly to the TypeScript version
+    pair_regex = re.compile(
+        r"(\d+(?:\.\d+)?)(?:\s*(kg|kgs?|lb|lbs?|plates?|plate))?[\s]*(?:x|×)?[\s]*(\d+(?:\.\d+)?)(?:\s*reps?)?",
+        re.IGNORECASE
+    )
+    
+    for match in pair_regex.finditer(tail):
+        val1, unit, val2 = match.groups()
+        pairs.append(NumberPair(
+            weight=normalize_weight_to_lbs(val1, unit),
+            reps=val2
+        ))
+        
+    all_numbers = re.findall(r"\d+(?:\.\d+)?", tail)
+    number_count = len(all_numbers)
+    leftover = max(0, number_count - len(pairs) * 2)
+    
+    return ParsedPairs(pairs, leftover, number_count)
 
-  return False
+def extract_exercises(segment: str, allow_multiple: bool) -> List[str]:
+    cleaned = re.sub(r"\bsuperset\b", "", segment, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bss\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = cleaned.strip()
+    
+    if not cleaned:
+        return []
+    
+    if not allow_multiple:
+        return [cleaned]
+        
+    parts = re.split(r"\band\b|\/|,", cleaned, flags=re.IGNORECASE)
+    parts = [normalize_spaces(p) for p in parts if p and normalize_spaces(p)]
+    
+    if parts:
+        return parts
+    return [cleaned]
 
+def has_multiple_exercise_signals(segment: str) -> bool:
+    if re.search(r"\b(and|&)\b", segment, flags=re.IGNORECASE):
+        return True
+    if re.search(r"[,/]", segment):
+        return True
+    return False
 
-def _extract_numbers(tokens: List[str]) -> tuple[Optional[str], Optional[str], Set[int], int]:
-  weight: Optional[str] = None
-  reps: Optional[str] = None
-  used_indices: Set[int] = set()
+def has_cardio_signals(lower: str) -> bool:
+    if re.search(r"\bcardio\b|\belliptical\b|\btreadmill\b|\bbike\b|\brow(er)?\b|\brun\b|\bjog\b", lower):
+        return True
+    if re.search(r"\bmins?\b|\bminutes?\b|\bmiles?\b|\bkm\b", lower):
+        return True
+    return False
 
-  # Attached x-notation
-  for i, token in enumerate(tokens):
-    cleaned = token.rstrip(".,")
-    match = re.match(r"(\d+(?:\.\d+)?)(?:lbs?|lb)?x(\d+(?:\.\d+)?)(?:reps?)?$", cleaned, flags=re.I)
-    if match:
-      weight, reps = match.group(1), match.group(2)
-      used_indices.add(i)
-      break
+def build_fast_decision(rows: List[ParsedRow], pattern: Optional[FastPattern] = None) -> FastDecision:
+    meta = {"pattern": pattern} if pattern else None
+    return FastDecision(kind="fast", reason="success", rows=rows, meta=meta)
 
-  # Split x-notation
-  if not weight or not reps:
-    for i, token in enumerate(tokens[:-1]):
-      if i in used_indices:
-        continue
-      current_clean = token.rstrip(".,")
-      current_match = re.match(r"(\d+(?:\.\d+)?)(?:lbs?|lb)?$", current_clean, flags=re.I)
-      if not current_match:
-        continue
-
-      next_token = tokens[i + 1]
-      next_clean = next_token.rstrip(".,")
-      next_attached = re.match(r"x(\d+(?:\.\d+)?)(?:reps?)?$", next_clean, flags=re.I)
-
-      if next_token.lower() in {"x", "×"} and i + 2 < len(tokens):
-        after_next_clean = tokens[i + 2].rstrip(".,")
-        after_next_match = re.match(r"(\d+(?:\.\d+)?)(?:reps?)?$", after_next_clean, flags=re.I)
-        if after_next_match:
-          weight = weight or current_match.group(1)
-          reps = reps or after_next_match.group(1)
-          used_indices.update({i, i + 1, i + 2})
-          break
-
-      if next_attached:
-        weight = weight or current_match.group(1)
-        reps = reps or next_attached.group(1)
-        used_indices.update({i, i + 1})
-        break
-
-  # General numeric scan
-  for i, token in enumerate(tokens):
-    if i in used_indices:
-      continue
-    cleaned = token.rstrip(".,")
-    match = re.match(r"(\d+(?:\.\d+)?)([a-zA-Z]*)$", cleaned)
-    if not match:
-      continue
-    value, suffix = match.groups()
-    suffix = (suffix or "").lower()
-    next_lower = tokens[i + 1].lower() if i + 1 < len(tokens) else ""
-
-    marked_reps = suffix.startswith("rep") or next_lower.startswith("rep") or suffix == "r"
-    marked_weight = suffix.startswith("lb") or next_lower in {"lb", "lbs"} or suffix == "lbs"
-
-    if marked_reps and reps is None:
-      reps = value
-      used_indices.add(i)
-      if next_lower.startswith("rep"):
-        used_indices.add(i + 1)
-      continue
-    if marked_weight and weight is None:
-      weight = value
-      used_indices.add(i)
-      if next_lower in {"lb", "lbs"}:
-        used_indices.add(i + 1)
-      continue
-
-    if weight is None:
-      weight = value
-      used_indices.add(i)
-      continue
-    if reps is None:
-      reps = value
-      used_indices.add(i)
-      continue
-
-  leftover_numeric_count = sum(1 for idx, tok in enumerate(tokens) if idx not in used_indices and re.search(r"\d", tok))
-
-  return weight, reps, used_indices, leftover_numeric_count
-
-
-def decide_and_parse(message: str, last_exercise: Optional[str] = None) -> GateDecision:
-  trimmed = message.strip()
-  if not trimmed:
-    return AiDecision(kind="ai", reason="empty_message")
-  if "\n" in trimmed:
-    return AiDecision(kind="ai", reason=MULTI_REASON)
-
-  normalized = _normalize_spaces(trimmed)
-  lower = normalized.lower()
-
-  if _has_multiple_sets(normalized, lower):
-    return AiDecision(kind="ai", reason=MULTI_REASON)
-
-  if re.search(r"\bsame as\b", lower):
-    return AiDecision(kind="ai", reason="ambiguous_same_as_previous")
-
-  if re.search(r"\bplates?\b", lower):
-    return AiDecision(kind="ai", reason="unsupported_units")
-
-  if re.search(r"\d+(?:\.\d+)?\s*kg\b", lower) or re.search(r"\bkgs?\b", lower):
-    return AiDecision(kind="ai", reason="unsupported_units")
-
-  if re.search(r"\bmins?\b|\bminutes?\b|\bmiles?\b|\bkm\b", lower):
-    return AiDecision(kind="ai", reason="non_lift_units")
-
-  tokens = normalized.split(" ")
-  first_number_idx = next((i for i, tok in enumerate(tokens) if re.search(r"\d", tok)), -1)
-
-  exercise = ""
-  exercise_token_end = 0
-  if first_number_idx > 0:
-    candidate = " ".join(tokens[:first_number_idx])
-    cleaned = _strip_punctuation(candidate)
-    if cleaned and re.search(r"[a-zA-Z]", cleaned):
-      exercise = cleaned
-      exercise_token_end = first_number_idx
-
-  if not exercise and last_exercise:
-    exercise = last_exercise.strip()
-    exercise_token_end = 0
-
-  if not exercise:
-    return AiDecision(kind="ai", reason="missing_exercise")
-
-  weight, reps, used_indices, leftover_numeric_count = _extract_numbers(tokens)
-  if not reps:
-    return AiDecision(kind="ai", reason="missing_reps")
-  if leftover_numeric_count > 0:
-    return AiDecision(kind="ai", reason=MULTI_REASON)
-
-  notes_tokens = [tok for idx, tok in enumerate(tokens) if idx >= exercise_token_end and idx not in used_indices]
-  notes = " ".join(notes_tokens).strip()
-
-  return FastDecision(
-    kind="fast",
-    row=GateRow(
-      exercise=exercise,
-      weightLbs=weight or "",
-      reps=reps,
-      notes=notes,
-    ),
-  )
-
+def decide_and_parse(message: str, context: GateContext) -> GateDecision:
+    trimmed = message.strip()
+    if not trimmed:
+        return make_ai_decision("empty_message")
+    if "\n" in trimmed:
+        return make_ai_decision(MULTI_REASON)
+        
+    normalized = normalize_spaces(trimmed)
+    lower = normalized.lower()
+    
+    tokens = normalized.split(" ")
+    
+    first_number_idx = -1
+    for i, tok in enumerate(tokens):
+        if NUMBER_REGEX.search(tok):
+            first_number_idx = i
+            break
+            
+    warmup_flag = bool(re.search(r"\bwarm\s*-?\s*up\b", lower))
+    is_superset = bool(re.search(r"\bsuperset\b", lower) or re.search(r"\bss\b", lower))
+    is_dropset = bool(re.search(r"\bdrops?et\b", lower) or re.search(r"\bdrop set\b", lower))
+    is_cardio = has_cardio_signals(lower)
+    
+    if re.search(r"\bsame as\b", lower):
+        return make_ai_decision("ambiguous_same_as_previous")
+        
+    exercise_segment = normalized
+    if first_number_idx > -1:
+        exercise_segment = " ".join(tokens[:first_number_idx])
+        
+    if not is_superset and exercise_segment and has_multiple_exercise_signals(exercise_segment):
+        return make_ai_decision(MULTI_REASON)
+        
+    exercises = extract_exercises(exercise_segment, is_superset)
+    
+    if not exercises and context.lastExercise:
+        exercises.append(context.lastExercise.strip())
+        
+    if not exercises:
+        return make_ai_decision("missing_exercise")
+    
+    if not is_superset and len(exercises) > 1:
+        return make_ai_decision(MULTI_REASON)
+        
+    tail = ""
+    if first_number_idx > -1:
+        tail = " ".join(tokens[first_number_idx:])
+        
+    # Check for single number first (bodyweight exercise: reps only)
+    single_number_match = re.match(r"^(?:x\s*)?(\d+)$", tail)
+    if single_number_match and not is_superset and not is_dropset and not is_cardio:
+        reps = single_number_match.group(1)
+        base_notes = []
+        if warmup_flag:
+            base_notes.append("warmup")
+        
+        return build_fast_decision(
+            [
+                ParsedRow(
+                    exercise=exercises[0],
+                    weightLbs="0",
+                    reps=reps,
+                    notes=" ".join(base_notes),
+                    kind="warmup" if warmup_flag else "normal"
+                )
+            ],
+            "warmup" if warmup_flag else "single"
+        )
+        
+    pairs_result = parse_pairs_from_tail(tail)
+    pairs = pairs_result.pairs
+    leftover_numeric_count = pairs_result.leftoverNumericCount
+    number_count = pairs_result.numberCount
+    
+    if is_cardio:
+        minutes_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:min|mins|minutes)", lower)
+        distance_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mile|miles|km)", lower)
+        hr_match = re.search(r"hr\s*(\d+(?:\.\d+)?)", lower)
+        
+        reps_val = ""
+        if minutes_match:
+            reps_val = minutes_match.group(1)
+        elif distance_match:
+            reps_val = distance_match.group(1)
+        elif len(pairs) > 0:
+            reps_val = pairs[0].reps or pairs[0].weight
+            
+        intensity = pairs[0].weight if len(pairs) > 0 else ""
+        
+        notes_parts = ["cardio"]
+        if hr_match:
+            notes_parts.append(f"HR {hr_match.group(1)}")
+            
+        return build_fast_decision(
+            [
+                ParsedRow(
+                    exercise=exercises[0],
+                    weightLbs=intensity,
+                    reps=reps_val,
+                    notes=" ".join(notes_parts),
+                    kind="cardio"
+                )
+            ],
+            "cardio"
+        )
+        
+    if is_superset:
+        if len(exercises) < 2:
+            return make_ai_decision(MULTI_REASON)
+        if len(pairs) < 2:
+            return make_ai_decision("missing_reps")
+            
+        rows = [
+            ParsedRow(exercise=exercises[0], weightLbs=pairs[0].weight, reps=pairs[0].reps, notes="SS", kind="superset"),
+            ParsedRow(exercise=exercises[1], weightLbs=pairs[1].weight, reps=pairs[1].reps, notes="SS", kind="superset"),
+        ]
+        
+        if any(not r.reps for r in rows):
+            return make_ai_decision("missing_reps")
+            
+        if leftover_numeric_count > 0 and len(pairs) < 2:
+             return make_ai_decision(MULTI_REASON)
+             
+        return build_fast_decision(rows, "superset")
+        
+    if is_dropset and len(exercises) == 1:
+        if len(pairs) < 2:
+            return make_ai_decision(MULTI_REASON)
+            
+        rows = [
+            ParsedRow(
+                exercise=exercises[0],
+                weightLbs=pair.weight,
+                reps=pair.reps,
+                notes="DS",
+                kind="dropset"
+            ) for pair in pairs
+        ]
+        
+        if any(not r.reps for r in rows):
+            return make_ai_decision("missing_reps")
+            
+        return build_fast_decision(rows, "dropset")
+        
+    if len(pairs) > 1:
+        rows = [
+            ParsedRow(
+                exercise=exercises[0],
+                weightLbs=pair.weight,
+                reps=pair.reps,
+                notes="",
+                kind="normal"
+            ) for pair in pairs
+        ]
+        
+        if any(not r.reps for r in rows):
+            return make_ai_decision("missing_reps")
+        if leftover_numeric_count > 0:
+            return make_ai_decision(MULTI_REASON)
+            
+        return build_fast_decision(rows, "multi")
+        
+    if len(pairs) == 1:
+        base_notes = []
+        if warmup_flag:
+            base_notes.append("warmup")
+            
+        return build_fast_decision(
+            [
+                ParsedRow(
+                    exercise=exercises[0],
+                    weightLbs=pairs[0].weight,
+                    reps=pairs[0].reps,
+                    notes=" ".join(base_notes),
+                    kind="warmup" if warmup_flag else "normal"
+                )
+            ],
+            "warmup" if warmup_flag else "single"
+        )
+        
+    if number_count > 0:
+        return make_ai_decision("missing_reps")
+        
+    return make_ai_decision("missing_reps")
 
 def _run_dev_tests():
-  cases = [
-    ("Bench 135 8", None, "fast"),
-    ("Lat pulldown 120x10", None, "fast"),
-    ("100 10", "Bench", "fast"),
-    ("Hack squat 2 plates 10", None, "ai"),
-    ("", None, "ai"),
-    ("Bench 135 8, 155 6", None, "ai"),
-    ("Bench and Leg press 135 8", None, "ai"),
-    ("100", None, "ai"),
-    ("Leg press 4 plates 10 reps", None, "ai"),
-    ("same as above 8", None, "ai"),
-    ("Squat 100kg 5", None, "ai"),
-  ]
+    cases = [
+        {
+            "message": "Bench 135 8",
+            "expectKind": "fast",
+            "expectRowCount": 1,
+            "expectExercise": "Bench",
+            "expectWeight": "135",
+            "expectReps": "8",
+        },
+        {
+            "message": "Lat pulldown 120x10",
+            "expectKind": "fast",
+            "expectRowCount": 1,
+            "expectExercise": "Lat pulldown",
+            "expectWeight": "120",
+            "expectReps": "10",
+        },
+        {
+            "message": "100 10",
+            "context": GateContext(lastExercise="Bench"),
+            "expectKind": "fast",
+            "expectRowCount": 1,
+            "expectExercise": "Bench",
+            "expectWeight": "100",
+            "expectReps": "10",
+        },
+        {
+            "message": "Bench 135 8, 155 6",
+            "expectKind": "fast",
+            "expectRowCount": 2,
+            "expectPattern": "multi",
+        },
+        {
+            "message": "Bench 185 8 then 165 10 dropset",
+            "expectKind": "fast",
+            "expectRowCount": 2,
+            "expectPattern": "dropset",
+        },
+        {
+            "message": "Bench and Push Ups superset 135 10 0 15",
+            "expectKind": "fast",
+            "expectRowCount": 2,
+            "expectPattern": "superset",
+        },
+        {
+            "message": "Elliptical 15 min HR 150",
+            "expectKind": "fast",
+            "expectRowCount": 1,
+            "expectPattern": "cardio",
+        },
+        {
+            "message": "Curls 20 10 warmup",
+            "expectKind": "fast",
+            "expectRowCount": 1,
+            "expectPattern": "warmup",
+        },
+        {
+            "message": "Squat 100kg 5",
+            "expectKind": "fast",
+            "expectRowCount": 1,
+        },
+        { "message": "Bench and Leg press 135 8", "expectKind": "ai" },
+        { "message": "", "expectKind": "ai" },
+    ]
 
-  failures: List[str] = []
-  for message, last_exercise, expect_kind in cases:
-    res = decide_and_parse(message, last_exercise)
-    if res.kind != expect_kind:
-      failures.append(f"{message!r}: expected {expect_kind}, got {res.kind}")
+    failures = []
 
-  if failures:
-    print("[structured_gate] dev tests failed:", failures)
-  else:
-    print("[structured_gate] dev tests passed")
+    for test in cases:
+        ctx = test.get("context", GateContext())
+        res = decide_and_parse(test["message"], ctx)
+        
+        if res.kind != test["expectKind"]:
+            failures.append(f"\"{test['message']}\" -> expected {test['expectKind']}, got {res.kind}")
+            continue
+            
+        if res.kind == "fast":
+            if "expectRowCount" in test and len(res.rows) != test["expectRowCount"]:
+                 failures.append(f"\"{test['message']}\" rows mismatch: expected {test['expectRowCount']}, got {len(res.rows)}")
+                 
+            if "expectExercise" in test and res.rows and res.rows[0].exercise != test["expectExercise"]:
+                 failures.append(f"\"{test['message']}\" exercise mismatch: expected \"{test['expectExercise']}\" got \"{res.rows[0].exercise}\"")
+                 
+            if "expectWeight" in test and res.rows and res.rows[0].weightLbs != test["expectWeight"]:
+                 failures.append(f"\"{test['message']}\" weight mismatch: expected \"{test['expectWeight']}\" got \"{res.rows[0].weightLbs}\"")
+                 
+            if "expectReps" in test and res.rows and res.rows[0].reps != test["expectReps"]:
+                 failures.append(f"\"{test['message']}\" reps mismatch: expected \"{test['expectReps']}\" got \"{res.rows[0].reps}\"")
+                 
+            if "expectPattern" in test:
+                 pattern = res.meta.get("pattern") if res.meta else None
+                 if pattern != test["expectPattern"]:
+                      failures.append(f"\"{test['message']}\" pattern mismatch: expected \"{test['expectPattern']}\" got \"{pattern}\"")
 
+    if failures:
+        print("[structured_gate] dev tests failed:", failures)
+    else:
+        print("[structured_gate] dev tests passed")
 
 if __name__ == "__main__":
-  _run_dev_tests()
+    _run_dev_tests()

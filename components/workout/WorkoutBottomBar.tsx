@@ -75,7 +75,7 @@ export function WorkoutBottomBar({
       <View style={[styles.inputRow, !workoutActive && styles.inputRowDisabled]}>
         {!workoutActive ? (
           <Pressable
-            onPress={showStartToast}
+            onPress={onStartWorkout}
             style={styles.inputTapCatcher}
             accessibilityRole="button"
             accessibilityLabel="Start a workout to send your first set"

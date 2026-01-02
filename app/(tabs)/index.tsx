@@ -14,7 +14,6 @@ import {
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 
-import { BodyPartPickerModal } from "@/components/modals/BodyPartPickerModal";
 import { CoachModal } from "@/components/modals/CoachModal";
 import { MenuModal } from "@/components/modals/MenuModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
@@ -28,9 +27,9 @@ import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow } from "@/lib/api";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
 import { getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
-import { type BodyPart, type LogRow } from "@/types/workout";
+import { type LogRow } from "@/types/workout";
 
-const BODY_PARTS: BodyPart[] = ["Push", "Pull", "Legs", "Abs", "Chest", "Back", "Bis", "Tris", "Shoulders", "Cardio"];
+
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
 export default function HomeScreen() {
@@ -57,9 +56,7 @@ export default function HomeScreen() {
   const [coachAnswer, setCoachAnswer] = useState<string | null>(null);
   const [coachError, setCoachError] = useState<string | null>(null);
   const [nameModalVisible, setNameModalVisible] = useState(false);
-  const [sessionName, setSessionName] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [draftBodyParts, setDraftBodyParts] = useState<BodyPart[]>([]);
+
   const [menuOpen, setMenuOpen] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -174,16 +171,8 @@ export default function HomeScreen() {
 
   const confirmStartWorkout = (name: string) => {
     setNameModalVisible(false);
-    setSessionName(name);
-    setDraftBodyParts([]);
-    setPickerOpen(true);
-  };
-
-  const onConfirmBodyParts = () => {
-    setPickerOpen(false);
-    // Combine name and body parts for the session
-    const parts = [sessionName, ...draftBodyParts].filter(Boolean);
-    startWorkoutSession(parts);
+    // Directly start with just the name
+    startWorkoutSession(name ? [name] : []);
     setRows([]);
     setMessageInput("");
     setError(null);
@@ -764,15 +753,7 @@ export default function HomeScreen() {
         onConfirm={confirmStartWorkout}
       />
 
-      <BodyPartPickerModal
-        visible={pickerOpen}
-        isDark={isDark}
-        BODY_PARTS={BODY_PARTS}
-        draftBodyParts={draftBodyParts}
-        setDraftBodyParts={setDraftBodyParts}
-        onCancel={() => setPickerOpen(false)}
-        onStart={onConfirmBodyParts}
-      />
+
     </KeyboardAvoidingView >
   );
 }

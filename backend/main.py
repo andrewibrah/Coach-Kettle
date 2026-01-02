@@ -170,7 +170,9 @@ Keep answers under 120 words and prioritize clear, numbered or bulleted guidance
 
 
 @app.post("/parse")
-def parse(req: ParseRequest):
+@app.post("/parse/fast")
+def parse_fast(req: ParseRequest):
+    # Unified endpoint using structured_gate
     result = decide_and_parse(req.message, req.lastExercise)
 
     if isinstance(result, FastDecision):
@@ -187,6 +189,13 @@ def parse(req: ParseRequest):
         return ParseResponse(kind="ai", reason=result.reason)
     
     raise HTTPException(status_code=500, detail="Unknown decision type")
+
+
+@app.post("/log")
+def log_set(row: WorkoutRow):
+    # Stub for per-set logging
+    print(f"[log_set] {row.exercise} {row.weightLbs}x{row.reps}")
+    return {"ok": True}
 
 
 
@@ -209,7 +218,9 @@ def init_db():
 
 init_db()
 
+
 class BackendWorkoutRow(BaseModel):
+    id: str | None = None
     exercise: str
     weightLbs: str
     reps: str
@@ -225,18 +236,19 @@ class WorkoutSession(BaseModel):
 
 @app.post("/history")
 def save_workout(session: WorkoutSession):
-    print(f"[save_workout] Received session: id={session.id}, dateISO={session.dateISO}, part={session.part}, createdAt={session.createdAt}")
-    print(f"[save_workout] Rows count: {len(session.rows)}")
-    for i, r in enumerate(session.rows):
-        print(f"[save_workout]   Row {i}: exercise={r.exercise}, weightLbs={r.weightLbs}, reps={r.reps}, timestamp={r.timestamp}")
-    
+    # Upsert workout session
     rows_json = json.dumps([r.model_dump() for r in session.rows])
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO workouts (id, dateISO, part, createdAt, rows_json) VALUES (?, ?, ?, ?, ?)",
-            (session.id, session.dateISO, session.part, session.createdAt, rows_json)
-        )
-    print(f"[save_workout] Saved successfully to database")
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO workouts (id, dateISO, part, createdAt, rows_json) VALUES (?, ?, ?, ?, ?)",
+                (session.id, session.dateISO, session.part, session.createdAt, rows_json)
+            )
+            conn.commit()
+    except Exception as e:
+        print(f"[save_workout] Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error")
+    
     return {"ok": True}
 
 @app.get("/history")
