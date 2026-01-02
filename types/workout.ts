@@ -17,4 +17,5 @@ export type LogRow = {
   weightLbs: string;
   reps: string;
   notes: string;
+  timestamp: number;
 };

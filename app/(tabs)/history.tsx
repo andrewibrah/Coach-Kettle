@@ -1,14 +1,17 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
+import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { listWorkouts, type WorkoutSession } from "@/lib/workoutStorage";
+import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { api } from "@/lib/api";
+import { type WorkoutSession } from "@/lib/workoutStorage";
 
-function toMMDD(dateISO: string) {
-  const parts = dateISO.split("-");
-  if (parts.length !== 3) return dateISO;
-  return `${parts[1]}/${parts[2]}`;
+function formatDateHeader(dateISO: string) {
+  const date = new Date(dateISO);
+  if (isNaN(date.getTime())) return dateISO;
+  return date.toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function toNumber(raw: string): number {
@@ -17,12 +20,7 @@ function toNumber(raw: string): number {
   return match ? Number(match[0]) : 0;
 }
 
-function formatVolume(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return "—";
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M lb`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k lb`;
-  return `${Math.round(n)} lb`;
-}
+
 
 function sessionStats(s: WorkoutSession) {
   const exercises = new Set(
@@ -46,12 +44,18 @@ export default function HistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = async () => {
-    const data = await listWorkouts();
-    // newest first
-    const sorted = [...data].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-    setItems(sorted);
+    try {
+      const data = await api.getHistory();
+      // newest first
+      const sorted = [...data].sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+      setItems(sorted);
+    } catch (e) {
+      // alert?
+    }
   };
 
   useFocusEffect(
@@ -60,10 +64,37 @@ export default function HistoryScreen() {
     }, [])
   );
 
+  const handleDelete = async () => {
+    if (!selectedId) return;
+    try {
+      await api.deleteWorkout(selectedId);
+      await load();
+    } catch (e) {
+      // alert?
+    } finally {
+      setDeleteModalVisible(false);
+      setSelectedId(null);
+    }
+  };
+
   const headerStats = useMemo(() => {
     const totalWorkouts = items.length;
     const totalSets = items.reduce((sum, s) => sum + (s.rows?.length ?? 0), 0);
     return { totalWorkouts, totalSets };
+  }, [items]);
+
+  const groupedItems = useMemo(() => {
+    const groups: { title: string; data: WorkoutSession[] }[] = [];
+    items.forEach((item) => {
+      // Find existing group
+      let group = groups.find((g) => g.title === item.dateISO);
+      if (!group) {
+        group = { title: item.dateISO, data: [] };
+        groups.push(group);
+      }
+      group.data.push(item);
+    });
+    return groups;
   }, [items]);
 
   const onRefresh = async () => {
@@ -75,65 +106,79 @@ export default function HistoryScreen() {
     }
   };
 
+  const renderWorkoutCard = ({ item }: { item: WorkoutSession }) => {
+    const stats = sessionStats(item);
+
+    return (
+      <Pressable
+        onPress={() =>
+          router.push({
+            pathname: "/history/[id]",
+            params: { id: item.id },
+          })
+        }
+        onLongPress={() => {
+          setSelectedId(item.id);
+          setDeleteModalVisible(true);
+        }}
+        style={({ pressed }) => [
+          styles.card,
+          pressed && styles.cardPressed,
+        ]}
+      >
+        <View style={styles.cardRow}>
+          <View style={styles.cardMain}>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {item.part?.trim() ? item.part.trim() : "Workout"}
+            </Text>
+
+            <View style={styles.metaRow}>
+              <View style={styles.metaChip}>
+                <Text style={styles.metaChipText}>{stats.exercises} ex</Text>
+              </View>
+              <View style={styles.metaChip}>
+                <Text style={styles.metaChipText}>{stats.sets} sets</Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.chevron}>›</Text>
+        </View>
+      </Pressable>
+    );
+  };
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>History</Text>
-        <Text style={styles.subtitle}>
-          {headerStats.totalWorkouts} workouts • {headerStats.totalSets} sets
-        </Text>
+        <View style={styles.headerTop}>
+          <View style={styles.headerLeft}>
+            <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}>
+              <IconSymbol name="chevron.left" size={24} color="#111827" />
+            </Pressable>
+            <View>
+              <Text style={styles.title}>History</Text>
+              <Text style={styles.subtitle}>
+                {headerStats.totalWorkouts} workouts • {headerStats.totalSets} sets
+              </Text>
+            </View>
+          </View>
+        </View>
       </View>
 
-      <FlatList
-        data={items}
+      <SectionList
+        sections={groupedItems}
         keyExtractor={(w) => w.id}
         contentContainerStyle={[styles.listContent, items.length === 0 && { flex: 1 }]}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        renderItem={({ item }) => {
-          const stats = sessionStats(item);
-          return (
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/history/[id]",
-                  params: { id: item.id },
-                })
-              }
-              style={({ pressed }) => [
-                styles.card,
-                pressed && styles.cardPressed,
-              ]}
-            >
-              <View style={styles.cardRow}>
-                <View style={styles.datePill}>
-                  <Text style={styles.dateText}>{toMMDD(item.dateISO)}</Text>
-                </View>
-
-                <View style={styles.cardMain}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {item.part?.trim() ? item.part.trim() : "Workout"}
-                  </Text>
-
-                  <View style={styles.metaRow}>
-                    <View style={styles.metaChip}>
-                      <Text style={styles.metaChipText}>{stats.exercises} ex</Text>
-                    </View>
-                    <View style={styles.metaChip}>
-                      <Text style={styles.metaChipText}>{stats.sets} sets</Text>
-                    </View>
-                    <View style={styles.metaChipDark}>
-                      <Text style={styles.metaChipTextDark}>{formatVolume(stats.volume)}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={styles.chevron}>›</Text>
-              </View>
-            </Pressable>
-          );
-        }}
+        renderItem={renderWorkoutCard}
+        renderSectionHeader={({ section: { title } }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{formatDateHeader(title)}</Text>
+          </View>
+        )}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyTitle}>No saved workouts yet</Text>
@@ -142,6 +187,12 @@ export default function HistoryScreen() {
             </Text>
           </View>
         }
+      />
+
+      <DeleteWorkoutModal
+        visible={deleteModalVisible}
+        onClose={() => setDeleteModalVisible(false)}
+        onConfirm={handleDelete}
       />
     </View>
   );
@@ -155,6 +206,24 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 12,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backBtn: {
+    padding: 8,
+    marginLeft: -8,
+    borderRadius: 999,
+  },
+  backBtnPressed: {
+    backgroundColor: '#E5E7EB',
   },
   title: {
     fontSize: 26,
@@ -186,20 +255,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-
-  datePill: {
-    width: 62,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: "#111827",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dateText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "900",
   },
 
   cardMain: {
@@ -250,6 +305,19 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#9CA3AF",
     marginLeft: 2,
+  },
+
+  sectionHeader: {
+    paddingVertical: 8,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  sectionHeaderText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 
   emptyWrap: {

@@ -58,6 +58,28 @@ class CoachResponse(BaseModel):
     answer: str
 
 
+class ParseRequest(BaseModel):
+    message: str
+    lastExercise: str | None = None
+
+
+class ParseRow(BaseModel):
+    exercise: str
+    weightLbs: str
+    reps: str
+    notes: str
+
+
+class ParseResponse(BaseModel):
+    kind: str
+    reason: str | None = None
+    rows: list[ParseRow] = []
+    userHint: str | None = None
+
+
+from structured_gate import decide_and_parse, FastDecision, AiDecision
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -146,6 +168,103 @@ Keep answers under 120 words and prioritize clear, numbered or bulleted guidance
         raise HTTPException(status_code=500, detail="OpenAI request failed")
 
 
-@app.get("/")
-def root():
-    return {"message": "API running"}
+
+@app.post("/parse")
+def parse(req: ParseRequest):
+    result = decide_and_parse(req.message, req.lastExercise)
+
+    if isinstance(result, FastDecision):
+        return ParseResponse(
+            kind="fast",
+            rows=[ParseRow(
+                exercise=result.row.exercise,
+                weightLbs=result.row.weightLbs,
+                reps=result.row.reps,
+                notes=result.row.notes,
+            )],
+        )
+    elif isinstance(result, AiDecision):
+        return ParseResponse(kind="ai", reason=result.reason)
+    
+    raise HTTPException(status_code=500, detail="Unknown decision type")
+
+
+
+import sqlite3
+from datetime import datetime
+
+DB_PATH = "workouts.db"
+
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS workouts (
+                id TEXT PRIMARY KEY,
+                dateISO TEXT,
+                part TEXT,
+                createdAt INTEGER,
+                rows_json TEXT
+            )
+        """)
+
+init_db()
+
+class BackendWorkoutRow(BaseModel):
+    exercise: str
+    weightLbs: str
+    reps: str
+    notes: str
+    timestamp: int | None = None
+
+class WorkoutSession(BaseModel):
+    id: str
+    dateISO: str
+    part: str
+    rows: list[BackendWorkoutRow]
+    createdAt: int
+
+@app.post("/history")
+def save_workout(session: WorkoutSession):
+    print(f"[save_workout] Received session: id={session.id}, dateISO={session.dateISO}, part={session.part}, createdAt={session.createdAt}")
+    print(f"[save_workout] Rows count: {len(session.rows)}")
+    for i, r in enumerate(session.rows):
+        print(f"[save_workout]   Row {i}: exercise={r.exercise}, weightLbs={r.weightLbs}, reps={r.reps}, timestamp={r.timestamp}")
+    
+    rows_json = json.dumps([r.model_dump() for r in session.rows])
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO workouts (id, dateISO, part, createdAt, rows_json) VALUES (?, ?, ?, ?, ?)",
+            (session.id, session.dateISO, session.part, session.createdAt, rows_json)
+        )
+    print(f"[save_workout] Saved successfully to database")
+    return {"ok": True}
+
+@app.get("/history")
+def list_workouts():
+    sessions = []
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute("SELECT id, dateISO, part, createdAt, rows_json FROM workouts ORDER BY createdAt DESC")
+        for row in cursor:
+            w_id, date_iso, part, created_at, rows_str = row
+            try:
+                rows_data = json.loads(rows_str)
+                rows = [BackendWorkoutRow(**r) for r in rows_data]
+            except:
+                rows = []
+            
+            sessions.append(WorkoutSession(
+                id=w_id,
+                dateISO=date_iso,
+                part=part,
+                rows=rows,
+                createdAt=created_at
+            ))
+    return sessions
+
+@app.delete("/history/{workout_id}")
+def delete_workout(workout_id: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM workouts WHERE id = ?", (workout_id,))
+    return {"ok": True}
+
+

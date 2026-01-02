@@ -22,11 +22,11 @@ type FastPattern = "single" | "multi" | "dropset" | "superset" | "cardio" | "war
 
 export type GateDecision =
   | {
-      kind: "fast";
-      reason: "success";
-      rows: ParsedRow[];
-      meta?: { pattern?: FastPattern };
-    }
+    kind: "fast";
+    reason: "success";
+    rows: ParsedRow[];
+    meta?: { pattern?: FastPattern };
+  }
   | { kind: "ai"; reason: GateDecisionReason; userHint?: string };
 
 type GateContext = { lastExercise?: string };
@@ -161,6 +161,28 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
   if (!isSuperset && exercises.length > 1) return makeAiDecision(MULTI_REASON);
 
   const tail = firstNumberIdx > -1 ? tokens.slice(firstNumberIdx).join(" ") : "";
+
+  // Check for single number first (bodyweight exercise: reps only)
+  // This must happen BEFORE parsePairsFromTail to prevent "20" being split into "2" and "0"
+  const singleNumberMatch = tail.match(/^(?:x\s*)?(\d+)$/);
+  if (singleNumberMatch && !isSuperset && !isDropset && !isCardio) {
+    const reps = singleNumberMatch[1];
+    const baseNotes: string[] = [];
+    if (warmupFlag) baseNotes.push("warmup");
+    return buildFastDecision(
+      [
+        {
+          exercise: exercises[0],
+          weightLbs: "0",
+          reps: reps,
+          notes: baseNotes.join(" "),
+          kind: warmupFlag ? "warmup" : "normal",
+        },
+      ],
+      warmupFlag ? "warmup" : "single"
+    );
+  }
+
   const { pairs, leftoverNumericCount, numberCount } = parsePairsFromTail(tail);
 
   if (isCardio) {

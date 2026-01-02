@@ -37,3 +37,17 @@ export function nextSetNumberForExercise(rows: LogRow[], exercise: string): numb
   }
   return maxSet + 1;
 }
+
+export function normalizeExercise(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function resequenceSets(list: LogRow[]): LogRow[] {
+  const counters: Record<string, number> = {};
+  return list.map((row) => {
+    const norm = normalizeExercise(row.exercise);
+    const nextSet = (counters[norm] || 0) + 1;
+    counters[norm] = nextSet;
+    return { ...row, set: nextSet };
+  });
+}

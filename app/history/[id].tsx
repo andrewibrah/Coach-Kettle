@@ -1,9 +1,12 @@
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { listWorkouts, type WorkoutRow, type WorkoutSession } from "@/lib/workoutStorage";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { api } from "@/lib/api";
+import { type WorkoutRow, type WorkoutSession } from "@/lib/workoutStorage";
 
 type ExerciseGroup = {
   exercise: string;
@@ -29,10 +32,23 @@ export default function WorkoutDetail() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const backgroundColor = useThemeColor({}, 'background');
+  const textColor = useThemeColor({}, 'text');
+  const iconColor = useThemeColor({}, 'icon');
+  const cardColor = isDark ? '#1C1C1E' : '#F9FAFB';
+  const secondaryTextColor = isDark ? '#9CA3AF' : '#6B7280';
+
   useEffect(() => {
     (async () => {
-      const all = await listWorkouts();
-      setWorkout(all.find((w) => w.id === id) ?? null);
+      try {
+        const all: WorkoutSession[] = await api.getHistory();
+        setWorkout(all.find((w) => w.id === id) ?? null);
+      } catch (error) {
+        console.error("[WorkoutDetail] Failed to fetch history:", error);
+        setWorkout(null);
+      }
     })();
   }, [id]);
 
@@ -41,53 +57,46 @@ export default function WorkoutDetail() {
     return groupByExercise(workout.rows);
   }, [workout]);
 
-  const formatDate = (dateISO: string) => {
-    const parts = dateISO.split("-");
-    if (parts.length !== 3) return dateISO;
-    const [year, month, day] = parts;
-    const date = new Date(Number(year), Number(month) - 1, Number(day));
-    const weekday = date.toLocaleDateString(undefined, { weekday: "long" });
-    const monthName = date.toLocaleDateString(undefined, { month: "long" });
-    return `${weekday}, ${monthName} ${day}`;
-  };
+
 
   if (!workout) {
     return (
       <View style={[styles.screen, { paddingTop: Math.max(insets.top, 16) }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-        >
-          <Text style={styles.backButtonText}>← Back</Text>
-        </Pressable>
+        <Stack.Screen options={{ title: "Workout", headerBackTitle: "Back" }} />
         <Text style={styles.notFound}>Workout not found.</Text>
       </View>
     );
   }
 
-  return (
-    <View style={[styles.screen, { paddingTop: Math.max(insets.top, 16) }]}>
-      <Pressable
-        onPress={() => router.back()}
-        style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-      >
-        <Text style={styles.backButtonText}>← Back</Text>
-      </Pressable>
 
-      <View style={styles.headerSection}>
-        <Text style={styles.title}>{formatDate(workout.dateISO)}</Text>
-        <Text style={styles.date}>{workout.part}</Text>
+  const workoutName = workout.part?.trim() || "Workout";
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top + 12, backgroundColor }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}>
+            <IconSymbol name="chevron.left" size={24} color={textColor} />
+          </Pressable>
+          <View>
+            <Text style={[styles.title, { color: textColor }]}>{workoutName}</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+
+
         {groups.length === 0 ? (
           <Text style={styles.emptyText}>No exercises logged.</Text>
         ) : (
           groups.map((group, gIdx) => (
-            <View key={`group_${gIdx}`} style={styles.exerciseGroup}>
+            <View key={`group_${gIdx}`} style={[styles.exerciseGroup, { backgroundColor: cardColor }]}>
               <View style={styles.exerciseHeader}>
-                <Text style={styles.exerciseGroupName}>{group.exercise}</Text>
-                <Text style={styles.setCount}>{group.sets.length} sets</Text>
+                <Text style={[styles.exerciseGroupName, { color: textColor }]}>{group.exercise}</Text>
+                <Text style={[styles.setCount, { color: secondaryTextColor }]}>{group.sets.length} sets</Text>
               </View>
               <View style={styles.setsContainer}>
                 {group.sets.map(({ row, setNum }, sIdx) => (
@@ -96,10 +105,15 @@ export default function WorkoutDetail() {
                       <Text style={styles.setIndicatorText}>{setNum}</Text>
                     </View>
                     <View style={styles.statsRow}>
-                      <Text style={styles.statValue}>{row.weightLbs || "—"}</Text>
-                      <Text style={styles.statUnit}>lb</Text>
-                      <Text style={styles.statSep}>×</Text>
-                      <Text style={styles.statValue}>{row.reps || "—"}</Text>
+                      <Text style={[styles.statValue, { color: textColor }]}>{row.weightLbs || "—"}</Text>
+                      <Text style={[styles.statUnit, { color: secondaryTextColor }]}>lb</Text>
+                      <Text style={[styles.statSep, { color: secondaryTextColor }]}>×</Text>
+                      <Text style={[styles.statValue, { color: textColor }]}>{row.reps || "—"}</Text>
+                      {row.timestamp ? (
+                        <Text style={[styles.timestamp, { color: secondaryTextColor }]}>
+                          {new Date(row.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
                 ))}
@@ -118,42 +132,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: "#FFFFFF",
   },
-  backButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginBottom: 8,
-  },
-  backButtonPressed: {
-    opacity: 0.6,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#3B82F6",
-  },
-  headerSection: {
-    marginBottom: 20,
-    paddingTop: 8,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#111827",
-    letterSpacing: -0.5,
-  },
-  date: {
-    fontSize: 15,
-    color: "#6B7280",
-    marginTop: 4,
-  },
   listContent: {
+    paddingTop: 16,
     paddingBottom: 32,
     gap: 10,
   },
+  header: {
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backBtn: {
+    padding: 8,
+    marginLeft: -8,
+    borderRadius: 999,
+  },
+  backBtnPressed: {
+    backgroundColor: '#E5E7EB',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  dateSubtitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6B7280",
+    textAlign: "center",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   exerciseGroup: {
     backgroundColor: "#F9FAFB",
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
   },
   exerciseHeader: {
@@ -227,5 +245,10 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     textAlign: "center",
     marginTop: 40,
+  },
+  timestamp: {
+    fontSize: 11,
+    fontWeight: "400",
+    marginLeft: 6,
   },
 });

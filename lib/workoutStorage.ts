@@ -5,6 +5,7 @@ export type WorkoutRow = {
   weightLbs: string;
   reps: string;
   notes: string;
+  timestamp?: number;
 };
 
 export type WorkoutSession = {

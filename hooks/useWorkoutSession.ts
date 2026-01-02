@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 
 import { getTodayMMDD, makeId, todayISO } from "@/lib/workoutRules";
-import type { BodyPart } from "@/types/workout";
 
 type UseWorkoutSessionOptions = {
   onResetForNewDay: (nextDate: string) => void;
@@ -10,7 +9,7 @@ type UseWorkoutSessionOptions = {
 
 export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions) {
   const [sessionDate, setSessionDate] = useState<string>(getTodayMMDD());
-  const [bodyParts, setBodyParts] = useState<BodyPart[]>([]);
+  const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [workoutActive, setWorkoutActive] = useState(false);
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [workoutCreatedAt, setWorkoutCreatedAt] = useState<number | null>(null);
@@ -59,7 +58,7 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
     };
   }, [ensureFreshSession]);
 
-  const startWorkoutSession = useCallback((parts: BodyPart[]) => {
+  const startWorkoutSession = useCallback((parts: string[]) => {
     setBodyParts(parts);
     setWorkoutActive(true);
     setWorkoutId(makeId());
@@ -68,6 +67,7 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
   }, []);
 
   const endWorkoutSession = useCallback(() => {
+    console.log("[useWorkoutSession] endWorkoutSession called, setting workoutActive to false");
     setWorkoutActive(false);
     setWorkoutId(null);
     setWorkoutCreatedAt(null);
@@ -76,7 +76,7 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
   }, []);
 
   const buildWorkoutToSave = useCallback(
-    (rows: { exercise: string; weightLbs: string; reps: string; notes: string }[]) => ({
+    (rows: { exercise: string; weightLbs: string; reps: string; notes: string; timestamp?: number }[]) => ({
       id: workoutId ?? makeId(),
       dateISO: workoutDateISO ?? todayISO(),
       part: selectedPart.trim() || "Workout",

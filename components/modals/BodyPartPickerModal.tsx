@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { ThemedText } from "@/components/themed-text";
+import { ThemedText } from "@/components/ui/themed-text";
 import type { BodyPart } from "@/types/workout";
 
 type Props = {
@@ -26,7 +26,7 @@ export function BodyPartPickerModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.modalBackdrop} onPress={onCancel}>
-        <Pressable style={[styles.modalCard, isDark && styles.modalCardDark]} onPress={() => {}}>
+        <Pressable style={[styles.modalCard, isDark && styles.modalCardDark]} onPress={() => { }}>
           <ThemedText
             type="title"
             style={[styles.modalTitle, isDark ? styles.modalTextDark : styles.modalTextLight]}

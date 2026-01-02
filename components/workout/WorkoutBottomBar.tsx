@@ -1,9 +1,10 @@
 import { Dispatch, SetStateAction } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as Haptics from "expo-haptics";
 
-import { ThemedText } from "@/components/themed-text";
+import { ThemedText } from "@/components/ui/themed-text";
 
 type Props = {
   workoutActive: boolean;
@@ -41,6 +42,8 @@ export function WorkoutBottomBar({
   const disabledSend = !workoutActive || loading || !messageInput.trim();
 
   const handleSend = () => {
+    // Debug log to trace button presses
+    console.log(`[WorkoutBottomBar] Send pressed. disabledSend=${disabledSend}, loading=${loading}, input='${messageInput}'`);
     if (disabledSend) return;
     if (Platform.OS === "ios") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -62,8 +65,13 @@ export function WorkoutBottomBar({
     onEndWorkout();
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.bottomWrap}>
+    <View style={[styles.bottomWrap, { paddingBottom: insets.bottom + 10 }]}>
+      {/* Clear Button - Top Right */}
+
+
       <View style={[styles.inputRow, !workoutActive && styles.inputRowDisabled]}>
         {!workoutActive ? (
           <Pressable
@@ -82,25 +90,9 @@ export function WorkoutBottomBar({
           onSubmitEditing={handleSend}
           editable={workoutActive && !loading}
         />
-
-        <Pressable
-          onPress={handleSend}
-          disabled={disabledSend}
-          style={({ pressed }) => [
-            styles.sendButton,
-            disabledSend && styles.sendButtonDisabled,
-            pressed && !disabledSend && styles.sendButtonPressed,
-          ]}
-        >
-          {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.sendButtonText}>Send</Text>}
-        </Pressable>
       </View>
 
       <View style={styles.bottomButtons}>
-        <Pressable onPress={goToHistory} style={({ pressed }) => [styles.pillButton, pressed && styles.pillPressed]}>
-          <Text style={styles.pillText}>History</Text>
-        </Pressable>
-
         <Pressable
           onPress={workoutActive ? handleEndWorkout : handleStartWorkout}
           style={({ pressed }) => [
@@ -116,15 +108,19 @@ export function WorkoutBottomBar({
         </Pressable>
 
         <Pressable
-          onPress={onClearRows}
-          disabled={!hasRows}
+          onPress={handleSend}
           style={({ pressed }) => [
             styles.pillButton,
-            !hasRows && styles.pillDisabled,
-            pressed && hasRows && styles.pillPressed,
+            styles.sendButtonPill,
+            disabledSend && styles.pillDisabled,
+            pressed && !disabledSend && styles.pillPressed,
           ]}
         >
-          <Text style={styles.pillText}>Clear</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={[styles.pillText, styles.pillPrimaryText]}>Send</Text>
+          )}
         </Pressable>
       </View>
 
@@ -139,12 +135,8 @@ export function WorkoutBottomBar({
       {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
       {aiReason ? <ThemedText style={styles.errorHint}>{aiReason}</ThemedText> : null}
 
-      <ThemedText style={styles.hint}>
-        {workoutActive
-          ? 'Tip: "Exercise Weight Reps" — e.g., Bench 185x8 or Lat Pulldown 120 10.'
-          : "Pick a body part, then log sets fast."}
-      </ThemedText>
-    </View>
+
+    </View >
   );
 }
 
@@ -152,12 +144,32 @@ const styles = StyleSheet.create({
   bottomWrap: {
     marginTop: 10,
     gap: 10,
+    paddingHorizontal: 16,
   },
   inputRow: {
     position: "relative",
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 4,
+  },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 4,
+  },
+  clearBtnPressed: {
+    opacity: 0.6,
+  },
+  clearText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   inputTapCatcher: {
     position: "absolute",
@@ -174,7 +186,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
     fontSize: 14,
   },
   messageInput: {
@@ -183,25 +194,9 @@ const styles = StyleSheet.create({
   inputRowDisabled: {
     opacity: 0.7,
   },
-  sendButton: {
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  sendButtonPill: {
     backgroundColor: "#111827",
-    minWidth: 68,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendButtonDisabled: {
-    backgroundColor: "#9CA3AF",
-  },
-  sendButtonPressed: {
-    opacity: 0.85,
-  },
-  sendButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
+    borderColor: "#111827",
   },
   bottomButtons: {
     flexDirection: "row",
@@ -213,7 +208,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: "#D1D5DB",
-    borderRadius: 999,
+    borderRadius: 14,
     paddingVertical: 10,
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -241,20 +236,19 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   toastWrap: {
+    position: "absolute",
+    top: -200,
+    left: 0,
+    right: 0,
     alignItems: "center",
   },
   toastCard: {
-    backgroundColor: "#111827",
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: "#111827",
+    // transparent
   },
   toastText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
+    color: "#374151",
+    fontSize: 18,
+    fontWeight: "600",
   },
   errorText: {
     color: "#B00020",

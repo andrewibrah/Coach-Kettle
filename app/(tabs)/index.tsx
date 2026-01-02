@@ -1,34 +1,42 @@
-import { Image } from "expo-image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
-  Pressable,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   useColorScheme,
   useWindowDimensions,
-  View,
+  View
 } from "react-native";
 
-import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
 
-import { BodyPartPickerModal } from "@/components/BodyPartPickerModal";
-import { CoachModal } from "@/components/CoachModal";
-import { WorkoutBottomBar } from "@/components/WorkoutBottomBar";
-import { WorkoutTable } from "@/components/WorkoutTable";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { api, type ApiWorkoutRow } from "@/lib/api";
-import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
-import { getLastExerciseFromRows, makeId, nextSetNumberForExercise } from "@/lib/workoutRules";
-import { saveWorkout, type WorkoutRow as StoredWorkoutRow } from "@/lib/workoutStorage";
+import { CoachModal } from "@/components/modals/CoachModal";
+import { MenuModal } from "@/components/modals/MenuModal";
+import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ThemedText } from "@/components/ui/themed-text";
+import { ThemedView } from "@/components/ui/themed-view";
+import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
+import { WorkoutTable } from "@/components/workout/WorkoutTable";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
-import type { BodyPart, LogRow } from "@/types/workout";
+import { api, type ApiWorkoutRow } from "@/lib/api";
+import { decideAndParse } from "@/lib/structuredGate";
+import { getLastExerciseFromRows, makeId, nextSetNumberForExercise } from "@/lib/workoutRules";
+import { type LogRow } from "@/types/workout";
+import { useThemeColor } from "../../hooks/use-theme-color";
 
-const BODY_PARTS: BodyPart[] = ["Legs", "Abs", "Chest", "Back", "Bis", "Tris", "Shoulders"];
+type ParsedRow = {
+  exercise: string;
+  weightLbs: string;
+  reps: string;
+  notes: string;
+  kind?: string;
+};
+
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
 export default function HomeScreen() {
@@ -37,6 +45,7 @@ export default function HomeScreen() {
   const isDark = colorScheme === "dark";
   const { width } = useWindowDimensions();
   const compact = width < 380;
+  const backgroundColor = useThemeColor({}, 'background');
 
   const scrollRef = useRef<ScrollView | null>(null);
 
@@ -48,9 +57,6 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; reason?: string } | null>(null);
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [draftBodyParts, setDraftBodyParts] = useState<BodyPart[]>([]);
-
   const [startToastOpen, setStartToastOpen] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
@@ -58,6 +64,8 @@ export default function HomeScreen() {
   const [coachAnswer, setCoachAnswer] = useState<string | null>(null);
   const [coachError, setCoachError] = useState<string | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
+  const [nameModalVisible, setNameModalVisible] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onResetForNewDay = useCallback((_nextDate: string) => {
@@ -104,6 +112,8 @@ export default function HomeScreen() {
     setCoachOpen(false);
   };
 
+
+
   const buildRowsFromApi = (apiRows: ApiWorkoutRow[]): LogRow[] => {
     return apiRows
       .filter((row) => row.exercise && row.exercise.trim())
@@ -114,6 +124,7 @@ export default function HomeScreen() {
         weightLbs: String(row.weightLbs ?? "").trim(),
         reps: String(row.reps ?? "").trim(),
         notes: String(row.notes ?? "").trim(),
+        timestamp: Date.now(),
       }));
   };
 
@@ -159,12 +170,12 @@ export default function HomeScreen() {
       Alert.alert("Workout already started", "End the current workout to start a new one.");
       return;
     }
-    setDraftBodyParts([]);
-    setPickerOpen(true);
+    setNameModalVisible(true);
   };
 
-  const startWorkoutWithParts = (parts: BodyPart[]) => {
-    startWorkoutSession(parts);
+  const confirmStartWorkout = (name: string) => {
+    setNameModalVisible(false);
+    startWorkoutSession([name]);
     setRows([]);
     setMessageInput("");
     setError(null);
@@ -175,7 +186,6 @@ export default function HomeScreen() {
       clearTimeout(undoTimerRef.current);
       undoTimerRef.current = null;
     }
-    setPickerOpen(false);
   };
 
   const onClearRows = () => {
@@ -380,6 +390,7 @@ export default function HomeScreen() {
         ...source,
         id: makeId(),
         set: source.set + 1,
+        timestamp: Date.now(),
       };
       const next = [...prev];
       next.splice(idx + 1, 0, dupe);
@@ -417,39 +428,104 @@ export default function HomeScreen() {
   };
 
   const onEndWorkout = async () => {
+    console.log("[onEndWorkout] Called");
     const committedRows = commitPendingAndGet();
+    console.log("[onEndWorkout] Committed rows count:", committedRows.length);
     if (!workoutActive) {
+      console.log("[onEndWorkout] No active workout, showing alert");
       Alert.alert("No active workout", "Start a workout first.");
       return;
     }
     if (!committedRows.length) {
-      Alert.alert("Nothing to save", "Log at least one set first.");
+      console.log("[onEndWorkout] No rows, showing empty session alert");
+      Alert.alert(
+        "End empty session?",
+        "No sets logged. Nothing will be saved to history.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "End Session",
+            style: "destructive",
+            onPress: () => {
+              console.log("[onEndWorkout] User pressed 'End Session' for empty workout");
+              endWorkoutSession();
+              setRows([]);
+              setMessageInput("");
+              setEditingCell(null);
+              setEditValue("");
+              setUndoState(null);
+              if (undoTimerRef.current) {
+                clearTimeout(undoTimerRef.current);
+                undoTimerRef.current = null;
+              }
+            },
+          },
+        ]
+      );
       return;
     }
 
+    console.log("[onEndWorkout] Has rows, showing save confirmation alert");
     const proceed = await new Promise<boolean>((resolve) => {
       Alert.alert(
         "End workout?",
         "This will save to History.",
         [
-          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-          { text: "Save", style: "default", onPress: () => resolve(true) },
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => {
+              console.log("[onEndWorkout] User pressed Cancel");
+              resolve(false);
+            }
+          },
+          {
+            text: "Save",
+            style: "default",
+            onPress: () => {
+              console.log("[onEndWorkout] User pressed Save");
+              resolve(true);
+            }
+          },
         ]
       );
     });
-    if (!proceed) return;
+    if (!proceed) {
+      console.log("[onEndWorkout] User cancelled, not proceeding");
+      return;
+    }
 
-    const storedRows: StoredWorkoutRow[] = committedRows.map((row) => ({
+    console.log("[onEndWorkout] Building stored rows");
+    const storedRows = committedRows.map((row) => ({
       exercise: row.exercise,
       weightLbs: row.weightLbs,
       reps: row.reps,
       notes: row.notes,
+      timestamp: row.timestamp,
     }));
 
-    await saveWorkout(buildWorkoutToSave(storedRows));
+    try {
+      console.log("[onEndWorkout] Attempting to save workout via API");
+      await api.saveWorkout(buildWorkoutToSave(storedRows));
+      console.log("[onEndWorkout] Workout saved successfully");
+    } catch (error) {
+      console.error("[onEndWorkout] Failed to save workout:", error);
+      Alert.alert(
+        "Save Failed",
+        "Could not save to history. The session will still end. Check that the backend is running.",
+        [{ text: "OK" }]
+      );
+    }
 
-    Alert.alert("Saved", "Workout added to History.");
+    console.log("[onEndWorkout] About to call endWorkoutSession()");
     endWorkoutSession();
+    console.log("[onEndWorkout] endWorkoutSession() called, workoutActive should now be false");
+
+    // Check workoutActive value after state update
+    setTimeout(() => {
+      console.log("[onEndWorkout] workoutActive value after timeout:", workoutActive);
+    }, 100);
+
     setRows([]);
     setMessageInput("");
     setEditingCell(null);
@@ -459,6 +535,7 @@ export default function HomeScreen() {
       clearTimeout(undoTimerRef.current);
       undoTimerRef.current = null;
     }
+    console.log("[onEndWorkout] All state reset complete");
   };
 
   const sendMessage = async () => {
@@ -471,16 +548,27 @@ export default function HomeScreen() {
 
     const currentRows = commitPendingAndGet();
     setError(null);
+    // Don't set loading yet, as we try fast parse synchronously
 
+    // Local synchronous parse
     const gateDecision = decideAndParse(message, { lastExercise: getLastExerciseFromRows(currentRows) });
 
     if (gateDecision.kind === "ai" && gateDecision.userHint) {
       setError({ message: gateDecision.userHint });
+      setLoading(false);
     }
 
     if (gateDecision.kind === "fast") {
       let next = [...currentRows];
       const parsedRows = gateDecision.rows ?? [];
+
+      console.log("[sendMessage] Fast parse result:", parsedRows);
+
+      if (!parsedRows.length) {
+        setError({ message: "Could not parse details", reason: "Try format: Squat 100 10" });
+        return;
+      }
+
       if (parsedRows.length) {
         const addOrFillRow = (rowData: ParsedRow, setOverride?: number) => {
           const normalizedExercise = rowData.exercise.trim().toLowerCase();
@@ -524,19 +612,31 @@ export default function HomeScreen() {
               weightLbs: rowData.weightLbs,
               reps: rowData.reps,
               notes: rowData.notes,
+              timestamp: Date.now(),
             },
           ];
         };
 
-        if (gateDecision.meta?.pattern === "dropset" && parsedRows.length) {
-          const baseSet = nextSetNumberForExercise(next, parsedRows[0].exercise);
-          parsedRows.forEach((row, idx) => addOrFillRow(row, baseSet + (idx + 1) / 10));
+        if (false && parsedRows.length) {
         } else {
           parsedRows.forEach((row) => addOrFillRow(row));
         }
       }
       setRows(next);
       setMessageInput("");
+      setLoading(false);
+
+      // Sync log to backend
+      parsedRows.forEach(row => {
+        api.logSet({
+          exercise: row.exercise,
+          set: 1, // approximate
+          weightLbs: row.weightLbs,
+          reps: row.reps,
+          notes: row.notes
+        }).catch(err => console.error("Failed to sync row", err));
+      });
+
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
       return;
     }
@@ -546,9 +646,11 @@ export default function HomeScreen() {
         message: "Need clarification",
         reason: gateDecision.userHint,
       });
+      // No loading set, instant feedback
       return;
     }
 
+    // Fallback to AI Chat if local parse failed but no specific error reason
     setLoading(true);
     try {
       const contextRows: ApiWorkoutRow[] = toApiRows(currentRows);
@@ -557,8 +659,20 @@ export default function HomeScreen() {
 
       if (!newRows.length) {
         setError({ message: "No rows returned", reason: "Try Exercise Weight Reps format." });
+        setLoading(false);
         return;
       }
+
+      // Sync new rows from AI to backend
+      newRows.forEach(row => {
+        api.logSet({
+          exercise: row.exercise,
+          set: row.set,
+          weightLbs: row.weightLbs,
+          reps: row.reps,
+          notes: row.notes
+        }).catch(err => console.error("Failed to sync row", err));
+      });
 
       setRows((prev) => [...prev, ...newRows]);
       setMessageInput("");
@@ -573,26 +687,16 @@ export default function HomeScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor }]}
     >
       <ThemedView style={styles.header}>
-        <Image
-          source={require("@/assets/images/partial-react-logo.png")}
-          style={styles.headerImage}
-        />
+        <View style={styles.headerTopRow}>
+          <Pressable onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
+            <IconSymbol name="line.3.horizontal" size={24} color={isDark ? "#FFF" : "#000"} />
+          </Pressable>
 
-        <View style={styles.titleRow}>
-          <ThemedText type="title" style={styles.titleText}>
-            {title}
-          </ThemedText>
-        </View>
-
-        <View style={styles.headerActions}>
-          <Pressable
-            onPress={openCoach}
-            style={({ pressed }) => [styles.coachButton, pressed && styles.coachButtonPressed]}
-          >
-            <ThemedText style={styles.coachButtonText}>Ask Coach</ThemedText>
+          <Pressable onPress={onClearRows} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
+            <IconSymbol name="trash" size={24} color={isDark ? "#FFF" : "#000"} />
           </Pressable>
         </View>
       </ThemedView>
@@ -612,14 +716,16 @@ export default function HomeScreen() {
         onMoveRow={moveRow}
       />
 
-      {undoState ? (
-        <View style={styles.undoBar}>
-          <ThemedText style={styles.undoText}>Row deleted</ThemedText>
-          <Pressable onPress={undoDelete} style={({ pressed }) => [styles.undoButton, pressed && styles.undoButtonPressed]}>
-            <ThemedText style={styles.undoButtonText}>Undo</ThemedText>
-          </Pressable>
-        </View>
-      ) : null}
+      {
+        undoState ? (
+          <View style={styles.undoBar}>
+            <ThemedText style={styles.undoText}>Row deleted</ThemedText>
+            <Pressable onPress={undoDelete} style={({ pressed }) => [styles.undoButton, pressed && styles.undoButtonPressed]}>
+              <ThemedText style={styles.undoButtonText}>Undo</ThemedText>
+            </Pressable>
+          </View>
+        ) : null
+      }
 
       <WorkoutBottomBar
         workoutActive={workoutActive}
@@ -649,16 +755,19 @@ export default function HomeScreen() {
         onClose={closeCoach}
       />
 
-      <BodyPartPickerModal
-        visible={pickerOpen}
-        isDark={isDark}
-        BODY_PARTS={BODY_PARTS}
-        draftBodyParts={draftBodyParts}
-        setDraftBodyParts={setDraftBodyParts}
-        onCancel={() => setPickerOpen(false)}
-        onStart={() => startWorkoutWithParts(draftBodyParts)}
+      <MenuModal
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavigateHistory={() => router.push("/history")}
+        onOpenCoach={openCoach}
       />
-    </KeyboardAvoidingView>
+
+      <WorkoutNameModal
+        visible={nameModalVisible}
+        onClose={() => setNameModalVisible(false)}
+        onConfirm={confirmStartWorkout}
+      />
+    </KeyboardAvoidingView >
   );
 }
 
@@ -666,40 +775,25 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingTop: 12,
-    paddingHorizontal: 16,
   },
   header: {
     marginBottom: 10,
   },
-  headerImage: {
-    height: 56,
-    width: 160,
-    alignSelf: "center",
-    marginBottom: 6,
+
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  titleRow: {
-    gap: 10,
+  menuButton: {
+    padding: 8,
+    marginTop: 40,
   },
-  titleText: {
-    textAlign: "center",
+  menuButtonPressed: {
+    opacity: 0.7,
   },
-  headerActions: {
-    marginTop: 6,
-    alignItems: "flex-end",
-  },
-  coachButton: {
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: "#111827",
-  },
-  coachButtonPressed: {
-    opacity: 0.9,
-  },
-  coachButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
+
+
   undoBar: {
     marginTop: 10,
     flexDirection: "row",
