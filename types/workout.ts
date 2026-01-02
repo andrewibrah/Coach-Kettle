@@ -18,4 +18,5 @@ export type LogRow = {
   reps: string;
   notes: string;
   timestamp: number;
+  status?: 'syncing' | 'committed';
 };

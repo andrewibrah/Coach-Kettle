@@ -14,6 +14,7 @@ import {
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 
+import { BodyPartPickerModal } from "@/components/modals/BodyPartPickerModal";
 import { CoachModal } from "@/components/modals/CoachModal";
 import { MenuModal } from "@/components/modals/MenuModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
@@ -22,21 +23,14 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
 import { WorkoutTable } from "@/components/workout/WorkoutTable";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow } from "@/lib/api";
-import { decideAndParse } from "@/lib/structuredGate";
-import { getLastExerciseFromRows, makeId, nextSetNumberForExercise } from "@/lib/workoutRules";
-import { type LogRow } from "@/types/workout";
-import { useThemeColor } from "../../hooks/use-theme-color";
+import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
+import { getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
+import { type BodyPart, type LogRow } from "@/types/workout";
 
-type ParsedRow = {
-  exercise: string;
-  weightLbs: string;
-  reps: string;
-  notes: string;
-  kind?: string;
-};
-
+const BODY_PARTS: BodyPart[] = ["Push", "Pull", "Legs", "Abs", "Chest", "Back", "Bis", "Tris", "Shoulders", "Cardio"];
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
 export default function HomeScreen() {
@@ -57,16 +51,20 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; reason?: string } | null>(null);
 
-  const [startToastOpen, setStartToastOpen] = useState(false);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
   const [coachQuestion, setCoachQuestion] = useState("");
+  const [coachLoading, setCoachLoading] = useState(false);
   const [coachAnswer, setCoachAnswer] = useState<string | null>(null);
   const [coachError, setCoachError] = useState<string | null>(null);
-  const [coachLoading, setCoachLoading] = useState(false);
   const [nameModalVisible, setNameModalVisible] = useState(false);
+  const [sessionName, setSessionName] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftBodyParts, setDraftBodyParts] = useState<BodyPart[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [startToastOpen, setStartToastOpen] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onResetForNewDay = useCallback((_nextDate: string) => {
     setRows([]);
@@ -125,6 +123,7 @@ export default function HomeScreen() {
         reps: String(row.reps ?? "").trim(),
         notes: String(row.notes ?? "").trim(),
         timestamp: Date.now(),
+        status: "committed",
       }));
   };
 
@@ -175,7 +174,16 @@ export default function HomeScreen() {
 
   const confirmStartWorkout = (name: string) => {
     setNameModalVisible(false);
-    startWorkoutSession([name]);
+    setSessionName(name);
+    setDraftBodyParts([]);
+    setPickerOpen(true);
+  };
+
+  const onConfirmBodyParts = () => {
+    setPickerOpen(false);
+    // Combine name and body parts for the session
+    const parts = [sessionName, ...draftBodyParts].filter(Boolean);
+    startWorkoutSession(parts);
     setRows([]);
     setMessageInput("");
     setError(null);
@@ -214,15 +222,13 @@ export default function HomeScreen() {
     );
   };
 
-  const normalizeExercise = (value: string) => value.trim().toLowerCase();
-
-  const resequenceSets = (list: LogRow[]) => {
-    const counters: Record<string, number> = {};
-    return list.map((row) => {
-      const norm = normalizeExercise(row.exercise);
-      const nextSet = (counters[norm] || 0) + 1;
-      counters[norm] = nextSet;
-      return { ...row, set: nextSet };
+  const onIncrementSet = (rowId: string) => {
+    withPendingRows((prev) => {
+      const idx = prev.findIndex((r) => r.id === rowId);
+      if (idx === -1) return prev;
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], set: updated[idx].set + 1 };
+      return updated;
     });
   };
 
@@ -613,6 +619,7 @@ export default function HomeScreen() {
               reps: rowData.reps,
               notes: rowData.notes,
               timestamp: Date.now(),
+              status: "committed",
             },
           ];
         };
@@ -642,45 +649,33 @@ export default function HomeScreen() {
     }
 
     if (gateDecision.kind === "ai") {
-      setError({
-        message: "Need clarification",
-        reason: gateDecision.userHint,
-      });
-      // No loading set, instant feedback
-      return;
-    }
+      const ghostId = makeId();
+      const optimisticRow: LogRow = {
+        id: ghostId,
+        exercise: message.length > 20 ? message.slice(0, 17) + "..." : message,
+        set: 1,
+        weightLbs: "...",
+        reps: "...",
+        notes: "Parsing...",
+        timestamp: Date.now(),
+        status: "syncing",
+      };
 
-    // Fallback to AI Chat if local parse failed but no specific error reason
-    setLoading(true);
-    try {
-      const contextRows: ApiWorkoutRow[] = toApiRows(currentRows);
-      const res = await api.chat(message, contextRows);
-      const newRows = buildRowsFromApi(res.rows);
-
-      if (!newRows.length) {
-        setError({ message: "No rows returned", reason: "Try Exercise Weight Reps format." });
-        setLoading(false);
-        return;
-      }
-
-      // Sync new rows from AI to backend
-      newRows.forEach(row => {
-        api.logSet({
-          exercise: row.exercise,
-          set: row.set,
-          weightLbs: row.weightLbs,
-          reps: row.reps,
-          notes: row.notes
-        }).catch(err => console.error("Failed to sync row", err));
-      });
-
-      setRows((prev) => [...prev, ...newRows]);
+      setRows((prev) => [...prev, optimisticRow]);
       setMessageInput("");
-      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
-    } catch (e) {
-      setError({ message: "Failed to reach API", reason: "Check connection and retry." });
-    } finally {
-      setLoading(false);
+      setLoading(true);
+
+      try {
+        const res = await api.chat(message, toApiRows(currentRows));
+        const newRows = buildRowsFromApi(res.rows).map(r => ({ ...r, status: 'committed' as const }));
+        setRows((prev) => prev.filter((r) => r.id !== ghostId).concat(newRows));
+        requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+      } catch (e) {
+        setRows((prev) => prev.filter((r) => r.id !== ghostId));
+        setError({ message: "Clarification needed", reason: gateDecision.userHint || "Check connection." });
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -714,6 +709,7 @@ export default function HomeScreen() {
         onDeleteRow={deleteRow}
         onDuplicateRow={duplicateRow}
         onMoveRow={moveRow}
+        onIncrementSet={onIncrementSet}
       />
 
       {
@@ -766,6 +762,16 @@ export default function HomeScreen() {
         visible={nameModalVisible}
         onClose={() => setNameModalVisible(false)}
         onConfirm={confirmStartWorkout}
+      />
+
+      <BodyPartPickerModal
+        visible={pickerOpen}
+        isDark={isDark}
+        BODY_PARTS={BODY_PARTS}
+        draftBodyParts={draftBodyParts}
+        setDraftBodyParts={setDraftBodyParts}
+        onCancel={() => setPickerOpen(false)}
+        onStart={onConfirmBodyParts}
       />
     </KeyboardAvoidingView >
   );

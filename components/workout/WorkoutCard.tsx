@@ -1,5 +1,5 @@
 import { ThemedText } from "@/components/ui/themed-text";
-import type { LogRow } from "@/types/workout";
+import { LogRow } from "@/types/workout";
 import { Pressable, StyleSheet, View } from "react-native";
 
 type Props = {
@@ -7,24 +7,36 @@ type Props = {
     isDark: boolean;
     onPress: () => void;
     onLongPress: () => void;
+    onIncrementSet: (rowId: string) => void;
+    onBeginEditCell?: (rowId: string, field: "set", value: string) => void;
 };
 
-export function WorkoutCard({ row, isDark, onPress, onLongPress }: Props) {
+export function WorkoutCard({ row, isDark, onPress, onLongPress, onIncrementSet, onBeginEditCell }: Props) {
+    const isSyncing = row.status === 'syncing';
     return (
         <Pressable
             style={({ pressed }) => [
                 styles.card,
                 isDark ? styles.cardDark : styles.cardLight,
-                pressed && styles.pressed,
+                pressed && !isSyncing && styles.pressed,
+                isSyncing && styles.syncingRow,
             ]}
-            onPress={onPress}
-            onLongPress={onLongPress}
+            onPress={isSyncing ? undefined : onPress}
+            onLongPress={isSyncing ? undefined : onLongPress}
+            disabled={isSyncing}
         >
             <View style={styles.header}>
-                <ThemedText type="defaultSemiBold" style={styles.exercise}>
+                <ThemedText type="defaultSemiBold" style={[styles.exercise, isSyncing && styles.syncingText]}>
                     {row.exercise}
                 </ThemedText>
-                <ThemedText style={styles.set}>Set {row.set}</ThemedText>
+                <Pressable
+                    onPress={() => !isSyncing && onIncrementSet(row.id)}
+                    onLongPress={() => !isSyncing && onBeginEditCell?.(row.id, "set", row.set.toString())}
+                    hitSlop={10}
+                    disabled={isSyncing}
+                >
+                    <ThemedText style={[styles.set, isSyncing && styles.syncingText]}>Set {row.set}</ThemedText>
+                </Pressable>
             </View>
 
             <View style={[styles.details, { marginBottom: row.notes ? 12 : 0 }]}>
@@ -134,5 +146,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontStyle: "italic",
         color: "#4B5563",
+    },
+    syncingRow: {
+        opacity: 0.5,
+    },
+    syncingText: {
+        color: "#9CA3AF",
     },
 });

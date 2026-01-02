@@ -26,6 +26,7 @@ type Props = {
   onDeleteRow: (rowId: string) => void;
   onDuplicateRow: (rowId: string) => void;
   onMoveRow: (rowId: string, direction: MoveDirection) => void;
+  onIncrementSet: (rowId: string) => void;
 };
 
 export function WorkoutTable({
@@ -33,14 +34,15 @@ export function WorkoutTable({
   compact,
   isDark,
   scrollRef,
-  editingCell, // Unused in card view for now
-  editValue, // Unused in card view for now
-  onBeginEditCell, // Unused in card view for now
-  onChangeEditValue, // Unused in card view for now
-  onCommitEditCell, // Unused in card view for now
+  editingCell,
+  editValue,
+  onBeginEditCell,
+  onChangeEditValue,
+  onCommitEditCell,
   onDeleteRow,
   onDuplicateRow,
   onMoveRow,
+  onIncrementSet,
 }: Props) {
   const moveAvailability = (row: LogRow, idx: number) => {
     const normalized = row.exercise.trim().toLowerCase();
@@ -78,31 +80,43 @@ export function WorkoutTable({
         ) : (
           rows.map((r, idx) => {
             const moveAvail = moveAvailability(r, idx);
-            const renderRightActions = () => (
-              <View style={styles.swipeActions}>
-                <Pressable
-                  onPress={() => onDuplicateRow(r.id)}
-                  style={({ pressed }) => [styles.swipeButton, styles.swipeDuplicate, pressed && styles.swipePressed]}
-                >
-                  <ThemedText style={styles.swipeText}>Duplicate</ThemedText>
-                </Pressable>
-                <Pressable
-                  onPress={() => onDeleteRow(r.id)}
-                  style={({ pressed }) => [styles.swipeButton, styles.swipeDelete, pressed && styles.swipePressed]}
-                >
-                  <ThemedText style={styles.swipeText}>Delete</ThemedText>
-                </Pressable>
-              </View>
-            );
+            const isSyncing = r.status === 'syncing';
+            const renderRightActions = () => {
+              if (isSyncing) return null;
+              return (
+                <View style={styles.swipeActions}>
+                  <Pressable
+                    onPress={() => onDuplicateRow(r.id)}
+                    style={({ pressed }) => [styles.swipeButton, styles.swipeDuplicate, pressed && styles.swipePressed]}
+                  >
+                    <ThemedText style={styles.swipeText}>Duplicate</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => onDeleteRow(r.id)}
+                    style={({ pressed }) => [styles.swipeButton, styles.swipeDelete, pressed && styles.swipePressed]}
+                  >
+                    <ThemedText style={styles.swipeText}>Delete</ThemedText>
+                  </Pressable>
+                </View>
+              );
+            };
             return (
-              <Swipeable key={r.id} renderRightActions={renderRightActions} overshootRight={false}>
-                <WorkoutCard
-                  row={r}
-                  isDark={isDark}
-                  onPress={() => { }}
-                  onLongPress={() => openRowMenu(r.id, moveAvail.up, moveAvail.down)}
-                />
-              </Swipeable>
+              <View key={r.id} style={isSyncing ? styles.syncingWrap : undefined}>
+                <Swipeable
+                  renderRightActions={renderRightActions}
+                  overshootRight={false}
+                  enabled={!isSyncing}
+                >
+                  <WorkoutCard
+                    row={r}
+                    isDark={isDark}
+                    onPress={() => {}}
+                    onLongPress={() => openRowMenu(r.id, moveAvail.up, moveAvail.down)}
+                    onIncrementSet={onIncrementSet}
+                    onBeginEditCell={(rowId, field, value) => onBeginEditCell(rowId, field as any, value)}
+                  />
+                </Swipeable>
+              </View>
             );
           })
         )}
@@ -158,5 +172,8 @@ const styles = StyleSheet.create({
   },
   swipePressed: {
     opacity: 0.9,
+  },
+  syncingWrap: {
+    opacity: 0.5,
   },
 });
