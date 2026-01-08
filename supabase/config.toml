@@ -1,0 +1,23 @@
+[db]
+port = 5432
+shadow_port = 54320
+major_version = 17
+
+[api]
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = []
+jwt_expiry = 3600
+enable_signup = true
+
+[storage]
+file_size_limit = "50MB"
+
+[functions]
+  [functions.default]
+  verify_jwt = true

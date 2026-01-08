@@ -13,6 +13,8 @@ import {
 
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
+import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
+import { runOnJS } from "react-native-reanimated";
 
 import { CoachModal } from "@/components/modals/CoachModal";
 import { MenuModal } from "@/components/modals/MenuModal";
@@ -59,6 +61,13 @@ export default function HomeScreen() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const openMenu = () => setMenuOpen(true);
+  const swipeRight = Gesture.Fling()
+    .direction(Directions.RIGHT)
+    .onEnd(() => {
+      runOnJS(openMenu)();
+    });
 
   const [startToastOpen, setStartToastOpen] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -669,10 +678,11 @@ export default function HomeScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={[styles.screen, { backgroundColor }]}
-    >
+    <GestureDetector gesture={swipeRight}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={[styles.screen, { backgroundColor }]}
+      >
       <ThemedView style={styles.header}>
         <View style={styles.headerTopRow}>
           <Pressable onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
@@ -754,7 +764,8 @@ export default function HomeScreen() {
       />
 
 
-    </KeyboardAvoidingView >
+      </KeyboardAvoidingView >
+    </GestureDetector>
   );
 }
 
