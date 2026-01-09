@@ -5,14 +5,14 @@ import { Link, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/ui/themed-text';
@@ -67,32 +67,32 @@ export default function SignIn() {
 
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        
+
         if (result.type === 'success' && result.url) {
-            // Handle the redirect URL
-            // Extract tokens from URL if implicit flow, or code if PKCE
-            // For Supabase, usually you need to persist the session.
-            
-            // Check if URL has access_token (implicit) or code (PKCE)
-            // supabase-js doesn't automatically pick it up from WebBrowser result unless we force it.
-            
-            const params = Linking.parse(result.url);
-            // Unfortunately manually handling this is specific to how Supabase project is configured (Implicit vs PKCE)
-            // Default new projects are PKCE. url contains ?code=...
-            
-            if (params.queryParams?.code) {
-               const { error: sessionError } = await supabase.auth.exchangeCodeForSession(params.queryParams.code as string);
-               if (sessionError) throw sessionError;
-            } else if (result.url.includes('access_token')) {
-                // Implicit flow (url fragment)
-                // supabase.auth.getSession() usually works if url is processed or if we use setSession
-                // But simplified:
-                // We will rely on Supabase detecting it if we passed the URL? No.
-                
-                 await supabase.auth.getSession(); // Try to refresh
-            }
-            
-            router.replace('/(tabs)');
+          // Handle the redirect URL
+          // Extract tokens from URL if implicit flow, or code if PKCE
+          // For Supabase, usually you need to persist the session.
+
+          // Check if URL has access_token (implicit) or code (PKCE)
+          // supabase-js doesn't automatically pick it up from WebBrowser result unless we force it.
+
+          const params = Linking.parse(result.url);
+          // Unfortunately manually handling this is specific to how Supabase project is configured (Implicit vs PKCE)
+          // Default new projects are PKCE. url contains ?code=...
+
+          if (params.queryParams?.code) {
+            const { error: sessionError } = await supabase.auth.exchangeCodeForSession(params.queryParams.code as string);
+            if (sessionError) throw sessionError;
+          } else if (result.url.includes('access_token')) {
+            // Implicit flow (url fragment)
+            // supabase.auth.getSession() usually works if url is processed or if we use setSession
+            // But simplified:
+            // We will rely on Supabase detecting it if we passed the URL? No.
+
+            await supabase.auth.getSession(); // Try to refresh
+          }
+
+          router.replace('/(tabs)');
         }
       }
     } catch (err: any) {
@@ -104,77 +104,76 @@ export default function SignIn() {
 
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex:1}}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        
-        <View style={styles.header}>
-            <Ionicons name="fitness" size={64} color={primaryColor} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+
+          <View style={styles.header}>
             <ThemedText type="title" style={styles.title}>Welcome Back</ThemedText>
             <ThemedText style={styles.subtitle}>Sign in to continue your progress</ThemedText>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <ThemedText style={styles.label}>Email</ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
-              onChangeText={setEmail}
-              value={email}
-              placeholder="user@example.com"
-              placeholderTextColor="#999"
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
           </View>
 
-          <View style={styles.inputContainer}>
-            <ThemedText style={styles.label}>Password</ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
-              onChangeText={setPassword}
-              value={password}
-              placeholder="••••••••"
-              placeholderTextColor="#999"
-              secureTextEntry
-            />
-          </View>
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Email</ThemedText>
+              <TextInput
+                style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
+                onChangeText={setEmail}
+                value={email}
+                placeholder="user@example.com"
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+            </View>
 
-          <TouchableOpacity 
-            style={[styles.button, { backgroundColor: primaryColor, opacity: loading ? 0.7 : 1 }]} 
-            onPress={signInWithEmail}
-            disabled={loading}
-          >
-            <ThemedText style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</ThemedText>
-          </TouchableOpacity>
+            <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Password</ThemedText>
+              <TextInput
+                style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
+                onChangeText={setPassword}
+                value={password}
+                placeholder="••••••••"
+                placeholderTextColor="#999"
+                secureTextEntry
+              />
+            </View>
 
-          <View style={styles.divider}>
-             <View style={styles.line} />
-             <ThemedText style={styles.orText}>OR</ThemedText>
-             <View style={styles.line} />
-          </View>
-
-          <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('apple')}>
-             <Ionicons name="logo-apple" size={24} color={textColor} />
-             <ThemedText style={styles.oauthText}>Sign in with Apple</ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('google')}>
-             <Ionicons name="logo-google" size={24} color={textColor} />
-             <ThemedText style={styles.oauthText}>Sign in with Google</ThemedText>
-          </TouchableOpacity>
-
-        </View>
-
-        <View style={styles.footer}>
-          <ThemedText>Don't have an account? </ThemedText>
-          <Link href={"/auth/sign-up" as any} asChild>
-            <TouchableOpacity>
-              <ThemedText type="link">Sign Up</ThemedText>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: primaryColor, opacity: loading ? 0.7 : 1 }]}
+              onPress={signInWithEmail}
+              disabled={loading}
+            >
+              <ThemedText style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</ThemedText>
             </TouchableOpacity>
-          </Link>
-        </View>
 
-      </ScrollView>
+            <View style={styles.divider}>
+              <View style={styles.line} />
+              <ThemedText style={styles.orText}>OR</ThemedText>
+              <View style={styles.line} />
+            </View>
+
+            <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('apple')}>
+              <Ionicons name="logo-apple" size={24} color={textColor} />
+              <ThemedText style={styles.oauthText}>Sign in with Apple</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('google')}>
+              <Ionicons name="logo-google" size={24} color={textColor} />
+              <ThemedText style={styles.oauthText}>Sign in with Google</ThemedText>
+            </TouchableOpacity>
+
+          </View>
+
+          <View style={styles.footer}>
+            <ThemedText>Don't have an account? </ThemedText>
+            <Link href={"/auth/sign-up" as any} asChild>
+              <TouchableOpacity>
+                <ThemedText type="link">Sign Up</ThemedText>
+              </TouchableOpacity>
+            </Link>
+          </View>
+
+        </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>
   );
@@ -268,6 +267,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'baseline',
     justifyContent: 'center',
     marginTop: 16,
   },

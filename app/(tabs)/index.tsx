@@ -11,6 +11,7 @@ import {
   View
 } from "react-native";
 
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -683,85 +684,86 @@ export default function HomeScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={[styles.screen, { backgroundColor }]}
       >
-      <ThemedView style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <Pressable onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
-            <IconSymbol name="line.3.horizontal" size={24} color={isDark ? "#FFF" : "#000"} />
-          </Pressable>
+        <ThemedView style={styles.header}>
+          <View style={styles.headerTopRow}>
+            <Pressable onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
+              <IconSymbol name="line.3.horizontal" size={24} color={isDark ? "#FFF" : "#000"} />
+            </Pressable>
 
-          <Pressable onPress={onClearRows} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
-            <IconSymbol name="trash" size={24} color={isDark ? "#FFF" : "#000"} />
-          </Pressable>
-        </View>
-      </ThemedView>
-
-      <WorkoutTable
-        rows={rows}
-        compact={compact}
-        isDark={isDark}
-        scrollRef={scrollRef}
-        editingCell={editingCell}
-        editValue={editValue}
-        onBeginEditCell={beginCellEdit}
-        onChangeEditValue={setEditValue}
-        onCommitEditCell={commitCellEdit}
-        onDeleteRow={deleteRow}
-        onDuplicateRow={duplicateRow}
-        onMoveRow={moveRow}
-        onIncrementSet={onIncrementSet}
-      />
-
-      {
-        undoState ? (
-          <View style={styles.undoBar}>
-            <ThemedText style={styles.undoText}>Row deleted</ThemedText>
-            <Pressable onPress={undoDelete} style={({ pressed }) => [styles.undoButton, pressed && styles.undoButtonPressed]}>
-              <ThemedText style={styles.undoButtonText}>Undo</ThemedText>
+            <Pressable onPress={onClearRows} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
+              <MaterialCommunityIcons name="trash-can-outline" size={24} color={isDark ? "#FFF" : "#000"} />
             </Pressable>
           </View>
-        ) : null
-      }
+        </ThemedView>
 
-      <WorkoutBottomBar
-        workoutActive={workoutActive}
-        loading={loading}
-        messageInput={messageInput}
-        setMessageInput={setMessageInput}
-        sendMessage={sendMessage}
-        onStartWorkout={onStartWorkout}
-        onEndWorkout={onEndWorkout}
-        onClearRows={onClearRows}
-        goToHistory={() => router.push("/history")}
-        hasRows={rows.length > 0}
-        startToastOpen={startToastOpen}
-        showStartToast={showStartToast}
-        error={error?.message ?? null}
-        aiReason={error?.reason}
-      />
+        <WorkoutTable
+          rows={rows}
+          compact={compact}
+          isDark={isDark}
+          scrollRef={scrollRef}
+          editingCell={editingCell}
+          editValue={editValue}
+          onBeginEditCell={beginCellEdit}
+          onChangeEditValue={setEditValue}
+          onCommitEditCell={commitCellEdit}
+          onDeleteRow={deleteRow}
+          onDuplicateRow={duplicateRow}
+          onMoveRow={moveRow}
+          onIncrementSet={onIncrementSet}
+        />
 
-      <CoachModal
-        visible={coachOpen}
-        question={coachQuestion}
-        onChangeQuestion={setCoachQuestion}
-        loading={coachLoading}
-        answer={coachAnswer}
-        error={coachError}
-        onSubmit={submitCoachQuestion}
-        onClose={closeCoach}
-      />
+        {
+          undoState ? (
+            <View style={styles.undoBar}>
+              <ThemedText style={styles.undoText}>Row deleted</ThemedText>
+              <Pressable onPress={undoDelete} style={({ pressed }) => [styles.undoButton, pressed && styles.undoButtonPressed]}>
+                <ThemedText style={styles.undoButtonText}>Undo</ThemedText>
+              </Pressable>
+            </View>
+          ) : null
+        }
 
-      <MenuModal
-        visible={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        onNavigateHistory={() => router.push("/history")}
-        onOpenCoach={openCoach}
-      />
+        <WorkoutBottomBar
+          workoutActive={workoutActive}
+          loading={loading}
+          messageInput={messageInput}
+          setMessageInput={setMessageInput}
+          sendMessage={sendMessage}
+          onStartWorkout={onStartWorkout}
+          onEndWorkout={onEndWorkout}
+          onClearRows={onClearRows}
+          goToHistory={() => router.push("/history")}
+          hasRows={rows.length > 0}
+          startToastOpen={startToastOpen}
+          showStartToast={showStartToast}
+          error={error?.message ?? null}
+          aiReason={error?.reason}
+        />
 
-      <WorkoutNameModal
-        visible={nameModalVisible}
-        onClose={() => setNameModalVisible(false)}
-        onConfirm={confirmStartWorkout}
-      />
+        <CoachModal
+          visible={coachOpen}
+          question={coachQuestion}
+          onChangeQuestion={setCoachQuestion}
+          loading={coachLoading}
+          answer={coachAnswer}
+          error={coachError}
+          onSubmit={submitCoachQuestion}
+          onClose={closeCoach}
+        />
+
+        <MenuModal
+          visible={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          onNavigateHistory={() => router.push("/history")}
+          onNavigateSettings={() => router.push("/settings")}
+          onOpenCoach={openCoach}
+        />
+
+        <WorkoutNameModal
+          visible={nameModalVisible}
+          onClose={() => setNameModalVisible(false)}
+          onConfirm={confirmStartWorkout}
+        />
 
 
       </KeyboardAvoidingView >

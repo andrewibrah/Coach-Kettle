@@ -5,14 +5,14 @@ import { Link, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/ui/themed-text';
@@ -49,8 +49,8 @@ export default function SignUp() {
     setLoading(false);
     if (error) Alert.alert('Sign Up Failed', error.message);
     else {
-        if (!data.session) Alert.alert('Verification Sent', 'Please check your email to confirm your account.');
-        else router.replace('/(tabs)');
+      if (!data.session) Alert.alert('Verification Sent', 'Please check your email to confirm your account.');
+      else router.replace('/(tabs)');
     }
   }
 
@@ -69,14 +69,14 @@ export default function SignUp() {
 
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        
+
         if (result.type === 'success' && result.url) {
-            const params = Linking.parse(result.url);
-            if (params.queryParams?.code) {
-               const { error: sessionError } = await supabase.auth.exchangeCodeForSession(params.queryParams.code as string);
-               if (sessionError) throw sessionError;
-            }
-            router.replace('/(tabs)');
+          const params = Linking.parse(result.url);
+          if (params.queryParams?.code) {
+            const { error: sessionError } = await supabase.auth.exchangeCodeForSession(params.queryParams.code as string);
+            if (sessionError) throw sessionError;
+          }
+          router.replace('/(tabs)');
         }
       }
     } catch (err: any) {
@@ -88,77 +88,76 @@ export default function SignUp() {
 
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex:1}}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        
-        <View style={styles.header}>
-            <Ionicons name="person-add" size={64} color={primaryColor} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+
+          <View style={styles.header}>
             <ThemedText type="title" style={styles.title}>Create Account</ThemedText>
             <ThemedText style={styles.subtitle}>Join EasyWorkouts today</ThemedText>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <ThemedText style={styles.label}>Email</ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
-              onChangeText={setEmail}
-              value={email}
-              placeholder="user@example.com"
-              placeholderTextColor="#999"
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
           </View>
 
-          <View style={styles.inputContainer}>
-            <ThemedText style={styles.label}>Password</ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
-              onChangeText={setPassword}
-              value={password}
-              placeholder="Create a password"
-              placeholderTextColor="#999"
-              secureTextEntry
-            />
-          </View>
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Email</ThemedText>
+              <TextInput
+                style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
+                onChangeText={setEmail}
+                value={email}
+                placeholder="user@example.com"
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+            </View>
 
-          <TouchableOpacity 
-            style={[styles.button, { backgroundColor: primaryColor, opacity: loading ? 0.7 : 1 }]} 
-            onPress={signUpWithEmail}
-            disabled={loading}
-          >
-            <ThemedText style={styles.buttonText}>{loading ? 'Creating account...' : 'Sign Up'}</ThemedText>
-          </TouchableOpacity>
+            <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Password</ThemedText>
+              <TextInput
+                style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
+                onChangeText={setPassword}
+                value={password}
+                placeholder="Create a password"
+                placeholderTextColor="#999"
+                secureTextEntry
+              />
+            </View>
 
-          <View style={styles.divider}>
-             <View style={styles.line} />
-             <ThemedText style={styles.orText}>OR</ThemedText>
-             <View style={styles.line} />
-          </View>
-
-          <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('apple')}>
-             <Ionicons name="logo-apple" size={24} color={textColor} />
-             <ThemedText style={styles.oauthText}>Sign up with Apple</ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('google')}>
-             <Ionicons name="logo-google" size={24} color={textColor} />
-             <ThemedText style={styles.oauthText}>Sign up with Google</ThemedText>
-          </TouchableOpacity>
-
-        </View>
-
-        <View style={styles.footer}>
-          <ThemedText>Already have an account? </ThemedText>
-          <Link href={"/auth/sign-in" as any} asChild>
-            <TouchableOpacity>
-              <ThemedText type="link">Sign In</ThemedText>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: primaryColor, opacity: loading ? 0.7 : 1 }]}
+              onPress={signUpWithEmail}
+              disabled={loading}
+            >
+              <ThemedText style={styles.buttonText}>{loading ? 'Creating account...' : 'Sign Up'}</ThemedText>
             </TouchableOpacity>
-          </Link>
-        </View>
 
-      </ScrollView>
+            <View style={styles.divider}>
+              <View style={styles.line} />
+              <ThemedText style={styles.orText}>OR</ThemedText>
+              <View style={styles.line} />
+            </View>
+
+            <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('apple')}>
+              <Ionicons name="logo-apple" size={24} color={textColor} />
+              <ThemedText style={styles.oauthText}>Sign up with Apple</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('google')}>
+              <Ionicons name="logo-google" size={24} color={textColor} />
+              <ThemedText style={styles.oauthText}>Sign up with Google</ThemedText>
+            </TouchableOpacity>
+
+          </View>
+
+          <View style={styles.footer}>
+            <ThemedText>Already have an account? </ThemedText>
+            <Link href={"/auth/sign-in" as any} asChild>
+              <TouchableOpacity>
+                <ThemedText type="link">Sign In</ThemedText>
+              </TouchableOpacity>
+            </Link>
+          </View>
+
+        </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>
   );
@@ -252,6 +251,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'baseline',
     justifyContent: 'center',
     marginTop: 16,
   },

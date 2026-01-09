@@ -5,13 +5,15 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 type AuthContextType = {
   session: Session | null;
   loading: boolean;
-  isAdmin: boolean; // Placeholder for future roles
+  isAdmin: boolean;
+  signOut: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType>({ 
-  session: null, 
+const AuthContext = createContext<AuthContextType>({
+  session: null,
   loading: true,
-  isAdmin: false 
+  isAdmin: false,
+  signOut: async () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -36,8 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
-    <AuthContext.Provider value={{ session, loading, isAdmin: false }}>
+    <AuthContext.Provider value={{ session, loading, isAdmin: false, signOut }}>
       {children}
     </AuthContext.Provider>
   );
