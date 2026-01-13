@@ -1,8 +1,8 @@
 // Edge Function: history
-// CRUD operations for workout history
+// CRUD operations for workout history (per-user)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -27,22 +27,48 @@ interface WorkoutSession {
     createdAt: number;
 }
 
-function getSupabaseClient() {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-        throw new Error("Missing Supabase env vars");
+if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing Supabase env vars");
+}
+
+function respondJson(body: unknown, status = 200) {
+    return new Response(
+        JSON.stringify(body),
+        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+}
+
+function createUserClient(authHeader: string): SupabaseClient {
+    return createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+            headers: { Authorization: authHeader },
+        },
+    });
+}
+
+async function getUserContext(authHeader: string | null): Promise<{ supabase: SupabaseClient; userId: string } | Response> {
+    if (!authHeader) {
+        return respondJson({ error: "Missing Authorization header" }, 401);
     }
 
-    return createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createUserClient(authHeader);
+    const { data, error } = await supabase.auth.getUser();
+
+    if (error || !data?.user) {
+        console.error("[history] Auth error:", error);
+        return respondJson({ error: "Unauthorized" }, 401);
+    }
+
+    return { supabase, userId: data.user.id };
 }
 
 // POST: Save/upsert workout session
-async function saveWorkout(session: WorkoutSession): Promise<Response> {
-    const supabase = getSupabaseClient();
-
-    const rowsJson = JSON.stringify(session.rows);
+async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, userId: string): Promise<Response> {
+    const rows = Array.isArray(session.rows) ? session.rows : [];
+    const rowsJson = JSON.stringify(rows);
 
     const { error } = await supabase
         .from("workouts")
@@ -52,37 +78,28 @@ async function saveWorkout(session: WorkoutSession): Promise<Response> {
             part: session.part,
             createdAt: session.createdAt,
             rows_json: rowsJson,
+            user_id: userId,
         }, { onConflict: "id" });
 
     if (error) {
         console.error("[history] Database error:", error);
-        return new Response(
-            JSON.stringify({ error: "Database error" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return respondJson({ error: "Database error" }, 500);
     }
 
-    return new Response(
-        JSON.stringify({ ok: true }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return respondJson({ ok: true });
 }
 
 // GET: List all workouts
-async function listWorkouts(): Promise<Response> {
-    const supabase = getSupabaseClient();
-
+async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<Response> {
     const { data, error } = await supabase
         .from("workouts")
         .select("id, dateISO, part, createdAt, rows_json")
+        .eq("user_id", userId)
         .order("createdAt", { ascending: false });
 
     if (error) {
         console.error("[history] Database error:", error);
-        return new Response(
-            JSON.stringify({ error: "Database error" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return respondJson({ error: "Database error" }, 500);
     }
 
     const sessions: WorkoutSession[] = (data || []).map((row: any) => {
@@ -102,33 +119,23 @@ async function listWorkouts(): Promise<Response> {
         };
     });
 
-    return new Response(
-        JSON.stringify(sessions),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return respondJson(sessions);
 }
 
 // DELETE: Delete workout by ID
-async function deleteWorkout(workoutId: string): Promise<Response> {
-    const supabase = getSupabaseClient();
-
+async function deleteWorkout(workoutId: string, supabase: SupabaseClient, userId: string): Promise<Response> {
     const { error } = await supabase
         .from("workouts")
         .delete()
-        .eq("id", workoutId);
+        .eq("id", workoutId)
+        .eq("user_id", userId);
 
     if (error) {
         console.error("[history] Database error:", error);
-        return new Response(
-            JSON.stringify({ error: "Database error" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return respondJson({ error: "Database error" }, 500);
     }
 
-    return new Response(
-        JSON.stringify({ ok: true }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return respondJson({ ok: true });
 }
 
 serve(async (req) => {
@@ -137,6 +144,12 @@ serve(async (req) => {
         return new Response("ok", { headers: corsHeaders });
     }
 
+    const authContext = await getUserContext(req.headers.get("Authorization"));
+    if (authContext instanceof Response) {
+        return authContext;
+    }
+
+    const { supabase, userId } = authContext;
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(p => p);
     // Path format: /history or /history/{id}
@@ -149,24 +162,18 @@ serve(async (req) => {
             try {
                 payload = await req.json();
             } catch {
-                return new Response(
-                    JSON.stringify({ error: "Invalid JSON" }),
-                    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
+                return respondJson({ error: "Invalid JSON" }, 400);
             }
 
             if (!payload.id || !payload.dateISO || !payload.part) {
-                return new Response(
-                    JSON.stringify({ error: "id, dateISO, and part are required" }),
-                    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
+                return respondJson({ error: "id, dateISO, and part are required" }, 400);
             }
 
-            return await saveWorkout(payload);
+            return await saveWorkout(payload, supabase, userId);
         }
 
         if (req.method === "GET") {
-            return await listWorkouts();
+            return await listWorkouts(supabase, userId);
         }
 
         if (req.method === "DELETE") {
@@ -189,25 +196,16 @@ serve(async (req) => {
             }
 
             if (!idToDelete) {
-                return new Response(
-                    JSON.stringify({ error: "workout_id is required" }),
-                    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
+                return respondJson({ error: "workout_id is required" }, 400);
             }
 
-            return await deleteWorkout(idToDelete);
+            return await deleteWorkout(idToDelete, supabase, userId);
         }
 
-        return new Response(
-            JSON.stringify({ error: "Method not allowed" }),
-            { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return respondJson({ error: "Method not allowed" }, 405);
     } catch (error) {
         console.error("[history] Error:", error);
         const message = error instanceof Error ? error.message : "Internal server error";
-        return new Response(
-            JSON.stringify({ error: message }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return respondJson({ error: message }, 500);
     }
 });

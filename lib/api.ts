@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { supabase, supabaseAnonKey } from "./supabase";
 
 function resolveApiBase(): string {
   const envBase = process.env.EXPO_PUBLIC_API_URL?.trim();
@@ -36,6 +37,23 @@ const API_BASE = resolveApiBase();
 if (__DEV__) {
   // eslint-disable-next-line no-console
   console.info(`[api] API_BASE=${API_BASE}`);
+}
+
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("Not authenticated");
+  }
+
+  return {
+    Authorization: `Bearer ${session.access_token}`,
+    apikey: supabaseAnonKey,
+  };
+}
+
+async function getJsonAuthHeaders(): Promise<HeadersInit> {
+  const authHeaders = await getAuthHeaders();
+  return { ...authHeaders, "Content-Type": "application/json" };
 }
 
 export type ApiWorkoutRow = {
@@ -135,12 +153,13 @@ export const api = {
     const url = `${API_BASE}/history`;
     console.log("[api.saveWorkout] Sending to:", url);
     console.log("[api.saveWorkout] Session data:", JSON.stringify(session, null, 2));
+    const headers = await getJsonAuthHeaders();
 
     let res: Response;
     try {
       res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(session),
       });
     } catch (error) {
@@ -158,13 +177,15 @@ export const api = {
   },
   getHistory: async () => {
     const url = `${API_BASE}/history`;
-    const res = await fetch(url);
+    const headers = await getAuthHeaders();
+    const res = await fetch(url, { method: "GET", headers });
     if (!res.ok) throw new Error("Failed to fetch history");
     return await res.json();
   },
   deleteWorkout: async (id: string) => {
     const url = `${API_BASE}/history/${id}`;
-    await fetch(url, { method: "DELETE" });
+    const headers = await getAuthHeaders();
+    await fetch(url, { method: "DELETE", headers });
   },
   logSet: async (row: ApiWorkoutRow) => {
     const url = `${API_BASE}/log`;
