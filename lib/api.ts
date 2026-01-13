@@ -76,7 +76,7 @@ export const api = {
       throw new Error(`HTTP ${res.status} from ${url}: ${body}`);
     }
 
-    return (await res.json()) as { rows: ApiWorkoutRow[] };
+    return (await res.json()) as { rows: ApiWorkoutRow[]; answer?: string };
   },
   askCoach: async (question: string, rows: ApiWorkoutRow[]) => {
     const url = `${API_BASE}/coach`;

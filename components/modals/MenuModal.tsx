@@ -7,11 +7,12 @@ type Props = {
     visible: boolean;
     onClose: () => void;
     onNavigateHistory: () => void;
+    onNavigateChats: () => void;
     onNavigateSettings: () => void;
     onOpenCoach: () => void;
 };
 
-export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateSettings, onOpenCoach }: Props) {
+export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats, onNavigateSettings, onOpenCoach }: Props) {
     const insets = useSafeAreaInsets();
 
     return (
@@ -36,6 +37,13 @@ export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateSetti
                             onPress={() => { onClose(); onOpenCoach(); }}
                         >
                             <Text style={styles.buttonText}>Ask Coach</Text>
+                        </Pressable>
+
+                        <Pressable
+                            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                            onPress={() => { onClose(); onNavigateChats(); }}
+                        >
+                            <Text style={styles.buttonText}>Chats</Text>
                         </Pressable>
 
                         <Pressable

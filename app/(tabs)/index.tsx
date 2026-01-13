@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  useColorScheme,
-  useWindowDimensions,
-  View
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    useColorScheme,
+    useWindowDimensions,
+    View
 } from "react-native";
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -20,6 +20,7 @@ import { runOnJS } from "react-native-reanimated";
 import { CoachModal } from "@/components/modals/CoachModal";
 import { MenuModal } from "@/components/modals/MenuModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
+import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
@@ -52,6 +53,7 @@ export default function HomeScreen() {
   const [messageInput, setMessageInput] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; reason?: string } | null>(null);
+  const [aiBubbleText, setAiBubbleText] = useState<string | null>(null);
 
   const [coachOpen, setCoachOpen] = useState(false);
   const [coachQuestion, setCoachQuestion] = useState("");
@@ -666,9 +668,15 @@ export default function HomeScreen() {
 
       try {
         const res = await api.chat(message, toApiRows(currentRows));
-        const newRows = buildRowsFromApi(res.rows).map(r => ({ ...r, status: 'committed' as const }));
-        setRows((prev) => prev.filter((r) => r.id !== ghostId).concat(newRows));
-        requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+        
+        if (res.answer) {
+          setAiBubbleText(res.answer);
+          setRows((prev) => prev.filter((r) => r.id !== ghostId));
+        } else {
+          const newRows = buildRowsFromApi(res.rows).map(r => ({ ...r, status: 'committed' as const }));
+          setRows((prev) => prev.filter((r) => r.id !== ghostId).concat(newRows));
+          requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+        }
       } catch (e) {
         setRows((prev) => prev.filter((r) => r.id !== ghostId));
         setError({ message: "Clarification needed", reason: gateDecision.userHint || "Check connection." });
@@ -740,6 +748,13 @@ export default function HomeScreen() {
           aiReason={error?.reason}
         />
 
+        {aiBubbleText && (
+          <AiResponseBubble 
+            text={aiBubbleText} 
+            onDismiss={() => setAiBubbleText(null)} 
+          />
+        )}
+
         <CoachModal
           visible={coachOpen}
           question={coachQuestion}
@@ -755,6 +770,7 @@ export default function HomeScreen() {
           visible={menuOpen}
           onClose={() => setMenuOpen(false)}
           onNavigateHistory={() => router.push("/history")}
+          onNavigateChats={() => router.push("/chats")}
           onNavigateSettings={() => router.push("/settings")}
           onOpenCoach={openCoach}
         />

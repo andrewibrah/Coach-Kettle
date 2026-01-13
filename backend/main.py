@@ -47,6 +47,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     rows: list[WorkoutRow]
+    answer: str | None = None
 
 
 class CoachRequest(BaseModel):
@@ -93,13 +94,16 @@ def chat(req: ChatRequest):
     system_prompt = """
 You are a Gym Workout Tracker parser.
 
-Return a JSON object with a single key "rows" containing an array of workout rows.
-Each row must include: exercise (string), set (integer), weightLbs (string), reps (string), notes (string).
-If a field is missing, return an empty string.
-If weights are mentioned, convert to numeric pounds with no units.
-Set numbers must auto-increment per exercise based on existing rows provided.
-Return only new rows inferred from the message.
-Do not include extra keys, text, or markdown.
+Analyze the user's message.
+1. If the user is trying to log a set (e.g. "Bench 135x5", "Squat 3 sets"), return a JSON object with:
+   - "rows": [array of inferred rows]
+   - "answer": null
+   - Each row must include: exercise, set, weightLbs, reps, notes. Auto-increment sets.
+2. If the user is asking a question (e.g. "What should I do next?", "How much weight?"), return:
+   - "rows": []
+   - "answer": "Short, helpful advice (<50 words)."
+
+Do not return both rows and an answer. Priority is logging if ambiguous.
 """
 
     try:
@@ -120,6 +124,19 @@ Do not include extra keys, text, or markdown.
         parsed = resp.output_parsed
         if parsed is None:
             raise HTTPException(status_code=500, detail="Model did not return structured output")
+
+        # Save to history if it's a question
+        if parsed.answer:
+            with sqlite3.connect(DB_PATH) as conn:
+                chat_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+                conn.execute(
+                    "INSERT INTO chats (id, title, role, content, createdAt, source) VALUES (?, ?, ?, ?, ?, ?)",
+                    (f"{chat_id}-u", "Workout Q&A", "user", req.message, int(datetime.now().timestamp() * 1000), "workout_chat")
+                )
+                conn.execute(
+                    "INSERT INTO chats (id, title, role, content, createdAt, source) VALUES (?, ?, ?, ?, ?, ?)",
+                    (f"{chat_id}-a", "Workout Q&A", "assistant", parsed.answer, int(datetime.now().timestamp() * 1000), "workout_chat")
+                )
 
         return parsed.model_dump()
 
@@ -160,6 +177,18 @@ Keep answers under 120 words and prioritize clear, numbered or bulleted guidance
         parsed = resp.output_parsed
         if parsed is None:
             raise HTTPException(status_code=500, detail="Model did not return structured output")
+
+        # Save to history
+        with sqlite3.connect(DB_PATH) as conn:
+            chat_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+            conn.execute(
+                "INSERT INTO chats (id, title, role, content, createdAt, source) VALUES (?, ?, ?, ?, ?, ?)",
+                (f"{chat_id}-u", "Coach Q&A", "user", req.question, int(datetime.now().timestamp() * 1000), "coach_modal")
+            )
+            conn.execute(
+                "INSERT INTO chats (id, title, role, content, createdAt, source) VALUES (?, ?, ?, ?, ?, ?)",
+                (f"{chat_id}-a", "Coach Q&A", "assistant", parsed.answer, int(datetime.now().timestamp() * 1000), "coach_modal")
+            )
 
         return parsed.model_dump()
     except HTTPException:
@@ -215,6 +244,17 @@ def init_db():
                 rows_json TEXT
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS chats (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                role TEXT,
+                content TEXT,
+                createdAt INTEGER,
+                source TEXT
+            )
+        """)
+
 
 init_db()
 
@@ -278,5 +318,23 @@ def delete_workout(workout_id: str):
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("DELETE FROM workouts WHERE id = ?", (workout_id,))
     return {"ok": True}
+
+
+@app.get("/chats")
+def list_chats():
+    results = []
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute("SELECT id, title, role, content, createdAt, source FROM chats ORDER BY createdAt DESC LIMIT 100")
+        for row in cursor:
+            cid, title, role, content, createdAt, source = row
+            results.append({
+                "id": cid,
+                "title": title,
+                "role": role,
+                "content": content,
+                "createdAt": createdAt,
+                "source": source
+            })
+    return results
 
 
