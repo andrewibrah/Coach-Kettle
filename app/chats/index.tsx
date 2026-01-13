@@ -1,68 +1,110 @@
+import { useAuth } from "@/components/AuthProvider";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { fetchChatHistory, groupChatsByDate, type ChatMessage, type ChatsByDate } from "@/lib/chatStorage";
 import { Stack, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type ChatItem = {
-  id: string;
-  title: string;
-  role: "user" | "assistant";
-  content: string;
-  createdAt: number;
-  source: string;
-};
-
 export default function ChatsScreen() {
-  const [chats, setChats] = useState<ChatItem[]>([]);
+  const [chatGroups, setChatGroups] = useState<ChatsByDate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeColor({}, 'background');
-  const isDark = useThemeColor({}, 'text') === '#FFFFFF'; // Rough check
+  const textColor = useThemeColor({}, 'text');
+  const isDark = textColor === '#FFFFFF';
+  const { session } = useAuth();
 
-  useEffect(() => {
-    fetchChats();
-  }, []);
-
-  const fetchChats = async () => {
+  const loadChats = useCallback(async () => {
+    if (!session) {
+      setLoading(false);
+      return;
+    }
+    
     try {
-      // Assuming API_BASE is reachable, straightforward fetch
-      const apiBase = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiBase}/chats`);
-      if (res.ok) {
-        const data = await res.json();
-        setChats(data);
-      }
+      const messages = await fetchChatHistory();
+      const grouped = groupChatsByDate(messages);
+      setChatGroups(grouped);
     } catch (e) {
       console.error("Failed to load chats", e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [session]);
 
-  const renderItem = ({ item }: { item: ChatItem }) => {
+  useEffect(() => {
+    loadChats();
+  }, [loadChats]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadChats();
+  }, [loadChats]);
+
+  const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === "user";
+    const sourceLabel = item.source === 'coach_modal' ? '🏋️ Coach' : '💬 Workout';
+    
     return (
-      <View style={[
-        styles.messageRow,
-        isUser ? styles.userRow : styles.botRow
-      ]}>
-        <View style={[
-          styles.bubble,
-          isUser ? styles.userBubble : styles.botBubble
-        ]}>
+      <View style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
+        <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble]}>
+          {!isUser && (
+            <Text style={styles.sourceLabel}>{sourceLabel}</Text>
+          )}
           <Text style={[styles.messageText, isUser ? styles.userText : styles.botText]}>
             {item.content}
           </Text>
           <Text style={[styles.timeText, isUser ? styles.userTime : styles.botTime]}>
-             {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {item.created_at 
+              ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : ''
+            }
           </Text>
         </View>
       </View>
     );
   };
+
+  const renderSectionHeader = ({ section }: { section: ChatsByDate }) => (
+    <View style={styles.sectionHeader}>
+      <View style={styles.datePill}>
+        <Text style={styles.dateText}>{section.displayDate}</Text>
+      </View>
+    </View>
+  );
+
+  // Convert to SectionList format
+  const sections = chatGroups.map(group => ({
+    ...group,
+    data: group.messages,
+  }));
+
+  if (!session) {
+    return (
+      <ThemedView style={[styles.container, { backgroundColor }]}>
+        <Stack.Screen options={{ 
+          title: "Chat History",
+          headerStyle: { backgroundColor },
+          headerTintColor: isDark ? "#FFF" : "#000",
+        }} />
+        <View style={styles.center}>
+          <Text style={[styles.emptyText, { color: isDark ? "#9CA3AF" : "#6B7280" }]}>
+            Sign in to view chat history
+          </Text>
+          <Pressable 
+            style={styles.signInButton}
+            onPress={() => router.push('/auth/sign-in')}
+          >
+            <Text style={styles.signInButtonText}>Sign In</Text>
+          </Pressable>
+        </View>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
@@ -74,23 +116,33 @@ export default function ChatsScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={isDark ? "#FFF" : "#000"} />
         </View>
-      ) : chats.length === 0 ? (
+      ) : chatGroups.length === 0 ? (
         <View style={styles.center}>
+          <Text style={[styles.emptyIcon]}>💬</Text>
           <Text style={[styles.emptyText, { color: isDark ? "#9CA3AF" : "#6B7280" }]}>
             No chats yet
           </Text>
           <Text style={[styles.emptyHint, { color: isDark ? "#6B7280" : "#9CA3AF" }]}>
-            Ask questions during your workout or use Ask Coach
+            Ask questions during your workout{'\n'}or use Ask Coach from the menu
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={chats}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id || `${item.created_at}-${item.role}`}
+          renderItem={renderMessage}
+          renderSectionHeader={renderSectionHeader}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
+          stickySectionHeadersEnabled={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              tintColor={isDark ? "#FFF" : "#000"}
+            />
+          }
         />
       )}
     </ThemedView>
@@ -107,6 +159,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
@@ -115,11 +171,37 @@ const styles = StyleSheet.create({
   emptyHint: {
     fontSize: 14,
     textAlign: 'center',
+    lineHeight: 20,
   },
-
+  signInButton: {
+    marginTop: 20,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  signInButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
   listContent: {
     padding: 16,
-    gap: 12,
+  },
+  sectionHeader: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  datePill: {
+    backgroundColor: 'rgba(107, 114, 128, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  dateText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9CA3AF',
   },
   messageRow: {
     width: '100%',
@@ -138,12 +220,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   userBubble: {
-    backgroundColor: '#3B82F6', // Blue
-    borderBottomRightRadius: 2,
+    backgroundColor: '#3B82F6',
+    borderBottomRightRadius: 4,
   },
   botBubble: {
-    backgroundColor: '#374151', // Gray
-    borderBottomLeftRadius: 2,
+    backgroundColor: '#1F2937',
+    borderBottomLeftRadius: 4,
+  },
+  sourceLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginBottom: 4,
+    fontWeight: '500',
   },
   messageText: {
     fontSize: 16,

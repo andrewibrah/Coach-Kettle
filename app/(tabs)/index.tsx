@@ -29,6 +29,7 @@ import { WorkoutTable } from "@/components/workout/WorkoutTable";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow } from "@/lib/api";
+import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
 import { getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
 import { type LogRow } from "@/types/workout";
@@ -158,7 +159,14 @@ export default function HomeScreen() {
 
     try {
       const res = await api.askCoach(q, toApiRows(rows));
-      setCoachAnswer(res.answer?.trim() || "Coach had no response.");
+      const answerText = res.answer?.trim() || "Coach had no response.";
+      setCoachAnswer(answerText);
+      
+      // Save to Supabase chat history
+      saveCoachChatQA(q, answerText).catch(err => 
+        console.warn("[Coach] Failed to save chat history:", err)
+      );
+      
       if (Platform.OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -672,6 +680,11 @@ export default function HomeScreen() {
         if (res.answer) {
           setAiBubbleText(res.answer);
           setRows((prev) => prev.filter((r) => r.id !== ghostId));
+          
+          // Save to Supabase chat history
+          saveWorkoutChatQA(message, res.answer).catch(err => 
+            console.warn("[Workout] Failed to save chat history:", err)
+          );
         } else {
           const newRows = buildRowsFromApi(res.rows).map(r => ({ ...r, status: 'committed' as const }));
           setRows((prev) => prev.filter((r) => r.id !== ghostId).concat(newRows));
