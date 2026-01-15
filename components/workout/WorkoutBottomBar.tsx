@@ -19,8 +19,6 @@ type Props = {
   hasRows: boolean;
   startToastOpen: boolean;
   showStartToast: () => void;
-  error: string | null;
-  aiReason?: string;
 };
 
 export function WorkoutBottomBar({
@@ -36,8 +34,6 @@ export function WorkoutBottomBar({
   hasRows,
   startToastOpen,
   showStartToast,
-  error,
-  aiReason,
 }: Props) {
   const disabledSend = !workoutActive || loading || !messageInput.trim();
 
@@ -131,10 +127,6 @@ export function WorkoutBottomBar({
           </View>
         </View>
       ) : null}
-
-      {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
-      {aiReason ? <ThemedText style={styles.errorHint}>{aiReason}</ThemedText> : null}
-
 
     </View >
   );
@@ -252,10 +244,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#B00020",
-  },
-  errorHint: {
-    color: "#6B7280",
-    fontStyle: "italic",
   },
   hint: {
     opacity: 0.7,

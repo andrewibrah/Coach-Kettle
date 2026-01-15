@@ -42,8 +42,8 @@ export async function saveWorkout(session: WorkoutSession) {
   try {
     await api.saveWorkout(session);
   } catch (e) {
-    // Fail silently if backend is unreachable
-    console.log("[saveWorkout] Backend sync failed, saved locally only.", e);
+    // Fail silently if Supabase is unreachable
+    console.log("[saveWorkout] Supabase sync failed, saved locally only.", e);
   }
 }
 

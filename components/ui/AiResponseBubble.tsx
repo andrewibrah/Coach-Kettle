@@ -1,8 +1,10 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
+import { ThemedView } from "@/components/ui/themed-view";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import * as Haptics from "expo-haptics";
 import React, { useEffect } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, useColorScheme } from "react-native";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 
 type Props = {
@@ -11,6 +13,12 @@ type Props = {
 };
 
 export function AiResponseBubble({ text, onDismiss }: Props) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const backgroundColor = useThemeColor({}, 'background');
+  const textColor = useThemeColor({}, 'text');
+  const borderColor = isDark ? "#374151" : "#D6D6D6";
+
   useEffect(() => {
     if (Platform.OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -23,21 +31,25 @@ export function AiResponseBubble({ text, onDismiss }: Props) {
       exiting={FadeOutDown.duration(200)}
       style={styles.container}
     >
-      <View style={styles.bubble}>
+      <ThemedView style={[styles.bubble, { backgroundColor, borderColor }]}>
         <View style={styles.header}>
-          <View style={styles.botIcon}>
+          <View style={[styles.botIcon, { backgroundColor: isDark ? "#6366F1" : "#111827" }]}>
             <IconSymbol name="sparkles" size={16} color="#FFFFFF" />
           </View>
           <ThemedText style={styles.title}>AI Coach</ThemedText>
         </View>
-        <Text style={styles.message}>{text}</Text>
+        <ThemedText style={styles.message}>{text}</ThemedText>
         <Pressable 
           onPress={onDismiss} 
-          style={({pressed}) => [styles.dismissButton, pressed && styles.dismissPressed]}
+          style={({pressed}) => [
+            styles.dismissButton, 
+            { backgroundColor: isDark ? "#374151" : "#F3F4F6" },
+            pressed && styles.dismissPressed
+          ]}
         >
-          <Text style={styles.dismissText}>Done</Text>
+          <ThemedText style={styles.dismissText}>Done</ThemedText>
         </Pressable>
-      </View>
+      </ThemedView>
     </Animated.View>
   );
 }
@@ -49,58 +61,51 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     zIndex: 100,
-    alignItems: 'flex-start', // Align bubble to left or center? Let's do full width usually or tailored.
+    alignItems: 'flex-start',
   },
   bubble: {
-    backgroundColor: '#1F2937', // Dark gray/blue
-    borderRadius: 20,
+    borderRadius: 14,
     padding: 16,
     width: '100%',
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#374151',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
     gap: 8,
   },
   botIcon: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#6366F1', // Indigo
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontWeight: '600',
     fontSize: 14,
-    color: '#E5E7EB',
   },
   message: {
-    fontSize: 16,
-    color: '#F3F4F6',
+    fontSize: 15,
     lineHeight: 22,
     marginBottom: 16,
   },
   dismissButton: {
     alignSelf: 'flex-end',
-    backgroundColor: '#374151',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 12,
   },
   dismissPressed: {
-    opacity: 0.8,
+    opacity: 0.7,
   },
   dismissText: {
-    color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 14,
   },

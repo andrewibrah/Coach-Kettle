@@ -7,8 +7,12 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
+  useColorScheme
 } from "react-native";
+import { ThemedText } from "@/components/ui/themed-text";
+import { ThemedView } from "@/components/ui/themed-view";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 
 type Props = {
@@ -33,60 +37,63 @@ export function CoachModal({
   onClose,
 }: Props) {
   const disabled = loading || !question.trim();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const backgroundColor = useThemeColor({}, 'background');
+  const textColor = useThemeColor({}, 'text');
+  const borderColor = isDark ? "#374151" : "#D6D6D6";
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Coach</Text>
+        <ThemedView style={[styles.card, { backgroundColor, borderColor }]}>
+          <View style={[styles.header, { borderBottomColor: borderColor }]}>
+            <ThemedText style={styles.headerTitle}>Coach</ThemedText>
             <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeText}>×</Text>
+              <ThemedText style={styles.closeText}>×</ThemedText>
             </Pressable>
           </View>
 
           <ScrollView
-            style={styles.chatArea}
+            style={[styles.chatArea, { backgroundColor: isDark ? "#1F2937" : "#F9FAFB" }]}
             contentContainerStyle={styles.chatContent}
             keyboardShouldPersistTaps="handled"
           >
-            {error ? (
-              <View style={styles.errorBubble}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
-
             {answer ? (
-              <View style={styles.aiBubble}>
-                <Text style={styles.aiText}>{answer}</Text>
-              </View>
+              <ThemedView style={[styles.aiBubble, { backgroundColor, borderColor }]}>
+                <ThemedText style={styles.aiText}>{answer}</ThemedText>
+              </ThemedView>
             ) : null}
 
             {/* If loading, show a thinking indicator or just keep the input disabled/loading state */}
             {loading && !answer ? (
-              <ActivityIndicator style={{ alignSelf: "center", marginTop: 20 }} color="#9CA3AF" />
+              <ActivityIndicator style={{ alignSelf: "center", marginTop: 20 }} color={isDark ? "#9CA3AF" : "#6B7280"} />
             ) : null}
           </ScrollView>
 
-          <View style={styles.inputFooter}>
+          <ThemedView style={[styles.inputFooter, { backgroundColor, borderTopColor: borderColor }]}>
             <TextInput
               value={question}
               onChangeText={onChangeQuestion}
               placeholder="Ask anything..."
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+              style={[styles.input, { backgroundColor: isDark ? "#374151" : "#F3F4F6", color: textColor }]}
               multiline
               editable={!loading}
             />
             <Pressable
               onPress={onSubmit}
               disabled={disabled}
-              style={[styles.sendBtn, disabled && styles.sendBtnDisabled]}
+              style={[
+                styles.sendBtn, 
+                { backgroundColor: isDark ? "#111827" : "#111827" },
+                disabled && styles.sendBtnDisabled
+              ]}
             >
               <Text style={styles.sendArrow}>↑</Text>
             </Pressable>
-          </View>
-        </View>
+          </ThemedView>
+        </ThemedView>
       </View>
     </Modal>
   );
@@ -100,7 +107,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   card: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 14,
     height: "80%", // Fixed height to feel like a window
     overflow: "hidden",
@@ -111,6 +117,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
+    borderWidth: 1,
   },
   header: {
     flexDirection: "row",
@@ -119,24 +126,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#111827",
   },
   closeBtn: {
     padding: 4,
   },
   closeText: {
     fontSize: 24,
-    color: "#9CA3AF",
     lineHeight: 24,
+    opacity: 0.6,
   },
   chatArea: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
   },
   chatContent: {
     padding: 16,
@@ -146,18 +150,15 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end", // Bottom alignment for chat
   },
   aiBubble: {
-    backgroundColor: "#FFFFFF",
     padding: 12,
-    borderRadius: 16,
+    borderRadius: 14,
     borderTopLeftRadius: 4,
     maxWidth: "85%",
     alignSelf: "flex-start",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
   },
   aiText: {
     fontSize: 15,
-    color: "#111827",
     lineHeight: 22,
   },
   inputFooter: {
@@ -165,22 +166,17 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 10,
     borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-    backgroundColor: "#FFFFFF",
     alignItems: "flex-end",
   },
   input: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
     maxHeight: 100,
-    color: "#111827",
   },
   sendBtn: {
-    backgroundColor: "#111827",
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -189,22 +185,12 @@ const styles = StyleSheet.create({
     marginBottom: 2, // Align with text input baseline roughly
   },
   sendBtnDisabled: {
-    backgroundColor: "#E5E7EB",
+    opacity: 0.45,
   },
   sendArrow: {
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "800",
     marginTop: -2,
-  },
-  errorBubble: {
-    backgroundColor: "#FEF2F2",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  errorText: {
-    color: "#B91C1C",
-    fontSize: 13,
   },
 });

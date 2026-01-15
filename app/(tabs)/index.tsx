@@ -568,11 +568,6 @@ export default function HomeScreen() {
     // Local synchronous parse
     const gateDecision = decideAndParse(message, { lastExercise: getLastExerciseFromRows(currentRows) });
 
-    if (gateDecision.kind === "ai" && gateDecision.userHint) {
-      setError({ message: gateDecision.userHint });
-      setLoading(false);
-    }
-
     if (gateDecision.kind === "fast") {
       let next = [...currentRows];
       const parsedRows = gateDecision.rows ?? [];
@@ -580,7 +575,7 @@ export default function HomeScreen() {
       console.log("[sendMessage] Fast parse result:", parsedRows);
 
       if (!parsedRows.length) {
-        setError({ message: "Could not parse details", reason: "Try format: Squat 100 10" });
+        // Parsing failed but continue silently - parsing logic intact
         return;
       }
 
@@ -692,7 +687,7 @@ export default function HomeScreen() {
         }
       } catch (e) {
         setRows((prev) => prev.filter((r) => r.id !== ghostId));
-        setError({ message: "Clarification needed", reason: gateDecision.userHint || "Check connection." });
+        // Error occurred but continue silently - parsing logic intact
       } finally {
         setLoading(false);
       }
@@ -757,8 +752,6 @@ export default function HomeScreen() {
           hasRows={rows.length > 0}
           startToastOpen={startToastOpen}
           showStartToast={showStartToast}
-          error={error?.message ?? null}
-          aiReason={error?.reason}
         />
 
         {aiBubbleText && (

@@ -47,7 +47,7 @@ export default function ChatsScreen() {
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === "user";
-    const sourceLabel = item.source === 'coach_modal' ? '🏋️ Coach' : '💬 Workout';
+    const sourceLabel = item.source === 'coach_modal' ? 'Coach' : 'Workout';
     
     return (
       <View style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
@@ -120,7 +120,7 @@ export default function ChatsScreen() {
         </View>
       ) : chatGroups.length === 0 ? (
         <View style={styles.center}>
-          <Text style={[styles.emptyIcon]}>💬</Text>
+          <Text style={[styles.emptyIcon]}></Text>
           <Text style={[styles.emptyText, { color: isDark ? "#9CA3AF" : "#6B7280" }]}>
             No chats yet
           </Text>
