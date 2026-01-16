@@ -2,6 +2,7 @@
 // OpenAI-powered coach Q&A
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -30,9 +31,33 @@ const SYSTEM_PROMPT = `You are Coach, a concise strength trainer.
 Use the workout table as context when answering the user's question.
 - If rows are present, reference trends, gaps, or next steps based on them.
 - If no rows are provided, give a short, actionable answer without making up data.
-Keep answers under 120 words and prioritize clear, numbered or bulleted guidance when helpful.`;
+Keep answers under 60 words.
+Do NOT use bold text (stars), italics, or markdown formatting. Use plain text only.`;
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+
+async function verifyAuth(req: Request) {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+        throw new Error("Missing Authorization header");
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    try {
+        await jwtVerify(token, JWKS, {
+            issuer: `${supabaseUrl}/auth/v1`,
+            audience: "authenticated",
+        });
+    } catch (error) {
+        console.error("[coach] JWT verification failed:", error);
+        throw new Error("Unauthorized");
+    }
+}
 
 serve(async (req) => {
+    console.log("[coach] Function started (Stream + Manual Auth)");
+
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
@@ -42,6 +67,16 @@ serve(async (req) => {
         return new Response(
             JSON.stringify({ error: "Method not allowed" }),
             { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+
+    // Manual JWT Verification
+    try {
+        await verifyAuth(req);
+    } catch (e) {
+        return new Response(
+            JSON.stringify({ error: "Unauthorized" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 
@@ -89,8 +124,7 @@ serve(async (req) => {
                     { role: "system", content: SYSTEM_PROMPT },
                     { role: "user", content: JSON.stringify(context) },
                 ],
-                response_format: { type: "json_object" },
-                max_tokens: 500,
+                stream: true, // Enable streaming
             }),
         });
 
@@ -98,43 +132,65 @@ serve(async (req) => {
             const errorText = await response.text();
             console.error("[coach] OpenAI error:", errorText);
             return new Response(
-                JSON.stringify({ error: "OpenAI request failed" }),
+                JSON.stringify({ error: "OpenAI request failed", upstream_error: errorText }),
                 { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
+        // Create a stream that transforms OpenAI SSE into raw text
+        const stream = new ReadableStream({
+            async start(controller) {
+                const reader = response.body?.getReader();
+                if (!reader) {
+                    controller.close();
+                    return;
+                }
 
-        if (!content) {
-            return new Response(
-                JSON.stringify({ error: "Model did not return structured output" }),
-                { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
+                const decoder = new TextDecoder("utf-8");
+                const encoder = new TextEncoder();
 
-        // Parse JSON and extract answer
-        let parsed: CoachResponse;
-        try {
-            parsed = JSON.parse(content);
-        } catch {
-            // If not JSON, use content as answer directly
-            parsed = { answer: content };
-        }
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
 
-        // Ensure answer field exists
-        if (!parsed.answer && typeof content === "string") {
-            parsed = { answer: content };
-        }
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split("\n");
 
-        return new Response(
-            JSON.stringify(parsed),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+                        for (const line of lines) {
+                            const trimmed = line.trim();
+                            if (!trimmed || trimmed === "data: [DONE]") continue;
+                            if (trimmed.startsWith("data: ")) {
+                                const data = trimmed.slice(6);
+                                try {
+                                    const json = JSON.parse(data);
+                                    const content = json.choices?.[0]?.delta?.content;
+                                    if (content) {
+                                        controller.enqueue(encoder.encode(content));
+                                    }
+                                } catch (e) {
+                                    console.warn("Failed to parse SSE line:", trimmed);
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Stream error:", err);
+                    controller.error(err);
+                } finally {
+                    controller.close();
+                }
+            },
+        });
+
+        return new Response(stream, {
+            headers: { ...corsHeaders, "Content-Type": "text/plain" },
+        });
+
     } catch (error) {
         console.error("[coach] Error:", error);
         return new Response(
-            JSON.stringify({ error: "OpenAI request failed" }),
+            JSON.stringify({ error: "OpenAI request failed", details: String(error) }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

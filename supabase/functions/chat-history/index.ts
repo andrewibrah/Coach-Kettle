@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase env vars");
 }
 
+// JWKS endpoint for ES256 JWT verification
+const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+
 function respondJson(body: unknown, status = 200) {
     return new Response(
         JSON.stringify(body),
@@ -46,49 +50,60 @@ async function getUserContext(authHeader: string | null): Promise<{ supabase: Su
         return respondJson({ error: "Missing Authorization header" }, 401);
     }
 
-    const supabase = createUserClient(authHeader);
-    const { data, error } = await supabase.auth.getUser();
+    const token = authHeader.replace("Bearer ", "");
 
-    if (error || !data?.user) {
-        console.error("[chat-history] Auth error:", error);
+    try {
+        const { payload } = await jwtVerify(token, JWKS, {
+            issuer: `${supabaseUrl}/auth/v1`,
+            audience: "authenticated",
+        });
+
+        const userId = payload.sub;
+        if (!userId) {
+            console.error("[chat-history] No user ID in token payload");
+            return respondJson({ error: "Invalid token" }, 401);
+        }
+
+        const supabase = createUserClient(authHeader);
+        return { supabase, userId };
+    } catch (error) {
+        console.error("[chat-history] JWT verification failed:", error);
         return respondJson({ error: "Unauthorized" }, 401);
     }
-
-    return { supabase, userId: data.user.id };
 }
 
 // POST: Save chat messages
 async function saveChat(messages: ChatMessage[], supabase: SupabaseClient, userId: string): Promise<Response> {
-    // Validate message count (prevent abuse)
     if (messages.length > 10) {
         return respondJson({ error: "Too many messages (max 10)" }, 400);
     }
 
-    // Ensure all messages have the correct user_id and validate/sanitize content
-    const messagesWithUser = messages.map(msg => {
-        if (msg.role !== "user" && msg.role !== "assistant") {
-            throw new Error("Invalid role");
-        }
-        if (msg.source !== "workout_chat" && msg.source !== "coach_modal") {
-            throw new Error("Invalid source");
-        }
+    // Map to DB schema (chats table)
+    // Table: id (text), title (text), role (text), content (text), createdAt (bigint), source (text), user_id (uuid)
+    const dbMessages = messages.map(msg => {
+        if (msg.role !== "user" && msg.role !== "assistant") throw new Error("Invalid role");
+        if (msg.source !== "workout_chat" && msg.source !== "coach_modal") throw new Error("Invalid source");
 
         const content = (msg.content || "")
             .slice(0, 5000)
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 
+        // Use provided created_at or now. DB stores bigint (ms)
+        const createdAt = msg.created_at ? new Date(msg.created_at).getTime() : Date.now();
+
         return {
-            user_id: userId,
+            id: crypto.randomUUID(), // App doesn't send ID for new messages usually, generate one
             role: msg.role,
             content,
             source: msg.source,
-            created_at: msg.created_at || new Date().toISOString(),
+            "createdAt": createdAt,
+            user_id: userId,
         };
     });
 
     const { error } = await supabase
-        .from("chat_history")
-        .insert(messagesWithUser);
+        .from("chats")
+        .insert(dbMessages);
 
     if (error) {
         console.error("[chat-history] Database error:", error);
@@ -99,15 +114,17 @@ async function saveChat(messages: ChatMessage[], supabase: SupabaseClient, userI
 }
 
 
-// GET: List chat history for authenticated user
+// GET: List chat history
 async function listChats(supabase: SupabaseClient, userId: string, source?: string): Promise<Response> {
+    // Select column mapping
     let query = supabase
-        .from("chat_history")
-        .select("id, user_id, role, content, source, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
+        .from("chats")
+        .select("id, role, content, source, createdAt")
+        .eq("user_id", userId) // Explicitly filter by user_id
+        .order("createdAt", { ascending: false })
         .limit(200);
 
+    // Filter by source if provided
     if (source) {
         query = query.eq("source", source);
     }
@@ -119,16 +136,25 @@ async function listChats(supabase: SupabaseClient, userId: string, source?: stri
         return respondJson({ error: "Database error" }, 500);
     }
 
-    return respondJson(data || []);
+    // Map back to client schema
+    const clientMessages = (data || []).map((row: any) => ({
+        id: row.id,
+        role: row.role,
+        content: row.content,
+        source: row.source,
+        created_at: new Date(row.createdAt).toISOString(), // Convert bigint -> ISO string
+    }));
+
+    return respondJson(clientMessages);
 }
 
-// DELETE: Delete chat message by ID (only if owned by user)
+// DELETE: Delete chat message by ID
 async function deleteChat(chatId: string, supabase: SupabaseClient, userId: string): Promise<Response> {
     const { error } = await supabase
-        .from("chat_history")
+        .from("chats")
         .delete()
         .eq("id", chatId)
-        .eq("user_id", userId);
+        .eq("user_id", userId); // Ensure user owns the chat
 
     if (error) {
         console.error("[chat-history] Database error:", error);
@@ -138,12 +164,12 @@ async function deleteChat(chatId: string, supabase: SupabaseClient, userId: stri
     return respondJson({ ok: true });
 }
 
-// DELETE: Clear all chat history for user
+// DELETE: Clear all chat history
 async function clearAllChats(supabase: SupabaseClient, userId: string): Promise<Response> {
     const { error } = await supabase
-        .from("chat_history")
+        .from("chats")
         .delete()
-        .eq("user_id", userId);
+        .eq("user_id", userId); // Safe delete for user
 
     if (error) {
         console.error("[chat-history] Database error:", error);
@@ -154,7 +180,8 @@ async function clearAllChats(supabase: SupabaseClient, userId: string): Promise<
 }
 
 serve(async (req) => {
-    // Handle CORS preflight
+    console.log("[chat-history] Function started");
+
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }

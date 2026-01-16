@@ -4,7 +4,7 @@ import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import * as Haptics from "expo-haptics";
 import React, { useEffect } from "react";
-import { Platform, Pressable, StyleSheet, useColorScheme } from "react-native";
+import { Platform, Pressable, StyleSheet, useColorScheme, View } from "react-native";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 
 type Props = {
@@ -26,30 +26,24 @@ export function AiResponseBubble({ text, onDismiss }: Props) {
   }, []);
 
   return (
-    <Animated.View 
-      entering={FadeInUp.springify().damping(20).stiffness(300)} 
+    <Animated.View
+      entering={FadeInUp.springify().damping(20).stiffness(300)}
       exiting={FadeOutDown.duration(200)}
       style={styles.container}
     >
-      <ThemedView style={[styles.bubble, { backgroundColor, borderColor }]}>
-        <View style={styles.header}>
-          <View style={[styles.botIcon, { backgroundColor: isDark ? "#6366F1" : "#111827" }]}>
-            <IconSymbol name="sparkles" size={16} color="#FFFFFF" />
+      <Pressable onPress={onDismiss} style={styles.touchableContainer}>
+        <ThemedView style={[styles.bubble, { backgroundColor, borderColor }]}>
+          <View style={styles.header}>
+            <View style={[styles.botIcon, { backgroundColor: isDark ? "#6366F1" : "#111827" }]}>
+              <IconSymbol name="sparkles" size={16} color="#FFFFFF" />
+            </View>
+            <ThemedText style={styles.title}>AI Coach</ThemedText>
+            <View style={{ flex: 1 }} />
+            <IconSymbol name="xmark" size={14} color={isDark ? "#9CA3AF" : "#6B7280"} />
           </View>
-          <ThemedText style={styles.title}>AI Coach</ThemedText>
-        </View>
-        <ThemedText style={styles.message}>{text}</ThemedText>
-        <Pressable 
-          onPress={onDismiss} 
-          style={({pressed}) => [
-            styles.dismissButton, 
-            { backgroundColor: isDark ? "#374151" : "#F3F4F6" },
-            pressed && styles.dismissPressed
-          ]}
-        >
-          <ThemedText style={styles.dismissText}>Done</ThemedText>
-        </Pressable>
-      </ThemedView>
+          <ThemedText style={styles.message}>{text}</ThemedText>
+        </ThemedView>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -74,10 +68,13 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 1,
   },
+  touchableContainer: {
+    width: '100%',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     gap: 8,
   },
   botIcon: {
@@ -94,19 +91,5 @@ const styles = StyleSheet.create({
   message: {
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 16,
-  },
-  dismissButton: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  dismissPressed: {
-    opacity: 0.7,
-  },
-  dismissText: {
-    fontWeight: '600',
-    fontSize: 14,
   },
 });

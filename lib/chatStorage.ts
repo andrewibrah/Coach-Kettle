@@ -46,7 +46,7 @@ function sanitizeContent(content: string): string {
 /**
  * Save chat messages to Supabase
  */
-export async function saveChatMessages(messages: Omit<ChatMessage, 'id' | 'user_id' | 'created_at'>[]): Promise<void> {
+export async function saveChatMessages(messages: Omit<ChatMessage, 'id' | 'user_id'>[]): Promise<void> {
     // Validate and sanitize messages
     const sanitizedMessages = messages.map(msg => ({
         ...msg,
@@ -84,8 +84,16 @@ export async function fetchChatHistory(source?: ChatSource): Promise<ChatMessage
     });
 
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(error.error || 'Failed to fetch chat history');
+        const text = await response.text();
+        console.error(`[fetchChatHistory] Failed: ${response.status} ${text}`);
+        let errorMessage = `Failed to fetch chat history (${response.status})`;
+        try {
+            const json = JSON.parse(text);
+            if (json.error) errorMessage = json.error;
+        } catch {
+            errorMessage += `: ${text}`;
+        }
+        throw new Error(errorMessage);
     }
 
     return response.json();
@@ -142,9 +150,9 @@ export function groupChatsByDate(messages: ChatMessage[]): ChatsByDate[] {
         groups.get(date)!.push(msg);
     }
 
-    // Convert to array and sort by date descending
+    // Convert to array and sort by date ascending (oldest first)
     const result: ChatsByDate[] = [];
-    const sortedDates = Array.from(groups.keys()).sort((a, b) => b.localeCompare(a));
+    const sortedDates = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b));
 
     for (const date of sortedDates) {
         const messages = groups.get(date)!;
@@ -190,19 +198,27 @@ function formatDisplayDate(dateStr: string): string {
 /**
  * Helper to save a Q&A pair from workout chat
  */
-export async function saveWorkoutChatQA(question: string, answer: string): Promise<void> {
+export async function saveWorkoutChatQA(question: string, answer: string, timestamp?: number): Promise<void> {
+    const baseTime = timestamp || Date.now();
+    const questionTime = new Date(baseTime).toISOString();
+    const answerTime = new Date(baseTime + 1).toISOString();
+
     await saveChatMessages([
-        { role: 'user', content: question, source: 'workout_chat' },
-        { role: 'assistant', content: answer, source: 'workout_chat' },
+        { role: 'user', content: question, source: 'workout_chat', created_at: questionTime },
+        { role: 'assistant', content: answer, source: 'workout_chat', created_at: answerTime },
     ]);
 }
 
 /**
  * Helper to save a Q&A pair from coach modal
  */
-export async function saveCoachChatQA(question: string, answer: string): Promise<void> {
+export async function saveCoachChatQA(question: string, answer: string, timestamp?: number): Promise<void> {
+    const baseTime = timestamp || Date.now();
+    const questionTime = new Date(baseTime).toISOString();
+    const answerTime = new Date(baseTime + 1).toISOString();
+
     await saveChatMessages([
-        { role: 'user', content: question, source: 'coach_modal' },
-        { role: 'assistant', content: answer, source: 'coach_modal' },
+        { role: 'user', content: question, source: 'coach_modal', created_at: questionTime },
+        { role: 'assistant', content: answer, source: 'coach_modal', created_at: answerTime },
     ]);
 }

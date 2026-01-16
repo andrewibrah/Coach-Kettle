@@ -4,16 +4,17 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
-    const { signOut, session } = useAuth();
+    const { signOut, session, clearAllCaches } = useAuth();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
+    const [isClearing, setIsClearing] = useState(false);
 
     const handleLogout = async () => {
         try {
@@ -22,6 +23,32 @@ export default function SettingsScreen() {
         } catch (error) {
             console.error('Logout failed:', error);
         }
+    };
+
+    const handleClearCache = async () => {
+        Alert.alert(
+            'Clear Cache',
+            'This will clear all local workout data and cached sessions. Your cloud data will not be affected.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsClearing(true);
+                        try {
+                            await clearAllCaches();
+                            Alert.alert('Success', 'All local caches have been cleared.');
+                        } catch (error) {
+                            console.error('Failed to clear cache:', error);
+                            Alert.alert('Error', 'Failed to clear cache. Please try again.');
+                        } finally {
+                            setIsClearing(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     return (
@@ -42,6 +69,14 @@ export default function SettingsScreen() {
                             <ThemedText style={styles.emailText}>{session.user.email}</ThemedText>
                         </View>
                     )}
+                    <Pressable
+                        style={({ pressed }) => [styles.cacheButton, pressed && styles.buttonPressed]}
+                        onPress={handleClearCache}
+                        disabled={isClearing}
+                    >
+                        <IconSymbol name="trash" size={20} color="#FF9500" />
+                        <Text style={styles.cacheText}>{isClearing ? 'Clearing...' : 'Clear Local Cache'}</Text>
+                    </Pressable>
                     <Pressable
                         style={({ pressed }) => [styles.logoutButton, pressed && styles.buttonPressed]}
                         onPress={handleLogout}
@@ -89,6 +124,21 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
+    },
+    cacheButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF8E6',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        gap: 10,
+        marginBottom: 12,
+    },
+    cacheText: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: '#FF9500',
     },
     logoutButton: {
         flexDirection: 'row',

@@ -23,7 +23,7 @@ export default function ChatsScreen() {
       setLoading(false);
       return;
     }
-    
+
     try {
       const messages = await fetchChatHistory();
       const grouped = groupChatsByDate(messages);
@@ -48,7 +48,7 @@ export default function ChatsScreen() {
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === "user";
     const sourceLabel = item.source === 'coach_modal' ? 'Coach' : 'Workout';
-    
+
     return (
       <View style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
         <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble]}>
@@ -59,7 +59,7 @@ export default function ChatsScreen() {
             {item.content}
           </Text>
           <Text style={[styles.timeText, isUser ? styles.userTime : styles.botTime]}>
-            {item.created_at 
+            {item.created_at
               ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : ''
             }
@@ -77,25 +77,28 @@ export default function ChatsScreen() {
     </View>
   );
 
-  // Convert to SectionList format
+  // Convert to SectionList format - Reverse messages for inverted list (Newest at index 0 = Visual Bottom)
   const sections = chatGroups.map(group => ({
     ...group,
-    data: group.messages,
+    data: [...group.messages].reverse(),
   }));
 
   if (!session) {
     return (
       <ThemedView style={[styles.container, { backgroundColor }]}>
-        <Stack.Screen options={{ 
+        <Stack.Screen options={{
           title: "Chat History",
           headerStyle: { backgroundColor },
           headerTintColor: isDark ? "#FFF" : "#000",
+          headerBackTitleVisible: false,
+          headerBackTitle: "",
+          headerShadowVisible: false,
         }} />
         <View style={styles.center}>
           <Text style={[styles.emptyText, { color: isDark ? "#9CA3AF" : "#6B7280" }]}>
             Sign in to view chat history
           </Text>
-          <Pressable 
+          <Pressable
             style={styles.signInButton}
             onPress={() => router.push('/auth/sign-in')}
           >
@@ -108,10 +111,13 @@ export default function ChatsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
-      <Stack.Screen options={{ 
+      <Stack.Screen options={{
         title: "Chat History",
         headerStyle: { backgroundColor },
         headerTintColor: isDark ? "#FFF" : "#000",
+        headerBackTitleVisible: false,
+        headerBackTitle: "",
+        headerShadowVisible: false,
       }} />
 
       {loading ? (
@@ -130,15 +136,16 @@ export default function ChatsScreen() {
         </View>
       ) : (
         <SectionList
-          sections={sections}
+          sections={[...sections].reverse()}
+          inverted
           keyExtractor={(item) => item.id || `${item.created_at}-${item.role}`}
           renderItem={renderMessage}
-          renderSectionHeader={renderSectionHeader}
+          renderSectionFooter={renderSectionHeader}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
           stickySectionHeadersEnabled={false}
           refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
+            <RefreshControl
+              refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={isDark ? "#FFF" : "#000"}
             />

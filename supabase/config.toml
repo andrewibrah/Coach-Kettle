@@ -20,4 +20,6 @@ file_size_limit = "50MB"
 
 [functions]
   [functions.default]
-  verify_jwt = true
+  # Disabled: Supabase now issues ES256 user tokens, incompatible with legacy HS256 verify_jwt
+  # JWT verification is now handled manually in each function using JWKS
+  verify_jwt = false

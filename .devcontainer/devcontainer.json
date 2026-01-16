@@ -1,0 +1,33 @@
+{
+    "name": "WorkoutTracker Dev",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "editor.formatOnSave": true
+            },
+            "extensions": [
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "expo.vscode-expo-tools",
+                "usernamehw.errorlens"
+            ]
+        }
+    },
+    "forwardPorts": [
+        8081,
+        19000,
+        19001,
+        19002,
+        54321,
+        54323
+    ],
+    "postCreateCommand": "npm install",
+    "remoteUser": "node",
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    }
+}

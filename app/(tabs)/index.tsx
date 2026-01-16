@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    useColorScheme,
-    useWindowDimensions,
-    View
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useColorScheme,
+  useWindowDimensions,
+  View
 } from "react-native";
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -18,6 +18,7 @@ import { Directions, Gesture, GestureDetector } from "react-native-gesture-handl
 import { runOnJS } from "react-native-reanimated";
 
 import { CoachModal } from "@/components/modals/CoachModal";
+import { EditSetModal } from "@/components/modals/EditSetModal";
 import { MenuModal } from "@/components/modals/MenuModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
 import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
@@ -62,6 +63,8 @@ export default function HomeScreen() {
   const [coachAnswer, setCoachAnswer] = useState<string | null>(null);
   const [coachError, setCoachError] = useState<string | null>(null);
   const [nameModalVisible, setNameModalVisible] = useState(false);
+  const [editSetModalVisible, setEditSetModalVisible] = useState(false);
+  const [targetRowId, setTargetRowId] = useState<string | null>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -158,15 +161,18 @@ export default function HomeScreen() {
     }
 
     try {
-      const res = await api.askCoach(q, toApiRows(rows));
+      // Stream the response
+      const res = await api.askCoach(q, toApiRows(rows), (chunk) => {
+        setCoachAnswer((prev) => (prev || "") + chunk);
+      });
       const answerText = res.answer?.trim() || "Coach had no response.";
       setCoachAnswer(answerText);
-      
+
       // Save to Supabase chat history
-      saveCoachChatQA(q, answerText).catch(err => 
+      saveCoachChatQA(q, answerText, Date.now()).catch(err =>
         console.warn("[Coach] Failed to save chat history:", err)
       );
-      
+
       if (Platform.OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -442,17 +448,45 @@ export default function HomeScreen() {
     });
   };
 
+  const handleOpenEditSet = (rowId: string) => {
+    setTargetRowId(rowId);
+    setEditSetModalVisible(true);
+  };
+
+  const handleSaveSet = (updatedRow: LogRow) => {
+    withPendingRows((prev) => {
+      const idx = prev.findIndex((r) => r.id === updatedRow.id);
+      if (idx === -1) return prev;
+
+      const oldRow = prev[idx];
+      const next = [...prev];
+      next[idx] = updatedRow;
+
+      // If exercise name changed, re-sequence
+      if (normalizeExercise(oldRow.exercise) !== normalizeExercise(updatedRow.exercise)) {
+        // Remove and re-insert logic handled by simple sort? 
+        // Or re-use applyPendingEdit logic? 
+        // Simplest is to just let re-sequencing happen.
+        // But resequenceSets mainly handles set numbers.
+        // If name changes, it should conceptually move to that exercise's group.
+
+        // Let's rely on a simpler approach: Just update and maybe re-sort/re-sequence if needed.
+        // Our table handles grouping by visual order essentially.
+        // If I change "Bench" to "Squat", it should ideally jump to Squat group or start one.
+        // For now, let's just update and resequence.
+      }
+      return resequenceSets(next);
+    });
+  };
+
   const onEndWorkout = async () => {
-    console.log("[onEndWorkout] Called");
     const committedRows = commitPendingAndGet();
-    console.log("[onEndWorkout] Committed rows count:", committedRows.length);
+
     if (!workoutActive) {
-      console.log("[onEndWorkout] No active workout, showing alert");
       Alert.alert("No active workout", "Start a workout first.");
       return;
     }
     if (!committedRows.length) {
-      console.log("[onEndWorkout] No rows, showing empty session alert");
       Alert.alert(
         "End empty session?",
         "No sets logged. Nothing will be saved to history.",
@@ -462,7 +496,6 @@ export default function HomeScreen() {
             text: "End Session",
             style: "destructive",
             onPress: () => {
-              console.log("[onEndWorkout] User pressed 'End Session' for empty workout");
               endWorkoutSession();
               setRows([]);
               setMessageInput("");
@@ -480,7 +513,6 @@ export default function HomeScreen() {
       return;
     }
 
-    console.log("[onEndWorkout] Has rows, showing save confirmation alert");
     const proceed = await new Promise<boolean>((resolve) => {
       Alert.alert(
         "End workout?",
@@ -489,58 +521,24 @@ export default function HomeScreen() {
           {
             text: "Cancel",
             style: "cancel",
-            onPress: () => {
-              console.log("[onEndWorkout] User pressed Cancel");
-              resolve(false);
-            }
+            onPress: () => resolve(false)
           },
           {
             text: "Save",
             style: "default",
-            onPress: () => {
-              console.log("[onEndWorkout] User pressed Save");
-              resolve(true);
-            }
+            onPress: () => resolve(true)
           },
         ]
       );
     });
-    if (!proceed) {
-      console.log("[onEndWorkout] User cancelled, not proceeding");
-      return;
-    }
+    if (!proceed) return;
 
-    console.log("[onEndWorkout] Building stored rows");
-    const storedRows = committedRows.map((row) => ({
-      exercise: row.exercise,
-      weightLbs: row.weightLbs,
-      reps: row.reps,
-      notes: row.notes,
-      timestamp: row.timestamp,
-    }));
+    // Capture state for rollback
+    const rowsToSave = [...committedRows];
+    const previousRows = [...rows];
 
-    try {
-      console.log("[onEndWorkout] Attempting to save workout via API");
-      await api.saveWorkout(buildWorkoutToSave(storedRows));
-      console.log("[onEndWorkout] Workout saved successfully");
-    } catch (error) {
-      console.error("[onEndWorkout] Failed to save workout:", error);
-      Alert.alert(
-        "Save Failed",
-        "Could not save to history. The session will still end. Check that the backend is running.",
-        [{ text: "OK" }]
-      );
-    }
-
-    console.log("[onEndWorkout] About to call endWorkoutSession()");
+    // Optimistic: Clear UI immediately
     endWorkoutSession();
-    console.log("[onEndWorkout] endWorkoutSession() called, workoutActive should now be false");
-
-    // Check workoutActive value after state update
-    setTimeout(() => {
-      console.log("[onEndWorkout] workoutActive value after timeout:", workoutActive);
-    }, 100);
-
     setRows([]);
     setMessageInput("");
     setEditingCell(null);
@@ -550,7 +548,43 @@ export default function HomeScreen() {
       clearTimeout(undoTimerRef.current);
       undoTimerRef.current = null;
     }
-    console.log("[onEndWorkout] All state reset complete");
+
+    // Build payload
+    const storedRows = rowsToSave.map((row) => ({
+      exercise: row.exercise,
+      weightLbs: row.weightLbs,
+      reps: row.reps,
+      notes: row.notes,
+      timestamp: row.timestamp,
+    }));
+
+    // Save in background
+    try {
+      await api.saveWorkout(buildWorkoutToSave(storedRows));
+    } catch (error) {
+      console.error("[onEndWorkout] Failed to save workout:", error);
+
+      // Rollback UI
+      Alert.alert(
+        "Save Failed",
+        "Could not save to history. Your workout has been restored.",
+        [{
+          text: "OK",
+          onPress: () => {
+            // Restore session
+            // We can't easily restore the exact workoutActive state variable inside this closure 
+            // if hooks don't support it, but we can re-start a session or just put rows back.
+            // Since we called endWorkoutSession(), we need to re-start it to be "active" again 
+            // if we want to let them try saving again.
+            // Ideally useWorkoutSession would expose a restore function, but we can just start 
+            // a new one with the old data if needed, or just set rows back and letting them click "Start" if title lost. 
+            // But let's try to just restore rows so they are not lost.
+            setRows(previousRows);
+            startWorkoutSession([title]); // specific heuristic to try to restore title if possible or just generic
+          }
+        }]
+      );
+    }
   };
 
   const sendMessage = async () => {
@@ -653,6 +687,33 @@ export default function HomeScreen() {
     }
 
     if (gateDecision.kind === "ai") {
+      // Check if this is a conversational question - handle without ghost row
+      if (gateDecision.reason === "conversational_question") {
+        setMessageInput("");
+        setLoading(true);
+
+        try {
+          const res = await api.askCoach(message, toApiRows(currentRows));
+          const answerText = res.answer?.trim() || "I'm not sure how to answer that.";
+          setAiBubbleText(answerText);
+
+          // Save to Supabase chat history
+          saveWorkoutChatQA(message, answerText, Date.now()).catch(err =>
+            console.warn("[Workout] Failed to save chat history:", err)
+          );
+
+          if (Platform.OS === "ios") {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        } catch (e) {
+          console.error("[sendMessage] Coach question failed:", e);
+          setAiBubbleText("Sorry, I couldn't get an answer right now. Try again.");
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
       const ghostId = makeId();
       const optimisticRow: LogRow = {
         id: ghostId,
@@ -671,13 +732,13 @@ export default function HomeScreen() {
 
       try {
         const res = await api.chat(message, toApiRows(currentRows));
-        
+
         if (res.answer) {
           setAiBubbleText(res.answer);
           setRows((prev) => prev.filter((r) => r.id !== ghostId));
-          
+
           // Save to Supabase chat history
-          saveWorkoutChatQA(message, res.answer).catch(err => 
+          saveWorkoutChatQA(message, res.answer, optimisticRow.timestamp).catch(err =>
             console.warn("[Workout] Failed to save chat history:", err)
           );
         } else {
@@ -726,6 +787,7 @@ export default function HomeScreen() {
           onDuplicateRow={duplicateRow}
           onMoveRow={moveRow}
           onIncrementSet={onIncrementSet}
+          onEditSet={handleOpenEditSet}
         />
 
         {
@@ -755,9 +817,9 @@ export default function HomeScreen() {
         />
 
         {aiBubbleText && (
-          <AiResponseBubble 
-            text={aiBubbleText} 
-            onDismiss={() => setAiBubbleText(null)} 
+          <AiResponseBubble
+            text={aiBubbleText}
+            onDismiss={() => setAiBubbleText(null)}
           />
         )}
 
@@ -770,6 +832,13 @@ export default function HomeScreen() {
           error={coachError}
           onSubmit={submitCoachQuestion}
           onClose={closeCoach}
+        />
+
+        <EditSetModal
+          visible={editSetModalVisible}
+          row={rows.find((r) => r.id === targetRowId) ?? null}
+          onClose={() => setEditSetModalVisible(false)}
+          onSave={handleSaveSet}
         />
 
         <MenuModal

@@ -16,6 +16,7 @@ export type GateDecisionReason =
   | "non_lift_units"
   | "missing_exercise"
   | "missing_reps"
+  | "conversational_question"
   | "success";
 
 type FastPattern = "single" | "multi" | "dropset" | "superset" | "cardio" | "warmup";
@@ -37,6 +38,68 @@ const PLATE_WEIGHT = 45; // per plate
 const BAR_WEIGHT = 45;
 
 const numberRegex = /\d/;
+
+// Patterns that indicate conversational questions rather than workout logging
+const QUESTION_PATTERNS = [
+  /^what\s+should\s+i/i,
+  /^what\s+do\s+i/i,
+  /^what\s+next/i,
+  /^what\s+now/i,
+  /^what\s+else/i,
+  /^what's\s+next/i,
+  /^what\s+about/i,
+  /^what\s+can\s+i/i,
+  /^what\s+exercise/i,
+  /^now\s+what/i,
+  /^next\s+exercise/i,
+  /^next\s+set/i,
+  /^how\s+many/i,
+  /^how\s+much/i,
+  /^should\s+i/i,
+  /^can\s+i/i,
+  /^is\s+it\s+ok/i,
+  /^is\s+this/i,
+  /^am\s+i/i,
+  /^do\s+i/i,
+  /^why/i,
+  /^when/i,
+  /^where/i,
+  /^which/i,
+  /^who/i,
+  /^help/i,
+  /^suggest/i,
+  /^recommend/i,
+  /^advice/i,
+  /^tips?\s*(for|on)?/i,
+  /\?$/,  // Ends with question mark
+];
+
+
+const isConversationalQuestion = (message: string): boolean => {
+  const lower = message.toLowerCase().trim();
+  const hasNumbers = /\d/.test(message);
+
+  // If message has NO numbers, it's likely a conversation/question
+  // (e.g. "What next", "Bench press", "I am tired")
+  // Exception: short exercise names might be here, but we default to AI coach
+  if (!hasNumbers) {
+    return true;
+  }
+
+  // Even if it has numbers ("How many reps for 135?"), check question patterns
+  for (const pattern of QUESTION_PATTERNS) {
+    if (pattern.test(lower)) {
+      return true;
+    }
+  }
+
+  // If message ends with ? and doesn't look like a workout entry
+  if (message.trim().endsWith('?')) {
+    return true;
+  }
+
+  return false;
+};
 
 const normalizeSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
 
@@ -78,6 +141,8 @@ const userHintForReason = (reason: GateDecisionReason): string | undefined => {
       return 'What exercise? Try "Bench 185 8" or just "135 10".';
     case "missing_reps":
       return "Add reps. Example: Exercise Weight Reps.";
+    case "conversational_question":
+      return undefined; // No hint needed, AI will respond
     default:
       return undefined;
   }
@@ -131,6 +196,12 @@ const buildFastDecision = (rows: ParsedRow[], pattern?: FastPattern): GateDecisi
 export function decideAndParse(message: string, context: GateContext): GateDecision {
   const trimmed = message.trim();
   if (!trimmed) return makeAiDecision("empty_message");
+
+  // Check for conversational questions first - route to AI for coach response
+  if (isConversationalQuestion(trimmed)) {
+    return makeAiDecision("conversational_question");
+  }
+
   if (trimmed.includes("\n")) return makeAiDecision(MULTI_REASON);
 
   const normalized = normalizeSpaces(trimmed);

@@ -23,6 +23,8 @@ const MAPPING = {
   'questionmark.circle': 'help-outline',
   'xmark.circle.fill': 'close',
   'trash': 'delete',
+  'sparkles': 'auto_awesome',
+  'xmark': 'close',
 } as IconMapping;
 
 /**

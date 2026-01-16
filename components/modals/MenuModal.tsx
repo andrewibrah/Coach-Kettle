@@ -34,16 +34,16 @@ export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats
 
                         <Pressable
                             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                            onPress={() => { onClose(); onOpenCoach(); }}
+                            onPress={() => { onClose(); onNavigateChats(); }}
                         >
-                            <Text style={styles.buttonText}>Ask Coach</Text>
+                            <Text style={styles.buttonText}>Chats</Text>
                         </Pressable>
 
                         <Pressable
                             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                            onPress={() => { onClose(); onNavigateChats(); }}
+                            onPress={() => { onClose(); onOpenCoach(); }}
                         >
-                            <Text style={styles.buttonText}>Chats</Text>
+                            <Text style={styles.buttonText}>Ask Coach</Text>
                         </Pressable>
 
                         <Pressable

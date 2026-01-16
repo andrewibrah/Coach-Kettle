@@ -1,19 +1,24 @@
-import { Dispatch, SetStateAction } from "react";
+import { ThemedText } from "@/components/ui/themed-text";
+import { ThemedView } from "@/components/ui/themed-view";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { ChatMessage, clearAllChatHistory, fetchChatHistory } from "@/lib/chatStorage";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
   useColorScheme
 } from "react-native";
-import { ThemedText } from "@/components/ui/themed-text";
-import { ThemedView } from "@/components/ui/themed-view";
-import { useThemeColor } from "@/hooks/use-theme-color";
-
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type Props = {
   visible: boolean;
@@ -43,82 +48,205 @@ export function CoachModal({
   const textColor = useThemeColor({}, 'text');
   const borderColor = isDark ? "#374151" : "#D6D6D6";
 
+  const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+
+  // Fetch history when modal opens
+  useEffect(() => {
+    if (visible) {
+      setHistoryLoading(true);
+      fetchChatHistory('coach_modal')
+        .then(msgs => {
+          // Sort explicitly by date ascending (oldest first)
+          const sorted = msgs.sort((a, b) =>
+            new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+          );
+          setHistory(sorted);
+        })
+        .catch(err => console.error("Failed to load coach history:", err))
+        .finally(() => setHistoryLoading(false));
+    }
+  }, [visible]);
+
+  // Scroll logic is handled by inverted FlatList
+  useEffect(() => {
+    // No-op
+  }, [visible, history, answer, loading]);
+
+  const renderItem = ({ item }: { item: ChatMessage }) => {
+    const isUser = item.role === 'user';
+    return (
+      <View style={[
+        styles.messageRow,
+        isUser ? styles.userRow : styles.aiRow
+      ]}>
+        <ThemedView style={[
+          styles.bubble,
+          isUser ? styles.userBubble : styles.aiBubble,
+          { borderColor: isUser ? "#111827" : borderColor }
+        ]}>
+          <ThemedText style={[
+            styles.messageText,
+            isUser && styles.userMessageText
+          ]}>
+            {item.content}
+          </ThemedText>
+        </ThemedView>
+      </View>
+    );
+  };
+
+  const handleSend = () => {
+    if (disabled) return;
+
+    // Optimistically add user message to history
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content: question,
+      source: 'coach_modal',
+      created_at: new Date().toISOString()
+    };
+    setHistory(prev => [...prev, userMsg]);
+
+    // Call parent submit logic
+    onSubmit();
+    // Input is cleared by parent
+    onChangeQuestion("");
+  };
+
+  const handleClear = () => {
+    if (history.length === 0) return;
+
+    Alert.alert(
+      "Clear Chat?",
+      "This will remove all messages from the coach chat history.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await clearAllChatHistory();
+              setHistory([]);
+            } catch (err) {
+              Alert.alert("Error", "Failed to clear chat history.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Combine history with current streaming answer
+  const displayData = [...history];
+  if (loading || answer) {
+    if (answer) {
+      displayData.push({
+        role: 'assistant',
+        content: answer,
+        source: 'coach_modal',
+        created_at: new Date().toISOString()
+      });
+    } else if (loading) {
+      // Show loading placeholder if no answer yet
+    }
+  }
+
+  // Effect to commit the answer to history once streaming is done
+  const wasLoading = useRef(loading);
+  useEffect(() => {
+    if (wasLoading.current && !loading && answer) {
+      // Just finished loading a valid answer
+      const aiMsg: ChatMessage = {
+        role: 'assistant',
+        content: answer,
+        source: 'coach_modal',
+        created_at: new Date().toISOString()
+      };
+      setHistory(prev => [...prev, aiMsg]);
+    }
+    wasLoading.current = loading;
+  }, [loading, answer]);
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <ThemedView style={[styles.card, { backgroundColor, borderColor }]}>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <ThemedView style={{ flex: 1, backgroundColor }}>
+        <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
           <View style={[styles.header, { borderBottomColor: borderColor }]}>
+            <Pressable onPress={onClose} style={styles.iconBtn}>
+              <MaterialCommunityIcons name="chevron-down" size={30} color={isDark ? "#FFF" : "#000"} />
+            </Pressable>
+
             <ThemedText style={styles.headerTitle}>Coach</ThemedText>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <ThemedText style={styles.closeText}>×</ThemedText>
+
+            <Pressable onPress={handleClear} style={[styles.iconBtn, { opacity: history.length ? 1 : 0.3 }]} disabled={!history.length}>
+              <MaterialCommunityIcons name="trash-can-outline" size={24} color={isDark ? "#FFF" : "#000"} />
             </Pressable>
           </View>
 
-          <ScrollView
-            style={[styles.chatArea, { backgroundColor: isDark ? "#1F2937" : "#F9FAFB" }]}
-            contentContainerStyle={styles.chatContent}
-            keyboardShouldPersistTaps="handled"
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
           >
-            {answer ? (
-              <ThemedView style={[styles.aiBubble, { backgroundColor, borderColor }]}>
-                <ThemedText style={styles.aiText}>{answer}</ThemedText>
-              </ThemedView>
-            ) : null}
+            {historyLoading && history.length === 0 ? (
+              <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color={isDark ? "#9CA3AF" : "#6B7280"} />
+              </View>
+            ) : (
+              <FlatList
+                ref={flatListRef}
+                data={[...displayData].reverse()}
+                inverted
+                renderItem={renderItem}
+                keyExtractor={(item, index) => item.id || `msg-${index}`}
+                contentContainerStyle={styles.chatContent}
+                style={[styles.chatArea, { backgroundColor: isDark ? "#1F2937" : "#F9FAFB" }]}
+                ListHeaderComponent={
+                  loading && !answer ? (
+                    <View style={styles.aiRow}>
+                      <ThemedView style={[styles.bubble, styles.aiBubble, { borderColor, paddingVertical: 12 }]}>
+                        <ActivityIndicator size="small" color={isDark ? "#9CA3AF" : "#6B7280"} />
+                      </ThemedView>
+                    </View>
+                  ) : null
+                }
+              />
+            )}
 
-            {/* If loading, show a thinking indicator or just keep the input disabled/loading state */}
-            {loading && !answer ? (
-              <ActivityIndicator style={{ alignSelf: "center", marginTop: 20 }} color={isDark ? "#9CA3AF" : "#6B7280"} />
-            ) : null}
-          </ScrollView>
-
-          <ThemedView style={[styles.inputFooter, { backgroundColor, borderTopColor: borderColor }]}>
-            <TextInput
-              value={question}
-              onChangeText={onChangeQuestion}
-              placeholder="Ask anything..."
-              placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
-              style={[styles.input, { backgroundColor: isDark ? "#374151" : "#F3F4F6", color: textColor }]}
-              multiline
-              editable={!loading}
-            />
-            <Pressable
-              onPress={onSubmit}
-              disabled={disabled}
-              style={[
-                styles.sendBtn, 
-                { backgroundColor: isDark ? "#111827" : "#111827" },
-                disabled && styles.sendBtnDisabled
-              ]}
-            >
-              <Text style={styles.sendArrow}>↑</Text>
-            </Pressable>
-          </ThemedView>
-        </ThemedView>
-      </View>
+            <ThemedView style={[styles.inputFooter, { backgroundColor, borderTopColor: borderColor }]}>
+              <TextInput
+                value={question}
+                onChangeText={onChangeQuestion}
+                placeholder="Ask anything..."
+                placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+                style={[styles.input, { backgroundColor: isDark ? "#374151" : "#F3F4F6", color: textColor }]}
+                multiline
+                editable={!loading}
+              />
+              <Pressable
+                onPress={handleSend}
+                disabled={disabled}
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  { backgroundColor: "#111827" },
+                  disabled && styles.sendBtnDisabled,
+                  pressed && !disabled && { opacity: 0.8 }
+                ]}
+              >
+                <Text style={styles.sendArrow}>↑</Text>
+              </Pressable>
+            </ThemedView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </ThemedView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    padding: 16,
-  },
-  card: {
-    borderRadius: 14,
-    height: "80%", // Fixed height to feel like a window
-    overflow: "hidden",
-    display: "flex",
-    flexDirection: "column",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -126,40 +254,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
+    marginTop: 12, // Lower the header for better reachability/aesthetics
+  },
+  iconBtn: {
+    padding: 8,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
   },
-  closeBtn: {
-    padding: 4,
-  },
-  closeText: {
-    fontSize: 24,
-    lineHeight: 24,
-    opacity: 0.6,
-  },
   chatArea: {
     flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   chatContent: {
     padding: 16,
     paddingBottom: 20,
     gap: 16,
     flexGrow: 1,
-    justifyContent: "flex-end", // Bottom alignment for chat
   },
-  aiBubble: {
+  messageRow: {
+    width: '100%',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  userRow: {
+    justifyContent: 'flex-end',
+  },
+  aiRow: {
+    justifyContent: 'flex-start',
+  },
+  bubble: {
     padding: 12,
-    borderRadius: 14,
-    borderTopLeftRadius: 4,
+    borderRadius: 18,
     maxWidth: "85%",
-    alignSelf: "flex-start",
     borderWidth: 1,
   },
-  aiText: {
+  userBubble: {
+    backgroundColor: '#111827', // Dark/Primary
+    borderBottomRightRadius: 4,
+  },
+  aiBubble: {
+    borderTopLeftRadius: 4,
+  },
+  messageText: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  userMessageText: {
+    color: '#ffffff',
   },
   inputFooter: {
     flexDirection: "row",
@@ -182,7 +329,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 2, // Align with text input baseline roughly
+    marginBottom: 2,
   },
   sendBtnDisabled: {
     opacity: 0.45,

@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -34,6 +35,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase env vars");
 }
 
+// JWKS endpoint for ES256 JWT verification
+const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+
 function respondJson(body: unknown, status = 200) {
     return new Response(
         JSON.stringify(body),
@@ -54,16 +58,34 @@ async function getUserContext(authHeader: string | null): Promise<{ supabase: Su
         return respondJson({ error: "Missing Authorization header" }, 401);
     }
 
-    const supabase = createUserClient(authHeader);
-    const { data, error } = await supabase.auth.getUser();
+    // Extract token from "Bearer <token>"
+    const token = authHeader.replace("Bearer ", "");
 
-    if (error || !data?.user) {
-        console.error("[history] Auth error:", error);
+    try {
+        // Verify JWT using JWKS (supports ES256)
+        const { payload } = await jwtVerify(token, JWKS, {
+            issuer: `${supabaseUrl}/auth/v1`,
+            audience: "authenticated",
+        });
+
+        const userId = payload.sub;
+        if (!userId) {
+            console.error("[history] No user ID in token payload");
+            return respondJson({ error: "Invalid token" }, 401);
+        }
+
+        // Create Supabase client with the verified token for database operations
+        const supabase = createUserClient(authHeader);
+
+        return { supabase, userId };
+    } catch (error) {
+        console.error("[history] JWT verification failed:", error);
         return respondJson({ error: "Unauthorized" }, 401);
     }
-
-    return { supabase, userId: data.user.id };
 }
+
+
+
 
 // POST: Save/upsert workout session
 async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, userId: string): Promise<Response> {

@@ -27,6 +27,7 @@ type Props = {
   onDuplicateRow: (rowId: string) => void;
   onMoveRow: (rowId: string, direction: MoveDirection) => void;
   onIncrementSet: (rowId: string) => void;
+  onEditSet: (rowId: string) => void;
 };
 
 export function WorkoutTable({
@@ -43,6 +44,7 @@ export function WorkoutTable({
   onDuplicateRow,
   onMoveRow,
   onIncrementSet,
+  onEditSet,
 }: Props) {
   const moveAvailability = (row: LogRow, idx: number) => {
     const normalized = row.exercise.trim().toLowerCase();
@@ -53,6 +55,8 @@ export function WorkoutTable({
 
   const openRowMenu = (rowId: string, canMoveUp: boolean, canMoveDown: boolean) => {
     const actions: Array<{ text: string; onPress?: () => void; style?: "default" | "cancel" | "destructive" }> = [
+      { text: "Edit Set", onPress: () => onEditSet(rowId) },
+      { text: "Add Note", onPress: () => onBeginEditCell(rowId, "notes", rows.find(r => r.id === rowId)?.notes || "") },
       { text: "Duplicate", onPress: () => onDuplicateRow(rowId) },
     ];
     if (canMoveUp) actions.unshift({ text: "Move up", onPress: () => onMoveRow(rowId, "up") });
@@ -110,10 +114,14 @@ export function WorkoutTable({
                   <WorkoutCard
                     row={r}
                     isDark={isDark}
-                    onPress={() => {}}
+                    onPress={() => { }}
                     onLongPress={() => openRowMenu(r.id, moveAvail.up, moveAvail.down)}
                     onIncrementSet={onIncrementSet}
                     onBeginEditCell={(rowId, field, value) => onBeginEditCell(rowId, field as any, value)}
+                    editingField={editingCell?.rowId === r.id ? (editingCell.field as any) : undefined}
+                    editValue={editValue}
+                    onChangeEditValue={onChangeEditValue}
+                    onCommitEditCell={onCommitEditCell}
                   />
                 </Swipeable>
               </View>

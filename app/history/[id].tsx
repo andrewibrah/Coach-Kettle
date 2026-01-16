@@ -104,15 +104,20 @@ export default function WorkoutDetail() {
                     <View style={styles.setIndicator}>
                       <Text style={styles.setIndicatorText}>{setNum}</Text>
                     </View>
-                    <View style={styles.statsRow}>
-                      <Text style={[styles.statValue, { color: textColor }]}>{row.weightLbs || "—"}</Text>
-                      <Text style={[styles.statUnit, { color: secondaryTextColor }]}>lb</Text>
-                      <Text style={[styles.statSep, { color: secondaryTextColor }]}>×</Text>
-                      <Text style={[styles.statValue, { color: textColor }]}>{row.reps || "—"}</Text>
-                      {row.timestamp ? (
-                        <Text style={[styles.timestamp, { color: secondaryTextColor }]}>
-                          {new Date(row.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                        </Text>
+                    <View style={styles.setContent}>
+                      <View style={styles.statsRow}>
+                        <Text style={[styles.statValue, { color: textColor }]}>{row.weightLbs || "—"}</Text>
+                        <Text style={[styles.statUnit, { color: secondaryTextColor }]}>lb</Text>
+                        <Text style={[styles.statSep, { color: secondaryTextColor }]}>×</Text>
+                        <Text style={[styles.statValue, { color: textColor }]}>{row.reps || "—"}</Text>
+                        {row.timestamp ? (
+                          <Text style={[styles.timestamp, { color: secondaryTextColor }]}>
+                            {new Date(row.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                          </Text>
+                        ) : null}
+                      </View>
+                      {row.notes ? (
+                        <Text style={styles.noteText}>{row.notes}</Text>
                       ) : null}
                     </View>
                   </View>
@@ -213,8 +218,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  statsRow: {
+  setContent: {
     flex: 1,
+    gap: 2,
+  },
+  statsRow: {
     flexDirection: "row",
     alignItems: "baseline",
     gap: 3,
@@ -250,5 +258,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "400",
     marginLeft: 6,
+  },
+  noteText: {
+    fontSize: 13,
+    fontStyle: "italic",
+    color: "#4B5563",
   },
 });
