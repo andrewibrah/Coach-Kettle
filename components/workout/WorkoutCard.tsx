@@ -6,7 +6,6 @@ import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 type Props = {
     row: LogRow;
-    isDark: boolean;
     onPress: () => void;
     onLongPress: () => void;
     onIncrementSet: (rowId: string) => void;
@@ -19,7 +18,6 @@ type Props = {
 
 export function WorkoutCard({
     row,
-    isDark,
     onPress,
     onLongPress,
     onIncrementSet,
@@ -32,6 +30,9 @@ export function WorkoutCard({
     const isSyncing = row.status === 'syncing';
     const inputRef = useRef<TextInput>(null);
     const textColor = useThemeColor({}, 'text');
+    const cardBg = useThemeColor({}, 'cardBackground');
+    const borderColor = useThemeColor({}, 'border');
+
 
     useEffect(() => {
         if (editingField && inputRef.current) {
@@ -58,7 +59,7 @@ export function WorkoutCard({
         <Pressable
             style={({ pressed }) => [
                 styles.card,
-                isDark ? styles.cardDark : styles.cardLight,
+                { backgroundColor: cardBg, borderColor },
                 pressed && !isSyncing && !editingField && styles.pressed,
                 isSyncing && styles.syncingRow,
             ]}
@@ -141,14 +142,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 4,
         elevation: 2,
-    },
-    cardLight: {
-        backgroundColor: "#FFFFFF",
-        borderColor: "#E5E7EB",
-    },
-    cardDark: {
-        backgroundColor: "#1F2937",
-        borderColor: "#374151",
     },
     pressed: {
         opacity: 0.95,

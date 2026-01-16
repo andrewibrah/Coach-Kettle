@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as Haptics from "expo-haptics";
 
-import { ThemedText } from "@/components/ui/themed-text";
+
 
 type Props = {
   workoutActive: boolean;

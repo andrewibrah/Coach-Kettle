@@ -15,7 +15,8 @@ export default function ChatsScreen() {
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
-  const isDark = textColor === '#FFFFFF';
+  const iconColor = useThemeColor({}, 'text');
+  const placeholder = useThemeColor({}, 'placeholder');
   const { session } = useAuth();
 
   const loadChats = useCallback(async () => {
@@ -89,13 +90,13 @@ export default function ChatsScreen() {
         <Stack.Screen options={{
           title: "Chat History",
           headerStyle: { backgroundColor },
-          headerTintColor: isDark ? "#FFF" : "#000",
+          headerTintColor: iconColor,
           headerBackTitleVisible: false,
           headerBackTitle: "",
           headerShadowVisible: false,
         }} />
         <View style={styles.center}>
-          <Text style={[styles.emptyText, { color: isDark ? "#9CA3AF" : "#6B7280" }]}>
+          <Text style={[styles.emptyText, { color: placeholder }]}>
             Sign in to view chat history
           </Text>
           <Pressable
@@ -114,7 +115,7 @@ export default function ChatsScreen() {
       <Stack.Screen options={{
         title: "Chat History",
         headerStyle: { backgroundColor },
-        headerTintColor: isDark ? "#FFF" : "#000",
+        headerTintColor: iconColor,
         headerBackTitleVisible: false,
         headerBackTitle: "",
         headerShadowVisible: false,
@@ -122,15 +123,15 @@ export default function ChatsScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={isDark ? "#FFF" : "#000"} />
+          <ActivityIndicator size="large" color={iconColor} />
         </View>
       ) : chatGroups.length === 0 ? (
         <View style={styles.center}>
           <Text style={[styles.emptyIcon]}></Text>
-          <Text style={[styles.emptyText, { color: isDark ? "#9CA3AF" : "#6B7280" }]}>
+          <Text style={[styles.emptyText, { color: placeholder }]}>
             No chats yet
           </Text>
-          <Text style={[styles.emptyHint, { color: isDark ? "#6B7280" : "#9CA3AF" }]}>
+          <Text style={[styles.emptyHint, { color: placeholder }]}>
             Ask questions during your workout{'\n'}or use Ask Coach from the menu
           </Text>
         </View>
@@ -147,7 +148,7 @@ export default function ChatsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={isDark ? "#FFF" : "#000"}
+              tintColor={iconColor}
             />
           }
         />

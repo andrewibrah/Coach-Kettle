@@ -1,7 +1,8 @@
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { BlurView } from "expo-blur";
 import React from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Modal, Pressable, StyleSheet, Text, View, useColorScheme } from "react-native";
+
 
 type Props = {
     visible: boolean;
@@ -13,7 +14,10 @@ type Props = {
 };
 
 export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats, onNavigateSettings, onOpenCoach }: Props) {
-    const insets = useSafeAreaInsets();
+
+    const colorScheme = useColorScheme();
+    const textColor = useThemeColor({}, 'text');
+    const isDark = colorScheme === 'dark';
 
     return (
         <Modal
@@ -22,35 +26,35 @@ export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats
             animationType="fade"
             onRequestClose={onClose}
         >
-            <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+            <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill}>
                 <Pressable style={styles.container} onPress={onClose}>
                     <View style={styles.content}>
                         <Pressable
                             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                             onPress={() => { onClose(); onNavigateHistory(); }}
                         >
-                            <Text style={styles.buttonText}>History</Text>
+                            <Text style={[styles.buttonText, { color: textColor }]}>History</Text>
                         </Pressable>
 
                         <Pressable
                             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                             onPress={() => { onClose(); onNavigateChats(); }}
                         >
-                            <Text style={styles.buttonText}>Chats</Text>
+                            <Text style={[styles.buttonText, { color: textColor }]}>Chats</Text>
                         </Pressable>
 
                         <Pressable
                             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                             onPress={() => { onClose(); onOpenCoach(); }}
                         >
-                            <Text style={styles.buttonText}>Ask Coach</Text>
+                            <Text style={[styles.buttonText, { color: textColor }]}>Ask Coach</Text>
                         </Pressable>
 
                         <Pressable
                             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                             onPress={() => { onClose(); onNavigateSettings(); }}
                         >
-                            <Text style={styles.buttonText}>Settings</Text>
+                            <Text style={[styles.buttonText, { color: textColor }]}>Settings</Text>
                         </Pressable>
                     </View>
                 </Pressable>
@@ -81,7 +85,6 @@ const styles = StyleSheet.create({
     buttonText: {
         fontSize: 20,
         fontWeight: "500",
-        color: "#000000",
         textAlign: "center",
         letterSpacing: 0.5,
     },

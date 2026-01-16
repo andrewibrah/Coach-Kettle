@@ -19,17 +19,24 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth" options={{ headerShown: false }} />
-            <Stack.Screen name="chats" options={{ headerShown: true }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            <Stack.Screen name="history/[id]" options={{ headerShown: false }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
+        <RootLayoutNav />
       </GestureHandlerRootView>
     </AuthProvider>
+  );
+}
+
+function RootLayoutNav() {
+  const colorScheme = useColorScheme();
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="chats" options={{ headerShown: true }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen name="history/[id]" options={{ headerShown: false }} />
+      </Stack>
+      <StatusBar style="auto" />
+    </ThemeProvider>
   );
 }

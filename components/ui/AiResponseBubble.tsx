@@ -16,8 +16,9 @@ export function AiResponseBubble({ text, onDismiss }: Props) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const backgroundColor = useThemeColor({}, 'background');
-  const textColor = useThemeColor({}, 'text');
-  const borderColor = isDark ? "#374151" : "#D6D6D6";
+
+  const borderColor = useThemeColor({}, 'border');
+  const placeholderColor = useThemeColor({}, 'placeholder');
 
   useEffect(() => {
     if (Platform.OS === "ios") {
@@ -39,7 +40,7 @@ export function AiResponseBubble({ text, onDismiss }: Props) {
             </View>
             <ThemedText style={styles.title}>AI Coach</ThemedText>
             <View style={{ flex: 1 }} />
-            <IconSymbol name="xmark" size={14} color={isDark ? "#9CA3AF" : "#6B7280"} />
+            <IconSymbol name="xmark" size={14} color={placeholderColor} />
           </View>
           <ThemedText style={styles.message}>{text}</ThemedText>
         </ThemedView>

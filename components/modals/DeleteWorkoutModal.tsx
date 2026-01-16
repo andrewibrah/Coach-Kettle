@@ -1,6 +1,7 @@
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { BlurView } from "expo-blur";
 import React from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
@@ -11,6 +12,14 @@ type Props = {
 
 export function DeleteWorkoutModal({ visible, onClose, onConfirm }: Props) {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+    const cardBg = useThemeColor({}, 'cardBackground');
+    const textColor = useThemeColor({}, 'text');
+    const secondaryText = useThemeColor({}, 'placeholder');
+    const buttonBg = useThemeColor({}, 'inputBackground');
+    const danger = useThemeColor({}, 'danger');
+    const buttonText = useThemeColor({}, 'text');
 
     return (
         <Modal
@@ -19,20 +28,20 @@ export function DeleteWorkoutModal({ visible, onClose, onConfirm }: Props) {
             animationType="fade"
             onRequestClose={onClose}
         >
-            <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill}>
                 <View style={styles.container}>
-                    <View style={styles.card}>
-                        <Text style={styles.title}>Delete Workout?</Text>
-                        <Text style={styles.message}>
+                    <View style={[styles.card, { backgroundColor: cardBg }]}>
+                        <Text style={[styles.title, { color: textColor }]}>Delete Workout?</Text>
+                        <Text style={[styles.message, { color: secondaryText }]}>
                             This action cannot be undone. Are you sure you want to remove this workout from your history?
                         </Text>
 
                         <View style={styles.buttonRow}>
-                            <Pressable onPress={onClose} style={styles.cancelButton}>
-                                <Text style={styles.cancelText}>Cancel</Text>
+                            <Pressable onPress={onClose} style={[styles.cancelButton, { backgroundColor: buttonBg }]}>
+                                <Text style={[styles.cancelText, { color: textColor }]}>Cancel</Text>
                             </Pressable>
 
-                            <Pressable onPress={onConfirm} style={styles.deleteButton}>
+                            <Pressable onPress={onConfirm} style={[styles.deleteButton, { backgroundColor: danger }]}>
                                 <Text style={styles.deleteText}>Delete</Text>
                             </Pressable>
                         </View>
@@ -88,7 +97,6 @@ const styles = StyleSheet.create({
         backgroundColor: "#F3F4F6",
     },
     cancelText: {
-        color: "#374151",
         fontWeight: "600",
         fontSize: 16,
     },

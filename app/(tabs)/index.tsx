@@ -40,11 +40,13 @@ type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
 export default function HomeScreen() {
   const router = useRouter();
+
+
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const { width } = useWindowDimensions();
   const compact = width < 380;
   const backgroundColor = useThemeColor({}, 'background');
+  const iconColor = useThemeColor({}, 'text');
 
   const scrollRef = useRef<ScrollView | null>(null);
 
@@ -764,11 +766,11 @@ export default function HomeScreen() {
         <ThemedView style={styles.header}>
           <View style={styles.headerTopRow}>
             <Pressable onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
-              <IconSymbol name="line.3.horizontal" size={24} color={isDark ? "#FFF" : "#000"} />
+              <IconSymbol name="line.3.horizontal" size={24} color={iconColor} />
             </Pressable>
 
             <Pressable onPress={onClearRows} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
-              <MaterialCommunityIcons name="trash-can-outline" size={24} color={isDark ? "#FFF" : "#000"} />
+              <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
             </Pressable>
           </View>
         </ThemedView>
@@ -776,7 +778,6 @@ export default function HomeScreen() {
         <WorkoutTable
           rows={rows}
           compact={compact}
-          isDark={isDark}
           scrollRef={scrollRef}
           editingCell={editingCell}
           editValue={editValue}

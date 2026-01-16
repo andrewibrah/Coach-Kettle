@@ -19,7 +19,9 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
-    const placeholderColor = "#9CA3AF";
+    const placeholderColor = useThemeColor({}, 'placeholder');
+    const borderColor = useThemeColor({}, 'border');
+    const inputBg = useThemeColor({}, 'inputBackground');
 
     useEffect(() => {
         if (visible && row) {
@@ -58,7 +60,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                         <View style={styles.header}>
                             <ThemedText type="subtitle">Edit Set</ThemedText>
                             <Pressable onPress={onClose} hitSlop={10}>
-                                <ThemedText style={{ color: "#6B7280" }}>Cancel</ThemedText>
+                                <ThemedText style={{ color: placeholderColor }}>Cancel</ThemedText>
                             </Pressable>
                         </View>
 
@@ -66,7 +68,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                             <View style={styles.inputGroup}>
                                 <ThemedText style={styles.label}>Exercise</ThemedText>
                                 <TextInput
-                                    style={[styles.input, { color: textColor, borderColor: "#E5E7EB" }]}
+                                    style={[styles.input, { color: textColor, borderColor, backgroundColor: inputBg }]}
                                     value={exercise}
                                     onChangeText={setExercise}
                                     placeholder="Exercise Name"
@@ -78,7 +80,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                                 <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                                     <ThemedText style={styles.label}>Weight (lbs)</ThemedText>
                                     <TextInput
-                                        style={[styles.input, { color: textColor, borderColor: "#E5E7EB" }]}
+                                        style={[styles.input, { color: textColor, borderColor, backgroundColor: inputBg }]}
                                         value={weight}
                                         onChangeText={setWeight}
                                         placeholder="0"
@@ -90,7 +92,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                                     <ThemedText style={styles.label}>Reps</ThemedText>
                                     <TextInput
-                                        style={[styles.input, { color: textColor, borderColor: "#E5E7EB" }]}
+                                        style={[styles.input, { color: textColor, borderColor, backgroundColor: inputBg }]}
                                         value={reps}
                                         onChangeText={setReps}
                                         placeholder="0"
@@ -103,7 +105,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                             <View style={styles.inputGroup}>
                                 <ThemedText style={styles.label}>Notes</ThemedText>
                                 <TextInput
-                                    style={[styles.input, styles.textArea, { color: textColor, borderColor: "#E5E7EB" }]}
+                                    style={[styles.input, styles.textArea, { color: textColor, borderColor, backgroundColor: inputBg }]}
                                     value={notes}
                                     onChangeText={setNotes}
                                     placeholder="Add a note..."

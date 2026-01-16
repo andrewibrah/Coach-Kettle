@@ -46,7 +46,11 @@ export function CoachModal({
   const isDark = colorScheme === "dark";
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
-  const borderColor = isDark ? "#374151" : "#D6D6D6";
+  const borderColor = useThemeColor({}, 'border');
+  const iconColor = useThemeColor({}, 'icon');
+  const inputBackground = useThemeColor({}, 'inputBackground');
+  const placeholderColor = useThemeColor({}, 'placeholder');
+  const chatBackground = useThemeColor({}, 'secondaryBackground');
 
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -176,13 +180,13 @@ export function CoachModal({
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
           <View style={[styles.header, { borderBottomColor: borderColor }]}>
             <Pressable onPress={onClose} style={styles.iconBtn}>
-              <MaterialCommunityIcons name="chevron-down" size={30} color={isDark ? "#FFF" : "#000"} />
+              <MaterialCommunityIcons name="chevron-left" size={30} color={iconColor} />
             </Pressable>
 
             <ThemedText style={styles.headerTitle}>Coach</ThemedText>
 
             <Pressable onPress={handleClear} style={[styles.iconBtn, { opacity: history.length ? 1 : 0.3 }]} disabled={!history.length}>
-              <MaterialCommunityIcons name="trash-can-outline" size={24} color={isDark ? "#FFF" : "#000"} />
+              <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
             </Pressable>
           </View>
 
@@ -193,7 +197,7 @@ export function CoachModal({
           >
             {historyLoading && history.length === 0 ? (
               <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color={isDark ? "#9CA3AF" : "#6B7280"} />
+                <ActivityIndicator size="large" color={placeholderColor} />
               </View>
             ) : (
               <FlatList
@@ -203,12 +207,12 @@ export function CoachModal({
                 renderItem={renderItem}
                 keyExtractor={(item, index) => item.id || `msg-${index}`}
                 contentContainerStyle={styles.chatContent}
-                style={[styles.chatArea, { backgroundColor: isDark ? "#1F2937" : "#F9FAFB" }]}
+                style={[styles.chatArea, { backgroundColor: chatBackground }]}
                 ListHeaderComponent={
                   loading && !answer ? (
                     <View style={styles.aiRow}>
                       <ThemedView style={[styles.bubble, styles.aiBubble, { borderColor, paddingVertical: 12 }]}>
-                        <ActivityIndicator size="small" color={isDark ? "#9CA3AF" : "#6B7280"} />
+                        <ActivityIndicator size="small" color={placeholderColor} />
                       </ThemedView>
                     </View>
                   ) : null
@@ -221,8 +225,8 @@ export function CoachModal({
                 value={question}
                 onChangeText={onChangeQuestion}
                 placeholder="Ask anything..."
-                placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
-                style={[styles.input, { backgroundColor: isDark ? "#374151" : "#F3F4F6", color: textColor }]}
+                placeholderTextColor={placeholderColor}
+                style={[styles.input, { backgroundColor: inputBackground, color: textColor }]}
                 multiline
                 editable={!loading}
               />

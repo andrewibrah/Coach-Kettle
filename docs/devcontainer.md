@@ -30,9 +30,14 @@ This project is configured with a **VS Code Development Container**. This ensure
 -   **Running the App**:
     ```bash
     npm install
-    npx expo start
+    npx expo start --tunnel
     ```
-    This will forward port `8081`. You can scan the QR code with your phone (on the same Wi-Fi) or press `a` for Android emulator / `i` for iOS simulator.
+    -   **Physical Device**: Scan the QR code with your phone (Expo Go app).
+        -   *Note*: The `--tunnel` flag is required because the container network is isolated from your phone's network.
+        -   *Troubleshooting*: If you see `ngrok 3004` (rate limited), get a free token from [ngrok dashboard](https://dashboard.ngrok.com), then run `export NGROK_AUTHTOKEN=<token>` before starting.
+    -   **Web**: Press `w` to open in browser.
+    -   **Android Emulator**: Press `a` (requires configuring Android in the container or connecting a device via USB/ADB).
+    -   **iOS Simulator**: Not supported on Linux/Windows containers (requires a Mac).
 
 -   **Supabase**:
     ```bash

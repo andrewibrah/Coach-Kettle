@@ -16,7 +16,6 @@ type MoveDirection = "up" | "down";
 type Props = {
   rows: LogRow[];
   compact: boolean;
-  isDark: boolean;
   scrollRef: RefObject<ScrollView | null>;
   editingCell: { rowId: string; field: EditableField } | null;
   editValue: string;
@@ -33,7 +32,6 @@ type Props = {
 export function WorkoutTable({
   rows,
   compact,
-  isDark,
   scrollRef,
   editingCell,
   editValue,
@@ -54,7 +52,7 @@ export function WorkoutTable({
   };
 
   const openRowMenu = (rowId: string, canMoveUp: boolean, canMoveDown: boolean) => {
-    const actions: Array<{ text: string; onPress?: () => void; style?: "default" | "cancel" | "destructive" }> = [
+    const actions: ({ text: string; onPress?: () => void; style?: "default" | "cancel" | "destructive" })[] = [
       { text: "Edit Set", onPress: () => onEditSet(rowId) },
       { text: "Add Note", onPress: () => onBeginEditCell(rowId, "notes", rows.find(r => r.id === rowId)?.notes || "") },
       { text: "Duplicate", onPress: () => onDuplicateRow(rowId) },
@@ -113,7 +111,6 @@ export function WorkoutTable({
                 >
                   <WorkoutCard
                     row={r}
-                    isDark={isDark}
                     onPress={() => { }}
                     onLongPress={() => openRowMenu(r.id, moveAvail.up, moveAvail.down)}
                     onIncrementSet={onIncrementSet}

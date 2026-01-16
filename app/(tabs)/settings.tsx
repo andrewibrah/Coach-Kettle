@@ -14,6 +14,8 @@ export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
+    const border = useThemeColor({}, 'border');
+    const activeColor = useThemeColor({}, 'tint');
     const [isClearing, setIsClearing] = useState(false);
 
     const handleLogout = async () => {
@@ -167,5 +169,20 @@ const styles = StyleSheet.create({
     },
     buttonPressed: {
         opacity: 0.7,
+    },
+    optionsContainer: {
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    optionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    optionSelected: {
+        backgroundColor: 'rgba(0,0,0,0.05)',
     },
 });
