@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { AuthLockProvider } from '@/components/AuthLockProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -18,9 +19,11 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <RootLayoutNav />
-      </GestureHandlerRootView>
+      <AuthLockProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <RootLayoutNav />
+        </GestureHandlerRootView>
+      </AuthLockProvider>
     </AuthProvider>
   );
 }

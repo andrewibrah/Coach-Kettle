@@ -15,10 +15,12 @@ import {
   View,
 } from 'react-native';
 
+import { TermsConsent } from '@/components/TermsConsent';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { setTermsAcceptance, syncTermsAcceptanceToServer } from '@/lib/authLock';
 import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -27,6 +29,7 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const router = useRouter();
 
   const primaryColor = useThemeColor({}, 'tint');
@@ -40,6 +43,8 @@ export default function SignUp() {
 
   async function signUpWithEmail() {
     if (!email || !password) return Alert.alert('Error', 'Please enter email and password');
+    if (!termsAccepted) return Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy to continue');
+
     setLoading(true);
     const { error, data } = await supabase.auth.signUp({
       email,
@@ -49,12 +54,25 @@ export default function SignUp() {
     setLoading(false);
     if (error) Alert.alert('Sign Up Failed', error.message);
     else {
-      if (!data.session) Alert.alert('Verification Sent', 'Please check your email to confirm your account.');
-      else router.replace('/(tabs)');
+      // Record terms acceptance locally
+      await setTermsAcceptance();
+
+      if (!data.session) {
+        Alert.alert('Verification Sent', 'Please check your email to confirm your account.');
+      } else {
+        // Sync terms acceptance to server (non-blocking)
+        syncTermsAcceptanceToServer().catch(console.error);
+        router.replace('/(tabs)');
+      }
     }
   }
 
   async function signInWithOAuth(provider: 'google' | 'apple') {
+    if (!termsAccepted) {
+      Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy to continue');
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -76,6 +94,9 @@ export default function SignUp() {
             const { error: sessionError } = await supabase.auth.exchangeCodeForSession(params.queryParams.code as string);
             if (sessionError) throw sessionError;
           }
+          // Record terms acceptance locally and sync to server
+          await setTermsAcceptance();
+          syncTermsAcceptanceToServer().catch(console.error);
           router.replace('/(tabs)');
         }
       }
@@ -145,6 +166,12 @@ export default function SignUp() {
               <Ionicons name="logo-google" size={24} color={textColor} />
               <ThemedText style={styles.oauthText}>Sign up with Google</ThemedText>
             </TouchableOpacity>
+
+            {/* Terms & Privacy Consent */}
+            <TermsConsent
+              accepted={termsAccepted}
+              onAcceptedChange={setTermsAccepted}
+            />
 
           </View>
 

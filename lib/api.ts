@@ -261,4 +261,61 @@ export const api = {
       // Fail silently for logging
     }
   },
+
+  // Terms Acceptance APIs
+  checkTermsAcceptance: async () => {
+    const url = `${API_BASE}/terms-acceptance`;
+
+    try {
+      const res = await fetchWithAuth(url, { method: "GET" });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`Failed to check terms acceptance: ${res.status} - ${body}`);
+      }
+
+      return (await res.json()) as {
+        accepted: boolean;
+        needs_acceptance: boolean;
+        accepted_terms_version?: string;
+        accepted_privacy_version?: string;
+        accepted_at?: string;
+        current_terms_version: string;
+        current_privacy_version: string;
+      };
+    } catch (error) {
+      console.error("[api.checkTermsAcceptance] Error:", error);
+      throw error;
+    }
+  },
+
+  recordTermsAcceptance: async (termsVersion?: string, privacyVersion?: string) => {
+    const url = `${API_BASE}/terms-acceptance`;
+
+    try {
+      const res = await fetchWithAuth(url, {
+        method: "POST",
+        body: JSON.stringify({
+          terms_version: termsVersion,
+          privacy_version: privacyVersion,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`Failed to record terms acceptance: ${res.status} - ${body}`);
+      }
+
+      return (await res.json()) as {
+        ok: boolean;
+        accepted_at?: string;
+        terms_version: string;
+        privacy_version: string;
+        message?: string;
+      };
+    } catch (error) {
+      console.error("[api.recordTermsAcceptance] Error:", error);
+      throw error;
+    }
+  },
 };

@@ -19,6 +19,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { setLastAuthenticatedAt } from '@/lib/authLock';
 import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -48,8 +49,13 @@ export default function SignIn() {
     });
 
     setLoading(false);
-    if (error) Alert.alert('Sign In Failed', error.message);
-    else router.replace('/(tabs)');
+    if (error) {
+      Alert.alert('Sign In Failed', error.message);
+    } else {
+      // Refresh auth timestamp for TTL tracking
+      await setLastAuthenticatedAt();
+      router.replace('/(tabs)');
+    }
   }
 
   async function signInWithOAuth(provider: 'google' | 'apple') {
@@ -92,6 +98,8 @@ export default function SignIn() {
             await supabase.auth.getSession(); // Try to refresh
           }
 
+          // Refresh auth timestamp for TTL tracking
+          await setLastAuthenticatedAt();
           router.replace('/(tabs)');
         }
       }
@@ -165,7 +173,7 @@ export default function SignIn() {
           </View>
 
           <View style={styles.footer}>
-            <ThemedText>Don't have an account? </ThemedText>
+            <ThemedText>Don&apos;t have an account? </ThemedText>
             <Link href={"/auth/sign-up" as any} asChild>
               <TouchableOpacity>
                 <ThemedText type="link">Sign Up</ThemedText>
