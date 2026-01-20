@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { setTermsAcceptance, syncTermsAcceptanceToServer } from '@/lib/authLock';
+import { setLastAuthenticatedAt, setTermsAcceptance, syncTermsAcceptanceToServer } from '@/lib/authLock';
 import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -60,7 +60,8 @@ export default function SignUp() {
       if (!data.session) {
         Alert.alert('Verification Sent', 'Please check your email to confirm your account.');
       } else {
-        // Sync terms acceptance to server (non-blocking)
+        // Refresh auth timestamp for TTL tracking and sync terms to server
+        await setLastAuthenticatedAt();
         syncTermsAcceptanceToServer().catch(console.error);
         router.replace('/(tabs)');
       }
@@ -94,8 +95,8 @@ export default function SignUp() {
             const { error: sessionError } = await supabase.auth.exchangeCodeForSession(params.queryParams.code as string);
             if (sessionError) throw sessionError;
           }
-          // Record terms acceptance locally and sync to server
-          await setTermsAcceptance();
+          // Record terms acceptance and refresh auth timestamp for TTL tracking
+          await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
           syncTermsAcceptanceToServer().catch(console.error);
           router.replace('/(tabs)');
         }

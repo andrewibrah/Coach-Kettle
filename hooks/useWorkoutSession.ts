@@ -16,9 +16,10 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
   const [workoutDateISO, setWorkoutDateISO] = useState<string | null>(null);
 
   const title = useMemo(() => {
-    const bp = bodyParts.length ? `${bodyParts.join(" + ")} ` : "";
-    return `${sessionDate} ${bp}Workout`;
-  }, [sessionDate, bodyParts]);
+    // Format: "MM/DD Part1/Part2" or just "MM/DD Workout" if no parts specified
+    const bp = bodyParts.length ? bodyParts.join("/") : "Workout";
+    return `${sessionDate} ${bp}`;
+  }, [sessionDate, bodyParts,]);
 
   const selectedPart = useMemo(
     () => (bodyParts.length ? bodyParts.join(" + ") : ""),

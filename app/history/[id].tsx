@@ -6,12 +6,72 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { api } from "@/lib/api";
-import { type WorkoutRow, type WorkoutSession } from "@/lib/workoutStorage";
+import { type SessionReview, type WorkoutRow, type WorkoutSession } from "@/lib/workoutStorage";
 
 type ExerciseGroup = {
   exercise: string;
   sets: { row: WorkoutRow; setNum: number }[];
 };
+
+function ReviewCard({
+  review,
+  isDark,
+  cardColor,
+  textColor,
+  secondaryTextColor,
+}: {
+  review: SessionReview;
+  isDark: boolean;
+  cardColor: string;
+  textColor: string;
+  secondaryTextColor: string;
+}) {
+  const getRatingColor = (rating: number) => {
+    if (rating >= 8) return "#10B981";
+    if (rating >= 6) return "#3B82F6";
+    if (rating >= 4) return "#F59E0B";
+    return "#EF4444";
+  };
+
+  const getRatingEmoji = (rating: number) => {
+    if (rating >= 9) return "🔥";
+    if (rating >= 7) return "💪";
+    if (rating >= 5) return "👍";
+    if (rating >= 3) return "🙂";
+    return "😅";
+  };
+
+  return (
+    <View style={[styles.reviewCard, { backgroundColor: cardColor }]}>
+      <View style={styles.reviewHeader}>
+        <Text style={styles.reviewEmoji}>{getRatingEmoji(review.rating)}</Text>
+        <View style={styles.reviewRatingInfo}>
+          <Text style={[styles.reviewRating, { color: getRatingColor(review.rating) }]}>
+            {review.rating}/10
+          </Text>
+          <Text style={[styles.reviewLabel, { color: secondaryTextColor }]}>Session Rating</Text>
+        </View>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={[styles.reviewSectionTitle, { color: "#10B981" }]}>✓ Strengths</Text>
+        {review.strengths.map((s, i) => (
+          <Text key={i} style={[styles.reviewBullet, { color: textColor }]}>• {s}</Text>
+        ))}
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={[styles.reviewSectionTitle, { color: "#F59E0B" }]}>↑ Improve</Text>
+        <Text style={[styles.reviewText, { color: textColor }]}>{review.weakness}</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={[styles.reviewSectionTitle, { color: "#3B82F6" }]}>📝 Next Session</Text>
+        <Text style={[styles.reviewText, { color: textColor, fontStyle: 'italic' }]}>{review.nextSessionNote}</Text>
+      </View>
+    </View>
+  );
+}
 
 function groupByExercise(rows: WorkoutRow[]): ExerciseGroup[] {
   const groups: ExerciseGroup[] = [];
@@ -88,6 +148,10 @@ export default function WorkoutDetail() {
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
 
+        {/* Session Review Card */}
+        {workout.review && (
+          <ReviewCard review={workout.review} isDark={isDark} cardColor={cardColor} textColor={textColor} secondaryTextColor={secondaryTextColor} />
+        )}
 
         {groups.length === 0 ? (
           <Text style={styles.emptyText}>No exercises logged.</Text>
@@ -263,5 +327,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: "italic",
     color: "#4B5563",
+  },
+  // Review Card styles
+  reviewCard: {
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
+  reviewEmoji: {
+    fontSize: 36,
+  },
+  reviewRatingInfo: {
+    flex: 1,
+  },
+  reviewRating: {
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  reviewLabel: {
+    fontSize: 12,
+  },
+  reviewSection: {
+    gap: 4,
+  },
+  reviewSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  reviewBullet: {
+    fontSize: 14,
+    lineHeight: 20,
+    paddingLeft: 4,
+  },
+  reviewText: {
+    fontSize: 14,
+    lineHeight: 20,
+    paddingLeft: 4,
   },
 });

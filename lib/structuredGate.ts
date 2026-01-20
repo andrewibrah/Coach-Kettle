@@ -17,6 +17,7 @@ export type GateDecisionReason =
   | "missing_exercise"
   | "missing_reps"
   | "conversational_question"
+  | "end_workout_intent"
   | "success";
 
 type FastPattern = "single" | "multi" | "dropset" | "superset" | "cardio" | "warmup";
@@ -28,7 +29,8 @@ export type GateDecision =
     rows: ParsedRow[];
     meta?: { pattern?: FastPattern };
   }
-  | { kind: "ai"; reason: GateDecisionReason; userHint?: string };
+  | { kind: "ai"; reason: GateDecisionReason; userHint?: string }
+  | { kind: "end_workout"; reason: "end_workout_intent" };
 
 type GateContext = { lastExercise?: string };
 
@@ -38,6 +40,37 @@ const PLATE_WEIGHT = 45; // per plate
 const BAR_WEIGHT = 45;
 
 const numberRegex = /\d/;
+
+// Patterns that indicate user wants to end their workout
+const END_WORKOUT_PATTERNS = [
+  /^(i'?m\s+)?done$/i,
+  /^(i'?m\s+)?finished$/i,
+  /^(that'?s\s+)?it$/i,
+  /^end\s*(workout|session)?$/i,
+  /^finish\s*(workout|session)?$/i,
+  /^done\s*(for\s+today|with\s+workout|working\s+out)?$/i,
+  /^finished\s*(for\s+today|with\s+workout|working\s+out)?$/i,
+  /^wrap\s*(it\s+)?up$/i,
+  /^that'?s\s+(a\s+)?wrap$/i,
+  /^all\s+done$/i,
+  /^good\s+workout$/i,
+  /^great\s+workout$/i,
+  /^save\s*(workout|session)?$/i,
+  /^end\s+it$/i,
+  /^call\s+it\s+(a\s+day|quits)$/i,
+  /^(let'?s\s+)?finish\s+up$/i,
+  /^time\s+to\s+(go|leave|end)$/i,
+];
+
+const isEndWorkoutIntent = (message: string): boolean => {
+  const lower = message.toLowerCase().trim();
+  for (const pattern of END_WORKOUT_PATTERNS) {
+    if (pattern.test(lower)) {
+      return true;
+    }
+  }
+  return false;
+};
 
 // Patterns that indicate conversational questions rather than workout logging
 const QUESTION_PATTERNS = [
@@ -196,6 +229,11 @@ const buildFastDecision = (rows: ParsedRow[], pattern?: FastPattern): GateDecisi
 export function decideAndParse(message: string, context: GateContext): GateDecision {
   const trimmed = message.trim();
   if (!trimmed) return makeAiDecision("empty_message");
+
+  // Check for end workout intent first
+  if (isEndWorkoutIntent(trimmed)) {
+    return { kind: "end_workout", reason: "end_workout_intent" };
+  }
 
   // Check for conversational questions first - route to AI for coach response
   if (isConversationalQuestion(trimmed)) {

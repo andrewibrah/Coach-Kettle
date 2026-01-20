@@ -75,29 +75,11 @@ export default function SignIn() {
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
         if (result.type === 'success' && result.url) {
-          // Handle the redirect URL
-          // Extract tokens from URL if implicit flow, or code if PKCE
-          // For Supabase, usually you need to persist the session.
-
-          // Check if URL has access_token (implicit) or code (PKCE)
-          // supabase-js doesn't automatically pick it up from WebBrowser result unless we force it.
-
           const params = Linking.parse(result.url);
-          // Unfortunately manually handling this is specific to how Supabase project is configured (Implicit vs PKCE)
-          // Default new projects are PKCE. url contains ?code=...
-
           if (params.queryParams?.code) {
             const { error: sessionError } = await supabase.auth.exchangeCodeForSession(params.queryParams.code as string);
             if (sessionError) throw sessionError;
-          } else if (result.url.includes('access_token')) {
-            // Implicit flow (url fragment)
-            // supabase.auth.getSession() usually works if url is processed or if we use setSession
-            // But simplified:
-            // We will rely on Supabase detecting it if we passed the URL? No.
-
-            await supabase.auth.getSession(); // Try to refresh
           }
-
           // Refresh auth timestamp for TTL tracking
           await setLastAuthenticatedAt();
           router.replace('/(tabs)');
@@ -145,6 +127,12 @@ export default function SignIn() {
                 secureTextEntry
               />
             </View>
+
+            <Link href={"/auth/forgot-password" as any} asChild>
+              <TouchableOpacity style={styles.forgotPassword}>
+                <ThemedText type="link">Forgot Password?</ThemedText>
+              </TouchableOpacity>
+            </Link>
 
             <TouchableOpacity
               style={[styles.button, { backgroundColor: primaryColor, opacity: loading ? 0.7 : 1 }]}
@@ -223,6 +211,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 16,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
   },
   button: {
     height: 50,

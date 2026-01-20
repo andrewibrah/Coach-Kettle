@@ -11,12 +11,21 @@ export type WorkoutRow = {
   timestamp?: number;
 };
 
+export type SessionReview = {
+  rating: number; // 1-10
+  strengths: string[];
+  weakness: string;
+  nextSessionNote: string;
+  generatedAt: number;
+};
+
 export type WorkoutSession = {
   id: string;
   dateISO: string; // YYYY-MM-DD
   part: string;
   rows: WorkoutRow[];
   createdAt: number;
+  review?: SessionReview;
 };
 
 const KEY = "workout_history_v1";

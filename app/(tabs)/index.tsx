@@ -20,6 +20,7 @@ import { runOnJS } from "react-native-reanimated";
 import { CoachModal } from "@/components/modals/CoachModal";
 import { EditSetModal } from "@/components/modals/EditSetModal";
 import { MenuModal } from "@/components/modals/MenuModal";
+import { SessionReviewModal } from "@/components/modals/SessionReviewModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
 import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -34,6 +35,7 @@ import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
 import { getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
 import { type LogRow } from "@/types/workout";
+import { type SessionReview } from "@/lib/workoutStorage";
 
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
@@ -71,6 +73,11 @@ export default function HomeScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Session review modal state
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [sessionReview, setSessionReview] = useState<SessionReview | null>(null);
+
   const openMenu = () => setMenuOpen(true);
   const swipeRight = Gesture.Fling()
     .direction(Directions.RIGHT)
@@ -95,7 +102,7 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const { workoutActive, title, startWorkoutSession, endWorkoutSession, buildWorkoutToSave } = useWorkoutSession({
+  const { workoutActive, title, selectedPart, startWorkoutSession, endWorkoutSession, buildWorkoutToSave } = useWorkoutSession({
     onResetForNewDay,
   });
 
@@ -589,6 +596,98 @@ export default function HomeScreen() {
     }
   };
 
+  // Handle end workout with auto-save and AI review generation
+  const handleEndWorkoutWithReview = async (currentRows: LogRow[]) => {
+    const committedRows = currentRows.filter(r => r.status === "committed");
+    if (committedRows.length === 0) {
+      Alert.alert("No sets logged", "Log some sets before ending your workout.");
+      return;
+    }
+
+    // Show review modal with loading state
+    setReviewModalVisible(true);
+    setReviewLoading(true);
+    setSessionReview(null);
+
+    // Capture state
+    const rowsToSave = [...committedRows];
+    const previousRows = [...rows];
+
+    // Build stored rows
+    const storedRows = rowsToSave.map((row) => ({
+      exercise: row.exercise,
+      weightLbs: row.weightLbs,
+      reps: row.reps,
+      notes: row.notes,
+      timestamp: row.timestamp,
+    }));
+
+    // Generate review
+    try {
+      const reviewData = await api.generateSessionReview(
+        rowsToSave.map(r => ({
+          exercise: r.exercise,
+          set: r.set,
+          weightLbs: r.weightLbs,
+          reps: r.reps,
+          notes: r.notes,
+        })),
+        selectedPart
+      );
+
+      const review: SessionReview = {
+        ...reviewData,
+        generatedAt: Date.now(),
+      };
+
+      setSessionReview(review);
+      setReviewLoading(false);
+
+      // Save workout with review
+      const workoutPayload = {
+        ...buildWorkoutToSave(storedRows),
+        review,
+      };
+
+      await api.saveWorkout(workoutPayload);
+
+      // Clear UI after successful save
+      endWorkoutSession();
+      setRows([]);
+      setMessageInput("");
+      setEditingCell(null);
+      setEditValue("");
+      setUndoState(null);
+      if (undoTimerRef.current) {
+        clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = null;
+      }
+
+      if (Platform.OS === "ios") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (error) {
+      console.error("[handleEndWorkoutWithReview] Error:", error);
+      setReviewLoading(false);
+
+      // Still try to save workout without review
+      try {
+        await api.saveWorkout(buildWorkoutToSave(storedRows));
+        endWorkoutSession();
+        setRows([]);
+        setMessageInput("");
+      } catch (saveError) {
+        console.error("[handleEndWorkoutWithReview] Save also failed:", saveError);
+        setReviewModalVisible(false);
+        Alert.alert(
+          "Save Failed",
+          "Could not save your workout. Please try again.",
+          [{ text: "OK" }]
+        );
+      }
+    }
+  };
+
   const sendMessage = async () => {
     const message = messageInput.trim();
     if (!message || loading) return;
@@ -688,6 +787,20 @@ export default function HomeScreen() {
       return;
     }
 
+    // Handle end workout intent - auto-save and generate review
+    if (gateDecision.kind === "end_workout") {
+      setMessageInput("");
+
+      if (currentRows.length === 0) {
+        Alert.alert("No sets logged", "Log some sets before ending your workout.");
+        return;
+      }
+
+      // Trigger the end workout flow with review
+      handleEndWorkoutWithReview(currentRows);
+      return;
+    }
+
     if (gateDecision.kind === "ai") {
       // Check if this is a conversational question - handle without ghost row
       if (gateDecision.reason === "conversational_question") {
@@ -773,6 +886,12 @@ export default function HomeScreen() {
               <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
             </Pressable>
           </View>
+
+          {workoutActive && (
+            <View style={styles.workoutTitleRow}>
+              <ThemedText style={styles.workoutTitle}>{title}</ThemedText>
+            </View>
+          )}
         </ThemedView>
 
         <WorkoutTable
@@ -857,6 +976,16 @@ export default function HomeScreen() {
           onConfirm={confirmStartWorkout}
         />
 
+        <SessionReviewModal
+          visible={reviewModalVisible}
+          loading={reviewLoading}
+          review={sessionReview}
+          workoutTitle={title}
+          onClose={() => {
+            setReviewModalVisible(false);
+            setSessionReview(null);
+          }}
+        />
 
       </KeyboardAvoidingView >
     </GestureDetector>
@@ -884,7 +1013,15 @@ const styles = StyleSheet.create({
   menuButtonPressed: {
     opacity: 0.7,
   },
-
+  workoutTitleRow: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  workoutTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
 
   undoBar: {
     marginTop: 10,

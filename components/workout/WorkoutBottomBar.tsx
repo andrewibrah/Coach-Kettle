@@ -1,8 +1,9 @@
 import { Dispatch, SetStateAction } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as Haptics from "expo-haptics";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 
 
@@ -35,6 +36,11 @@ export function WorkoutBottomBar({
   startToastOpen,
   showStartToast,
 }: Props) {
+  const colorScheme = useColorScheme();
+  const textColor = useThemeColor({}, 'text');
+  const backgroundColor = useThemeColor({}, 'background');
+  const isDark = colorScheme === 'dark';
+
   const disabledSend = !workoutActive || loading || !messageInput.trim();
 
   const handleSend = () => {
@@ -80,8 +86,13 @@ export function WorkoutBottomBar({
         <TextInput
           value={messageInput}
           onChangeText={setMessageInput}
-          placeholder={workoutActive ? "e.g. Leg press 4 plates 10 reps" : "Start a workout to log sets"}
-          style={[styles.input, styles.messageInput]}
+          placeholder={workoutActive ? "Exercise  lbs  reps" : "Start a workout to log sets"}
+          placeholderTextColor={isDark ? "#888" : "#999"}
+          style={[
+            styles.input,
+            styles.messageInput,
+            { color: textColor, backgroundColor: isDark ? '#1c1c1e' : '#fff', borderColor: isDark ? '#3a3a3c' : '#D6D6D6' }
+          ]}
           returnKeyType="send"
           onSubmitEditing={handleSend}
           editable={workoutActive && !loading}

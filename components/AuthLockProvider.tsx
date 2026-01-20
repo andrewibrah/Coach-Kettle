@@ -156,12 +156,21 @@ export function AuthLockProvider({ children }: AuthLockProviderProps) {
     return () => subscription.remove();
   }, [checkLockStatus]);
 
+  // Track if initial check has been done
+  const initialCheckDone = useRef(false);
+
   /**
-   * Initial lock check on mount and when session changes
+   * Initial lock check on mount only
+   * We DON'T want to show loading spinner on session refreshes as it unmounts the app UI
    */
   useEffect(() => {
     if (!authLoading) {
-      setIsCheckingLock(true);
+      // Only show loading spinner on initial check, not on session refreshes
+      if (!initialCheckDone.current) {
+        setIsCheckingLock(true);
+        initialCheckDone.current = true;
+      }
+      // Always check lock status, but don't flash loading state
       checkLockStatus();
       initBiometrics();
     }

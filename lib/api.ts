@@ -183,6 +183,62 @@ export const api = {
       throw new Error(`Coach request failed: ${error}`);
     }
   },
+  generateSessionReview: async (rows: ApiWorkoutRow[], workoutPart: string): Promise<{
+    rating: number;
+    strengths: string[];
+    weakness: string;
+    nextSessionNote: string;
+  }> => {
+    const url = `${API_BASE}/coach`;
+
+    const reviewPrompt = `Analyze this ${workoutPart || 'workout'} session and provide a JSON review with:
+- rating: number 1-10 based on volume, intensity, exercise selection
+- strengths: array of 2-3 brief positive points about the session
+- weakness: one area to improve (string)
+- nextSessionNote: one actionable tip for next session (string)
+
+Respond ONLY with valid JSON, no other text. Example format:
+{"rating":8,"strengths":["Good volume on compound lifts","Progressive overload on bench"],"weakness":"Could add more isolation work","nextSessionNote":"Try adding a finisher set next time"}`;
+
+    try {
+      const res = await fetchWithAuth(url, {
+        method: "POST",
+        body: JSON.stringify({ question: reviewPrompt, rows }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`HTTP ${res.status}: ${body}`);
+      }
+
+      const text = await res.text();
+
+      // Try to parse JSON from the response
+      // The response might have some text around the JSON, so we try to extract it
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("No JSON found in response");
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      return {
+        rating: Math.min(10, Math.max(1, Number(parsed.rating) || 7)),
+        strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 3) : ["Great effort today!"],
+        weakness: String(parsed.weakness || "Keep pushing yourself"),
+        nextSessionNote: String(parsed.nextSessionNote || "Stay consistent and keep logging your workouts"),
+      };
+    } catch (error) {
+      console.error("[api.generateSessionReview] Error:", error);
+      // Return a fallback review if AI fails
+      return {
+        rating: 7,
+        strengths: ["Completed your workout", "Logged all your sets"],
+        weakness: "Consider tracking more details",
+        nextSessionNote: "Keep up the consistency!",
+      };
+    }
+  },
   parse: async (message: string, lex?: string) => {
     const url = `${API_BASE}/parse`;
 

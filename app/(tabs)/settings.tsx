@@ -1,8 +1,10 @@
 import { useAuth } from '@/components/AuthProvider';
 import { useAuthLock } from '@/components/AuthLockProvider';
+import { useTheme } from '@/components/ThemeProvider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
+import { Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getBiometricDisplayName } from '@/lib/biometrics';
 import { useRouter } from 'expo-router';
@@ -17,12 +19,23 @@ export default function SettingsScreen() {
         biometricEnabled,
         setBiometricEnabled,
     } = useAuthLock();
+    const { themeMode, setThemeMode, isDark } = useTheme();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const activeColor = useThemeColor({}, 'tint');
     const [isClearing, setIsClearing] = useState(false);
+
+    // Dynamic colors for dark mode
+    const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
+    const sectionTitleColor = isDark ? '#8E8E93' : '#8E8E93';
+    const warningBg = isDark ? '#3d2d00' : '#FFF8E6';
+    const warningTextColor = isDark ? '#FFD60A' : '#996600';
+    const infoBg = isDark ? '#0a2540' : '#E8F4FD';
+    const infoTextColor = isDark ? '#64B5F6' : '#0066CC';
+    const cacheBg = isDark ? '#3d2d00' : '#FFF8E6';
+    const logoutBg = isDark ? '#3d1515' : '#FFF1F0';
 
     // Check if biometrics can be used
     const canUseBiometrics = biometricStatus?.isEnrolled || biometricStatus?.canUsePasscode;
@@ -96,20 +109,49 @@ export default function SettingsScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Account</ThemedText>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Account</ThemedText>
                     {session?.user?.email && (
-                        <View style={styles.emailContainer}>
+                        <View style={[styles.emailContainer, { backgroundColor: cardBg }]}>
                             <ThemedText style={styles.emailText}>{session.user.email}</ThemedText>
                         </View>
                     )}
                 </View>
 
+                {/* Appearance Section */}
+                <View style={styles.section}>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Appearance</ThemedText>
+                    <View style={[styles.settingRow, { backgroundColor: cardBg }]}>
+                        <View style={styles.settingInfo}>
+                            <ThemedText style={styles.settingLabel}>Dark Mode</ThemedText>
+                            <ThemedText style={styles.settingDescription}>
+                                {themeMode === 'system' ? 'Following system setting' : themeMode === 'dark' ? 'Always dark' : 'Always light'}
+                            </ThemedText>
+                        </View>
+                        <Switch
+                            value={isDark}
+                            onValueChange={(value) => setThemeMode(value ? 'dark' : 'light')}
+                            trackColor={{ false: '#767577', true: activeColor }}
+                            thumbColor="#fff"
+                        />
+                    </View>
+                    <Pressable
+                        style={({ pressed }) => [styles.systemThemeButton, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => setThemeMode('system')}
+                    >
+                        <IconSymbol name="gear" size={20} color={textColor} />
+                        <Text style={[styles.systemThemeText, { color: textColor }]}>Use System Setting</Text>
+                        {themeMode === 'system' && (
+                            <IconSymbol name="checkmark" size={20} color={activeColor} />
+                        )}
+                    </Pressable>
+                </View>
+
                 {/* Security Section */}
                 <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Security</ThemedText>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Security</ThemedText>
 
                     {/* Biometric Toggle */}
-                    <View style={styles.settingRow}>
+                    <View style={[styles.settingRow, { backgroundColor: cardBg }]}>
                         <View style={styles.settingInfo}>
                             <ThemedText style={styles.settingLabel}>
                                 Use {biometricName} for faster login
@@ -129,42 +171,42 @@ export default function SettingsScreen() {
 
                     {/* Biometric Explanation */}
                     {biometricEnabled && (
-                        <View style={styles.infoBox}>
+                        <View style={[styles.infoBox, { backgroundColor: infoBg }]}>
                             <IconSymbol name="lock.shield" size={16} color={activeColor} />
-                            <ThemedText style={styles.infoText}>
+                            <Text style={[styles.infoText, { color: infoTextColor }]}>
                                 Your biometric data never leaves your device. EasyWorkouts only receives a success/fail result from your device&apos;s secure enclave.
-                            </ThemedText>
+                            </Text>
                         </View>
                     )}
 
                     {!canUseBiometrics && (
-                        <View style={styles.warningBox}>
-                            <IconSymbol name="exclamationmark.triangle" size={16} color="#FF9500" />
-                            <ThemedText style={styles.warningText}>
+                        <View style={[styles.warningBox, { backgroundColor: warningBg }]}>
+                            <IconSymbol name="exclamationmark.triangle" size={16} color={isDark ? '#FFD60A' : '#FF9500'} />
+                            <Text style={[styles.warningText, { color: warningTextColor }]}>
                                 Set up Face ID, Touch ID, or a device passcode in Settings to enable this feature.
-                            </ThemedText>
+                            </Text>
                         </View>
                     )}
                 </View>
 
                 {/* Data Section */}
                 <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Data</ThemedText>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Data</ThemedText>
                     <Pressable
-                        style={({ pressed }) => [styles.cacheButton, pressed && styles.buttonPressed]}
+                        style={({ pressed }) => [styles.cacheButton, { backgroundColor: cacheBg }, pressed && styles.buttonPressed]}
                         onPress={handleClearCache}
                         disabled={isClearing}
                     >
-                        <IconSymbol name="trash" size={20} color="#FF9500" />
-                        <Text style={styles.cacheText}>{isClearing ? 'Clearing...' : 'Clear Local Cache'}</Text>
+                        <IconSymbol name="trash" size={20} color={isDark ? '#FFD60A' : '#FF9500'} />
+                        <Text style={[styles.cacheText, { color: isDark ? '#FFD60A' : '#FF9500' }]}>{isClearing ? 'Clearing...' : 'Clear Local Cache'}</Text>
                     </Pressable>
                 </View>
 
                 {/* Account Actions */}
                 <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Account Actions</ThemedText>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Account Actions</ThemedText>
                     <Pressable
-                        style={({ pressed }) => [styles.logoutButton, pressed && styles.buttonPressed]}
+                        style={({ pressed }) => [styles.logoutButton, { backgroundColor: logoutBg }, pressed && styles.buttonPressed]}
                         onPress={handleLogout}
                     >
                         <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color="#FF3B30" />
@@ -225,6 +267,19 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: '600',
         color: '#FF9500',
+    },
+    systemThemeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        gap: 10,
+    },
+    systemThemeText: {
+        flex: 1,
+        fontSize: 16,
+        fontWeight: '500',
     },
     logoutButton: {
         flexDirection: 'row',
