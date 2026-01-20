@@ -47,6 +47,7 @@ create or replace function public.has_accepted_terms(
 language sql
 security definer
 stable
+    SET search_path = pg_temp
 as $$
     select exists (
         select 1
@@ -67,6 +68,7 @@ returns table (
 language sql
 security definer
 stable
+    SET search_path = pg_temp
 as $$
     select terms_version, privacy_version, accepted_at
     from public.user_terms_acceptance
