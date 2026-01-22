@@ -8,6 +8,7 @@ import { HapticTab } from '@/components/ui/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
+import { useProfile } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ActivityIndicator } from 'react-native';
 
@@ -15,9 +16,10 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { session, loading } = useAuth();
   const { isLocked, isCheckingLock } = useAuthLock();
+  const { profileLoading, needsOnboarding } = useProfile();
 
-  // Show loading while checking auth state or lock state
-  if (loading || isCheckingLock) {
+  // Show loading while checking auth state, lock state, or profile state
+  if (loading || isCheckingLock || profileLoading) {
     return (
       <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
@@ -34,6 +36,11 @@ export default function TabLayout() {
   // This prevents any protected UI from flashing before the lock is enforced
   if (isLocked) {
     return <LockScreen />;
+  }
+
+  // Session exists but needs onboarding - redirect to onboarding
+  if (needsOnboarding) {
+    return <Redirect href={"/onboarding" as any} />;
   }
 
   return (

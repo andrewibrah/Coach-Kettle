@@ -5,6 +5,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
+import { useProfile } from '@/contexts/ProfileContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getBiometricDisplayName } from '@/lib/biometrics';
 import { useRouter } from 'expo-router';
@@ -19,6 +20,7 @@ export default function SettingsScreen() {
         biometricEnabled,
         setBiometricEnabled,
     } = useAuthLock();
+    const { profile } = useProfile();
     const { themeMode, setThemeMode, isDark } = useTheme();
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -115,6 +117,46 @@ export default function SettingsScreen() {
                             <ThemedText style={styles.emailText}>{session.user.email}</ThemedText>
                         </View>
                     )}
+                </View>
+
+                {/* Profile Section */}
+                <View style={styles.section}>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Profile</ThemedText>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/settings/profile' as any)}
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="person.fill" size={20} color={activeColor} />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>Edit Profile</ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    {profile?.focus ? `Focus: ${profile.focus.replace('_', ' ')}` : 'Update your fitness info'}
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
+                </View>
+
+                {/* PR Tracking Section */}
+                <View style={styles.section}>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>PR Tracking</ThemedText>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/settings/pr-tracking' as any)}
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="trophy.fill" size={20} color="#FFD700" />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>Personal Records</ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    Manage tracked lifts and view PR history
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
                 </View>
 
                 {/* Appearance Section */}
@@ -376,5 +418,32 @@ const styles = StyleSheet.create({
         fontSize: 13,
         lineHeight: 18,
         color: '#996600',
+    },
+    navRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginBottom: 8,
+    },
+    navRowContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 12,
+    },
+    navRowText: {
+        flex: 1,
+    },
+    navRowLabel: {
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    navRowDescription: {
+        fontSize: 13,
+        opacity: 0.6,
+        marginTop: 2,
     },
 });
