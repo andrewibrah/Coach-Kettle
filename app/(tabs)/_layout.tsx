@@ -8,6 +8,7 @@ import { HapticTab } from '@/components/ui/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
+import { useProfile } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ActivityIndicator } from 'react-native';
 
@@ -15,9 +16,10 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { session, loading } = useAuth();
   const { isLocked, isCheckingLock, needsTermsAcceptance } = useAuthLock();
+  const { profileLoading, needsOnboarding } = useProfile();
 
-  // Show loading while checking auth state or lock state
-  if (loading || isCheckingLock) {
+  // Show loading while checking auth state, lock state, or profile state
+  if (loading || isCheckingLock || profileLoading) {
     return (
       <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
@@ -31,14 +33,18 @@ export default function TabLayout() {
   }
 
   // Session exists but is locked - show lock screen
-  // This prevents any protected UI from flashing before the lock is enforced
   if (isLocked) {
     return <LockScreen />;
   }
 
-  // Redirect to ToS if needed
+  // Redirect to ToS if needed (before onboarding)
   if (needsTermsAcceptance) {
     return <Redirect href="/terms-of-service" />;
+  }
+
+  // Session exists but needs onboarding - redirect to onboarding
+  if (needsOnboarding) {
+    return <Redirect href={"/onboarding" as any} />;
   }
 
   return (
@@ -47,7 +53,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarStyle: { display: 'none' }, // Hiding the footer as requested
+        tabBarStyle: { display: 'none' },
       }}>
       <Tabs.Screen
         name="index"
@@ -63,14 +69,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="clock.fill" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: "Settings",
-          href: null,
-        }}
-      />
     </Tabs>
   );
 }
-

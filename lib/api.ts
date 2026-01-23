@@ -1,4 +1,71 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from "./supabase";
+import { fetchProfile, UserProfile } from "./profile";
+
+// Cache for user profile to avoid repeated fetches
+let cachedProfile: UserProfile | null = null;
+let profileCacheTime = 0;
+const PROFILE_CACHE_TTL = 60000; // 1 minute cache
+
+async function getCachedProfile(): Promise<UserProfile | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) return null;
+
+  const now = Date.now();
+  if (cachedProfile && (now - profileCacheTime) < PROFILE_CACHE_TTL) {
+    return cachedProfile;
+  }
+
+  cachedProfile = await fetchProfile(session.user.id);
+  profileCacheTime = now;
+  return cachedProfile;
+}
+
+// Invalidate the profile cache (call after profile updates)
+export function invalidateProfileCache(): void {
+  cachedProfile = null;
+  profileCacheTime = 0;
+}
+
+// Build personalized context for AI
+function buildAIContextString(profile: UserProfile | null): string {
+  if (!profile || !profile.ai_context) return "";
+
+  const ctx = profile.ai_context as any;
+  const parts: string[] = [];
+
+  if (ctx.height?.value) {
+    parts.push(`Height: ${ctx.height.value}${ctx.height.unit}`);
+  }
+
+  if (ctx.dob) {
+    const age = Math.floor((Date.now() - new Date(ctx.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    parts.push(`Age: ${age} years`);
+  }
+
+  if (ctx.current_weight?.value) {
+    parts.push(`Current weight: ${ctx.current_weight.value}${ctx.current_weight.unit}`);
+  }
+
+  if (ctx.goal_weight?.value) {
+    parts.push(`Goal weight: ${ctx.goal_weight.value}${ctx.goal_weight.unit}`);
+  }
+
+  if (ctx.focus?.type && ctx.focus.type !== 'other') {
+    const focusLabel = ctx.focus.type.replace('_', ' ');
+    parts.push(`Fitness focus: ${focusLabel}`);
+  } else if (ctx.focus?.other) {
+    parts.push(`Fitness focus: ${ctx.focus.other}`);
+  }
+
+  if (ctx.current_prs && ctx.current_prs.length > 0) {
+    const prStrings = ctx.current_prs.map((pr: any) =>
+      `${pr.lift}: ${pr.best.weight}lbs x ${pr.best.reps} (E1RM: ${pr.best.e1rm}lbs)`
+    ).join(', ');
+    parts.push(`Current PRs: ${prStrings}`);
+  }
+
+  return parts.length > 0 ? `\n\nUser Profile: ${parts.join('. ')}.` : "";
+}
 
 // Use Supabase edge functions
 const API_BASE = `${supabaseUrl}/functions/v1`;
@@ -159,9 +226,14 @@ export const api = {
     const url = `${API_BASE}/coach`;
 
     try {
+      // Get user profile context for personalized responses
+      const profile = await getCachedProfile();
+      const profileContext = buildAIContextString(profile);
+      const enhancedQuestion = question + profileContext;
+
       const res = await fetchWithAuth(url, {
         method: "POST",
-        body: JSON.stringify({ question, rows }),
+        body: JSON.stringify({ question: enhancedQuestion, rows }),
       });
 
       if (!res.ok) {
@@ -201,7 +273,13 @@ export const api = {
   }> => {
     const url = `${API_BASE}/coach`;
 
-    const reviewPrompt = `Analyze this ${workoutPart || 'workout'} session and provide a JSON review with:
+    // Get user profile context for personalized review
+    const profile = await getCachedProfile();
+    const profileContext = buildAIContextString(profile);
+
+    const reviewPrompt = `Analyze this ${workoutPart || 'workout'} session and provide a JSON review with:${profileContext}
+
+Consider the user's profile when evaluating and providing advice.
 - rating: number 1-10 based on volume, intensity, exercise selection
 - strengths: array of 2-3 brief positive points about the session
 - weakness: one area to improve (string)
