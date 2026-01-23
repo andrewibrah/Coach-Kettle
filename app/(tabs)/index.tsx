@@ -11,7 +11,6 @@ import {
   View
 } from "react-native";
 
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -23,9 +22,8 @@ import { MenuModal } from "@/components/modals/MenuModal";
 import { SessionReviewModal } from "@/components/modals/SessionReviewModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
 import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Header } from "@/components/ui/Header";
 import { ThemedText } from "@/components/ui/themed-text";
-import { ThemedView } from "@/components/ui/themed-view";
 import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
 import { WorkoutTable } from "@/components/workout/WorkoutTable";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -34,8 +32,8 @@ import { api, type ApiWorkoutRow } from "@/lib/api";
 import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
 import { getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
-import { type LogRow } from "@/types/workout";
 import { type SessionReview } from "@/lib/workoutStorage";
+import { type LogRow } from "@/types/workout";
 
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
@@ -876,23 +874,11 @@ export default function HomeScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={[styles.screen, { backgroundColor }]}
       >
-        <ThemedView style={styles.header}>
-          <View style={styles.headerTopRow}>
-            <Pressable onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
-              <IconSymbol name="line.3.horizontal" size={24} color={iconColor} />
-            </Pressable>
-
-            <Pressable onPress={onClearRows} style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
-              <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
-            </Pressable>
-          </View>
-
-          {workoutActive && (
-            <View style={styles.workoutTitleRow}>
-              <ThemedText style={styles.workoutTitle}>{title}</ThemedText>
-            </View>
-          )}
-        </ThemedView>
+        <Header
+          title={workoutActive ? title : null}
+          onMenuPress={() => setMenuOpen(true)}
+          onClearPress={onClearRows}
+        />
 
         <WorkoutTable
           rows={rows}
@@ -995,34 +981,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    paddingTop: 12,
   },
-  header: {
-    marginBottom: 10,
-  },
-
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  menuButton: {
-    padding: 8,
-    marginTop: 40,
-  },
-  menuButtonPressed: {
-    opacity: 0.7,
-  },
-  workoutTitleRow: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  workoutTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
   undoBar: {
     marginTop: 10,
     flexDirection: "row",

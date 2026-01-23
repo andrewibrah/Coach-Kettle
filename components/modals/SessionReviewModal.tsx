@@ -1,4 +1,4 @@
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -65,12 +65,10 @@ export function SessionReviewModal({
           ]}
         >
           {/* Header */}
-          <View style={styles.header}>
-            <ThemedText style={styles.headerTitle}>Session Review</ThemedText>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <IconSymbol name="xmark" size={24} color={textColor} />
-            </Pressable>
-          </View>
+          <ScreenHeader
+            title="Session Review"
+            onBack={onClose}
+          />
 
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -197,21 +195,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: "90%",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  closeBtn: {
-    padding: 8,
-  },
+
   loadingContainer: {
     padding: 60,
     alignItems: "center",

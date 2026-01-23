@@ -1,8 +1,8 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 
-import { useAuth } from '@/components/AuthProvider';
 import { useAuthLock } from '@/components/AuthLockProvider';
+import { useAuth } from '@/components/AuthProvider';
 import { LockScreen } from '@/components/LockScreen';
 import { HapticTab } from '@/components/ui/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -14,7 +14,7 @@ import { ActivityIndicator } from 'react-native';
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { session, loading } = useAuth();
-  const { isLocked, isCheckingLock } = useAuthLock();
+  const { isLocked, isCheckingLock, needsTermsAcceptance } = useAuthLock();
 
   // Show loading while checking auth state or lock state
   if (loading || isCheckingLock) {
@@ -34,6 +34,11 @@ export default function TabLayout() {
   // This prevents any protected UI from flashing before the lock is enforced
   if (isLocked) {
     return <LockScreen />;
+  }
+
+  // Redirect to ToS if needed
+  if (needsTermsAcceptance) {
+    return <Redirect href="/terms-of-service" />;
   }
 
   return (

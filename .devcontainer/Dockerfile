@@ -6,7 +6,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Install global Expo CLI & EAS CLI
-RUN npm install -g eas-cli expo-cli
+RUN npm install -g eas-cli expo-cli @anthropic-ai/claude-code
 
 # Install Supabase CLI
 # Using brew is often easiest, but on Linux (container), we can use the script.

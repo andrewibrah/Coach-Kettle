@@ -1,16 +1,16 @@
-import { useAuth } from '@/components/AuthProvider';
 import { useAuthLock } from '@/components/AuthLockProvider';
+import { useAuth } from '@/components/AuthProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getBiometricDisplayName } from '@/lib/biometrics';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
     const { signOut, session, clearAllCaches } = useAuth();
@@ -21,7 +21,6 @@ export default function SettingsScreen() {
     } = useAuthLock();
     const { themeMode, setThemeMode, isDark } = useTheme();
     const router = useRouter();
-    const insets = useSafeAreaInsets();
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const activeColor = useThemeColor({}, 'tint');
@@ -98,14 +97,9 @@ export default function SettingsScreen() {
     };
 
     return (
-        <ThemedView style={[styles.container, { paddingTop: insets.top + 20, backgroundColor }]}>
-            <View style={styles.header}>
-                <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
-                    <IconSymbol name="chevron.left" size={28} color={textColor} />
-                </Pressable>
-                <ThemedText type="subtitle" style={styles.title}>Settings</ThemedText>
-                <View style={{ width: 44 }} />
-            </View>
+        <ThemedView style={[styles.container, { backgroundColor }]}>
+            <Stack.Screen options={{ headerShown: false }} />
+            <ScreenHeader title="Settings" />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.section}>
@@ -222,28 +216,11 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        marginBottom: 24,
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: '700',
-    },
     scrollContent: {
         paddingHorizontal: 20,
     },
     section: {
-        marginBottom: 32,
+        marginBottom: 12,
     },
     sectionTitle: {
         fontSize: 14,

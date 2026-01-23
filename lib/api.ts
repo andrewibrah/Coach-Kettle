@@ -68,6 +68,16 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 
   // Log token preview for debugging (without decoding)
   const tokenPreview = session.access_token.substring(0, 20) + "...";
+
+  // Debug: Check JWT Algo
+  try {
+    const headerPart = session.access_token.split('.')[0];
+    const decodedHeader = JSON.parse(atob(headerPart));
+    console.log("[getAuthHeaders] Token Header:", decodedHeader);
+  } catch (e) {
+    console.log("[getAuthHeaders] Failed to decode token header");
+  }
+
   console.log("[getAuthHeaders] Using token:", {
     preview: tokenPreview,
     expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,

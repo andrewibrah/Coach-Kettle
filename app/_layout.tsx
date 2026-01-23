@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthLockProvider } from '@/components/AuthLockProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
@@ -36,9 +37,26 @@ function RootLayoutNav() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
-        <Stack.Screen name="chats" options={{ headerShown: true }} />
+        <Stack.Screen name="chats" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="history/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{
+          headerShown: true,
+          title: 'Settings',
+          headerBackTitle: "",
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background },
+          headerTintColor: colorScheme === 'dark' ? Colors.dark.text : Colors.light.text,
+        }} />
+        <Stack.Screen name="terms-of-service" options={{
+          headerShown: true,
+          title: 'Terms of Service',
+          presentation: 'modal',
+          headerBackTitle: "",
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background },
+          headerTintColor: colorScheme === 'dark' ? Colors.dark.text : Colors.light.text,
+        }} />
       </Stack>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </NavigationThemeProvider>

@@ -21,12 +21,15 @@ import { AppState, AppStateStatus } from 'react-native';
 
 import { useAuth } from '@/components/AuthProvider';
 import {
+  checkServerTermsAcceptance,
   clearLastAuthenticatedAt,
+  getBiometricEnabled,
   getLastAuthenticatedAt,
   isSessionExpired,
-  setLastAuthenticatedAt,
-  getBiometricEnabled,
   setBiometricEnabled as persistBiometricEnabled,
+  setLastAuthenticatedAt,
+  setTermsAcceptance as setLocalTermsAcceptance,
+  syncTermsAcceptanceToServer,
 } from '@/lib/authLock';
 import {
   authenticateWithBiometrics,
@@ -40,6 +43,7 @@ interface AuthLockContextType {
   // Lock state
   isLocked: boolean;
   isCheckingLock: boolean;
+  needsTermsAcceptance: boolean;
 
   // Biometric info
   biometricStatus: BiometricStatus | null;
@@ -50,17 +54,20 @@ interface AuthLockContextType {
   unlockWithBiometrics: () => Promise<{ success: boolean; error?: string }>;
   refreshAuthTimestamp: () => Promise<void>;
   setBiometricEnabled: (enabled: boolean) => Promise<void>;
+  acceptTerms: () => Promise<boolean>;
 }
 
 const AuthLockContext = createContext<AuthLockContextType>({
   isLocked: false,
   isCheckingLock: true,
+  needsTermsAcceptance: false,
   biometricStatus: null,
   biometricEnabled: false,
   unlockButtonText: 'Unlock',
   unlockWithBiometrics: async () => ({ success: false }),
-  refreshAuthTimestamp: async () => {},
-  setBiometricEnabled: async () => {},
+  refreshAuthTimestamp: async () => { },
+  setBiometricEnabled: async () => { },
+  acceptTerms: async () => false,
 });
 
 export const useAuthLock = () => useContext(AuthLockContext);
@@ -75,6 +82,7 @@ export function AuthLockProvider({ children }: AuthLockProviderProps) {
   // Lock state
   const [isLocked, setIsLocked] = useState(false);
   const [isCheckingLock, setIsCheckingLock] = useState(true);
+  const [needsTermsAcceptance, setNeedsTermsAcceptance] = useState(false);
 
   // Biometric state
   const [biometricStatus, setBiometricStatus] = useState<BiometricStatus | null>(null);
@@ -96,6 +104,11 @@ export function AuthLockProvider({ children }: AuthLockProviderProps) {
     }
 
     const lastAuthAt = await getLastAuthenticatedAt();
+    const serverAcceptance = await checkServerTermsAcceptance();
+
+    if (serverAcceptance) {
+      setNeedsTermsAcceptance(serverAcceptance.needsAcceptance);
+    }
 
     // If never authenticated (new session), set timestamp and don't lock
     if (lastAuthAt === null) {
@@ -182,6 +195,7 @@ export function AuthLockProvider({ children }: AuthLockProviderProps) {
   useEffect(() => {
     if (!session) {
       clearLastAuthenticatedAt();
+      setNeedsTermsAcceptance(false);
     }
   }, [session]);
 
@@ -241,15 +255,34 @@ export function AuthLockProvider({ children }: AuthLockProviderProps) {
     }
   }, []);
 
+  /**
+   * Accept the current terms of service
+   */
+  const acceptTerms = useCallback(async () => {
+    // 1. Update local storage
+    await setLocalTermsAcceptance();
+
+    // 2. Sync to server
+    const success = await syncTermsAcceptanceToServer();
+
+    if (success) {
+      setNeedsTermsAcceptance(false);
+    }
+
+    return success;
+  }, []);
+
   const value: AuthLockContextType = {
     isLocked,
     isCheckingLock,
+    needsTermsAcceptance,
     biometricStatus,
     biometricEnabled,
     unlockButtonText,
     unlockWithBiometrics,
     refreshAuthTimestamp,
     setBiometricEnabled: handleSetBiometricEnabled,
+    acceptTerms,
   };
 
   return (

@@ -3,7 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
+import { createRemoteJWKSet, decodeJwt, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -22,13 +22,19 @@ interface ChatMessage {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const supabaseJwtSecret = Deno.env.get("SUPABASE_JWT_SECRET") ?? "";
 
 if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase env vars");
 }
 
-// JWKS endpoint for ES256 JWT verification
-const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+// JWKS endpoint for ES256 JWT verification (Supabase Auth v2)
+let JWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
+try {
+    JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+} catch (e) {
+    console.warn("[chat-history] Failed to create JWKS, will fallback to secret:", e);
+}
 
 function respondJson(body: unknown, status = 200) {
     return new Response(
@@ -47,29 +53,70 @@ function createUserClient(authHeader: string): SupabaseClient {
 
 async function getUserContext(authHeader: string | null): Promise<{ supabase: SupabaseClient; userId: string } | Response> {
     if (!authHeader) {
-        return respondJson({ error: "Missing Authorization header" }, 401);
+        return respondJson({ code: 401, message: "Missing Authorization header" }, 401);
     }
 
     const token = authHeader.replace("Bearer ", "");
 
+    // Decode token for logging
     try {
-        const { payload } = await jwtVerify(token, JWKS, {
-            issuer: `${supabaseUrl}/auth/v1`,
-            audience: "authenticated",
-        });
-
-        const userId = payload.sub;
-        if (!userId) {
-            console.error("[chat-history] No user ID in token payload");
-            return respondJson({ error: "Invalid token" }, 401);
-        }
-
-        const supabase = createUserClient(authHeader);
-        return { supabase, userId };
-    } catch (error) {
-        console.error("[chat-history] JWT verification failed:", error);
-        return respondJson({ error: "Unauthorized" }, 401);
+        const decoded = decodeJwt(token);
+        console.log("[chat-history] Token claims:", { sub: decoded.sub, iss: decoded.iss, aud: decoded.aud });
+    } catch (e) {
+        console.error("[chat-history] Failed to decode token:", e);
     }
+
+    // Try JWKS verification first (ES256)
+    if (JWKS) {
+        try {
+            const { payload } = await jwtVerify(token, JWKS, {
+                issuer: `${supabaseUrl}/auth/v1`,
+                audience: "authenticated",
+            });
+
+            const userId = payload.sub;
+            if (!userId) {
+                console.error("[chat-history] No user ID in token payload");
+                return respondJson({ code: 401, message: "Invalid token: no sub claim" }, 401);
+            }
+
+            console.log("[chat-history] JWKS verification successful for user:", userId);
+            const supabase = createUserClient(authHeader);
+            return { supabase, userId };
+        } catch (jwksError) {
+            console.warn("[chat-history] JWKS verification failed, trying secret fallback:", jwksError);
+        }
+    }
+
+    // Fallback: Try HS256 verification with JWT secret
+    if (supabaseJwtSecret) {
+        try {
+            const encoder = new TextEncoder();
+            const secretKey = encoder.encode(supabaseJwtSecret);
+
+            const { payload } = await jwtVerify(token, secretKey, {
+                issuer: `${supabaseUrl}/auth/v1`,
+                audience: "authenticated",
+            });
+
+            const userId = payload.sub;
+            if (!userId) {
+                console.error("[chat-history] No user ID in token payload (secret fallback)");
+                return respondJson({ code: 401, message: "Invalid token: no sub claim" }, 401);
+            }
+
+            console.log("[chat-history] Secret verification successful for user:", userId);
+            const supabase = createUserClient(authHeader);
+            return { supabase, userId };
+        } catch (secretError) {
+            console.error("[chat-history] Secret verification also failed:", secretError);
+            return respondJson({ code: 401, message: "Invalid JWT" }, 401);
+        }
+    }
+
+    // No valid verification method succeeded
+    console.error("[chat-history] All JWT verification methods failed");
+    return respondJson({ code: 401, message: "Invalid JWT" }, 401);
 }
 
 // POST: Save chat messages

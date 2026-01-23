@@ -3,7 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
+import { createRemoteJWKSet, decodeJwt, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -17,13 +17,19 @@ const CURRENT_PRIVACY_VERSION = "1.0.0";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const supabaseJwtSecret = Deno.env.get("SUPABASE_JWT_SECRET") ?? "";
 
 if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase env vars");
 }
 
-// JWKS endpoint for ES256 JWT verification
-const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+// JWKS endpoint for ES256 JWT verification (Supabase Auth v2)
+let JWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
+try {
+    JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+} catch (e) {
+    console.warn("[terms-acceptance] Failed to create JWKS, will fallback to secret:", e);
+}
 
 function respondJson(body: unknown, status = 200) {
     return new Response(
@@ -47,30 +53,73 @@ interface UserContext {
 
 async function getUserContext(authHeader: string | null): Promise<UserContext | Response> {
     if (!authHeader) {
-        return respondJson({ error: "Missing Authorization header" }, 401);
+        return respondJson({ code: 401, message: "Missing Authorization header" }, 401);
     }
 
     const token = authHeader.replace("Bearer ", "");
 
+    // Decode token header to check algorithm
+    let tokenHeader: { alg?: string } = {};
     try {
-        const { payload } = await jwtVerify(token, JWKS, {
-            issuer: `${supabaseUrl}/auth/v1`,
-            audience: "authenticated",
-        });
-
-        const userId = payload.sub;
-        if (!userId) {
-            console.error("[terms-acceptance] No user ID in token payload");
-            return respondJson({ error: "Invalid token" }, 401);
-        }
-
-        const supabase = createUserClient(authHeader);
-        return { supabase, userId };
-    } catch (error) {
-        console.error("[terms-acceptance] JWT verification failed:", error);
-        return respondJson({ error: "Unauthorized" }, 401);
+        const decoded = decodeJwt(token);
+        console.log("[terms-acceptance] Token claims:", { sub: decoded.sub, iss: decoded.iss, aud: decoded.aud });
+    } catch (e) {
+        console.error("[terms-acceptance] Failed to decode token:", e);
     }
+
+    // Try JWKS verification first (ES256)
+    if (JWKS) {
+        try {
+            const { payload } = await jwtVerify(token, JWKS, {
+                issuer: `${supabaseUrl}/auth/v1`,
+                audience: "authenticated",
+            });
+
+            const userId = payload.sub;
+            if (!userId) {
+                console.error("[terms-acceptance] No user ID in token payload");
+                return respondJson({ code: 401, message: "Invalid token: no sub claim" }, 401);
+            }
+
+            console.log("[terms-acceptance] JWKS verification successful for user:", userId);
+            const supabase = createUserClient(authHeader);
+            return { supabase, userId };
+        } catch (jwksError) {
+            console.warn("[terms-acceptance] JWKS verification failed, trying secret fallback:", jwksError);
+        }
+    }
+
+    // Fallback: Try HS256 verification with JWT secret
+    if (supabaseJwtSecret) {
+        try {
+            const encoder = new TextEncoder();
+            const secretKey = encoder.encode(supabaseJwtSecret);
+
+            const { payload } = await jwtVerify(token, secretKey, {
+                issuer: `${supabaseUrl}/auth/v1`,
+                audience: "authenticated",
+            });
+
+            const userId = payload.sub;
+            if (!userId) {
+                console.error("[terms-acceptance] No user ID in token payload (secret fallback)");
+                return respondJson({ code: 401, message: "Invalid token: no sub claim" }, 401);
+            }
+
+            console.log("[terms-acceptance] Secret verification successful for user:", userId);
+            const supabase = createUserClient(authHeader);
+            return { supabase, userId };
+        } catch (secretError) {
+            console.error("[terms-acceptance] Secret verification also failed:", secretError);
+            return respondJson({ code: 401, message: "Invalid JWT" }, 401);
+        }
+    }
+
+    // No valid verification method succeeded
+    console.error("[terms-acceptance] All JWT verification methods failed");
+    return respondJson({ code: 401, message: "Invalid JWT" }, 401);
 }
+
 
 interface AcceptanceRequest {
     terms_version?: string;

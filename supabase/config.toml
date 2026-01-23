@@ -10,8 +10,15 @@ extra_search_path = ["public"]
 max_rows = 1000
 
 [auth]
-site_url = "http://localhost:3000"
-additional_redirect_urls = []
+site_url = "easyworkouts://auth/callback"
+additional_redirect_urls = [
+  "easyworkouts://auth/callback",
+  "exp://localhost:8081/--/auth/callback",
+  "exp://192.168.*.*:8081/--/auth/callback",
+  "http://localhost:8081/auth/callback",
+  "http://localhost:19006/auth/callback",
+  "com.easyworkouts.app://auth/callback"
+]
 jwt_expiry = 3600
 enable_signup = true
 

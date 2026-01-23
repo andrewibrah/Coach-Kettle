@@ -4,7 +4,7 @@ import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ScreenHeader } from "@/components/ui/screen-header";
 import { api } from "@/lib/api";
 import { type WorkoutSession } from "@/lib/workoutStorage";
 
@@ -150,21 +150,11 @@ export default function HistoryScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}>
-              <IconSymbol name="chevron.left" size={24} color="#111827" />
-            </Pressable>
-            <View>
-              <Text style={styles.title}>History</Text>
-              <Text style={styles.subtitle}>
-                {headerStats.totalWorkouts} workouts • {headerStats.totalSets} sets
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
+      <ScreenHeader
+        title="History"
+        subtitle={`${headerStats.totalWorkouts} workouts • ${headerStats.totalSets} sets`}
+        skipSafeArea
+      />
 
       <SectionList
         sections={groupedItems}
@@ -206,35 +196,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 12,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backBtn: {
-    padding: 8,
-    marginLeft: -8,
-    borderRadius: 999,
-  },
-  backBtnPressed: {
-    backgroundColor: '#E5E7EB',
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#111827",
-  },
-  subtitle: {
-    marginTop: 4,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#6B7280",
   },
 
   listContent: {

@@ -1,3 +1,4 @@
+import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -178,17 +179,15 @@ export function CoachModal({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <ThemedView style={{ flex: 1, backgroundColor }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
-          <View style={[styles.header, { borderBottomColor: borderColor }]}>
-            <Pressable onPress={onClose} style={styles.iconBtn}>
-              <MaterialCommunityIcons name="chevron-left" size={30} color={iconColor} />
-            </Pressable>
-
-            <ThemedText style={styles.headerTitle}>Coach</ThemedText>
-
-            <Pressable onPress={handleClear} style={[styles.iconBtn, { opacity: history.length ? 1 : 0.3 }]} disabled={!history.length}>
-              <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
-            </Pressable>
-          </View>
+          <ScreenHeader
+            title="Coach"
+            onBack={onClose}
+            rightElement={
+              <Pressable onPress={handleClear} style={[styles.iconBtn, { opacity: history.length ? 1 : 0.3 }]} disabled={!history.length}>
+                <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
+              </Pressable>
+            }
+          />
 
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -251,22 +250,11 @@ export function CoachModal({
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    marginTop: 12, // Lower the header for better reachability/aesthetics
-  },
+
   iconBtn: {
     padding: 8,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
+
   chatArea: {
     flex: 1,
   },
@@ -315,13 +303,14 @@ const styles = StyleSheet.create({
   inputFooter: {
     flexDirection: "row",
     padding: 12,
+    marginBottom: 10, // Higher up
     gap: 10,
     borderTopWidth: 1,
     alignItems: "flex-end",
   },
   input: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 12, // Match other inputs
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,

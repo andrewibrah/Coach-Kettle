@@ -3,7 +3,7 @@ import { makeRedirectUri } from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import { Link, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -36,10 +36,48 @@ export default function SignUp() {
   const textColor = useThemeColor({}, 'text');
 
   // Create redirect URL
+  // In Expo Go: uses exp:// scheme (dynamic URL)
+  // In dev/prod builds: uses easyworkouts:// scheme (stable)
   const redirectTo = makeRedirectUri({
     scheme: 'easyworkouts',
     path: 'auth/callback',
   });
+
+  // Log redirect URL in dev for debugging
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('[SignUp] OAuth redirect URL:', redirectTo);
+      console.log('[SignUp] Ensure this is in Supabase Dashboard Redirect URLs');
+    }
+  }, [redirectTo]);
+
+  // Listen for deep link events as fallback for OAuth callback
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      const parsed = Linking.parse(event.url);
+
+      if (parsed.path?.includes('auth/callback') && parsed.queryParams?.code) {
+        setLoading(true);
+        try {
+          const { error: sessionError } = await supabase.auth.exchangeCodeForSession(
+            parsed.queryParams.code as string
+          );
+          if (sessionError) throw sessionError;
+
+          await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
+          syncTermsAcceptanceToServer().catch(console.error);
+          router.replace('/(tabs)');
+        } catch (err: any) {
+          Alert.alert('Authentication Error', err.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    return () => subscription.remove();
+  }, [router]);
 
   async function signUpWithEmail() {
     if (!email || !password) return Alert.alert('Error', 'Please enter email and password');
@@ -87,21 +125,70 @@ export default function SignUp() {
       if (error) throw error;
 
       if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        console.log('[SignUp] Opening OAuth URL:', data.url);
+        console.log('[SignUp] Expected redirect:', redirectTo);
+
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectTo,
+          { showInRecents: true }
+        );
+
+        console.log('[SignUp] WebBrowser result:', result.type);
 
         if (result.type === 'success' && result.url) {
-          const params = Linking.parse(result.url);
-          if (params.queryParams?.code) {
-            const { error: sessionError } = await supabase.auth.exchangeCodeForSession(params.queryParams.code as string);
+          console.log('[SignUp] Success URL:', result.url);
+          const parsed = Linking.parse(result.url);
+
+          // Handle code exchange (PKCE flow)
+          if (parsed.queryParams?.code) {
+            const { error: sessionError } = await supabase.auth.exchangeCodeForSession(
+              parsed.queryParams.code as string
+            );
             if (sessionError) throw sessionError;
+
+            await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
+            syncTermsAcceptanceToServer().catch(console.error);
+            router.replace('/(tabs)');
+            return;
           }
-          // Record terms acceptance and refresh auth timestamp for TTL tracking
-          await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
-          syncTermsAcceptanceToServer().catch(console.error);
-          router.replace('/(tabs)');
+
+          // Handle access_token (implicit flow fallback)
+          if (parsed.queryParams?.access_token) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: parsed.queryParams.access_token as string,
+              refresh_token: parsed.queryParams.refresh_token as string || '',
+            });
+            if (sessionError) throw sessionError;
+
+            await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
+            syncTermsAcceptanceToServer().catch(console.error);
+            router.replace('/(tabs)');
+            return;
+          }
+
+          // Handle error from OAuth provider
+          if (parsed.queryParams?.error) {
+            throw new Error(
+              (parsed.queryParams.error_description as string) ||
+              (parsed.queryParams.error as string)
+            );
+          }
+        } else if (result.type === 'cancel') {
+          console.log('[SignUp] User cancelled OAuth');
+        } else if (result.type === 'dismiss') {
+          // Browser was dismissed - check if session was established via deep link
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
+            syncTermsAcceptanceToServer().catch(console.error);
+            router.replace('/(tabs)');
+            return;
+          }
         }
       }
     } catch (err: any) {
+      console.error('[SignUp] OAuth error:', err);
       Alert.alert('OAuth Error', err.message);
     } finally {
       setLoading(false);

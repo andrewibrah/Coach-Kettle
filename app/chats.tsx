@@ -1,10 +1,11 @@
 import { useAuth } from "@/components/AuthProvider";
+import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchChatHistory, groupChatsByDate, type ChatMessage, type ChatsByDate } from "@/lib/chatStorage";
 import { Stack, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ChatsScreen() {
@@ -18,6 +19,12 @@ export default function ChatsScreen() {
   const iconColor = useThemeColor({}, 'text');
   const placeholder = useThemeColor({}, 'placeholder');
   const { session } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  // Theme-aware colors for AI response bubbles
+  const botBubbleBg = isDark ? '#1F2937' : '#E5E7EB';
+  const botTextColor = isDark ? '#F3F4F6' : '#1F2937';
 
   const loadChats = useCallback(async () => {
     if (!session) {
@@ -52,11 +59,11 @@ export default function ChatsScreen() {
 
     return (
       <View style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
-        <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble]}>
+        <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble, !isUser && { backgroundColor: botBubbleBg }]}>
           {!isUser && (
             <Text style={styles.sourceLabel}>{sourceLabel}</Text>
           )}
-          <Text style={[styles.messageText, isUser ? styles.userText : styles.botText]}>
+          <Text style={[styles.messageText, isUser ? styles.userText : { color: botTextColor }]}>
             {item.content}
           </Text>
           <Text style={[styles.timeText, isUser ? styles.userTime : styles.botTime]}>
@@ -91,8 +98,6 @@ export default function ChatsScreen() {
           title: "Chat History",
           headerStyle: { backgroundColor },
           headerTintColor: iconColor,
-          headerBackTitleVisible: false,
-          headerBackTitle: "",
           headerShadowVisible: false,
         }} />
         <View style={styles.center}>
@@ -113,13 +118,10 @@ export default function ChatsScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
       <Stack.Screen options={{
-        title: "Chat History",
-        headerStyle: { backgroundColor },
-        headerTintColor: iconColor,
-        headerBackTitleVisible: false,
-        headerBackTitle: "",
-        headerShadowVisible: false,
+        headerShown: false,
       }} />
+
+      <ScreenHeader title="Chat History" />
 
       {loading ? (
         <View style={styles.center}>

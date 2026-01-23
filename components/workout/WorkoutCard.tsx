@@ -43,7 +43,17 @@ export function WorkoutCard({
     const renderInput = (placeholder: string, keyboardType: "default" | "numeric" = "default") => (
         <TextInput
             ref={inputRef}
-            style={[styles.input, { color: textColor, minWidth: 40 }]}
+            style={[
+                styles.input,
+                {
+                    color: '#000000',
+                    backgroundColor: '#FFFFFF',
+                    minWidth: 40,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 6,
+                }
+            ]}
             value={editValue}
             onChangeText={onChangeEditValue}
             onBlur={onCommitEditCell}

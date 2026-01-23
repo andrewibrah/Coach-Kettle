@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo config:*)",
+      "Bash(node -e:*)",
+      "Bash(npm run lint:*)"
+    ]
+  }
+}
