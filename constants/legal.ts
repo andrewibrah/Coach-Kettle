@@ -1,7 +1,7 @@
 /**
  * Legal Content
  *
- * Terms of Service and Privacy Policy content for EasyWorkouts.
+ * Terms of Service and Privacy Policy content for Coach Kettle.
  * Written in plain English to be accessible to all users.
  */
 
@@ -9,15 +9,15 @@ export const TERMS_VERSION = '1.0.0';
 export const LAST_UPDATED = 'January 2026';
 
 export const TERMS_OF_SERVICE = `
-# EasyWorkouts Terms of Service
+# Coach Kettle Terms of Service
 
 **Last Updated: ${LAST_UPDATED}**
 
-Welcome to EasyWorkouts. By creating an account, you agree to these terms.
+Welcome to Coach Kettle. By creating an account, you agree to these terms.
 
-## 1. What EasyWorkouts Does
+## 1. What Coach Kettle Does
 
-EasyWorkouts helps you track your workouts using natural language. You type or speak your exercises, and we parse and organize them for you. We may use AI to help understand your input.
+Coach Kettle helps you track your workouts using natural language. You type or speak your exercises, and we parse and organize them for you. We may use AI to help understand your input.
 
 ## 2. Your Account
 
@@ -65,7 +65,7 @@ You can request deletion of your account and all associated data at any time by 
 
 ## 5. Acceptable Use
 
-Don't use EasyWorkouts to:
+Don't use Coach Kettle to:
 - Share your account with others
 - Attempt to access other users' data
 - Reverse engineer or exploit the app
@@ -74,7 +74,7 @@ Don't use EasyWorkouts to:
 ## 6. Disclaimers
 
 ### Not Medical Advice
-EasyWorkouts is a workout logging tool, not a medical or fitness professional. Always consult qualified professionals before starting any exercise program.
+Coach Kettle is a workout logging tool, not a medical or fitness professional. Always consult qualified professionals before starting any exercise program.
 
 ### Service Availability
 We strive for 99% uptime but cannot guarantee uninterrupted service. We may perform maintenance that temporarily affects availability.
@@ -95,11 +95,11 @@ We may update these terms. Significant changes will be communicated via email or
 
 ## 9. Contact
 
-Questions? Reach us at support@easyworkouts.app
+Questions? Reach us at support@coachkettle.app
 `.trim();
 
 export const PRIVACY_POLICY = `
-# EasyWorkouts Privacy Policy
+# Coach Kettle Privacy Policy
 
 **Last Updated: ${LAST_UPDATED}**
 
@@ -164,7 +164,7 @@ You can:
 
 ## Children's Privacy
 
-EasyWorkouts is not intended for children under 13. We don't knowingly collect data from children.
+Coach Kettle is not intended for children under 13. We don't knowingly collect data from children.
 
 ## California Privacy Rights (CCPA)
 
@@ -183,7 +183,7 @@ We'll notify you of significant privacy policy changes via email or in-app notif
 
 ## Contact
 
-Privacy questions? Email privacy@easyworkouts.app
+Privacy questions? Email privacy@coachkettle.app
 `.trim();
 
 export const CONSENT_CHECKBOX_TEXT =
@@ -199,7 +199,7 @@ By creating an account, you acknowledge that:
 `.trim();
 
 export const BIOMETRIC_EXPLANATION = `
-When enabled, you can unlock EasyWorkouts using Face ID, Touch ID, or your device passcode instead of entering your credentials each time.
+When enabled, you can unlock Coach Kettle using Face ID, Touch ID, or your device passcode instead of entering your credentials each time.
 
 **How it works:**
 • Your biometric data stays on your device—we never receive or store it

@@ -1,4 +1,8 @@
-import { supabase } from './supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
+
+const PROFILE_CACHE_KEY = 'cached_profile';
+const API_BASE = `${supabaseUrl}/functions/v1`;
 
 export interface UserProfile {
   id: string;
@@ -68,43 +72,101 @@ export interface WorkoutTemplateItem {
   lift_name: string;
   target_sets: number | null;
   target_reps: number | null;
+  target_weight: number | null;
   display_order: number;
   notes: string | null;
   created_at: string;
 }
 
-// Fetch user profile
-export async function fetchProfile(userId: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
+// Get auth headers for API calls
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      // No profile found - this is expected for new users
-      return null;
-    }
-    console.error('[Profile] Error fetching profile:', error);
-    return null;
-  }
-
-  return data as UserProfile;
+  return {
+    'Authorization': token ? `Bearer ${token}` : '',
+    'apikey': supabaseAnonKey,
+    'Content-Type': 'application/json',
+  };
 }
 
-// Create profile for user (calls the DB function)
-export async function createProfile(userId: string): Promise<string | null> {
-  const { data, error } = await supabase.rpc('create_profile_for_user', {
-    p_user_id: userId,
-  });
+// Cache profile locally
+async function cacheProfile(profile: UserProfile): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+  } catch (e) {
+    console.warn('[Profile] Failed to cache profile:', e);
+  }
+}
 
-  if (error) {
+// Get cached profile
+async function getCachedProfile(): Promise<UserProfile | null> {
+  try {
+    const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached) as UserProfile;
+    }
+  } catch (e) {
+    console.warn('[Profile] Failed to get cached profile:', e);
+  }
+  return null;
+}
+
+// Clear cached profile
+export async function clearCachedProfile(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch (e) {
+    console.warn('[Profile] Failed to clear cached profile:', e);
+  }
+}
+
+// Fetch user profile via Edge Function
+export async function fetchProfile(userId: string): Promise<UserProfile | null> {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/profile?action=fetch`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      console.error('[Profile] Error fetching profile:', response.status);
+      return getCachedProfile();
+    }
+
+    const data = await response.json();
+    if (data.profile) {
+      await cacheProfile(data.profile);
+    }
+    return data.profile;
+  } catch (error) {
+    console.error('[Profile] Error fetching profile:', error);
+    return getCachedProfile();
+  }
+}
+
+// Create profile for user via Edge Function
+export async function createProfile(userId: string): Promise<string | null> {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/profile`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'create' }),
+    });
+
+    if (!response.ok) {
+      console.error('[Profile] Error creating profile:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.id;
+  } catch (error) {
     console.error('[Profile] Error creating profile:', error);
     return null;
   }
-
-  return data as string;
 }
 
 // Ensure profile exists (fetch or create)
@@ -120,316 +182,433 @@ export async function ensureProfile(userId: string): Promise<UserProfile | null>
   return profile;
 }
 
-// Update profile fields
+// Update profile fields via Edge Function
 export async function updateProfile(
   userId: string,
   updates: Partial<Omit<UserProfile, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'ai_context'>>
 ): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('user_id', userId)
-    .select()
-    .single();
+  console.log('[Profile] Updating profile for user:', userId, 'with updates:', updates);
 
-  if (error) {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/profile`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'update', updates }),
+    });
+
+    if (!response.ok) {
+      console.error('[Profile] Error updating profile:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('[Profile] Profile updated successfully:', data.profile);
+
+    if (data.profile) {
+      await cacheProfile(data.profile);
+    }
+    return data.profile;
+  } catch (error) {
     console.error('[Profile] Error updating profile:', error);
     return null;
   }
-
-  return data as UserProfile;
 }
 
-// Complete onboarding
+// Complete onboarding via Edge Function
 export async function completeOnboarding(userId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ onboarding_completed: true })
-    .eq('user_id', userId);
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/profile`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'complete_onboarding' }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error completing onboarding:', response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('[Profile] Error completing onboarding:', error);
     return false;
   }
-
-  // Refresh AI context after onboarding
-  await refreshAIContext(userId);
-
-  return true;
 }
 
-// Update onboarding step
+// Update onboarding step via Edge Function
 export async function updateOnboardingStep(userId: string, step: number): Promise<boolean> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ onboarding_step: step })
-    .eq('user_id', userId);
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/profile`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'update_step', step }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error updating onboarding step:', response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('[Profile] Error updating onboarding step:', error);
     return false;
   }
-
-  return true;
 }
 
-// Refresh AI context
+// Refresh AI context via Edge Function
 export async function refreshAIContext(userId: string): Promise<boolean> {
-  const { error } = await supabase.rpc('refresh_ai_context', {
-    p_user_id: userId,
-  });
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/profile`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'refresh_ai_context' }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error refreshing AI context:', response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('[Profile] Error refreshing AI context:', error);
     return false;
   }
-
-  return true;
 }
 
-// PR Tracked Lifts
-export async function fetchTrackedLifts(userId: string): Promise<PRTrackedLift[]> {
-  const { data, error } = await supabase
-    .from('pr_tracked_lifts')
-    .select('*')
-    .eq('user_id', userId)
-    .order('display_order', { ascending: true });
+// ==================== PR TRACKING ====================
 
-  if (error) {
+// Fetch tracked lifts via Edge Function
+export async function fetchTrackedLifts(userId: string): Promise<PRTrackedLift[]> {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/pr-tracking?action=tracked_lifts`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      console.error('[Profile] Error fetching tracked lifts:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.lifts || [];
+  } catch (error) {
     console.error('[Profile] Error fetching tracked lifts:', error);
     return [];
   }
-
-  return data as PRTrackedLift[];
 }
 
+// Add tracked lift via Edge Function
 export async function addTrackedLift(userId: string, liftName: string): Promise<PRTrackedLift | null> {
-  const { data, error } = await supabase
-    .from('pr_tracked_lifts')
-    .insert({
-      user_id: userId,
-      lift_name: liftName,
-      is_active: true,
-    })
-    .select()
-    .single();
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/pr-tracking`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'add_tracked', lift_name: liftName }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error adding tracked lift:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.lift;
+  } catch (error) {
     console.error('[Profile] Error adding tracked lift:', error);
     return null;
   }
-
-  return data as PRTrackedLift;
 }
 
+// Remove tracked lift via Edge Function
 export async function removeTrackedLift(liftId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('pr_tracked_lifts')
-    .delete()
-    .eq('id', liftId);
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/pr-tracking`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'remove_tracked', lift_id: liftId }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error removing tracked lift:', response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('[Profile] Error removing tracked lift:', error);
     return false;
   }
-
-  return true;
 }
 
+// Toggle tracked lift via Edge Function
 export async function toggleTrackedLift(liftId: string, isActive: boolean): Promise<boolean> {
-  const { error } = await supabase
-    .from('pr_tracked_lifts')
-    .update({ is_active: isActive })
-    .eq('id', liftId);
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/pr-tracking`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'toggle_tracked', lift_id: liftId, is_active: isActive }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error toggling tracked lift:', response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('[Profile] Error toggling tracked lift:', error);
     return false;
   }
-
-  return true;
 }
 
-// PR Lifts (Current Records)
+// Fetch PR lifts via Edge Function
 export async function fetchPRLifts(userId: string): Promise<PRLift[]> {
-  const { data, error } = await supabase
-    .from('pr_lifts')
-    .select('*')
-    .eq('user_id', userId)
-    .order('lift_name', { ascending: true });
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/pr-tracking?action=pr_lifts`, {
+      method: 'GET',
+      headers,
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error fetching PR lifts:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.lifts || [];
+  } catch (error) {
     console.error('[Profile] Error fetching PR lifts:', error);
     return [];
   }
-
-  return data as PRLift[];
 }
 
+// Set PR lift via Edge Function
 export async function setPRLift(
   userId: string,
   liftName: string,
   weightLbs: number,
   reps: number
 ): Promise<PRLift | null> {
-  // Calculate e1rm using Epley formula
-  const estimated1rm = reps <= 0 ? weightLbs : Math.round(weightLbs * (1 + reps / 30) * 10) / 10;
-
-  const { data, error } = await supabase
-    .from('pr_lifts')
-    .upsert(
-      {
-        user_id: userId,
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/pr-tracking`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'set_pr',
         lift_name: liftName,
         weight_lbs: weightLbs,
-        reps: reps,
-        estimated_1rm: estimated1rm,
-        achieved_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,lift_name' }
-    )
-    .select()
-    .single();
+        reps,
+      }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error setting PR lift:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.lift;
+  } catch (error) {
     console.error('[Profile] Error setting PR lift:', error);
     return null;
   }
-
-  return data as PRLift;
 }
 
-// PR History
+// Fetch PR history via Edge Function
 export async function fetchPRHistory(userId: string, liftName?: string): Promise<PRHistory[]> {
-  let query = supabase
-    .from('pr_history')
-    .select('*')
-    .eq('user_id', userId)
-    .order('achieved_at', { ascending: false });
+  try {
+    const headers = await getAuthHeaders();
+    let url = `${API_BASE}/pr-tracking?action=pr_history`;
+    if (liftName) {
+      url += `&lift_name=${encodeURIComponent(liftName)}`;
+    }
 
-  if (liftName) {
-    query = query.eq('lift_name', liftName);
-  }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
 
-  const { data, error } = await query;
+    if (!response.ok) {
+      console.error('[Profile] Error fetching PR history:', response.status);
+      return [];
+    }
 
-  if (error) {
+    const data = await response.json();
+    return data.history || [];
+  } catch (error) {
     console.error('[Profile] Error fetching PR history:', error);
     return [];
   }
-
-  return data as PRHistory[];
 }
 
-// Workout Templates
-export async function fetchWorkoutTemplates(userId: string): Promise<WorkoutTemplate[]> {
-  const { data, error } = await supabase
-    .from('workout_templates')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .order('display_order', { ascending: true });
+// ==================== WORKOUT TEMPLATES ====================
 
-  if (error) {
+// Fetch workout templates via Edge Function
+export async function fetchWorkoutTemplates(userId: string): Promise<WorkoutTemplate[]> {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/workout-templates?action=list`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      console.error('[Profile] Error fetching workout templates:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.templates || [];
+  } catch (error) {
     console.error('[Profile] Error fetching workout templates:', error);
     return [];
   }
-
-  return data as WorkoutTemplate[];
 }
 
+// Create workout template via Edge Function
 export async function createWorkoutTemplate(
   userId: string,
   name: string,
   description?: string
 ): Promise<WorkoutTemplate | null> {
-  const { data, error } = await supabase
-    .from('workout_templates')
-    .insert({
-      user_id: userId,
-      name: name,
-      description: description || null,
-    })
-    .select()
-    .single();
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/workout-templates`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'create', name, description }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error creating workout template:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.template;
+  } catch (error) {
     console.error('[Profile] Error creating workout template:', error);
     return null;
   }
-
-  return data as WorkoutTemplate;
 }
 
+// Delete workout template via Edge Function
 export async function deleteWorkoutTemplate(templateId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('workout_templates')
-    .update({ is_active: false })
-    .eq('id', templateId);
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/workout-templates`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'delete', template_id: templateId }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error deleting workout template:', response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('[Profile] Error deleting workout template:', error);
     return false;
   }
-
-  return true;
 }
 
-// Workout Template Items
+// Fetch template items via Edge Function
 export async function fetchTemplateItems(templateId: string): Promise<WorkoutTemplateItem[]> {
-  const { data, error } = await supabase
-    .from('workout_template_items')
-    .select('*')
-    .eq('template_id', templateId)
-    .order('display_order', { ascending: true });
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(
+      `${API_BASE}/workout-templates?action=items&template_id=${encodeURIComponent(templateId)}`,
+      {
+        method: 'GET',
+        headers,
+      }
+    );
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error fetching template items:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
     console.error('[Profile] Error fetching template items:', error);
     return [];
   }
-
-  return data as WorkoutTemplateItem[];
 }
 
+// Add template item via Edge Function
 export async function addTemplateItem(
   userId: string,
   templateId: string,
   liftName: string,
   targetSets?: number,
   targetReps?: number,
+  targetWeight?: number,
   notes?: string
 ): Promise<WorkoutTemplateItem | null> {
-  const { data, error } = await supabase
-    .from('workout_template_items')
-    .insert({
-      user_id: userId,
-      template_id: templateId,
-      lift_name: liftName,
-      target_sets: targetSets || null,
-      target_reps: targetReps || null,
-      notes: notes || null,
-    })
-    .select()
-    .single();
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/workout-templates`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'add_item',
+        template_id: templateId,
+        lift_name: liftName,
+        target_sets: targetSets,
+        target_reps: targetReps,
+        target_weight: targetWeight,
+        notes,
+      }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error adding template item:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.item;
+  } catch (error) {
     console.error('[Profile] Error adding template item:', error);
     return null;
   }
-
-  return data as WorkoutTemplateItem;
 }
 
+// Remove template item via Edge Function
 export async function removeTemplateItem(itemId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('workout_template_items')
-    .delete()
-    .eq('id', itemId);
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/workout-templates`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'remove_item', item_id: itemId }),
+    });
 
-  if (error) {
+    if (!response.ok) {
+      console.error('[Profile] Error removing template item:', response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.error('[Profile] Error removing template item:', error);
     return false;
   }
-
-  return true;
 }

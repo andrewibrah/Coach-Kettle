@@ -1,20 +1,19 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { ThemedView } from '@/components/ui/themed-view';
-import { ThemedText } from '@/components/ui/themed-text';
 import {
-  QuizProgress,
-  QuizContainer,
-  QuizQuestion,
   QuizButtonGroup,
+  QuizContainer,
+  QuizProgress,
+  QuizQuestion,
 } from '@/components/onboarding';
+import { ThemedText } from '@/components/ui/themed-text';
+import { ThemedView } from '@/components/ui/themed-view';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import React, { useState } from 'react';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 2;
@@ -102,9 +101,19 @@ export default function AgeScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
+      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/height' as any)} />
 
-      <QuizContainer animationKey="age">
+      <QuizContainer
+        animationKey="age"
+        footer={
+          <QuizButtonGroup
+            onSkip={handleSkip}
+            onContinue={handleContinue}
+            continueDisabled={!!error}
+            continueLoading={loading}
+          />
+        }
+      >
         <QuizQuestion
           question="When were you born?"
           subtitle="Your age helps personalize workout recommendations"
@@ -145,13 +154,6 @@ export default function AgeScreen() {
 
           {error && <ThemedText style={styles.error}>{error}</ThemedText>}
         </View>
-
-        <QuizButtonGroup
-          onSkip={handleSkip}
-          onContinue={handleContinue}
-          continueDisabled={!!error}
-          continueLoading={loading}
-        />
       </QuizContainer>
     </ThemedView>
   );

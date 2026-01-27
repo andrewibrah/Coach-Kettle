@@ -1,21 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemedView } from '@/components/ui/themed-view';
+import { useAuth } from '@/components/AuthProvider';
 import {
-  QuizProgress,
-  QuizContainer,
-  QuizQuestion,
   QuizButtonGroup,
   QuizLiftAdder,
   QuizLiftList,
+  QuizProgress,
+  QuizQuestion,
 } from '@/components/onboarding';
+import { ThemedView } from '@/components/ui/themed-view';
 import { useProfile } from '@/contexts/ProfileContext';
-import { useAuth } from '@/components/AuthProvider';
 import { addTrackedLift, fetchTrackedLifts } from '@/lib/profile';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 6;
@@ -113,31 +112,44 @@ export default function PRLiftsScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
+      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/focus' as any)} />
 
-      <QuizContainer animationKey="pr-lifts">
-        <QuizQuestion
-          question="Which lifts do you want to track PRs for?"
-          subtitle="We'll automatically detect when you beat your personal records"
-        />
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <View style={styles.questionSection}>
+          <QuizQuestion
+            question="Which lifts do you want to track PRs for?"
+            subtitle="We'll automatically detect when you beat your personal records"
+          />
 
-        <View style={styles.content}>
           <QuizLiftAdder
             onAdd={handleAddLift}
             placeholder="Add a lift..."
             suggestions={availableSuggestions}
           />
-
-          <QuizLiftList lifts={lifts} onRemove={handleRemoveLift} />
         </View>
 
-        <QuizButtonGroup
-          onSkip={handleSkip}
-          onContinue={handleContinue}
-          continueLoading={loading}
-          continueLabel={lifts.length > 0 ? 'Continue' : 'Skip PR Tracking'}
-        />
-      </QuizContainer>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <QuizLiftList lifts={lifts} onRemove={handleRemoveLift} />
+        </ScrollView>
+
+        <View style={[styles.buttonContainer, { paddingBottom: insets.bottom + 16 }]}>
+          <QuizButtonGroup
+            onSkip={handleSkip}
+            onContinue={handleContinue}
+            continueLoading={loading}
+            continueLabel={lifts.length > 0 ? 'Continue' : 'Skip PR Tracking'}
+          />
+        </View>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
@@ -146,7 +158,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    marginBottom: 24,
+  keyboardView: {
+    flex: 1,
+  },
+  questionSection: {
+    paddingHorizontal: 24,
+    paddingTop: 40,
+  },
+  scrollView: {
+    flex: 1,
+    marginTop: 20,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  buttonContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
   },
 });
+

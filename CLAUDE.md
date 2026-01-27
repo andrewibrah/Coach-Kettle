@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EasyWorkouts is an Expo/React Native workout tracking app with Supabase backend. Users log exercises via natural language input (e.g., "Bench 185 x 8") which is parsed locally or via AI. The app supports iOS, Android, and web.
+Coach Kettle is an Expo/React Native workout tracking app with Supabase backend. Users log exercises via natural language input (e.g., "Bench 185 x 8") which is parsed locally or via AI. The app supports iOS, Android, and web.
 
 ## Commands
 

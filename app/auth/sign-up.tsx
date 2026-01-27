@@ -37,9 +37,9 @@ export default function SignUp() {
 
   // Create redirect URL
   // In Expo Go: uses exp:// scheme (dynamic URL)
-  // In dev/prod builds: uses easyworkouts:// scheme (stable)
+  // In dev/prod builds: uses coachkettle:// scheme (stable)
   const redirectTo = makeRedirectUri({
-    scheme: 'easyworkouts',
+    scheme: 'coachkettle',
     path: 'auth/callback',
   });
 
@@ -202,7 +202,7 @@ export default function SignUp() {
 
           <View style={styles.header}>
             <ThemedText type="title" style={styles.title}>Create Account</ThemedText>
-            <ThemedText style={styles.subtitle}>Join EasyWorkouts today</ThemedText>
+            <ThemedText style={styles.subtitle}>Join Coach Kettle today</ThemedText>
           </View>
 
           <View style={styles.form}>

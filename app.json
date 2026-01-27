@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "EasyWorkouts",
-    "slug": "EasyWorkouts",
+    "name": "Coach Kettle",
+    "slug": "CoachKettle",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "easyworkouts",
+    "scheme": "coachkettle",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.easyworkouts.app",
+      "bundleIdentifier": "com.coachkettle.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Allow EasyWorkouts to use Face ID to unlock your session"
+        "NSFaceIDUsageDescription": "Allow Coach Kettle to use Face ID to unlock your session"
       }
     },
     "android": {
-      "package": "com.easyworkouts.app",
+      "package": "com.coachkettle.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -48,7 +48,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow EasyWorkouts to use Face ID to unlock your session"
+          "faceIDPermission": "Allow Coach Kettle to use Face ID to unlock your session"
         }
       ]
     ],

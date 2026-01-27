@@ -1,18 +1,18 @@
+import {
+  QuizButtonGroup,
+  QuizContainer,
+  QuizInput,
+  QuizOptionList,
+  QuizProgress,
+  QuizQuestion,
+} from '@/components/onboarding';
+import { ThemedView } from '@/components/ui/themed-view';
+import { useProfile } from '@/contexts/ProfileContext';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import { ThemedView } from '@/components/ui/themed-view';
-import {
-  QuizProgress,
-  QuizContainer,
-  QuizQuestion,
-  QuizButtonGroup,
-  QuizOptionList,
-  QuizInput,
-} from '@/components/onboarding';
-import { useProfile } from '@/contexts/ProfileContext';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 5;
@@ -84,9 +84,18 @@ export default function FocusScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
+      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/goal-weight' as any)} />
 
-      <QuizContainer animationKey="focus">
+      <QuizContainer
+        animationKey="focus"
+        footer={
+          <QuizButtonGroup
+            onSkip={handleSkip}
+            onContinue={handleContinue}
+            continueLoading={loading}
+          />
+        }
+      >
         <QuizQuestion
           question="What's your fitness focus?"
           subtitle="We'll tailor advice to your goals"
@@ -110,12 +119,6 @@ export default function FocusScreen() {
             </View>
           )}
         </View>
-
-        <QuizButtonGroup
-          onSkip={handleSkip}
-          onContinue={handleContinue}
-          continueLoading={loading}
-        />
       </QuizContainer>
     </ThemedView>
   );

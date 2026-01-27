@@ -6,7 +6,7 @@ import {
   Pressable,
   Alert,
   Platform,
-  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,7 +35,12 @@ export default function ProfileSettingsScreen() {
   const textColor = useThemeColor({}, 'text');
   const activeColor = useThemeColor({}, 'tint');
 
-  const { profile, updateProfile } = useProfile();
+  const { profile, profileLoading, updateProfile, refreshProfile } = useProfile();
+
+  // Refresh profile when screen mounts to ensure we have latest data
+  useEffect(() => {
+    refreshProfile();
+  }, [refreshProfile]);
 
   const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
   const sectionTitleColor = '#8E8E93';
@@ -82,12 +87,16 @@ export default function ProfileSettingsScreen() {
       const updates: Record<string, any> = {};
 
       if (heightValue) updates.height_value = parseFloat(heightValue);
+      else updates.height_value = null;
       updates.height_unit = heightUnit;
 
       if (dob) updates.dob = dob.toISOString().split('T')[0];
+      else updates.dob = null;
 
       if (currentWeight) updates.current_weight = parseFloat(currentWeight);
+      else updates.current_weight = null;
       if (goalWeight) updates.goal_weight = parseFloat(goalWeight);
+      else updates.goal_weight = null;
       updates.weight_unit = weightUnit;
 
       updates.focus = focus;
@@ -108,6 +117,16 @@ export default function ProfileSettingsScreen() {
       setSaving(false);
     }
   };
+
+  // Show loading state while profile is being fetched
+  if (profileLoading) {
+    return (
+      <ThemedView style={[styles.container, styles.loadingContainer, { paddingTop: insets.top + 20, backgroundColor }]}>
+        <ActivityIndicator size="large" color={activeColor} />
+        <ThemedText style={styles.loadingText}>Loading profile...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + 20, backgroundColor }]}>
@@ -131,6 +150,15 @@ export default function ProfileSettingsScreen() {
           </ThemedText>
         </Pressable>
       </View>
+
+      {!profile && (
+        <View style={[styles.infoBox, { backgroundColor: isDark ? '#0a2540' : '#E8F4FD', marginHorizontal: 20, marginBottom: 16 }]}>
+          <IconSymbol name="info.circle" size={18} color={activeColor} />
+          <ThemedText style={[styles.infoText, { color: isDark ? '#64B5F6' : '#0066CC' }]}>
+            Fill out your profile to personalize your experience. All fields are optional.
+          </ThemedText>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Physical Stats */}
@@ -334,6 +362,26 @@ export default function ProfileSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    opacity: 0.6,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
   header: {
     flexDirection: 'row',

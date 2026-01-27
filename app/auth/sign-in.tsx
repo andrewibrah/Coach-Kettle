@@ -90,9 +90,9 @@ export default function SignIn() {
 
   // Create redirect URL
   // In Expo Go: uses exp:// scheme (dynamic URL)
-  // In dev/prod builds: uses easyworkouts:// scheme (stable)
+  // In dev/prod builds: uses coachkettle:// scheme (stable)
   const redirectTo = makeRedirectUri({
-    scheme: 'easyworkouts',
+    scheme: 'coachkettle',
     path: 'auth/callback',
     // For Expo Go development, this will still return exp:// URL
     // The scheme is only used in standalone builds
@@ -106,7 +106,7 @@ export default function SignIn() {
       console.log('[SignIn] Add this URL (or wildcard pattern) to Supabase Dashboard:');
       console.log('[SignIn] Authentication → URL Configuration → Redirect URLs');
       console.log('[SignIn] For Expo Go, add: exp://*.exp.direct/--/auth/callback');
-      console.log('[SignIn] For prod builds, add: easyworkouts://auth/callback');
+      console.log('[SignIn] For prod builds, add: coachkettle://auth/callback');
       console.log('[SignIn] ========================================');
     }
   }, [redirectTo]);

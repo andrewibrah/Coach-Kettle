@@ -1,14 +1,14 @@
-import React from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
-import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useProfile } from '@/contexts/ProfileContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function OnboardingWelcome() {
   const insets = useSafeAreaInsets();
@@ -29,28 +29,18 @@ export default function OnboardingWelcome() {
   };
 
   return (
-    <ThemedView style={[styles.container, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 20 }]}>
-      <View style={styles.content}>
-        <Animated.View entering={FadeInDown.duration(600).delay(200)}>
-          <ThemedText style={styles.emoji}>💪</ThemedText>
-        </Animated.View>
+    <ThemedView style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+      <Animated.View entering={FadeInDown.duration(600).delay(200)} style={styles.content}>
+        <ThemedText style={styles.title}>Questions from Coach Kettle</ThemedText>
 
-        <Animated.View entering={FadeInDown.duration(600).delay(400)}>
-          <ThemedText style={styles.title}>Let's get to know you</ThemedText>
-        </Animated.View>
+        <ThemedText style={styles.subtitle}>
+          A few quick questions to personalize your experience. You can skip any question and update answers later in settings.
+        </ThemedText>
 
-        <Animated.View entering={FadeInDown.duration(600).delay(600)}>
-          <ThemedText style={styles.subtitle}>
-            A few quick questions to personalize your experience. You can skip any question and update answers later in settings.
-          </ThemedText>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(600).delay(800)} style={styles.timeEstimate}>
+        <View style={styles.timeEstimate}>
           <ThemedText style={styles.timeText}>Takes about 5 minutes</ThemedText>
-        </Animated.View>
-      </View>
+        </View>
 
-      <Animated.View entering={FadeInUp.duration(600).delay(1000)} style={styles.buttonContainer}>
         <TouchableOpacity
           style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
           onPress={handleGetStarted}
@@ -66,29 +56,26 @@ export default function OnboardingWelcome() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 24,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emoji: {
-    fontSize: 64,
-    marginBottom: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 60,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 16,
+    paddingTop: 12,
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
     opacity: 0.7,
     lineHeight: 24,
-    paddingHorizontal: 20,
   },
   timeEstimate: {
     marginTop: 32,
@@ -101,11 +88,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.6,
   },
-  buttonContainer: {
-    paddingHorizontal: 20,
-  },
   button: {
+    marginTop: 48,
     paddingVertical: 18,
+    paddingHorizontal: 48,
     borderRadius: 14,
     alignItems: 'center',
   },

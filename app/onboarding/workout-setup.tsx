@@ -1,24 +1,24 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
-import { ThemedView } from '@/components/ui/themed-view';
-import { ThemedText } from '@/components/ui/themed-text';
-import {
-  QuizProgress,
-  QuizContainer,
-  QuizQuestion,
-  QuizButtonGroup,
-  QuizInput,
-} from '@/components/onboarding';
-import { useProfile } from '@/contexts/ProfileContext';
 import { useAuth } from '@/components/AuthProvider';
-import { createWorkoutTemplate, addTemplateItem } from '@/lib/profile';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import {
+  QuizButtonGroup,
+  QuizContainer,
+  QuizInput,
+  QuizProgress,
+  QuizQuestion,
+} from '@/components/onboarding';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ThemedText } from '@/components/ui/themed-text';
+import { ThemedView } from '@/components/ui/themed-view';
+import { Colors } from '@/constants/theme';
+import { useProfile } from '@/contexts/ProfileContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { addTemplateItem, createWorkoutTemplate } from '@/lib/profile';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 8;
@@ -29,6 +29,7 @@ interface WorkoutLift {
   name: string;
   sets: string;
   reps: string;
+  weight: string;
 }
 
 export default function WorkoutSetupScreen() {
@@ -39,7 +40,7 @@ export default function WorkoutSetupScreen() {
 
   const [step, setStep] = useState<Step>('initial');
   const [workoutName, setWorkoutName] = useState('');
-  const [currentLift, setCurrentLift] = useState<WorkoutLift>({ name: '', sets: '', reps: '' });
+  const [currentLift, setCurrentLift] = useState<WorkoutLift>({ name: '', sets: '', reps: '', weight: '' });
   const [lifts, setLifts] = useState<WorkoutLift[]>([]);
   const [savedWorkouts, setSavedWorkouts] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,7 +65,7 @@ export default function WorkoutSetupScreen() {
     if (currentLift.name.trim()) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setLifts([...lifts, currentLift]);
-      setCurrentLift({ name: '', sets: '', reps: '' });
+      setCurrentLift({ name: '', sets: '', reps: '', weight: '' });
     }
   };
 
@@ -89,7 +90,8 @@ export default function WorkoutSetupScreen() {
               template.id,
               lift.name,
               lift.sets ? parseInt(lift.sets, 10) : undefined,
-              lift.reps ? parseInt(lift.reps, 10) : undefined
+              lift.reps ? parseInt(lift.reps, 10) : undefined,
+              lift.weight ? parseFloat(lift.weight) : undefined
             );
           }
         }
@@ -110,7 +112,7 @@ export default function WorkoutSetupScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setWorkoutName('');
     setLifts([]);
-    setCurrentLift({ name: '', sets: '', reps: '' });
+    setCurrentLift({ name: '', sets: '', reps: '', weight: '' });
     setStep('name');
   };
 
@@ -132,7 +134,7 @@ export default function WorkoutSetupScreen() {
   if (step === 'initial') {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
+        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-values' as any)} />
         <QuizContainer animationKey="initial">
           <QuizQuestion
             question="Do you have workout routines you'd like to save?"
@@ -167,8 +169,18 @@ export default function WorkoutSetupScreen() {
   if (step === 'name') {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
-        <QuizContainer animationKey="name">
+        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-values' as any)} />
+        <QuizContainer
+          animationKey="name"
+          footer={
+            <QuizButtonGroup
+              onSkip={finishOnboarding}
+              onContinue={handleNameContinue}
+              continueDisabled={!workoutName.trim()}
+              continueLoading={loading}
+            />
+          }
+        >
           <QuizQuestion question="Name this workout" subtitle="e.g., Push Day, Leg Day, Full Body" />
 
           <View style={styles.inputContainer}>
@@ -179,13 +191,6 @@ export default function WorkoutSetupScreen() {
               autoFocus
             />
           </View>
-
-          <QuizButtonGroup
-            onSkip={finishOnboarding}
-            onContinue={handleNameContinue}
-            continueDisabled={!workoutName.trim()}
-            continueLoading={loading}
-          />
         </QuizContainer>
       </ThemedView>
     );
@@ -195,8 +200,19 @@ export default function WorkoutSetupScreen() {
   if (step === 'lifts') {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
-        <QuizContainer animationKey="lifts">
+        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-values' as any)} />
+        <QuizContainer
+          animationKey="lifts"
+          footer={
+            <QuizButtonGroup
+              onSkip={finishOnboarding}
+              onContinue={handleFinishWorkout}
+              continueDisabled={lifts.length === 0}
+              continueLoading={loading}
+              continueLabel="Save Workout"
+            />
+          }
+        >
           <QuizQuestion question={`Add lifts to "${workoutName}"`} subtitle="Build your workout one exercise at a time" />
 
           <View style={styles.liftInputs}>
@@ -224,6 +240,15 @@ export default function WorkoutSetupScreen() {
                   keyboardType="numeric"
                 />
               </View>
+              <View style={styles.smallInput}>
+                <ThemedText style={styles.smallLabel}>Weight</ThemedText>
+                <QuizInput
+                  value={currentLift.weight}
+                  onChangeText={(text) => setCurrentLift({ ...currentLift, weight: text })}
+                  placeholder="135"
+                  keyboardType="decimal-pad"
+                />
+              </View>
               <TouchableOpacity
                 style={[
                   styles.addLiftButton,
@@ -239,7 +264,12 @@ export default function WorkoutSetupScreen() {
           </View>
 
           {lifts.length > 0 && (
-            <View style={styles.liftsList}>
+            <ScrollView
+              style={styles.liftsList}
+              contentContainerStyle={styles.liftsListContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               {lifts.map((lift, index) => (
                 <Animated.View
                   key={`${lift.name}-${index}`}
@@ -255,11 +285,12 @@ export default function WorkoutSetupScreen() {
                   >
                     <View style={styles.liftInfo}>
                       <ThemedText style={styles.liftName}>{lift.name}</ThemedText>
-                      {(lift.sets || lift.reps) && (
+                      {(lift.sets || lift.reps || lift.weight) && (
                         <ThemedText style={styles.liftDetails}>
                           {lift.sets && `${lift.sets} sets`}
                           {lift.sets && lift.reps && ' x '}
                           {lift.reps && `${lift.reps} reps`}
+                          {lift.weight && ` @ ${lift.weight} lbs`}
                         </ThemedText>
                       )}
                     </View>
@@ -273,16 +304,8 @@ export default function WorkoutSetupScreen() {
                   </View>
                 </Animated.View>
               ))}
-            </View>
+            </ScrollView>
           )}
-
-          <QuizButtonGroup
-            onSkip={finishOnboarding}
-            onContinue={handleFinishWorkout}
-            continueDisabled={lifts.length === 0}
-            continueLoading={loading}
-            continueLabel="Save Workout"
-          />
         </QuizContainer>
       </ThemedView>
     );
@@ -291,7 +314,7 @@ export default function WorkoutSetupScreen() {
   // Add more workouts screen
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
+      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-values' as any)} />
       <QuizContainer animationKey="addMore">
         <QuizQuestion
           question="Workout saved!"
@@ -385,16 +408,20 @@ const styles = StyleSheet.create({
   addLiftButton: {
     width: 48,
     height: 48,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 18,
   },
   addLiftButtonDisabled: {
     opacity: 0.5,
   },
   liftsList: {
-    gap: 8,
+    maxHeight: 200,
     marginBottom: 24,
+  },
+  liftsListContent: {
+    gap: 8,
   },
   liftItem: {
     flexDirection: 'row',
@@ -402,7 +429,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   liftInfo: {
     flex: 1,
@@ -426,7 +453,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   savedName: {
     fontSize: 16,

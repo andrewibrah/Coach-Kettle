@@ -17,7 +17,7 @@ export function Header({ title, onMenuPress, onClearPress }: HeaderProps) {
     const textColor = useThemeColor({}, 'text');
 
     return (
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
             <View style={styles.headerTop}>
                 <View style={styles.headerLeft}>
                     <Pressable
@@ -30,7 +30,7 @@ export function Header({ title, onMenuPress, onClearPress }: HeaderProps) {
 
                 <View style={styles.titleContainer}>
                     <ThemedText style={[styles.title, { color: textColor }]} numberOfLines={1}>
-                        {title || "EasyWorkouts"}
+                        {title || "Coach Kettle"}
                     </ThemedText>
                 </View>
 
@@ -56,6 +56,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        minHeight: 44,
     },
     headerLeft: {
         flexDirection: 'row',
@@ -72,9 +73,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     title: {
-        fontSize: 26,
-        fontWeight: '800',
+        fontSize: 24,
+        fontWeight: '700',
         textAlign: 'center',
+        lineHeight: 32,
     },
     iconBtn: {
         padding: 8,

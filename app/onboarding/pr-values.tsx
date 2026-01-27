@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import { ThemedView } from '@/components/ui/themed-view';
-import { ThemedText } from '@/components/ui/themed-text';
-import {
-  QuizProgress,
-  QuizContainer,
-  QuizQuestion,
-  QuizButtonGroup,
-  QuizInput,
-} from '@/components/onboarding';
-import { useProfile } from '@/contexts/ProfileContext';
 import { useAuth } from '@/components/AuthProvider';
-import { fetchTrackedLifts, setPRLift, PRTrackedLift } from '@/lib/profile';
+import {
+  QuizButtonGroup,
+  QuizContainer,
+  QuizInput,
+  QuizProgress,
+  QuizQuestion,
+} from '@/components/onboarding';
+import { ThemedText } from '@/components/ui/themed-text';
+import { ThemedView } from '@/components/ui/themed-view';
+import { useProfile } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { fetchTrackedLifts, PRTrackedLift, setPRLift } from '@/lib/profile';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 7;
@@ -106,16 +106,27 @@ export default function PRValuesScreen() {
   if (initialLoading || trackedLifts.length === 0) {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
+        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-lifts' as any)} />
       </ThemedView>
     );
   }
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
+      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-lifts' as any)} />
 
-      <QuizContainer animationKey={`pr-value-${currentLiftIndex}`}>
+      <QuizContainer
+        animationKey={`pr-value-${currentLiftIndex}`}
+        footer={
+          <QuizButtonGroup
+            onSkip={handleSkip}
+            onContinue={handleSaveAndNext}
+            continueLoading={loading}
+            continueLabel={isLastLift ? 'Finish PRs' : 'Next Lift'}
+            skipDisabled={loading}
+          />
+        }
+      >
         <QuizQuestion
           question={`What's your current ${currentLift?.lift_name} PR?`}
           subtitle={`Lift ${currentLiftIndex + 1} of ${trackedLifts.length}`}
@@ -156,14 +167,6 @@ export default function PRValuesScreen() {
             </ThemedText>
           </View>
         )}
-
-        <QuizButtonGroup
-          onSkip={handleSkip}
-          onContinue={handleSaveAndNext}
-          continueLoading={loading}
-          continueLabel={isLastLift ? 'Finish PRs' : 'Next Lift'}
-          skipDisabled={loading}
-        />
       </QuizContainer>
     </ThemedView>
   );
@@ -188,7 +191,8 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   e1rmPreview: {
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 24,

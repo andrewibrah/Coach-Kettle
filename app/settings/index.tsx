@@ -9,7 +9,7 @@ import { Colors } from '@/constants/theme';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getBiometricDisplayName } from '@/lib/biometrics';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -100,7 +100,6 @@ export default function SettingsScreen() {
 
     return (
         <ThemedView style={[styles.container, { backgroundColor }]}>
-            <Stack.Screen options={{ headerShown: false }} />
             <ScreenHeader title="Settings" />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -125,7 +124,11 @@ export default function SettingsScreen() {
                             <View style={styles.navRowText}>
                                 <ThemedText style={styles.navRowLabel}>Edit Profile</ThemedText>
                                 <ThemedText style={styles.navRowDescription}>
-                                    {profile?.focus ? `Focus: ${profile.focus.replace('_', ' ')}` : 'Update your fitness info'}
+                                    {profile?.focus
+                                        ? `Focus: ${profile.focus.replace('_', ' ')}`
+                                        : profile
+                                            ? 'Update your fitness info'
+                                            : 'Set up your fitness profile'}
                                 </ThemedText>
                             </View>
                         </View>
@@ -210,7 +213,7 @@ export default function SettingsScreen() {
                         <View style={[styles.infoBox, { backgroundColor: infoBg }]}>
                             <IconSymbol name="lock.shield" size={16} color={activeColor} />
                             <Text style={[styles.infoText, { color: infoTextColor }]}>
-                                Your biometric data never leaves your device. EasyWorkouts only receives a success/fail result from your device&apos;s secure enclave.
+                                Your biometric data never leaves your device. Coach Kettle only receives a success/fail result from your device&apos;s secure enclave.
                             </Text>
                         </View>
                     )}

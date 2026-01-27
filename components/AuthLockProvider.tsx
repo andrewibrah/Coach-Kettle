@@ -217,7 +217,7 @@ export function AuthLockProvider({ children }: AuthLockProviderProps) {
 
     // Prompt for authentication
     const result = await authenticateWithBiometrics(
-      'Verify your identity to unlock EasyWorkouts',
+      'Verify your identity to unlock Coach Kettle',
       {
         fallbackLabel: 'Use Passcode',
         cancelLabel: 'Cancel',

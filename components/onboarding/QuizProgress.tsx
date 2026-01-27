@@ -1,19 +1,21 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ThemedText } from '@/components/ui/themed-text';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import { ThemedText } from '@/components/ui/themed-text';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
 
 interface QuizProgressProps {
   currentStep: number;
   totalSteps: number;
+  onBack?: () => void;
 }
 
-export function QuizProgress({ currentStep, totalSteps }: QuizProgressProps) {
+export function QuizProgress({ currentStep, totalSteps, onBack }: QuizProgressProps) {
   const colorScheme = useColorScheme();
   const progress = (currentStep / totalSteps) * 100;
 
@@ -24,6 +26,14 @@ export function QuizProgress({ currentStep, totalSteps }: QuizProgressProps) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        {onBack ? (
+          <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <IconSymbol name="chevron.left" size={20} color={colorScheme === 'dark' ? '#fff' : '#000'} />
+            <ThemedText style={styles.backText}>Back</ThemedText>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholder} />
+        )}
         <ThemedText style={styles.stepText}>
           Step {currentStep} of {totalSteps}
         </ThemedText>
@@ -54,8 +64,21 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  backText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  placeholder: {
+    width: 60,
   },
   stepText: {
     fontSize: 14,
@@ -71,3 +94,4 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 });
+

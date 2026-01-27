@@ -76,11 +76,34 @@ export default function PRTrackingScreen() {
   const handleAddLift = async () => {
     if (!session?.user?.id || !newLiftName.trim()) return;
 
+    const trimmedName = newLiftName.trim();
+
+    // Check if lift already exists in local state
+    const existingLift = trackedLifts.find(
+      (l) => l.lift_name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (existingLift) {
+      // If it exists but is inactive, reactivate it
+      if (!existingLift.is_active) {
+        await handleToggleLift(existingLift);
+      }
+      setNewLiftName('');
+      setShowAddInput(false);
+      return;
+    }
+
     try {
-      const lift = await addTrackedLift(session.user.id, newLiftName.trim());
+      const lift = await addTrackedLift(session.user.id, trimmedName);
       if (lift) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setTrackedLifts([...trackedLifts, lift]);
+        // Only add if not already in list (handles race conditions)
+        setTrackedLifts((prev) => {
+          if (prev.some((l) => l.id === lift.id)) {
+            return prev.map((l) => (l.id === lift.id ? lift : l));
+          }
+          return [...prev, lift];
+        });
         setNewLiftName('');
         setShowAddInput(false);
       }

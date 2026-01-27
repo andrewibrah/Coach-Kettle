@@ -1,66 +1,59 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ThemedText } from '@/components/ui/themed-text';
+import { ThemedView } from '@/components/ui/themed-view';
+import { Colors } from '@/constants/theme';
+import { useProfile } from '@/contexts/ProfileContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useEffect } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInDown,
-  FadeInUp,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
-  withSequence,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
-import { ThemedView } from '@/components/ui/themed-view';
-import { ThemedText } from '@/components/ui/themed-text';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CompleteScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const { completeOnboarding } = useProfile();
 
   const checkScale = useSharedValue(0);
-  const confettiOpacity = useSharedValue(0);
+  const ringScale = useSharedValue(0);
 
   useEffect(() => {
+    // Complete onboarding in database
+    completeOnboarding();
+
     // Trigger success haptic
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Animate checkmark
-    checkScale.value = withDelay(
-      200,
-      withSpring(1, { damping: 8, stiffness: 100 })
-    );
-
-    // Animate confetti
-    confettiOpacity.value = withDelay(
-      400,
-      withSequence(
-        withTiming(1, { duration: 300 }),
-        withDelay(2000, withTiming(0, { duration: 500 }))
-      )
-    );
+    // Animate ring first, then checkmark
+    ringScale.value = withDelay(100, withSpring(1, { damping: 12, stiffness: 100 }));
+    checkScale.value = withDelay(300, withSpring(1, { damping: 10, stiffness: 120 }));
 
     // Auto-redirect after 3 seconds
     const timer = setTimeout(() => {
       router.replace('/(tabs)' as any);
-    }, 3500);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, []);
 
-  const checkAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: checkScale.value }],
+  const ringAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: ringScale.value }],
+    opacity: ringScale.value,
   }));
 
-  const confettiAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: confettiOpacity.value,
+  const checkAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkScale.value }],
+    opacity: checkScale.value,
   }));
 
   const handleContinue = () => {
@@ -69,156 +62,163 @@ export default function CompleteScreen() {
   };
 
   return (
-    <ThemedView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
-      {/* Confetti background */}
-      <Animated.View style={[styles.confettiContainer, confettiAnimatedStyle]}>
-        {[...Array(20)].map((_, i) => (
-          <ConfettiPiece key={i} index={i} colorScheme={colorScheme} />
-        ))}
-      </Animated.View>
-
-      <View style={styles.content}>
-        <Animated.View style={[styles.checkContainer, checkAnimatedStyle]}>
-          <View
+    <ThemedView style={styles.container}>
+      <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
+        {/* Success Icon */}
+        <View style={styles.iconWrapper}>
+          <Animated.View
+            style={[
+              styles.ring,
+              { borderColor: Colors[colorScheme ?? 'light'].tint + '30' },
+              ringAnimatedStyle,
+            ]}
+          />
+          <Animated.View
             style={[
               styles.checkCircle,
               { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+              checkAnimatedStyle,
             ]}
           >
-            <IconSymbol name="checkmark" size={48} color="#fff" />
-          </View>
-        </Animated.View>
+            <IconSymbol name="checkmark" size={40} color="#fff" />
+          </Animated.View>
+        </View>
 
-        <Animated.View entering={FadeInDown.duration(600).delay(600)}>
-          <ThemedText style={styles.title}>You're all set!</ThemedText>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(600).delay(800)}>
-          <ThemedText style={styles.subtitle}>
-            Your profile is ready. Start tracking your workouts and crushing PRs!
+        {/* Text Content */}
+        <Animated.View entering={FadeInDown.duration(500).delay(500)} style={styles.textContent}>
+          <ThemedText style={styles.title}>All Set!</ThemedText>
+          <ThemedText style={[styles.subtitle, { color: isDark ? '#999' : '#666' }]}>
+            Your profile is ready. Time to start tracking your workouts.
           </ThemedText>
+        </Animated.View>
+
+        {/* Features List */}
+        <Animated.View entering={FadeIn.duration(400).delay(800)} style={styles.featuresList}>
+          <FeatureItem
+            icon="chart.line.uptrend.xyaxis"
+            text="Track your progress"
+            colorScheme={colorScheme}
+          />
+          <FeatureItem
+            icon="trophy.fill"
+            text="Hit new personal records"
+            colorScheme={colorScheme}
+          />
+          <FeatureItem
+            icon="brain.head.profile"
+            text="Get AI coaching tips"
+            colorScheme={colorScheme}
+          />
         </Animated.View>
       </View>
 
-      <Animated.View entering={FadeInUp.duration(600).delay(1000)} style={styles.buttonContainer}>
+      {/* Bottom Button */}
+      <Animated.View
+        entering={FadeInDown.duration(400).delay(1000)}
+        style={[styles.buttonContainer, { paddingBottom: insets.bottom + 24 }]}
+      >
         <TouchableOpacity
           style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
           onPress={handleContinue}
           activeOpacity={0.8}
         >
-          <ThemedText style={styles.buttonText}>Let's Go!</ThemedText>
+          <ThemedText style={styles.buttonText}>Start Training</ThemedText>
         </TouchableOpacity>
       </Animated.View>
     </ThemedView>
   );
 }
 
-interface ConfettiPieceProps {
-  index: number;
+interface FeatureItemProps {
+  icon: string;
+  text: string;
   colorScheme: 'light' | 'dark' | null;
 }
 
-function ConfettiPiece({ index, colorScheme }: ConfettiPieceProps) {
-  const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96c93d', '#f9ca24', '#a55eea'];
-  const color = colors[index % colors.length];
-
-  const translateY = useSharedValue(-50);
-  const translateX = useSharedValue(0);
-  const rotate = useSharedValue(0);
-  const opacity = useSharedValue(1);
-
-  const startX = Math.random() * 400 - 50;
-  const endX = startX + (Math.random() * 100 - 50);
-
-  useEffect(() => {
-    translateY.value = withDelay(
-      index * 50,
-      withTiming(800, { duration: 2500 })
-    );
-    translateX.value = withDelay(
-      index * 50,
-      withSequence(
-        withTiming(endX - startX, { duration: 1250 }),
-        withTiming(startX - endX, { duration: 1250 })
-      )
-    );
-    rotate.value = withDelay(
-      index * 50,
-      withRepeat(withTiming(360, { duration: 1000 }), -1)
-    );
-    opacity.value = withDelay(
-      1500 + index * 50,
-      withTiming(0, { duration: 500 })
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: translateY.value },
-      { translateX: translateX.value },
-      { rotate: `${rotate.value}deg` },
-    ],
-    opacity: opacity.value,
-    left: startX,
-  }));
-
+function FeatureItem({ icon, text, colorScheme }: FeatureItemProps) {
+  const isDark = colorScheme === 'dark';
   return (
-    <Animated.View
-      style={[
-        styles.confettiPiece,
-        { backgroundColor: color },
-        animatedStyle,
-      ]}
-    />
+    <View style={styles.featureItem}>
+      <View style={[styles.featureIcon, { backgroundColor: isDark ? '#1c1c1e' : '#f5f5f5' }]}>
+        <IconSymbol
+          name={icon as any}
+          size={18}
+          color={Colors[colorScheme ?? 'light'].tint}
+        />
+      </View>
+      <ThemedText style={styles.featureText}>{text}</ThemedText>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 24,
-  },
-  confettiContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  confettiPiece: {
-    position: 'absolute',
-    top: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 2,
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 32,
   },
-  checkContainer: {
-    marginBottom: 32,
+  iconWrapper: {
+    width: 120,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 40,
+  },
+  ring: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
   },
   checkCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  textContent: {
+    alignItems: 'center',
+    marginBottom: 48,
   },
   title: {
     fontSize: 32,
     fontWeight: '700',
+    marginBottom: 12,
     textAlign: 'center',
-    marginBottom: 16,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 17,
     textAlign: 'center',
-    opacity: 0.7,
     lineHeight: 24,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+  },
+  featuresList: {
+    width: '100%',
+    gap: 16,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  featureIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   buttonContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   button: {
     paddingVertical: 18,

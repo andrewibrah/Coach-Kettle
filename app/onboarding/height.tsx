@@ -1,17 +1,17 @@
+import {
+  QuizButtonGroup,
+  QuizContainer,
+  QuizNumberInputWithUnit,
+  QuizProgress,
+  QuizQuestion,
+} from '@/components/onboarding';
+import { ThemedView } from '@/components/ui/themed-view';
+import { useProfile } from '@/contexts/ProfileContext';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import { ThemedView } from '@/components/ui/themed-view';
-import {
-  QuizProgress,
-  QuizContainer,
-  QuizQuestion,
-  QuizButtonGroup,
-  QuizNumberInputWithUnit,
-} from '@/components/onboarding';
-import { useProfile } from '@/contexts/ProfileContext';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 1;
@@ -82,9 +82,19 @@ export default function HeightScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} />
+      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/' as any)} />
 
-      <QuizContainer animationKey="height">
+      <QuizContainer
+        animationKey="height"
+        footer={
+          <QuizButtonGroup
+            onSkip={handleSkip}
+            onContinue={handleContinue}
+            continueDisabled={!!error}
+            continueLoading={loading}
+          />
+        }
+      >
         <QuizQuestion
           question="What's your height?"
           subtitle="This helps us provide more accurate fitness advice"
@@ -107,13 +117,6 @@ export default function HeightScreen() {
             error={error}
           />
         </View>
-
-        <QuizButtonGroup
-          onSkip={handleSkip}
-          onContinue={handleContinue}
-          continueDisabled={!!error}
-          continueLoading={loading}
-        />
       </QuizContainer>
     </ThemedView>
   );

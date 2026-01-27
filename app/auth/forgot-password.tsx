@@ -35,7 +35,7 @@ export default function ForgotPassword() {
 
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'easyworkouts://auth/reset-password',
+      redirectTo: 'coachkettle://auth/reset-password',
     });
 
     setLoading(false);

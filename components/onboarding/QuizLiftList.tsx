@@ -185,12 +185,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   addButton: {
     width: 48,
     height: 48,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   liftName: {
     fontSize: 16,

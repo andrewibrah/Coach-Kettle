@@ -85,12 +85,23 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session?.user?.id]);
 
-  // Update profile fields
+  // Update profile fields (creates profile if it doesn't exist)
   const updateProfile = useCallback(
     async (updates: Partial<UserProfile>): Promise<boolean> => {
       if (!session?.user?.id) return false;
 
       try {
+        // Ensure profile exists before updating
+        if (!profile) {
+          console.log('[ProfileContext] No profile found, creating one first...');
+          const newProfile = await ensureProfile(session.user.id);
+          if (!newProfile) {
+            console.error('[ProfileContext] Failed to create profile');
+            return false;
+          }
+          setProfile(newProfile);
+        }
+
         const updated = await updateProfileApi(session.user.id, updates);
         if (updated) {
           setProfile(updated);
@@ -106,7 +117,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [session?.user?.id]
+    [session?.user?.id, profile]
   );
 
   // Complete onboarding

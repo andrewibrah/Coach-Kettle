@@ -1,19 +1,20 @@
-import React from 'react';
-import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { ThemedView } from '@/components/ui/themed-view';
+import React from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface QuizContainerProps {
   children: React.ReactNode;
   animationKey?: string;
+  footer?: React.ReactNode;
 }
 
-export function QuizContainer({ children, animationKey }: QuizContainerProps) {
+export function QuizContainer({ children, animationKey, footer }: QuizContainerProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <ThemedView style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <ThemedView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -34,6 +35,12 @@ export function QuizContainer({ children, animationKey }: QuizContainerProps) {
             {children}
           </Animated.View>
         </ScrollView>
+
+        {footer && (
+          <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+            {footer}
+          </View>
+        )}
       </KeyboardAvoidingView>
     </ThemedView>
   );
@@ -53,9 +60,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 40,
-    paddingBottom: 100,
+    paddingBottom: 24,
   },
   content: {
     flex: 1,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
   },
 });

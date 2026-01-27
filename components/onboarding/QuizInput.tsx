@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     paddingHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
   pickerText: {
