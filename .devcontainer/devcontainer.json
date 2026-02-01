@@ -7,13 +7,18 @@
     "customizations": {
         "vscode": {
             "settings": {
-                "editor.formatOnSave": true
+                "editor.formatOnSave": true,
+                "deno.enable": true,
+                "deno.enablePaths": [
+                    "./supabase/functions"
+                ]
             },
             "extensions": [
                 "dbaeumer.vscode-eslint",
                 "esbenp.prettier-vscode",
                 "expo.vscode-expo-tools",
-                "usernamehw.errorlens"
+                "usernamehw.errorlens",
+                "denoland.vscode-deno"
             ]
         }
     },

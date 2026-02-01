@@ -14,3 +14,9 @@ RUN npm install -g eas-cli expo-cli @anthropic-ai/claude-code
 RUN curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz -C /usr/local/bin \
     && mv /usr/local/bin/supabase /usr/local/bin/supabase-cli \
     && ln -s /usr/local/bin/supabase-cli /usr/local/bin/supabase
+
+# Install Deno (required for Supabase Edge Functions)
+RUN curl -fsSL https://deno.land/install.sh | sh \
+    && echo 'export DENO_INSTALL="/root/.deno"' >> /etc/bash.bashrc \
+    && echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> /etc/bash.bashrc \
+    && ln -s /root/.deno/bin/deno /usr/local/bin/deno
