@@ -48,6 +48,13 @@ export default function OnboardingWelcome() {
         >
           <ThemedText style={styles.buttonText}>Get Started</ThemedText>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.skipButton} 
+          onPress={() => router.replace('/(tabs)' as any)}
+        >
+          <ThemedText style={styles.skipButtonText}>Skip for now</ThemedText>
+        </TouchableOpacity>
       </Animated.View>
     </ThemedView>
   );
@@ -99,5 +106,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  skipButton: {
+    marginTop: 20,
+    paddingVertical: 12,
+  },
+  skipButtonText: {
+    fontSize: 16,
+    color: '#999',
+    fontWeight: '500',
   },
 });

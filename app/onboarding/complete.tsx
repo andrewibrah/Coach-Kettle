@@ -9,12 +9,12 @@ import { router } from 'expo-router';
 import React, { useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSpring,
+    FadeIn,
+    FadeInDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -69,7 +69,7 @@ export default function CompleteScreen() {
           <Animated.View
             style={[
               styles.ring,
-              { borderColor: Colors[colorScheme ?? 'light'].tint + '30' },
+              { borderColor: (Colors[colorScheme ?? 'light'].tint.length === 4 ? Colors[colorScheme ?? 'light'].tint.replace('#', '#000000').slice(0, 7) : Colors[colorScheme ?? 'light'].tint) + '30' },
               ringAnimatedStyle,
             ]}
           />

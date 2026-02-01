@@ -1,18 +1,17 @@
+
 import {
-  QuizButtonGroup,
-  QuizContainer,
-  QuizProgress,
-  QuizQuestion,
+    QuizButtonGroup,
+    QuizContainer,
+    QuizInput,
+    QuizProgress,
+    QuizQuestion,
 } from '@/components/onboarding';
-import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useProfile } from '@/contexts/ProfileContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TOTAL_STEPS = 8;
@@ -20,52 +19,28 @@ const CURRENT_STEP = 2;
 
 export default function AgeScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
   const { profile, updateProfile, updateOnboardingStep } = useProfile();
 
-  const initialDate = profile?.dob ? new Date(profile.dob) : new Date(2000, 0, 1);
-  const [date, setDate] = useState(initialDate);
-  const [showPicker, setShowPicker] = useState(Platform.OS === 'ios');
-  const [hasSelected, setHasSelected] = useState(!!profile?.dob);
+  // Calculate generic age if DOB exists
+  const initialAge = profile?.dob 
+    ? (new Date().getFullYear() - new Date(profile.dob).getFullYear()).toString() 
+    : '';
+
+  const [age, setAge] = useState(initialAge);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const calculateAge = (dob: Date): number => {
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
   const validateAge = (): boolean => {
-    if (!hasSelected) return true;
+    if (!age.trim()) return true; // Empty is valid (skip)
 
-    const age = calculateAge(date);
-    if (age < 13) {
-      setError('You must be at least 13 years old');
-      return false;
-    }
-    if (age > 120) {
-      setError('Please enter a valid date of birth');
+    const val = parseInt(age, 10);
+    if (isNaN(val) || val < 13 || val > 120) {
+      setError('Please enter a valid age (13-120)');
       return false;
     }
 
     setError('');
     return true;
-  };
-
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowPicker(false);
-    }
-    if (selectedDate) {
-      setDate(selectedDate);
-      setHasSelected(true);
-      setError('');
-    }
   };
 
   const handleContinue = async () => {
@@ -76,9 +51,15 @@ export default function AgeScreen() {
 
     setLoading(true);
     try {
-      if (hasSelected) {
+      if (age.trim()) {
+        const ageNum = parseInt(age, 10);
+        const currentYear = new Date().getFullYear();
+        const birthYear = currentYear - ageNum;
+        // Set to approx date: Jan 1st of that year
+        const dob = `${birthYear}-01-01`;
+
         await updateProfile({
-          dob: date.toISOString().split('T')[0],
+          dob: dob,
         });
       }
       await updateOnboardingStep(CURRENT_STEP);
@@ -97,8 +78,6 @@ export default function AgeScreen() {
     router.push('/onboarding/current-weight' as any);
   };
 
-  const age = hasSelected ? calculateAge(date) : null;
-
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
       <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/height' as any)} />
@@ -115,44 +94,22 @@ export default function AgeScreen() {
         }
       >
         <QuizQuestion
-          question="When were you born?"
+          question="How old are you?"
           subtitle="Your age helps personalize workout recommendations"
         />
 
-        <View style={styles.dateContainer}>
-          {Platform.OS === 'android' && !showPicker && (
-            <TouchableOpacity
-              style={[
-                styles.dateButton,
-                { backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5' },
-              ]}
-              onPress={() => setShowPicker(true)}
-            >
-              <ThemedText style={styles.dateButtonText}>
-                {hasSelected ? date.toLocaleDateString() : 'Select date of birth'}
-              </ThemedText>
-            </TouchableOpacity>
-          )}
-
-          {showPicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleDateChange}
-              maximumDate={new Date()}
-              minimumDate={new Date(1900, 0, 1)}
-              themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
-            />
-          )}
-
-          {hasSelected && age !== null && (
-            <View style={styles.ageDisplay}>
-              <ThemedText style={styles.ageText}>{age} years old</ThemedText>
-            </View>
-          )}
-
-          {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+        <View style={styles.inputContainer}>
+          <QuizInput
+            value={age}
+            onChangeText={(t) => {
+              setAge(t);
+              setError('');
+            }}
+            placeholder="25"
+            keyboardType="number-pad"
+            maxLength={3}
+            error={error}
+          />
         </View>
       </QuizContainer>
     </ThemedView>
@@ -163,30 +120,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  dateContainer: {
+  inputContainer: {
     marginBottom: 24,
-  },
-  dateButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-  },
-  dateButtonText: {
-    fontSize: 18,
-    textAlign: 'center',
-  },
-  ageDisplay: {
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  ageText: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  error: {
-    color: '#ff4444',
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
   },
 });

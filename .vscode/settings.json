@@ -1,8 +1,5 @@
 {
-  "editor.codeActionsOnSave": {
-    "source.fixAll": "explicit",
-    "source.organizeImports": "explicit",
-    "source.sortMembers": "explicit"
-  },
-  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python"
+  "deno.enable": true,
+  "deno.unstable": true,
+  "deno.importMap": "./supabase/functions/import_map.json"
 }
