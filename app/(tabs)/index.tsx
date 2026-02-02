@@ -39,6 +39,19 @@ type LogRow = {
   notes: string;
 };
 
+const BODY_PARTS: BodyPart[] = [
+  "Chest",
+  "Back",
+  "Legs",
+  "Shoulders",
+  "Arms",
+  "Push",
+  "Pull",
+  "Full Body",
+  "Cardio",
+  "Other",
+];
+
 function getTodayMMDD(): string {
   const now = new Date();
   const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -65,21 +78,6 @@ export default function HomeScreen() {
 
   // Body part picker
   const [pickerOpen, setPickerOpen] = useState(false);
-  const BODY_PARTS: BodyPart[] = useMemo(
-    () => [
-      "Chest",
-      "Back",
-      "Legs",
-      "Shoulders",
-      "Arms",
-      "Push",
-      "Pull",
-      "Full Body",
-      "Cardio",
-      "Other",
-    ],
-    []
-  );
 
   const scrollRef = useRef<ScrollView>(null);
 

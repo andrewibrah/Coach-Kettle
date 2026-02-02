@@ -28,7 +28,6 @@ _rate_buckets: dict[str, list[float]] = defaultdict(list)
 
 RATE_LIMITS: dict[str, tuple[int, int]] = {
     # key_prefix: (max_requests, window_seconds)
-    "input": (10, 60),
     "chat": (10, 60),
 }
 

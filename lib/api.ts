@@ -1,18 +1,7 @@
-const API_BASE = "http://localhost:8000";
-
-async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
-  }
-  return res.json() as Promise<T>;
-}
+const API_BASE =
+  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export const api = {
-  hello: (text: string) =>
-    getJSON<{ message: string }>(
-      `/hello?name=${encodeURIComponent(text)}`
-    ),
   chat: async (message: string) => {
     const res = await fetch(`${API_BASE}/chat`, {
       method: "POST",

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "EasyWorkouts",
-    "slug": "EasyWorkouts",
+    "name": "Coach Kettle",
+    "slug": "CoachKettle",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "easyworkouts",
+    "scheme": "coachkettle",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
