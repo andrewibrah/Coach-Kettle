@@ -9,9 +9,10 @@ type HeaderProps = {
     title?: string | null;
     onMenuPress: () => void;
     onClearPress: () => void;
+    onRoutinePress?: () => void;
 };
 
-export function Header({ title, onMenuPress, onClearPress }: HeaderProps) {
+export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: HeaderProps) {
     const insets = useSafeAreaInsets();
     const iconColor = useThemeColor({}, 'icon');
     const textColor = useThemeColor({}, 'text');
@@ -35,6 +36,14 @@ export function Header({ title, onMenuPress, onClearPress }: HeaderProps) {
                 </View>
 
                 <View style={styles.headerRight}>
+                    {onRoutinePress && (
+                        <Pressable
+                            onPress={onRoutinePress}
+                            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+                        >
+                            <MaterialCommunityIcons name="clipboard-list-outline" size={24} color={iconColor} />
+                        </Pressable>
+                    )}
                     <Pressable
                         onPress={onClearPress}
                         style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}

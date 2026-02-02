@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase";
 import { CoachModal } from "@/components/modals/CoachModal";
 import { EditSetModal } from "@/components/modals/EditSetModal";
 import { MenuModal } from "@/components/modals/MenuModal";
+import { RoutineModal } from "@/components/modals/RoutineModal";
 import { SessionReviewModal } from "@/components/modals/SessionReviewModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
 import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
@@ -34,8 +35,9 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow } from "@/lib/api";
 import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
+import { type WorkoutTemplate, type WorkoutTemplateItem } from "@/lib/profile";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
-import { getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
+import { expandTemplateToRows, getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
 import { type SessionReview } from "@/lib/workoutStorage";
 import { type LogRow } from "@/types/workout";
 
@@ -79,6 +81,9 @@ export default function HomeScreen() {
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [sessionReview, setSessionReview] = useState<SessionReview | null>(null);
+
+  // Routine modal state
+  const [routineModalVisible, setRoutineModalVisible] = useState(false);
 
   const openMenu = () => setMenuOpen(true);
   const swipeRight = Gesture.Fling()
@@ -153,9 +158,8 @@ export default function HomeScreen() {
             liftName: prData.lift_name,
             weight: prData.weight_lbs,
             reps: prData.reps,
-            estimatedOneRepMax: prData.estimated_1rm,
-            previousOneRepMax: prData.previous_1rm,
-            improvementPercentage: prData.improvement_pct,
+            newE1rm: prData.estimated_1rm,
+            previousE1rm: prData.previous_1rm,
           });
 
           // Haptic feedback
@@ -270,6 +274,53 @@ export default function HomeScreen() {
       clearTimeout(undoTimerRef.current);
       undoTimerRef.current = null;
     }
+  };
+
+  // Start workout from a template with skeleton rows
+  const handleSelectTemplateForStart = (template: WorkoutTemplate, items: WorkoutTemplateItem[]) => {
+    setNameModalVisible(false);
+    startWorkoutSession([template.name]);
+    
+    // Expand template items into skeleton rows
+    const skeletonRows = expandTemplateToRows(items);
+    setRows(skeletonRows);
+    
+    setMessageInput("");
+    setError(null);
+    setEditingCell(null);
+    setEditValue("");
+    setUndoState(null);
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+
+    if (Platform.OS === "ios") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  };
+
+  // Import routine into current workout (or start new one if not active)
+  const handleImportRoutine = (template: WorkoutTemplate, items: WorkoutTemplateItem[]) => {
+    setRoutineModalVisible(false);
+    
+    // Expand template items into skeleton rows
+    const skeletonRows = expandTemplateToRows(items);
+    
+    if (!workoutActive) {
+      // Start workout with template name
+      startWorkoutSession([template.name]);
+      setRows(skeletonRows);
+    } else {
+      // Append to current rows
+      setRows((prev) => [...prev, ...skeletonRows]);
+    }
+
+    if (Platform.OS === "ios") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   };
 
   const onClearRows = () => {
@@ -752,8 +803,38 @@ export default function HomeScreen() {
     setError(null);
     // Don't set loading yet, as we try fast parse synchronously
 
-    // Local synchronous parse
-    const gateDecision = decideAndParse(message, { lastExercise: getLastExerciseFromRows(currentRows) });
+    // Local synchronous parse - pass currentRows for routine-aware parsing
+    const gateDecision = decideAndParse(message, { 
+      lastExercise: getLastExerciseFromRows(currentRows),
+      currentRows: currentRows.map(r => ({
+        id: r.id,
+        exercise: r.exercise,
+        weightLbs: r.weightLbs,
+        reps: r.reps,
+      })),
+    });
+
+    // Handle routine-aware fill skeleton decision
+    if (gateDecision.kind === "fill_skeleton") {
+      const { weight, reps, targetRowIndex } = gateDecision;
+      setRows((prev) => {
+        const next = [...prev];
+        if (next[targetRowIndex]) {
+          next[targetRowIndex] = {
+            ...next[targetRowIndex],
+            weightLbs: weight,
+            ...(reps ? { reps } : {}),
+          };
+        }
+        return next;
+      });
+      setMessageInput("");
+      
+      if (Platform.OS === "ios") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      return;
+    }
 
     if (gateDecision.kind === "fast") {
       let next = [...currentRows];
@@ -765,8 +846,6 @@ export default function HomeScreen() {
         // Parsing failed but continue silently - parsing logic intact
         return;
       }
-
-      if (parsedRows.length) {
         const addOrFillRow = (rowData: ParsedRow, setOverride?: number) => {
           const normalizedExercise = rowData.exercise.trim().toLowerCase();
           for (let i = next.length - 1; i >= 0; i -= 1) {
@@ -819,7 +898,6 @@ export default function HomeScreen() {
         } else {
           parsedRows.forEach((row) => addOrFillRow(row));
         }
-      }
       setRows(next);
       setMessageInput("");
       setLoading(false);
@@ -932,6 +1010,7 @@ export default function HomeScreen() {
           title={workoutActive ? title : null}
           onMenuPress={() => setMenuOpen(true)}
           onClearPress={onClearRows}
+          onRoutinePress={() => setRoutineModalVisible(true)}
         />
 
         <WorkoutTable
@@ -1012,8 +1091,17 @@ export default function HomeScreen() {
 
         <WorkoutNameModal
           visible={nameModalVisible}
+          userId={session?.user?.id}
           onClose={() => setNameModalVisible(false)}
           onConfirm={confirmStartWorkout}
+          onSelectTemplate={handleSelectTemplateForStart}
+        />
+
+        <RoutineModal
+          visible={routineModalVisible}
+          userId={session?.user?.id || ""}
+          onClose={() => setRoutineModalVisible(false)}
+          onSelectTemplate={handleImportRoutine}
         />
 
         <SessionReviewModal

@@ -51,3 +51,39 @@ export function resequenceSets(list: LogRow[]): LogRow[] {
     return { ...row, set: nextSet };
   });
 }
+
+export interface TemplateItem {
+  lift_name: string;
+  target_sets: number | null;
+  target_reps: number | null;
+  target_weight?: number | null;
+}
+
+/**
+ * Expand workout template items into skeleton LogRows.
+ * Each template item with N sets becomes N LogRow entries,
+ * with weight empty (user fills in) and reps pre-filled.
+ */
+export function expandTemplateToRows(items: TemplateItem[]): LogRow[] {
+  const rows: LogRow[] = [];
+
+  for (const item of items) {
+    const setCount = item.target_sets || 1;
+    const reps = item.target_reps ? String(item.target_reps) : "";
+
+    for (let setNum = 1; setNum <= setCount; setNum++) {
+      rows.push({
+        id: makeId(),
+        exercise: item.lift_name,
+        set: setNum,
+        weightLbs: "", // Empty - user fills in during workout
+        reps: reps,
+        notes: "",
+        timestamp: Date.now(),
+        status: "committed",
+      });
+    }
+  }
+
+  return rows;
+}

@@ -16,7 +16,7 @@ import { addTemplateItem, createWorkoutTemplate } from '@/lib/profile';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -29,7 +29,6 @@ interface WorkoutLift {
   name: string;
   sets: string;
   reps: string;
-  weight: string;
 }
 
 export default function WorkoutSetupScreen() {
@@ -40,10 +39,11 @@ export default function WorkoutSetupScreen() {
 
   const [step, setStep] = useState<Step>('initial');
   const [workoutName, setWorkoutName] = useState('');
-  const [currentLift, setCurrentLift] = useState<WorkoutLift>({ name: '', sets: '', reps: '', weight: '' });
+  const [currentLift, setCurrentLift] = useState<WorkoutLift>({ name: '', sets: '3', reps: '10' });
   const [lifts, setLifts] = useState<WorkoutLift[]>([]);
   const [savedWorkouts, setSavedWorkouts] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const handleYes = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -64,9 +64,29 @@ export default function WorkoutSetupScreen() {
   const handleAddLift = () => {
     if (currentLift.name.trim()) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setLifts([...lifts, currentLift]);
-      setCurrentLift({ name: '', sets: '', reps: '', weight: '' });
+      if (editingIndex !== null) {
+        // Update existing lift
+        const updated = [...lifts];
+        updated[editingIndex] = currentLift;
+        setLifts(updated);
+        setEditingIndex(null);
+      } else {
+        // Add new lift
+        setLifts([...lifts, currentLift]);
+      }
+      setCurrentLift({ name: '', sets: '3', reps: '10' });
     }
+  };
+
+  const handleEditLift = (index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCurrentLift(lifts[index]);
+    setEditingIndex(index);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setCurrentLift({ name: '', sets: '3', reps: '10' });
   };
 
   const handleRemoveLift = (index: number) => {
@@ -82,27 +102,39 @@ export default function WorkoutSetupScreen() {
         const template = await createWorkoutTemplate(session.user.id, workoutName);
 
         if (template) {
-          // Add all lifts to template
+          // Add all lifts to template with display_order
           for (let i = 0; i < lifts.length; i++) {
             const lift = lifts[i];
-            await addTemplateItem(
+            const result = await addTemplateItem(
               session.user.id,
               template.id,
               lift.name,
-              lift.sets ? parseInt(lift.sets, 10) : undefined,
-              lift.reps ? parseInt(lift.reps, 10) : undefined,
-              lift.weight ? parseFloat(lift.weight) : undefined
+              lift.sets ? parseInt(lift.sets, 10) : 3,
+              lift.reps ? parseInt(lift.reps, 10) : 10,
+              undefined, // No weight during onboarding
+              undefined  // No notes
             );
+            
+            if (!result) {
+              throw new Error(`Failed to add exercise: ${lift.name}`);
+            }
           }
+          
+          setSavedWorkouts([...savedWorkouts, workoutName]);
+        } else {
+          throw new Error('Failed to create workout template');
         }
-
-        setSavedWorkouts([...savedWorkouts, workoutName]);
       }
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setStep('addMore');
     } catch (err) {
       console.error('Error saving workout:', err);
+      Alert.alert(
+        'Save Failed',
+        'Could not save your workout routine. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setLoading(false);
     }
@@ -112,7 +144,8 @@ export default function WorkoutSetupScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setWorkoutName('');
     setLifts([]);
-    setCurrentLift({ name: '', sets: '', reps: '', weight: '' });
+    setCurrentLift({ name: '', sets: '3', reps: '10' });
+    setEditingIndex(null);
     setStep('name');
   };
 
@@ -213,7 +246,14 @@ export default function WorkoutSetupScreen() {
             />
           }
         >
-          <QuizQuestion question={`Add lifts to "${workoutName}"`} subtitle="Build your workout one exercise at a time" />
+          <View style={styles.questionWithBadge}>
+            <QuizQuestion question={`Add lifts to "${workoutName}"`} subtitle="Build your workout one exercise at a time" />
+            {lifts.length > 0 && (
+              <View style={[styles.countBadge, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}>
+                <ThemedText style={styles.countBadgeText}>{lifts.length}</ThemedText>
+              </View>
+            )}
+          </View>
 
           <View style={styles.liftInputs}>
             <QuizInput
@@ -240,15 +280,17 @@ export default function WorkoutSetupScreen() {
                   keyboardType="numeric"
                 />
               </View>
-              <View style={styles.smallInput}>
-                <ThemedText style={styles.smallLabel}>Weight</ThemedText>
-                <QuizInput
-                  value={currentLift.weight}
-                  onChangeText={(text) => setCurrentLift({ ...currentLift, weight: text })}
-                  placeholder="135"
-                  keyboardType="decimal-pad"
-                />
-              </View>
+              {editingIndex !== null ? (
+                <TouchableOpacity
+                  style={[
+                    styles.addLiftButton,
+                    { backgroundColor: colorScheme === 'dark' ? '#444' : '#ccc' },
+                  ]}
+                  onPress={handleCancelEdit}
+                >
+                  <IconSymbol name="xmark" size={20} color={colorScheme === 'dark' ? '#fff' : '#333'} />
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity
                 style={[
                   styles.addLiftButton,
@@ -258,7 +300,7 @@ export default function WorkoutSetupScreen() {
                 onPress={handleAddLift}
                 disabled={!currentLift.name.trim()}
               >
-                <IconSymbol name="plus" size={20} color="#fff" />
+                <IconSymbol name={editingIndex !== null ? "checkmark" : "plus"} size={20} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
@@ -277,31 +319,38 @@ export default function WorkoutSetupScreen() {
                   exiting={FadeOut}
                   layout={Layout.springify()}
                 >
-                  <View
+                  <TouchableOpacity
+                    onPress={() => handleEditLift(index)}
                     style={[
                       styles.liftItem,
                       { backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5' },
+                      editingIndex === index && { borderColor: Colors[colorScheme ?? 'light'].tint, borderWidth: 2 },
                     ]}
                   >
                     <View style={styles.liftInfo}>
                       <ThemedText style={styles.liftName}>{lift.name}</ThemedText>
-                      {(lift.sets || lift.reps || lift.weight) && (
+                      {(lift.sets || lift.reps) && (
                         <ThemedText style={styles.liftDetails}>
                           {lift.sets && `${lift.sets} sets`}
-                          {lift.sets && lift.reps && ' x '}
+                          {lift.sets && lift.reps && ' × '}
                           {lift.reps && `${lift.reps} reps`}
-                          {lift.weight && ` @ ${lift.weight} lbs`}
                         </ThemedText>
                       )}
                     </View>
-                    <TouchableOpacity onPress={() => handleRemoveLift(index)}>
+                    <TouchableOpacity 
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleRemoveLift(index);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                       <IconSymbol
                         name="xmark.circle.fill"
                         size={22}
                         color={colorScheme === 'dark' ? '#666' : '#999'}
                       />
                     </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 </Animated.View>
               ))}
             </ScrollView>
@@ -458,5 +507,24 @@ const styles = StyleSheet.create({
   savedName: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  questionWithBadge: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  countBadge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    marginTop: 4,
+  },
+  countBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

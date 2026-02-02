@@ -185,10 +185,10 @@ serve(async (req) => {
                         user_id: userId,
                         template_id,
                         lift_name,
-                        target_sets: target_sets || null,
-                        target_reps: target_reps || null,
-                        target_weight: target_weight || null,
-                        notes: notes || null,
+                        target_sets: target_sets ?? null,
+                        target_reps: target_reps ?? null,
+                        target_weight: target_weight ?? null,
+                        notes: notes ?? null,
                     })
                     .select()
                     .single();

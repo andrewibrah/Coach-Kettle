@@ -1,12 +1,9 @@
 // Fallback for using MaterialIcons on Android and web.
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolViewProps, SymbolWeight } from 'expo-symbols';
+import { SymbolWeight } from 'expo-symbols';
 import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
-
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
-type IconSymbolName = keyof typeof MAPPING;
 
 /**
  * Add your SF Symbols to Material Icons mappings here.
@@ -18,6 +15,8 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
+  'chevron.up': 'expand-less',
+  'chevron.down': 'expand-more',
   'line.3.horizontal': 'menu',
   'clock.fill': 'history',
   'questionmark.circle': 'help-outline',
@@ -25,7 +24,23 @@ const MAPPING = {
   'trash': 'delete',
   'sparkles': 'auto_awesome',
   'xmark': 'close',
-} as IconMapping;
+  'plus': 'add',
+  'checkmark': 'check',
+  'checkmark.circle.fill': 'check-circle',
+  'person.fill': 'person',
+  'trophy.fill': 'emoji-events',
+  'gear': 'settings',
+  'lock.shield': 'security',
+  'exclamationmark.triangle': 'warning',
+  'rectangle.portrait.and.arrow.right': 'logout',
+  'chart.line.uptrend.xyaxis': 'trending-up',
+  'pencil': 'edit',
+  'eye.fill': 'visibility',
+  'eye.slash.fill': 'visibility-off',
+  'info.circle': 'info-outline',
+} as const;
+
+export type IconSymbolName = keyof typeof MAPPING;
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
@@ -44,5 +59,12 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  return (
+    <MaterialIcons
+      color={color}
+      size={size}
+      name={MAPPING[name] as ComponentProps<typeof MaterialIcons>['name']}
+      style={style}
+    />
+  );
 }

@@ -18,6 +18,7 @@ export type GateDecisionReason =
   | "missing_reps"
   | "conversational_question"
   | "end_workout_intent"
+  | "fill_skeleton_row"
   | "success";
 
 type FastPattern = "single" | "multi" | "dropset" | "superset" | "cardio" | "warmup";
@@ -30,9 +31,27 @@ export type GateDecision =
     meta?: { pattern?: FastPattern };
   }
   | { kind: "ai"; reason: GateDecisionReason; userHint?: string }
-  | { kind: "end_workout"; reason: "end_workout_intent" };
+  | { kind: "end_workout"; reason: "end_workout_intent" }
+  | {
+    kind: "fill_skeleton";
+    reason: "fill_skeleton_row";
+    weight: string;
+    reps?: string;
+    targetRowIndex: number;
+  };
 
-type GateContext = { lastExercise?: string };
+// Row interface for routine-aware parsing
+export interface SkeletonRow {
+  id: string;
+  exercise: string;
+  weightLbs: string;
+  reps: string;
+}
+
+type GateContext = {
+  lastExercise?: string;
+  currentRows?: SkeletonRow[];
+};
 
 const MULTI_REASON: GateDecisionReason = "multiple_entries_or_sets";
 const KG_TO_LB = 2.20462;
@@ -235,7 +254,51 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
     return { kind: "end_workout", reason: "end_workout_intent" };
   }
 
-  // Check for conversational questions first - route to AI for coach response
+  // ========== ROUTINE-AWARE WEIGHT-ONLY PARSING ==========
+  // When skeleton rows exist (from imported routine), allow weight-only or weight+reps input
+  // to fill the next empty-weight row sequentially.
+  // Format: "150" (weight only) or "150 8" (weight + override reps)
+  if (context.currentRows && context.currentRows.length > 0) {
+    // Find next row with empty weight
+    const nextEmptyIdx = context.currentRows.findIndex(
+      (row) => row.exercise && !row.weightLbs
+    );
+
+    if (nextEmptyIdx !== -1) {
+      // Check if message is just a number (weight only)
+      const weightOnlyMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:lbs?|kg)?$/i);
+      if (weightOnlyMatch) {
+        const weight = normalizeWeightToLbs(weightOnlyMatch[1],
+          trimmed.toLowerCase().includes('kg') ? 'kg' : undefined
+        );
+        return {
+          kind: "fill_skeleton",
+          reason: "fill_skeleton_row",
+          weight: weight,
+          targetRowIndex: nextEmptyIdx,
+        };
+      }
+
+      // Check if message is weight + reps (e.g., "150 8" or "150x8" or "150 for 8")
+      const weightRepsMatch = trimmed.match(
+        /^(\d+(?:\.\d+)?)\s*(?:lbs?|kg)?\s*(?:x|×|for|,)?\s*(\d+)(?:\s*reps?)?$/i
+      );
+      if (weightRepsMatch) {
+        const weight = normalizeWeightToLbs(weightRepsMatch[1],
+          trimmed.toLowerCase().includes('kg') ? 'kg' : undefined
+        );
+        return {
+          kind: "fill_skeleton",
+          reason: "fill_skeleton_row",
+          weight: weight,
+          reps: weightRepsMatch[2],
+          targetRowIndex: nextEmptyIdx,
+        };
+      }
+    }
+  }
+
+  // Check for conversational questions - route to AI for coach response
   if (isConversationalQuestion(trimmed)) {
     return makeAiDecision("conversational_question");
   }
