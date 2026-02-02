@@ -1,50 +1,69 @@
-# Welcome to your Expo app 👋
+# EasyWorkouts
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The fastest way to log your sets. No menus, no dropdowns, no friction.
 
-## Get started
+Just type what you did. The app handles the rest.
 
-1. Install dependencies
+## How it works
 
-   ```bash
-   npm install
-   ```
+1. Pick your body parts (Chest + Tri, Legs, whatever)
+2. Punch in your exercise, weight, and reps
+3. Hit Add. Row goes to the table. Exercise stays filled so you can bang out sets fast.
+4. When you switch exercises, just type the new name. Set numbers reset automatically.
 
-2. Start the app
+That's it. Your workout builds in real-time as a clean table right on screen.
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+               02/02 Chest + Arms Workout
++-----------------------+-----+---------+------+-------+
+| Exercise              | Set | Weight  | Reps | Notes |
++-----------------------+-----+---------+------+-------+
+| Flat Bench (Machine)  | 0   | 100     | 12   | WU    |
+|                       | 1   | 190     | 9    |       |
+|                       | 2   | 240     | 4    |       |
+|                       | 3   | 190     | 6    |       |
+| Incline Machine       | 1   | 90      | 9    |       |
+|                       | 2   | 140     | 5    |       |
+| Elliptical Cardio     | -   | —       |15 min| HR180 |
++-----------------------+-----+---------+------+-------+
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## AI Chat (optional)
 
-## Learn more
+Don't want to fill in fields? Just talk to it.
 
-To learn more about developing your project with Expo, look at the following resources:
+> "bench 185 10"
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The AI parses your messy gym shorthand into structured rows. It knows what exercise you're on, auto-increments sets, converts units, and handles drop sets, super sets, and warmups.
 
-## Join the community
+## Run it
 
-Join our community of developers creating universal apps.
+**Frontend (Expo)**
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npm install
+npx expo start
+```
+
+**Backend (FastAPI)**
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Set `OPENAI_API_KEY` in your environment for the AI chat feature.
+
+## Stack
+
+- **App**: React Native + Expo (iOS, Android, Web)
+- **Backend**: Python FastAPI + OpenAI GPT-4o-mini
+- **Database**: Supabase (Postgres) — migrations in `supabase/`
+- **Theming**: Light + dark mode
+
+## What's next
+
+- Supabase auth + per-user workout history
+- Workout history viewer
+- AI coach that analyzes your trends
