@@ -15,6 +15,8 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 type BodyPart =
   | "Chest"
@@ -45,6 +47,9 @@ function getTodayMMDD(): string {
 }
 
 export default function HomeScreen() {
+  const colorScheme = useColorScheme() ?? "light";
+  const colors = Colors[colorScheme];
+
   // Session header state
   const [sessionDate, setSessionDate] = useState<string>(getTodayMMDD());
   const [bodyParts, setBodyParts] = useState<BodyPart[]>([]);
@@ -52,7 +57,7 @@ export default function HomeScreen() {
   // Table rows (in-memory only for now)
   const [rows, setRows] = useState<LogRow[]>([]);
 
-  // “Chat input filler” fields
+  // "Chat input filler" fields
   const [exerciseInput, setExerciseInput] = useState<string>("");
   const [weightInput, setWeightInput] = useState<string>("");
   const [repsInput, setRepsInput] = useState<string>("");
@@ -84,11 +89,6 @@ export default function HomeScreen() {
   }, [sessionDate, bodyParts]);
 
   const resetForNewDay = (nextDate: string) => {
-    // Automated daily rollover:
-    // - Update date
-    // - Clear body part back to blank
-    // - Clear current table rows
-    // - Clear inputs
     setSessionDate(nextDate);
     setBodyParts([]);
     setRows([]);
@@ -104,13 +104,10 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    // 1) If the app sits open past midnight, we still want rollover.
-    //    A short interval is a low-risk approach without requiring DB/auth.
     const interval = setInterval(() => {
       ensureFreshSession();
     }, 30_000);
 
-    // 2) If the app is backgrounded and resumed next day.
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") ensureFreshSession();
     });
@@ -136,7 +133,7 @@ export default function HomeScreen() {
     if (!ex) return;
 
     const newRow: LogRow = {
-      id: `${Date.now()}-${Math.random()}`,
+      id: crypto.randomUUID(),
       exercise: ex,
       set: nextSetNumberForExercise(ex),
       weightLbs: weightInput.trim(),
@@ -154,6 +151,80 @@ export default function HomeScreen() {
     // Scroll to bottom so the new row is visible.
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   };
+
+  const themed = useMemo(
+    () =>
+      StyleSheet.create({
+        bodyPartPill: {
+          alignSelf: "center",
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: colors.pillBorder,
+        },
+        tableWrap: {
+          flex: 1,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          overflow: "hidden",
+        },
+        row: {
+          flexDirection: "row",
+          alignItems: "center",
+          paddingVertical: 10,
+          paddingHorizontal: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.borderLight,
+        },
+        headerRow: {
+          backgroundColor: colors.tableHeaderBg,
+          borderBottomColor: colors.tableHeaderBorder,
+        },
+        evenRow: {
+          backgroundColor: colors.tableRowEven,
+        },
+        oddRow: {
+          backgroundColor: colors.tableRowOdd,
+        },
+        input: {
+          borderWidth: 1,
+          borderColor: colors.inputBorder,
+          borderRadius: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 10,
+          backgroundColor: colors.inputBackground,
+          color: colors.text,
+          fontSize: 14,
+        },
+        modalCard: {
+          backgroundColor: colors.modalCardBg,
+          borderRadius: 14,
+          padding: 14,
+          maxHeight: "70%",
+        },
+        modalItem: {
+          paddingVertical: 12,
+          paddingHorizontal: 12,
+          borderWidth: 1,
+          borderColor: colors.modalItemBorder,
+          borderRadius: 12,
+        },
+        modalItemSelected: {
+          borderColor: colors.modalItemSelectedBorder,
+          backgroundColor: colors.modalItemSelectedBg,
+        },
+        modalDone: {
+          borderColor: colors.modalDoneBorder,
+          backgroundColor: colors.modalDoneBg,
+        },
+        modalClear: {
+          borderColor: colors.modalClearBorder,
+        },
+      }),
+    [colors]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -173,7 +244,7 @@ export default function HomeScreen() {
 
           <Pressable
             onPress={() => setPickerOpen(true)}
-            style={styles.bodyPartPill}
+            style={themed.bodyPartPill}
             accessibilityRole="button"
             accessibilityLabel="Select body part"
           >
@@ -185,8 +256,8 @@ export default function HomeScreen() {
       </ThemedView>
 
       {/* Table */}
-      <ThemedView style={styles.tableWrap}>
-        <View style={[styles.row, styles.headerRow]}>
+      <ThemedView style={themed.tableWrap}>
+        <View style={[themed.row, themed.headerRow]}>
           <ThemedText style={[styles.cell, styles.exerciseCol, styles.headerCell]}>
             Exercise
           </ThemedText>
@@ -220,12 +291,12 @@ export default function HomeScreen() {
             rows.map((r, idx) => (
               <View
                 key={r.id}
-                style={[styles.row, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}
+                style={[themed.row, idx % 2 === 0 ? themed.evenRow : themed.oddRow]}
               >
                 <ThemedText style={[styles.cell, styles.exerciseCol]}>{r.exercise}</ThemedText>
                 <ThemedText style={[styles.cell, styles.setCol]}>{String(r.set)}</ThemedText>
-                <ThemedText style={[styles.cell, styles.weightCol]}>{r.weightLbs || "—"}</ThemedText>
-                <ThemedText style={[styles.cell, styles.repsCol]}>{r.reps || "—"}</ThemedText>
+                <ThemedText style={[styles.cell, styles.weightCol]}>{r.weightLbs || "\u2014"}</ThemedText>
+                <ThemedText style={[styles.cell, styles.repsCol]}>{r.reps || "\u2014"}</ThemedText>
                 <ThemedText style={[styles.cell, styles.notesCol]}>{r.notes || ""}</ThemedText>
               </View>
             ))
@@ -233,21 +304,23 @@ export default function HomeScreen() {
         </ScrollView>
       </ThemedView>
 
-      {/* Input row (chat-like filler) */}
+      {/* Input row */}
       <View style={styles.inputWrap}>
         <View style={styles.inputGrid}>
           <TextInput
             value={exerciseInput}
             onChangeText={setExerciseInput}
             placeholder="Exercise"
-            style={[styles.input, styles.exerciseInput]}
+            placeholderTextColor={colors.icon}
+            style={[themed.input, styles.exerciseInput]}
             returnKeyType="next"
           />
           <TextInput
             value={weightInput}
             onChangeText={setWeightInput}
             placeholder="Weight"
-            style={[styles.input, styles.smallInput]}
+            placeholderTextColor={colors.icon}
+            style={[themed.input, styles.smallInput]}
             keyboardType={Platform.select({ ios: "numbers-and-punctuation", android: "numeric" })}
             returnKeyType="next"
           />
@@ -255,7 +328,8 @@ export default function HomeScreen() {
             value={repsInput}
             onChangeText={setRepsInput}
             placeholder="Reps"
-            style={[styles.input, styles.smallInput]}
+            placeholderTextColor={colors.icon}
+            style={[themed.input, styles.smallInput]}
             keyboardType={Platform.select({ ios: "numbers-and-punctuation", android: "numeric" })}
             returnKeyType="next"
           />
@@ -263,7 +337,8 @@ export default function HomeScreen() {
             value={notesInput}
             onChangeText={setNotesInput}
             placeholder="Notes"
-            style={[styles.input, styles.notesInput]}
+            placeholderTextColor={colors.icon}
+            style={[themed.input, styles.notesInput]}
             returnKeyType="done"
             onSubmitEditing={addRow}
           />
@@ -287,7 +362,7 @@ export default function HomeScreen() {
         onRequestClose={() => setPickerOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Pressable style={themed.modalCard} onPress={() => {}}>
             <ThemedText type="title" style={styles.modalTitle}>
               Select Body Part
             </ThemedText>
@@ -303,11 +378,11 @@ export default function HomeScreen() {
                         prev.includes(bp) ? prev.filter((x) => x !== bp) : [...prev, bp]
                       );
                     }}
-                    style={[styles.modalItem, selected && styles.modalItemSelected]}
+                    style={[themed.modalItem, selected && themed.modalItemSelected]}
                   >
                     <View style={styles.modalItemRow}>
                       <ThemedText style={styles.modalItemText}>{bp}</ThemedText>
-                      <ThemedText style={styles.modalItemCheck}>{selected ? "✓" : ""}</ThemedText>
+                      <ThemedText style={styles.modalItemCheck}>{selected ? "\u2713" : ""}</ThemedText>
                     </View>
                   </Pressable>
                 );
@@ -317,13 +392,13 @@ export default function HomeScreen() {
                 onPress={() => {
                   setBodyParts([]);
                 }}
-                style={[styles.modalItem, styles.modalClear]}
+                style={[themed.modalItem, themed.modalClear]}
               >
                 <ThemedText style={styles.modalItemText}>Clear selection</ThemedText>
               </Pressable>
               <Pressable
                 onPress={() => setPickerOpen(false)}
-                style={[styles.modalItem, styles.modalDone]}
+                style={[themed.modalItem, themed.modalDone]}
               >
                 <ThemedText style={styles.modalItemText}>Done</ThemedText>
               </Pressable>
@@ -356,48 +431,15 @@ const styles = StyleSheet.create({
   titleText: {
     textAlign: "center",
   },
-  bodyPartPill: {
-    alignSelf: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#D0D0D0",
-  },
   bodyPartPillText: {
     fontSize: 14,
   },
 
-  tableWrap: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
   tableBody: {
     flex: 1,
   },
   tableBodyContent: {
     paddingBottom: 6,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
-  },
-  headerRow: {
-    backgroundColor: "#F6F6F6",
-    borderBottomColor: "#E6E6E6",
-  },
-  evenRow: {
-    backgroundColor: "#FFFFFF",
-  },
-  oddRow: {
-    backgroundColor: "#FAFAFA",
   },
   cell: {
     fontSize: 13,
@@ -440,15 +482,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#D6D6D6",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
-    fontSize: 14,
-  },
   exerciseInput: {
     flex: 2.2,
   },
@@ -474,12 +507,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 18,
   },
-  modalCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 14,
-    maxHeight: "70%",
-  },
   modalTitle: {
     marginBottom: 10,
     textAlign: "center",
@@ -487,17 +514,6 @@ const styles = StyleSheet.create({
   modalList: {
     gap: 8,
     paddingBottom: 6,
-  },
-  modalItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "#E6E6E6",
-    borderRadius: 12,
-  },
-  modalItemSelected: {
-    borderColor: "#BDBDBD",
-    backgroundColor: "#F7F7F7",
   },
   modalItemRow: {
     flexDirection: "row",
@@ -507,13 +523,6 @@ const styles = StyleSheet.create({
   modalItemCheck: {
     fontSize: 18,
     opacity: 0.9,
-  },
-  modalDone: {
-    borderColor: "#CFCFCF",
-    backgroundColor: "#F2F2F2",
-  },
-  modalClear: {
-    borderColor: "#D8D8D8",
   },
   modalItemText: {
     fontSize: 16,

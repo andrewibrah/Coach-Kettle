@@ -1,7 +1,9 @@
 import logging
 import os
+import time
+from collections import defaultdict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from openai import OpenAI
@@ -19,6 +21,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------------------------------------------------------------------------
+# Simple in-memory sliding-window rate limiter
+# ---------------------------------------------------------------------------
+_rate_buckets: dict[str, list[float]] = defaultdict(list)
+
+RATE_LIMITS: dict[str, tuple[int, int]] = {
+    # key_prefix: (max_requests, window_seconds)
+    "input": (10, 60),
+    "chat": (10, 60),
+}
+
+
+def _check_rate_limit(client_ip: str, bucket: str) -> None:
+    max_req, window = RATE_LIMITS[bucket]
+    key = f"{bucket}:{client_ip}"
+    now = time.monotonic()
+    timestamps = _rate_buckets[key]
+    # Prune entries outside the window
+    _rate_buckets[key] = [t for t in timestamps if now - t < window]
+    if len(_rate_buckets[key]) >= max_req:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again shortly.")
+    _rate_buckets[key].append(now)
+
 # Lazily initialised so module import doesn't fail without the key
 _openai_client: OpenAI | None = None
 
@@ -31,7 +56,7 @@ def get_openai_client() -> OpenAI:
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=2000)
+    message: str = Field(..., min_length=1, max_length=1500)
 
 
 @app.get("/health")
@@ -40,7 +65,9 @@ def health():
 
 
 @app.post("/chat")
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, request: Request):
+    _check_rate_limit(request.client.host if request.client else "unknown", "chat")
+
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not set on the server")
 
