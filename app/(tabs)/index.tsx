@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -13,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -64,6 +64,7 @@ function getTodayMMDD(): string {
 export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
 
   // Session header state
   const [sessionDate, setSessionDate] = useState<string>(getTodayMMDD());
@@ -279,6 +280,12 @@ export default function HomeScreen() {
         modalClear: {
           borderColor: colors.modalClearBorder,
         },
+        modeToggleActive: {
+          opacity: 1,
+          fontWeight: "600",
+          borderBottomWidth: 2,
+          borderBottomColor: colors.tint,
+        },
       }),
     [colors]
   );
@@ -286,14 +293,9 @@ export default function HomeScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.screen}
+      style={[styles.screen, { paddingTop: insets.top + 8 }]}
     >
       <ThemedView style={styles.header}>
-        <Image
-          source={require("@/assets/images/partial-react-logo.png")}
-          style={styles.headerImage}
-        />
-
         <View style={styles.titleRow}>
           <ThemedText type="title" style={styles.titleText}>
             {title}
@@ -371,12 +373,12 @@ export default function HomeScreen() {
       <View style={styles.inputWrap}>
         <View style={styles.modeToggleRow}>
           <Pressable onPress={() => setChatMode(false)}>
-            <ThemedText style={[styles.modeToggle, !chatMode && styles.modeToggleActive]}>
+            <ThemedText style={[styles.modeToggle, !chatMode && themed.modeToggleActive]}>
               Fields
             </ThemedText>
           </Pressable>
           <Pressable onPress={() => setChatMode(true)}>
-            <ThemedText style={[styles.modeToggle, chatMode && styles.modeToggleActive]}>
+            <ThemedText style={[styles.modeToggle, chatMode && themed.modeToggleActive]}>
               AI Chat
             </ThemedText>
           </Pressable>
@@ -510,17 +512,10 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    paddingTop: 12,
     paddingHorizontal: 16,
   },
   header: {
     marginBottom: 10,
-  },
-  headerImage: {
-    height: 100,
-    width: 200,
-    alignSelf: "center",
-    marginBottom: 8,
   },
   titleRow: {
     gap: 10,
@@ -607,12 +602,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     paddingVertical: 4,
     paddingHorizontal: 12,
-  },
-  modeToggleActive: {
-    opacity: 1,
-    fontWeight: "600",
-    borderBottomWidth: 2,
-    borderBottomColor: "#0a7ea4",
   },
   chatRow: {
     flexDirection: "row",

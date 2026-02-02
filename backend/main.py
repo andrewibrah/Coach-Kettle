@@ -114,4 +114,4 @@ Rules:
 
 @app.get("/")
 def root():
-    return {"message": "API running"}
+    return {"message": "Coach Kettle API running"}
