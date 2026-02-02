@@ -560,7 +560,8 @@ export async function addTemplateItem(
   targetSets?: number,
   targetReps?: number,
   targetWeight?: number,
-  notes?: string
+  notes?: string,
+  displayOrder?: number
 ): Promise<WorkoutTemplateItem | null> {
   try {
     const headers = await getAuthHeaders();
@@ -575,6 +576,7 @@ export async function addTemplateItem(
         target_reps: targetReps,
         target_weight: targetWeight,
         notes,
+        display_order: displayOrder,
       }),
     });
 

@@ -516,6 +516,39 @@ function runDevStructuredGateTests() {
     },
     { message: "Bench and Leg press 135 8", expectKind: "ai" },
     { message: "", expectKind: "ai" },
+    // Routine-aware skeleton fill tests
+    {
+      message: "150",
+      context: {
+        currentRows: [
+          { id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" },
+          { id: "2", exercise: "Bench Press", weightLbs: "", reps: "10" },
+        ],
+      },
+      expectKind: "fill_skeleton",
+    },
+    {
+      message: "150 8",
+      context: {
+        currentRows: [
+          { id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" },
+        ],
+      },
+      expectKind: "fill_skeleton",
+    },
+    {
+      message: "Bench 185 8",
+      context: {
+        currentRows: [
+          { id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" },
+        ],
+      },
+      expectKind: "fast",
+      expectRowCount: 1,
+      expectExercise: "Bench",
+      expectWeight: "185",
+      expectReps: "8",
+    },
   ];
 
   const failures: string[] = [];

@@ -830,6 +830,18 @@ export default function HomeScreen() {
       });
       setMessageInput("");
       
+      // Sync the filled row to backend for PR tracking
+      const filledRow = rows[targetRowIndex];
+      if (filledRow) {
+        api.logSet({
+          exercise: filledRow.exercise,
+          set: filledRow.set,
+          weightLbs: weight,
+          reps: reps || filledRow.reps,
+          notes: filledRow.notes || "",
+        }).catch(err => console.error("Failed to sync skeleton fill", err));
+      }
+
       if (Platform.OS === "ios") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
@@ -894,10 +906,7 @@ export default function HomeScreen() {
           ];
         };
 
-        if (false && parsedRows.length) {
-        } else {
           parsedRows.forEach((row) => addOrFillRow(row));
-        }
       setRows(next);
       setMessageInput("");
       setLoading(false);

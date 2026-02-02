@@ -1,7 +1,11 @@
 // Edge Function: log-set
-// Per-set logging stub
+// Per-set logging with workout_log insert for real-time PR detection
+// The PR detection trigger (trg_update_pr_from_workout_log) fires
+// automatically on INSERT to workout_log.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -9,12 +13,46 @@ const corsHeaders = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+
+interface JWTPayload {
+    sub: string;
+    [key: string]: unknown;
+}
+
 interface WorkoutRow {
     exercise: string;
     set: number;
     weightLbs: string;
     reps: string;
     notes: string;
+}
+
+async function verifyAuth(req: Request): Promise<string> {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+        throw new Error("Missing Authorization header");
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    try {
+        const { payload } = await jwtVerify(token, JWKS, {
+            issuer: `${supabaseUrl}/auth/v1`,
+            audience: "authenticated",
+        });
+        return (payload as JWTPayload).sub;
+    } catch (error) {
+        console.error("[log-set] JWT verification failed:", error);
+        throw new Error("Unauthorized");
+    }
+}
+
+function createSupabaseClient() {
+    return createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { persistSession: false },
+    });
 }
 
 serve(async (req) => {
@@ -30,6 +68,17 @@ serve(async (req) => {
         );
     }
 
+    // Verify JWT and get user ID
+    let userId: string;
+    try {
+        userId = await verifyAuth(req);
+    } catch {
+        return new Response(
+            JSON.stringify({ error: "Unauthorized" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+
     let payload: WorkoutRow;
     try {
         payload = await req.json();
@@ -40,13 +89,55 @@ serve(async (req) => {
         );
     }
 
-    const { exercise, weightLbs, reps } = payload;
+    const { exercise, set, weightLbs, reps, notes } = payload;
 
-    // Log the set (stub - could be extended to save to database or observability)
-    console.log(`[log-set] ${exercise} ${weightLbs}x${reps}`);
+    if (!exercise || !weightLbs || !reps) {
+        return new Response(
+            JSON.stringify({ ok: true }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
 
-    return new Response(
-        JSON.stringify({ ok: true }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // Use service role client to bypass RLS for insert
+    const supabase = createSupabaseClient();
+
+    try {
+        const today = new Date().toISOString().split("T")[0];
+
+        const { error } = await supabase
+            .from("workout_log")
+            .insert({
+                workout_id: `live-${today}`,
+                workout_date: today,
+                user_id: userId,
+                exercise: exercise,
+                set_number: set || 1,
+                weight_lbs: weightLbs,
+                reps: reps,
+                notes: notes || null,
+                created_at: new Date().toISOString(),
+            });
+
+        if (error) {
+            console.error("[log-set] DB insert error:", error);
+            // Don't fail the client - log-set is fire-and-forget
+            return new Response(
+                JSON.stringify({ ok: true, pr_check: false }),
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        console.log(`[log-set] Inserted: ${exercise} ${weightLbs}x${reps} for user ${userId}`);
+
+        return new Response(
+            JSON.stringify({ ok: true, pr_check: true }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    } catch (error) {
+        console.error("[log-set] Error:", error);
+        return new Response(
+            JSON.stringify({ ok: true, pr_check: false }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
 });

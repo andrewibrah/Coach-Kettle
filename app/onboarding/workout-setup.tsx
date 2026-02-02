@@ -112,7 +112,8 @@ export default function WorkoutSetupScreen() {
               lift.sets ? parseInt(lift.sets, 10) : 3,
               lift.reps ? parseInt(lift.reps, 10) : 10,
               undefined, // No weight during onboarding
-              undefined  // No notes
+              undefined, // No notes
+              i          // display_order
             );
             
             if (!result) {

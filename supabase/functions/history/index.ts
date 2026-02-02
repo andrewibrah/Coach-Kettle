@@ -30,10 +30,17 @@ interface WorkoutSession {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const supabaseJwtSecret = Deno.env.get("SUPABASE_JWT_SECRET") ?? "";
 
 if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase env vars");
+}
+
+function createServiceClient(): SupabaseClient {
+    return createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { persistSession: false },
+    });
 }
 
 // JWKS endpoint for ES256 JWT verification (Supabase Auth v2)
@@ -168,7 +175,9 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
             created_at: new Date().toISOString(),
         }));
 
-        const { error: logError } = await supabase
+        // Use service role client to bypass RLS for workout_log insert
+        const serviceClient = createServiceClient();
+        const { error: logError } = await serviceClient
             .from('workout_log')
             .insert(workoutLogRows);
 

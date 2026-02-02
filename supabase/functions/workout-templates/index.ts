@@ -178,7 +178,7 @@ serve(async (req) => {
             }
 
             if (action === "add_item") {
-                const { template_id, lift_name, target_sets, target_reps, target_weight, notes } = body;
+                const { template_id, lift_name, target_sets, target_reps, target_weight, notes, display_order } = body;
                 const { data, error } = await supabase
                     .from("workout_template_items")
                     .insert({
@@ -189,6 +189,7 @@ serve(async (req) => {
                         target_reps: target_reps ?? null,
                         target_weight: target_weight ?? null,
                         notes: notes ?? null,
+                        display_order: display_order ?? 0,
                     })
                     .select()
                     .single();

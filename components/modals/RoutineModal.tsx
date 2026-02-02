@@ -1,5 +1,4 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   deleteWorkoutTemplate,
