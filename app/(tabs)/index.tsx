@@ -16,6 +16,10 @@ import { useRouter } from "expo-router";
 import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 
+import { useAuth } from "@/components/AuthProvider";
+import { usePRCelebration } from "@/contexts/PRCelebrationContext";
+import { supabase } from "@/lib/supabase";
+
 import { CoachModal } from "@/components/modals/CoachModal";
 import { EditSetModal } from "@/components/modals/EditSetModal";
 import { MenuModal } from "@/components/modals/MenuModal";
@@ -119,6 +123,56 @@ export default function HomeScreen() {
       if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     };
   }, []);
+
+  // Subscribe to PR breakthrough notifications
+  const { session } = useAuth();
+  const { showCelebration } = usePRCelebration();
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    console.log('[PR] Setting up Realtime subscription for PR breakthroughs...');
+
+    const channel = supabase
+      .channel('pr_breakthroughs')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'pr_history',
+          filter: `user_id=eq.${userId}`,
+        },
+        async (payload) => {
+          console.log('[PR] New PR detected!', payload.new);
+          const prData = payload.new as any;
+
+          // Show celebration
+          showCelebration({
+            liftName: prData.lift_name,
+            weight: prData.weight_lbs,
+            reps: prData.reps,
+            estimatedOneRepMax: prData.estimated_1rm,
+            previousOneRepMax: prData.previous_1rm,
+            improvementPercentage: prData.improvement_pct,
+          });
+
+          // Haptic feedback
+          if (Platform.OS === 'ios') {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[PR] Realtime subscription status:', status);
+      });
+
+    return () => {
+      console.log('[PR] Cleaning up Realtime subscription');
+      channel.unsubscribe();
+    };
+  }, [session?.user?.id, showCelebration]);
 
   const openCoach = () => {
     commitPendingAndGet();

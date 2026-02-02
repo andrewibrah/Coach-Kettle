@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { E1RMInfoTooltip } from '@/components/ui/E1RMInfoTooltip';
 import { useAuth } from '@/components/AuthProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -29,6 +30,7 @@ import {
   addTrackedLift,
   removeTrackedLift,
   toggleTrackedLift,
+  setPRLift,
 } from '@/lib/profile';
 
 export default function PRTrackingScreen() {
@@ -51,6 +53,13 @@ export default function PRTrackingScreen() {
   const [loading, setLoading] = useState(true);
   const [newLiftName, setNewLiftName] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
+  const [addStep, setAddStep] = useState<'name' | 'values'>('name');
+  const [prWeight, setPrWeight] = useState('');
+  const [prReps, setPrReps] = useState('');
+  const [calculatedE1rm, setCalculatedE1rm] = useState<number | null>(null);
+  const [editingPRId, setEditingPRId] = useState<string | null>(null);
+  const [editWeight, setEditWeight] = useState('');
+  const [editReps, setEditReps] = useState('');
 
   const loadData = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -168,6 +177,81 @@ export default function PRTrackingScreen() {
     );
   };
 
+  const updateE1rmPreview = (weight: string, reps: string) => {
+    const w = parseFloat(weight);
+    const r = parseInt(reps, 10);
+    if (w > 0 && r > 0) {
+      const e1rm = w * (1 + r / 30);
+      setCalculatedE1rm(e1rm);
+    } else {
+      setCalculatedE1rm(null);
+    }
+  };
+
+  const handleSkipPRValues = async () => {
+    await handleAddLift(); // Add without PR
+    resetAddForm();
+  };
+
+  const handleAddWithPR = async () => {
+    if (!session?.user?.id) return;
+
+    await handleAddLift(); // Add tracked lift first
+
+    // Then set PR if values provided
+    if (prWeight && prReps) {
+      const weight = parseFloat(prWeight);
+      const reps = parseInt(prReps, 10);
+      if (weight > 0 && reps > 0) {
+        try {
+          await setPRLift(session.user.id, newLiftName.trim(), weight, reps);
+          await loadData();
+        } catch (error) {
+          console.error('Error setting PR:', error);
+          Alert.alert('Error', 'Failed to set PR value');
+        }
+      }
+    }
+
+    resetAddForm();
+  };
+
+  const resetAddForm = () => {
+    setShowAddInput(false);
+    setNewLiftName('');
+    setPrWeight('');
+    setPrReps('');
+    setCalculatedE1rm(null);
+    setAddStep('name');
+  };
+
+  const handleSaveEdit = async (lift: PRTrackedLift) => {
+    const weight = parseFloat(editWeight);
+    const reps = parseInt(editReps, 10);
+
+    if (!session?.user?.id || weight <= 0 || reps <= 0) {
+      Alert.alert('Invalid Input', 'Please enter valid weight and reps');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await setPRLift(session.user.id, lift.lift_name, weight, reps);
+      await loadData();
+      setEditingPRId(null);
+      setEditWeight('');
+      setEditReps('');
+
+      // Haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('Error updating PR:', error);
+      Alert.alert('Error', 'Failed to update PR');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top + 20, backgroundColor }]}>
@@ -229,14 +313,17 @@ export default function PRTrackingScreen() {
                 <View style={styles.historyStats}>
                   <View style={styles.historyStat}>
                     <ThemedText style={styles.historyValue}>
-                      {record.weight_lbs} x {record.reps}
+                      {record.weight_lbs} × {record.reps}
                     </ThemedText>
-                    <ThemedText style={styles.historyLabel}>Weight x Reps</ThemedText>
+                    <ThemedText style={styles.historyLabel}>Weight × Reps</ThemedText>
                   </View>
                   <View style={styles.historyStat}>
-                    <ThemedText style={styles.historyValue}>
-                      {record.estimated_1rm.toFixed(0)} lbs
-                    </ThemedText>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <ThemedText style={styles.historyValue}>
+                        {record.estimated_1rm.toFixed(0)} lbs
+                      </ThemedText>
+                      <E1RMInfoTooltip />
+                    </View>
                     <ThemedText style={styles.historyLabel}>Est. 1RM</ThemedText>
                   </View>
                 </View>
@@ -276,36 +363,100 @@ export default function PRTrackingScreen() {
             exiting={FadeOut}
             style={[styles.addInputContainer, { backgroundColor: cardBg }]}
           >
-            <TextInput
-              style={[
-                styles.addInput,
-                { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
-              ]}
-              value={newLiftName}
-              onChangeText={setNewLiftName}
-              placeholder="Enter lift name..."
-              placeholderTextColor={isDark ? '#666' : '#999'}
-              autoFocus
-              onSubmitEditing={handleAddLift}
-            />
-            <View style={styles.addInputButtons}>
-              <Pressable
-                style={styles.cancelButton}
-                onPress={() => {
-                  setShowAddInput(false);
-                  setNewLiftName('');
-                }}
-              >
-                <ThemedText>Cancel</ThemedText>
-              </Pressable>
-              <Pressable
-                style={[styles.confirmButton, { backgroundColor: activeColor }]}
-                onPress={handleAddLift}
-                disabled={!newLiftName.trim()}
-              >
-                <ThemedText style={styles.confirmButtonText}>Add</ThemedText>
-              </Pressable>
-            </View>
+            {addStep === 'name' ? (
+              <>
+                <TextInput
+                  style={[
+                    styles.addInput,
+                    { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                  ]}
+                  value={newLiftName}
+                  onChangeText={setNewLiftName}
+                  placeholder="Enter lift name (e.g., Bench Press)"
+                  placeholderTextColor={isDark ? '#666' : '#999'}
+                  autoFocus
+                  onSubmitEditing={() => {
+                    if (newLiftName.trim()) setAddStep('values');
+                  }}
+                />
+                <View style={styles.addInputButtons}>
+                  <Pressable
+                    style={styles.cancelButton}
+                    onPress={resetAddForm}
+                  >
+                    <ThemedText>Cancel</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.confirmButton,
+                      { backgroundColor: activeColor },
+                      !newLiftName.trim() && styles.disabledButton,
+                    ]}
+                    onPress={() => {
+                      if (newLiftName.trim()) setAddStep('values');
+                    }}
+                    disabled={!newLiftName.trim()}
+                  >
+                    <ThemedText style={styles.confirmButtonText}>Continue</ThemedText>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <ThemedText style={styles.stepLabel}>
+                  Set initial PR for "{newLiftName}" (optional)
+                </ThemedText>
+                <View style={styles.prInputRow}>
+                  <TextInput
+                    style={[
+                      styles.prInput,
+                      { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                    ]}
+                    placeholder="Weight (lbs)"
+                    placeholderTextColor={isDark ? '#666' : '#999'}
+                    keyboardType="decimal-pad"
+                    value={prWeight}
+                    onChangeText={(text) => {
+                      setPrWeight(text);
+                      updateE1rmPreview(text, prReps);
+                    }}
+                  />
+                  <ThemedText style={styles.multiplier}>×</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.prInput,
+                      { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                    ]}
+                    placeholder="Reps"
+                    placeholderTextColor={isDark ? '#666' : '#999'}
+                    keyboardType="numeric"
+                    value={prReps}
+                    onChangeText={(text) => {
+                      setPrReps(text);
+                      updateE1rmPreview(prWeight, text);
+                    }}
+                  />
+                </View>
+                {calculatedE1rm !== null && (
+                  <View style={[styles.e1rmPreview, { backgroundColor: activeColor + '20' }]}>
+                    <ThemedText style={[styles.e1rmPreviewText, { color: activeColor }]}>
+                      Est. 1RM: {calculatedE1rm.toFixed(1)} lbs
+                    </ThemedText>
+                  </View>
+                )}
+                <View style={styles.addInputButtons}>
+                  <Pressable style={styles.cancelButton} onPress={handleSkipPRValues}>
+                    <ThemedText>Skip</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.confirmButton, { backgroundColor: activeColor }]}
+                    onPress={handleAddWithPR}
+                  >
+                    <ThemedText style={styles.confirmButtonText}>Add Lift</ThemedText>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </Animated.View>
         )}
 
@@ -334,48 +485,119 @@ export default function PRTrackingScreen() {
                     !lift.is_active && styles.liftCardInactive,
                   ]}
                 >
-                  <Pressable
-                    style={styles.liftCardContent}
-                    onPress={() => handleViewHistory(lift.lift_name)}
-                  >
-                    <View style={styles.liftInfo}>
-                      <ThemedText
-                        style={[styles.liftName, !lift.is_active && styles.liftNameInactive]}
-                      >
-                        {lift.lift_name}
-                      </ThemedText>
-                      {pr ? (
-                        <View style={styles.prInfo}>
-                          <ThemedText style={styles.prValue}>
-                            {pr.weight_lbs} lbs x {pr.reps}
-                          </ThemedText>
-                          <ThemedText style={styles.prE1rm}>
-                            E1RM: {pr.estimated_1rm.toFixed(0)} lbs
-                          </ThemedText>
+                  {editingPRId === lift.id ? (
+                    <View style={styles.liftCardContent}>
+                      <View style={styles.liftInfo}>
+                        <ThemedText style={styles.liftName}>{lift.lift_name}</ThemedText>
+                        <View style={styles.prInputRow}>
+                          <TextInput
+                            style={[
+                              styles.prInput,
+                              { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                            ]}
+                            value={editWeight}
+                            onChangeText={setEditWeight}
+                            keyboardType="decimal-pad"
+                            placeholder="Weight"
+                            placeholderTextColor={isDark ? '#666' : '#999'}
+                          />
+                          <ThemedText style={styles.multiplier}>×</ThemedText>
+                          <TextInput
+                            style={[
+                              styles.prInput,
+                              { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                            ]}
+                            value={editReps}
+                            onChangeText={setEditReps}
+                            keyboardType="numeric"
+                            placeholder="Reps"
+                            placeholderTextColor={isDark ? '#666' : '#999'}
+                          />
                         </View>
-                      ) : (
-                        <ThemedText style={styles.noPR}>No PR recorded</ThemedText>
-                      )}
+                        <View style={styles.editButtonRow}>
+                          <Pressable
+                            style={styles.cancelButton}
+                            onPress={() => {
+                              setEditingPRId(null);
+                              setEditWeight('');
+                              setEditReps('');
+                            }}
+                          >
+                            <ThemedText>Cancel</ThemedText>
+                          </Pressable>
+                          <Pressable
+                            style={[styles.confirmButton, { backgroundColor: activeColor }]}
+                            onPress={() => handleSaveEdit(lift)}
+                          >
+                            <ThemedText style={styles.confirmButtonText}>Save</ThemedText>
+                          </Pressable>
+                        </View>
+                      </View>
                     </View>
-                    <View style={styles.liftActions}>
-                      <Pressable
-                        style={styles.actionButton}
-                        onPress={() => handleToggleLift(lift)}
-                      >
-                        <IconSymbol
-                          name={lift.is_active ? 'eye.fill' : 'eye.slash.fill'}
-                          size={20}
-                          color={lift.is_active ? activeColor : sectionTitleColor}
-                        />
-                      </Pressable>
-                      <Pressable
-                        style={styles.actionButton}
-                        onPress={() => handleRemoveLift(lift)}
-                      >
-                        <IconSymbol name="trash" size={20} color="#FF3B30" />
-                      </Pressable>
-                    </View>
-                  </Pressable>
+                  ) : (
+                    <Pressable
+                      style={styles.liftCardContent}
+                      onPress={() => handleViewHistory(lift.lift_name)}
+                    >
+                      <View style={styles.liftInfo}>
+                        <ThemedText
+                          style={[styles.liftName, !lift.is_active && styles.liftNameInactive]}
+                        >
+                          {lift.lift_name}
+                        </ThemedText>
+                        {pr ? (
+                          <View style={styles.prInfoContainer}>
+                            <View style={styles.prInfo}>
+                              <ThemedText style={styles.prValue}>
+                                {pr.weight_lbs} lbs × {pr.reps}
+                              </ThemedText>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <ThemedText style={styles.prE1rm}>
+                                  E1RM: {pr.estimated_1rm.toFixed(0)} lbs
+                                </ThemedText>
+                                <E1RMInfoTooltip />
+                              </View>
+                            </View>
+                            <ThemedText style={styles.prDate}>
+                              Set on {new Date(pr.achieved_at).toLocaleDateString()}
+                            </ThemedText>
+                          </View>
+                        ) : (
+                          <ThemedText style={styles.noPR}>No PR recorded</ThemedText>
+                        )}
+                      </View>
+                      <View style={styles.liftActions}>
+                        {pr && (
+                          <Pressable
+                            style={styles.actionButton}
+                            onPress={() => {
+                              setEditingPRId(lift.id);
+                              setEditWeight(pr.weight_lbs.toString());
+                              setEditReps(pr.reps.toString());
+                            }}
+                          >
+                            <IconSymbol name="pencil" size={20} color={activeColor} />
+                          </Pressable>
+                        )}
+                        <Pressable
+                          style={styles.actionButton}
+                          onPress={() => handleToggleLift(lift)}
+                        >
+                          <IconSymbol
+                            name={lift.is_active ? 'eye.fill' : 'eye.slash.fill'}
+                            size={20}
+                            color={lift.is_active ? activeColor : sectionTitleColor}
+                          />
+                        </Pressable>
+                        <Pressable
+                          style={styles.actionButton}
+                          onPress={() => handleRemoveLift(lift)}
+                        >
+                          <IconSymbol name="trash" size={20} color="#FF3B30" />
+                        </Pressable>
+                      </View>
+                    </Pressable>
+                  )}
                 </Animated.View>
               );
             })
@@ -392,9 +614,12 @@ export default function PRTrackingScreen() {
               {prLifts.map((pr) => (
                 <View key={pr.id} style={styles.summaryRow}>
                   <ThemedText style={styles.summaryLift}>{pr.lift_name}</ThemedText>
-                  <ThemedText style={styles.summaryValue}>
-                    {pr.estimated_1rm.toFixed(0)} lbs E1RM
-                  </ThemedText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <ThemedText style={styles.summaryValue}>
+                      {pr.estimated_1rm.toFixed(0)} lbs E1RM
+                    </ThemedText>
+                    <E1RMInfoTooltip />
+                  </View>
                 </View>
               ))}
             </View>
@@ -516,9 +741,13 @@ const styles = StyleSheet.create({
   liftNameInactive: {
     opacity: 0.6,
   },
+  prInfoContainer: {
+    gap: 4,
+  },
   prInfo: {
     flexDirection: 'row',
     gap: 12,
+    flexWrap: 'wrap',
   },
   prValue: {
     fontSize: 14,
@@ -527,6 +756,11 @@ const styles = StyleSheet.create({
   prE1rm: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  prDate: {
+    fontSize: 12,
+    opacity: 0.5,
+    marginTop: 2,
   },
   noPR: {
     fontSize: 14,
@@ -613,5 +847,44 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.7,
+  },
+  stepLabel: {
+    fontSize: 14,
+    marginBottom: 12,
+    opacity: 0.7,
+  },
+  prInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  prInput: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    fontSize: 16,
+  },
+  multiplier: {
+    fontSize: 20,
+    opacity: 0.5,
+  },
+  e1rmPreview: {
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  e1rmPreviewText: {
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  disabledButton: {
+    opacity: 0.3,
+  },
+  editButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 8,
   },
 });

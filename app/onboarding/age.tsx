@@ -106,7 +106,7 @@ export default function AgeScreen() {
               setError('');
             }}
             placeholder="25"
-            keyboardType="number-pad"
+            keyboardType="numeric"
             maxLength={3}
             error={error}
           />

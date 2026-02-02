@@ -136,7 +136,7 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
     const rows = Array.isArray(session.rows) ? session.rows : [];
     const rowsJson = JSON.stringify(rows);
 
-    const { error } = await supabase
+    const { data, error } = await supabase
         .from("workouts")
         .upsert({
             id: session.id,
@@ -145,11 +145,39 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
             createdAt: session.createdAt,
             rows_json: rowsJson,
             user_id: userId,
-        }, { onConflict: "id" });
+        }, { onConflict: "id" })
+        .select()
+        .single();
 
     if (error) {
         console.error("[history] Database error:", error);
         return respondJson({ error: "Database error" }, 500);
+    }
+
+    // Insert rows into workout_log for PR detection trigger
+    if (data && rows.length > 0) {
+        const workoutLogRows = rows.map((row: WorkoutRow, index: number) => ({
+            workout_id: data.id,
+            workout_date: data.dateISO,
+            user_id: userId,
+            exercise: row.exercise,
+            set_number: index + 1,
+            weight_lbs: row.weightLbs || '0',
+            reps: row.reps || '0',
+            notes: row.notes || null,
+            created_at: new Date().toISOString(),
+        }));
+
+        const { error: logError } = await supabase
+            .from('workout_log')
+            .insert(workoutLogRows);
+
+        if (logError) {
+            console.error('[history] Error inserting workout_log (PR detection may not trigger):', logError);
+            // Don't fail the entire request - workout is already saved
+        } else {
+            console.log(`[history] Inserted ${workoutLogRows.length} rows into workout_log for PR detection`);
+        }
     }
 
     return respondJson({ ok: true });
