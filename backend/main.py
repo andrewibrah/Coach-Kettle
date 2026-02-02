@@ -1,27 +1,37 @@
+import logging
 import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
 # Allow your mobile app to call this API (simple dev setup)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # dev only
-    allow_credentials=True,
+    allow_origins=["*"],  # dev only — restrict in production
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# OpenAI client reads OPENAI_API_KEY from environment
-client = OpenAI()
+# Lazily initialised so module import doesn't fail without the key
+_openai_client: OpenAI | None = None
+
+
+def get_openai_client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = OpenAI()
+    return _openai_client
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=2000)
 
 
 @app.get("/health")
@@ -48,7 +58,7 @@ Rules:
 """
 
     try:
-        resp = client.responses.create(
+        resp = get_openai_client().responses.create(
             model="gpt-4o-mini",
             input=[
                 {
@@ -65,6 +75,7 @@ Rules:
         return {"reply": resp.output_text}
 
     except Exception:
+        logger.exception("OpenAI request failed")
         raise HTTPException(status_code=500, detail="OpenAI request failed")
 
 
