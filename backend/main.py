@@ -63,9 +63,16 @@ def health():
     return {"ok": True}
 
 
+def _get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @app.post("/chat")
 def chat(req: ChatRequest, request: Request):
-    _check_rate_limit(request.client.host if request.client else "unknown", "chat")
+    _check_rate_limit(_get_client_ip(request), "chat")
 
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not set on the server")

@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   AppState,
   Button,
   KeyboardAvoidingView,
@@ -17,6 +18,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { api } from "@/lib/api";
 
 type BodyPart =
   | "Chest"
@@ -75,6 +77,11 @@ export default function HomeScreen() {
   const [weightInput, setWeightInput] = useState<string>("");
   const [repsInput, setRepsInput] = useState<string>("");
   const [notesInput, setNotesInput] = useState<string>("");
+
+  // AI chat mode
+  const [chatMode, setChatMode] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
 
   // Body part picker
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -148,6 +155,58 @@ export default function HomeScreen() {
 
     // Scroll to bottom so the new row is visible.
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+  };
+
+  const deleteRow = (id: string) => {
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleDone = () => {
+    if (rows.length === 0) return;
+    // TODO: persist to Supabase once connected
+    Alert.alert(
+      "Workout Complete",
+      `${rows.length} sets logged. Save to history?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Save & Clear",
+          onPress: () => {
+            // TODO: write rows + session to Supabase here
+            setRows([]);
+            setBodyParts([]);
+            setExerciseInput("");
+            setWeightInput("");
+            setRepsInput("");
+            setNotesInput("");
+          },
+        },
+      ]
+    );
+  };
+
+  const sendChat = async () => {
+    const msg = chatInput.trim();
+    if (!msg || chatLoading) return;
+
+    if (msg.toLowerCase() === "done") {
+      handleDone();
+      setChatInput("");
+      return;
+    }
+
+    setChatLoading(true);
+    try {
+      const { reply } = await api.chat(msg);
+      // The AI returns structured text — for now show it as an alert.
+      // TODO: parse reply into LogRow[] and append to rows automatically.
+      Alert.alert("Coach Kettle", reply);
+    } catch {
+      Alert.alert("Error", "Could not reach AI. Check your connection.");
+    } finally {
+      setChatLoading(false);
+      setChatInput("");
+    }
   };
 
   const themed = useMemo(
@@ -287,8 +346,14 @@ export default function HomeScreen() {
             </View>
           ) : (
             rows.map((r, idx) => (
-              <View
+              <Pressable
                 key={r.id}
+                onLongPress={() =>
+                  Alert.alert("Delete Set", `Remove ${r.exercise} set ${r.set}?`, [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", style: "destructive", onPress: () => deleteRow(r.id) },
+                  ])
+                }
                 style={[themed.row, idx % 2 === 0 ? themed.evenRow : themed.oddRow]}
               >
                 <ThemedText style={[styles.cell, styles.exerciseCol]}>{r.exercise}</ThemedText>
@@ -296,7 +361,7 @@ export default function HomeScreen() {
                 <ThemedText style={[styles.cell, styles.weightCol]}>{r.weightLbs || "\u2014"}</ThemedText>
                 <ThemedText style={[styles.cell, styles.repsCol]}>{r.reps || "\u2014"}</ThemedText>
                 <ThemedText style={[styles.cell, styles.notesCol]}>{r.notes || ""}</ThemedText>
-              </View>
+              </Pressable>
             ))
           )}
         </ScrollView>
@@ -304,51 +369,85 @@ export default function HomeScreen() {
 
       {/* Input row */}
       <View style={styles.inputWrap}>
-        <View style={styles.inputGrid}>
-          <TextInput
-            value={exerciseInput}
-            onChangeText={setExerciseInput}
-            placeholder="Exercise"
-            placeholderTextColor={colors.icon}
-            style={[themed.input, styles.exerciseInput]}
-            returnKeyType="next"
-          />
-          <TextInput
-            value={weightInput}
-            onChangeText={setWeightInput}
-            placeholder="Weight"
-            placeholderTextColor={colors.icon}
-            style={[themed.input, styles.smallInput]}
-            keyboardType={Platform.select({ ios: "numbers-and-punctuation", android: "numeric" })}
-            returnKeyType="next"
-          />
-          <TextInput
-            value={repsInput}
-            onChangeText={setRepsInput}
-            placeholder="Reps"
-            placeholderTextColor={colors.icon}
-            style={[themed.input, styles.smallInput]}
-            keyboardType={Platform.select({ ios: "numbers-and-punctuation", android: "numeric" })}
-            returnKeyType="next"
-          />
-          <TextInput
-            value={notesInput}
-            onChangeText={setNotesInput}
-            placeholder="Notes"
-            placeholderTextColor={colors.icon}
-            style={[themed.input, styles.notesInput]}
-            returnKeyType="done"
-            onSubmitEditing={addRow}
-          />
+        <View style={styles.modeToggleRow}>
+          <Pressable onPress={() => setChatMode(false)}>
+            <ThemedText style={[styles.modeToggle, !chatMode && styles.modeToggleActive]}>
+              Fields
+            </ThemedText>
+          </Pressable>
+          <Pressable onPress={() => setChatMode(true)}>
+            <ThemedText style={[styles.modeToggle, chatMode && styles.modeToggleActive]}>
+              AI Chat
+            </ThemedText>
+          </Pressable>
         </View>
 
-        <View style={styles.actionsRow}>
-          <Button title="Add" onPress={addRow} />
-          <Button title="Clear" onPress={() => setRows([])} />
-        </View>
+        {chatMode ? (
+          <View style={styles.chatRow}>
+            <TextInput
+              value={chatInput}
+              onChangeText={setChatInput}
+              placeholder={chatLoading ? "Thinking..." : 'e.g. "bench 185 10" or "done"'}
+              placeholderTextColor={colors.icon}
+              style={[themed.input, styles.chatInput]}
+              editable={!chatLoading}
+              returnKeyType="send"
+              onSubmitEditing={sendChat}
+            />
+            <Button title={chatLoading ? "..." : "Send"} onPress={sendChat} disabled={chatLoading} />
+          </View>
+        ) : (
+          <>
+            <View style={styles.inputGrid}>
+              <TextInput
+                value={exerciseInput}
+                onChangeText={setExerciseInput}
+                placeholder="Exercise"
+                placeholderTextColor={colors.icon}
+                style={[themed.input, styles.exerciseInput]}
+                returnKeyType="next"
+              />
+              <TextInput
+                value={weightInput}
+                onChangeText={setWeightInput}
+                placeholder="Weight"
+                placeholderTextColor={colors.icon}
+                style={[themed.input, styles.smallInput]}
+                keyboardType={Platform.select({ ios: "numbers-and-punctuation", android: "numeric" })}
+                returnKeyType="next"
+              />
+              <TextInput
+                value={repsInput}
+                onChangeText={setRepsInput}
+                placeholder="Reps"
+                placeholderTextColor={colors.icon}
+                style={[themed.input, styles.smallInput]}
+                keyboardType={Platform.select({ ios: "numbers-and-punctuation", android: "numeric" })}
+                returnKeyType="next"
+              />
+              <TextInput
+                value={notesInput}
+                onChangeText={setNotesInput}
+                placeholder="Notes"
+                placeholderTextColor={colors.icon}
+                style={[themed.input, styles.notesInput]}
+                returnKeyType="done"
+                onSubmitEditing={addRow}
+              />
+            </View>
+
+            <View style={styles.actionsRow}>
+              <Button title="Add" onPress={addRow} />
+              {rows.length > 0 && <Button title="Done" onPress={handleDone} />}
+              <Button title="Clear" onPress={() => setRows([])} />
+            </View>
+          </>
+        )}
 
         <ThemedText style={styles.hint}>
-          {`Tip: keep Exercise filled, then just punch Weight/Reps for fast set logging.`}
+          {chatMode
+            ? 'Type naturally: "squat 225 5" or "done" to finish.'
+            : "Tip: keep Exercise filled, then punch Weight/Reps for fast sets.\nLong-press a row to delete it."}
         </ThemedText>
       </View>
 
@@ -497,6 +596,31 @@ const styles = StyleSheet.create({
   },
   hint: {
     opacity: 0.7,
+  },
+  modeToggleRow: {
+    flexDirection: "row",
+    gap: 16,
+    justifyContent: "center",
+  },
+  modeToggle: {
+    fontSize: 14,
+    opacity: 0.5,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  modeToggleActive: {
+    opacity: 1,
+    fontWeight: "600",
+    borderBottomWidth: 2,
+    borderBottomColor: "#0a7ea4",
+  },
+  chatRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  chatInput: {
+    flex: 1,
   },
 
   modalBackdrop: {
