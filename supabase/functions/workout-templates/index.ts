@@ -183,6 +183,7 @@ serve(async (req) => {
                     .from("workout_template_items")
                     .insert({
                         template_id,
+                        user_id: userId,
                         lift_name,
                         target_sets,
                         target_reps,
@@ -212,7 +213,8 @@ serve(async (req) => {
                 const { error } = await supabase
                     .from("workout_template_items")
                     .delete()
-                    .eq("id", item_id);
+                    .eq("id", item_id)
+                    .eq("user_id", userId);
 
                 if (error) {
                     console.error("[workout-templates] Error removing item:", error);

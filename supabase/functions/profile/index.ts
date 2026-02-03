@@ -13,8 +13,11 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+console.log("[profile] Init - URL:", supabaseUrl);
+// Log presence and length, but NOT the key itself for security
+console.log("[profile] Init - Service Key Present:", !!supabaseServiceKey, "Length:", supabaseServiceKey ? supabaseServiceKey.length : 0);
+
 // Create a single service role client for the function
-// We use this for both auth verification and database operations
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
         autoRefreshToken: false,
@@ -25,21 +28,28 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 async function verifyAuth(req: Request): Promise<string> {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+        console.error("[profile] Missing Authorization header");
         throw new Error("Missing Authorization header");
     }
 
     const token = authHeader.replace("Bearer ", "");
+    console.log("[profile] Verifying token (length):", token.length);
 
     // Use the admin client to verify the user token
-    // This is the most reliable method as it checks directly with Supabase Auth
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
 
-    if (error || !user) {
-        console.error("[profile] Auth verification failed:", error);
-        throw new Error("Unauthorized");
+    if (error) {
+        console.error("[profile] Auth verification ERROR details:", JSON.stringify(error));
+        throw new Error(`Unauthorized: ${error.message} (Token len: ${token.length}, start: ${token.substring(0, 10)}...)`);
     }
 
-    return user.id;
+    if (!data.user) {
+        console.error("[profile] Auth verification: No user returned (and no error?)");
+        throw new Error("Unauthorized: No user found");
+    }
+
+    console.log("[profile] User verified successfully:", data.user.id);
+    return data.user.id;
 }
 
 serve(async (req) => {
@@ -53,9 +63,10 @@ serve(async (req) => {
     try {
         userId = await verifyAuth(req);
     } catch (e) {
-        console.error("[profile] Verification error:", e);
+        // Log the full error to help debug
+        console.error("[profile] Verification exception:", e);
         return new Response(
-            JSON.stringify({ error: "Unauthorized" }),
+            JSON.stringify({ error: "Unauthorized", details: String(e) }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

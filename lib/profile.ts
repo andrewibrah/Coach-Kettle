@@ -78,20 +78,74 @@ export interface WorkoutTemplateItem {
   created_at: string;
 }
 
-// Get auth headers for API calls
+// Get auth headers for API calls - with robust token refresh
 async function getAuthHeaders(): Promise<HeadersInit> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  // Try to get current session
+  let { data: { session }, error } = await supabase.auth.getSession();
 
-  if (!token) {
-    console.warn('[Profile] No auth token available - session may not be loaded yet');
+  // If no session or error, try to refresh
+  if (!session || error) {
+    console.log('[Profile] No session or error, attempting refresh...');
+    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+    if (refreshError || !refreshedSession) {
+      console.error('[Profile] Session refresh failed:', refreshError);
+      throw new Error('Not authenticated - please sign in');
+    }
+    session = refreshedSession;
+  }
+
+  // Check if token expires soon (within 5 minutes) - proactive refresh
+  if (session.expires_at) {
+    const expiresAt = session.expires_at * 1000;
+    const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
+
+    if (expiresAt < fiveMinutesFromNow) {
+      console.log('[Profile] Token expires soon, refreshing proactively...');
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (!refreshError && refreshedSession) {
+        session = refreshedSession;
+      }
+    }
+  }
+
+  if (!session?.access_token) {
+    console.error('[Profile] No access token available after refresh attempts');
+    throw new Error('Not authenticated - please sign in');
   }
 
   return {
-    'Authorization': token ? `Bearer ${token}` : '',
+    'Authorization': `Bearer ${session.access_token}`,
     'apikey': supabaseAnonKey,
     'Content-Type': 'application/json',
   };
+}
+
+// Helper to handle 401 retries for profile API calls
+async function fetchWithAuth(url: string, options: RequestInit, retries = 1): Promise<Response> {
+  const headers = await getAuthHeaders();
+
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...headers, ...options.headers },
+  });
+
+  // If 401 and we have retries left, try refreshing the session
+  if (res.status === 401 && retries > 0) {
+    console.log(`[Profile] Got 401 from ${url}, refreshing session and retrying...`);
+    const { data, error } = await supabase.auth.refreshSession();
+
+    if (error || !data.session) {
+      console.error('[Profile] Session refresh failed:', error);
+      return res;
+    }
+
+    console.log('[Profile] Session refreshed, retrying request...');
+    return fetchWithAuth(url, options, retries - 1);
+  }
+
+  return res;
 }
 
 // Cache profile locally
@@ -128,14 +182,13 @@ export async function clearCachedProfile(): Promise<void> {
 // Fetch user profile via Edge Function
 export async function fetchProfile(userId: string): Promise<UserProfile | null> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/profile?action=fetch`, {
+    const response = await fetchWithAuth(`${API_BASE}/profile?action=fetch`, {
       method: 'GET',
-      headers,
     });
 
     if (!response.ok) {
-      console.error('[Profile] Error fetching profile:', response.status);
+      const errorText = await response.text();
+      console.error('[Profile] Error fetching profile:', response.status, errorText);
       return getCachedProfile();
     }
 
@@ -153,10 +206,8 @@ export async function fetchProfile(userId: string): Promise<UserProfile | null> 
 // Create profile for user via Edge Function
 export async function createProfile(userId: string): Promise<string | null> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/profile`, {
+    const response = await fetchWithAuth(`${API_BASE}/profile`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'create' }),
     });
 
@@ -194,10 +245,8 @@ export async function updateProfile(
   console.log('[Profile] Updating profile for user:', userId, 'with updates:', updates);
 
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/profile`, {
+    const response = await fetchWithAuth(`${API_BASE}/profile`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'update', updates }),
     });
 
@@ -222,10 +271,8 @@ export async function updateProfile(
 // Complete onboarding via Edge Function
 export async function completeOnboarding(userId: string): Promise<boolean> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/profile`, {
+    const response = await fetchWithAuth(`${API_BASE}/profile`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'complete_onboarding' }),
     });
 
@@ -244,10 +291,8 @@ export async function completeOnboarding(userId: string): Promise<boolean> {
 // Update onboarding step via Edge Function
 export async function updateOnboardingStep(userId: string, step: number): Promise<boolean> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/profile`, {
+    const response = await fetchWithAuth(`${API_BASE}/profile`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'update_step', step }),
     });
 
@@ -266,10 +311,8 @@ export async function updateOnboardingStep(userId: string, step: number): Promis
 // Refresh AI context via Edge Function
 export async function refreshAIContext(userId: string): Promise<boolean> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/profile`, {
+    const response = await fetchWithAuth(`${API_BASE}/profile`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'refresh_ai_context' }),
     });
 
@@ -290,10 +333,8 @@ export async function refreshAIContext(userId: string): Promise<boolean> {
 // Fetch tracked lifts via Edge Function
 export async function fetchTrackedLifts(userId: string): Promise<PRTrackedLift[]> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/pr-tracking?action=tracked_lifts`, {
+    const response = await fetchWithAuth(`${API_BASE}/pr-tracking?action=tracked_lifts`, {
       method: 'GET',
-      headers,
     });
 
     if (!response.ok) {
@@ -312,10 +353,8 @@ export async function fetchTrackedLifts(userId: string): Promise<PRTrackedLift[]
 // Add tracked lift via Edge Function
 export async function addTrackedLift(userId: string, liftName: string): Promise<PRTrackedLift | null> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/pr-tracking`, {
+    const response = await fetchWithAuth(`${API_BASE}/pr-tracking`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'add_tracked', lift_name: liftName }),
     });
 
@@ -335,10 +374,8 @@ export async function addTrackedLift(userId: string, liftName: string): Promise<
 // Remove tracked lift via Edge Function
 export async function removeTrackedLift(liftId: string): Promise<boolean> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/pr-tracking`, {
+    const response = await fetchWithAuth(`${API_BASE}/pr-tracking`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'remove_tracked', lift_id: liftId }),
     });
 
@@ -357,10 +394,8 @@ export async function removeTrackedLift(liftId: string): Promise<boolean> {
 // Toggle tracked lift via Edge Function
 export async function toggleTrackedLift(liftId: string, isActive: boolean): Promise<boolean> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/pr-tracking`, {
+    const response = await fetchWithAuth(`${API_BASE}/pr-tracking`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'toggle_tracked', lift_id: liftId, is_active: isActive }),
     });
 
@@ -379,10 +414,8 @@ export async function toggleTrackedLift(liftId: string, isActive: boolean): Prom
 // Fetch PR lifts via Edge Function
 export async function fetchPRLifts(userId: string): Promise<PRLift[]> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/pr-tracking?action=pr_lifts`, {
+    const response = await fetchWithAuth(`${API_BASE}/pr-tracking?action=pr_lifts`, {
       method: 'GET',
-      headers,
     });
 
     if (!response.ok) {
@@ -406,10 +439,8 @@ export async function setPRLift(
   reps: number
 ): Promise<PRLift | null> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/pr-tracking`, {
+    const response = await fetchWithAuth(`${API_BASE}/pr-tracking`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({
         action: 'set_pr',
         lift_name: liftName,
@@ -434,15 +465,13 @@ export async function setPRLift(
 // Fetch PR history via Edge Function
 export async function fetchPRHistory(userId: string, liftName?: string): Promise<PRHistory[]> {
   try {
-    const headers = await getAuthHeaders();
     let url = `${API_BASE}/pr-tracking?action=pr_history`;
     if (liftName) {
       url += `&lift_name=${encodeURIComponent(liftName)}`;
     }
 
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
-      headers,
     });
 
     if (!response.ok) {
@@ -463,10 +492,8 @@ export async function fetchPRHistory(userId: string, liftName?: string): Promise
 // Fetch workout templates via Edge Function
 export async function fetchWorkoutTemplates(userId: string): Promise<WorkoutTemplate[]> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/workout-templates?action=list`, {
+    const response = await fetchWithAuth(`${API_BASE}/workout-templates?action=list`, {
       method: 'GET',
-      headers,
     });
 
     if (!response.ok) {
@@ -489,10 +516,8 @@ export async function createWorkoutTemplate(
   description?: string
 ): Promise<WorkoutTemplate | null> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/workout-templates`, {
+    const response = await fetchWithAuth(`${API_BASE}/workout-templates`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'create', name, description }),
     });
 
@@ -512,10 +537,8 @@ export async function createWorkoutTemplate(
 // Delete workout template via Edge Function
 export async function deleteWorkoutTemplate(templateId: string): Promise<boolean> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/workout-templates`, {
+    const response = await fetchWithAuth(`${API_BASE}/workout-templates`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'delete', template_id: templateId }),
     });
 
@@ -534,12 +557,10 @@ export async function deleteWorkoutTemplate(templateId: string): Promise<boolean
 // Fetch template items via Edge Function
 export async function fetchTemplateItems(templateId: string): Promise<WorkoutTemplateItem[]> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(
+    const response = await fetchWithAuth(
       `${API_BASE}/workout-templates?action=items&template_id=${encodeURIComponent(templateId)}`,
       {
         method: 'GET',
-        headers,
       }
     );
 
@@ -568,10 +589,8 @@ export async function addTemplateItem(
   displayOrder?: number
 ): Promise<WorkoutTemplateItem | null> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/workout-templates`, {
+    const response = await fetchWithAuth(`${API_BASE}/workout-templates`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({
         action: 'add_item',
         template_id: templateId,
@@ -585,7 +604,8 @@ export async function addTemplateItem(
     });
 
     if (!response.ok) {
-      console.error('[Profile] Error adding template item:', response.status);
+      const errorText = await response.text();
+      console.error('[Profile] Error adding template item:', response.status, errorText);
       return null;
     }
 
@@ -600,10 +620,8 @@ export async function addTemplateItem(
 // Remove template item via Edge Function
 export async function removeTemplateItem(itemId: string): Promise<boolean> {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/workout-templates`, {
+    const response = await fetchWithAuth(`${API_BASE}/workout-templates`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ action: 'remove_item', item_id: itemId }),
     });
 

@@ -3,7 +3,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -13,36 +12,45 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
 
-interface JWTPayload {
-    sub: string;
-    [key: string]: unknown;
-}
+// Create a single service role client for the function
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+});
 
 async function verifyAuth(req: Request): Promise<string> {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+        console.error("[pr-tracking] Missing Authorization header");
         throw new Error("Missing Authorization header");
     }
 
     const token = authHeader.replace("Bearer ", "");
-    try {
-        const { payload } = await jwtVerify(token, JWKS, {
-            issuer: `${supabaseUrl}/auth/v1`,
-            audience: "authenticated",
-        });
-        return (payload as JWTPayload).sub;
-    } catch (error) {
-        console.error("[pr-tracking] JWT verification failed:", error);
-        throw new Error("Unauthorized");
+    if (!token) {
+        console.error("[pr-tracking] Empty token received");
+        throw new Error("Missing authentication token");
     }
-}
 
-function createSupabaseClient() {
-    return createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { persistSession: false },
-    });
+    console.log("[pr-tracking] Verifying token (length):", token.length);
+
+    // Use the admin client to verify the user token
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error) {
+        console.error("[pr-tracking] Auth verification ERROR:", JSON.stringify(error));
+        throw new Error("Unauthorized: " + error.message);
+    }
+
+    if (!data.user) {
+        console.error("[pr-tracking] Auth verification: No user returned");
+        throw new Error("Unauthorized: No user found");
+    }
+
+    console.log("[pr-tracking] User verified successfully:", data.user.id);
+    return data.user.id;
 }
 
 serve(async (req) => {
@@ -56,13 +64,14 @@ serve(async (req) => {
     try {
         userId = await verifyAuth(req);
     } catch (e) {
+        console.error("[pr-tracking] Verification exception:", e);
         return new Response(
-            JSON.stringify({ error: "Unauthorized" }),
+            JSON.stringify({ error: "Unauthorized", details: String(e) }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 
-    const supabase = createSupabaseClient();
+    const supabase = supabaseAdmin;
 
     try {
         if (req.method === "GET") {

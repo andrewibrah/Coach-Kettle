@@ -7,15 +7,13 @@ import {
     Alert,
     TextInput,
     ActivityIndicator,
-    FlatList,
 } from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { useAuth } from '@/components/AuthProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -33,7 +31,6 @@ import {
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 export default function TemplatesScreen() {
-    const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const backgroundColor = useThemeColor({}, 'background');
@@ -200,7 +197,8 @@ export default function TemplatesScreen() {
 
     if (loading) {
         return (
-            <ThemedView style={[styles.container, { paddingTop: insets.top + 20, backgroundColor }]}>
+            <ThemedView style={[styles.container, { backgroundColor }]}>
+                <ScreenHeader title="Templates" />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={activeColor} />
                 </View>
@@ -209,24 +207,18 @@ export default function TemplatesScreen() {
     }
 
     return (
-        <ThemedView style={[styles.container, { paddingTop: insets.top + 20, backgroundColor }]}>
-            <View style={styles.header}>
-                <Pressable
-                    onPress={() => router.back()}
-                    style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}
-                >
-                    <IconSymbol name="chevron.left" size={28} color={textColor} />
-                </Pressable>
-                <ThemedText type="subtitle" style={styles.title}>
-                    Workout Templates
-                </ThemedText>
-                <Pressable
-                    onPress={() => setShowNewForm(true)}
-                    style={({ pressed }) => [styles.addButton, pressed && styles.buttonPressed]}
-                >
-                    <IconSymbol name="plus" size={24} color={activeColor} />
-                </Pressable>
-            </View>
+        <ThemedView style={[styles.container, { backgroundColor }]}>
+            <ScreenHeader
+                title="Templates"
+                rightElement={
+                    <Pressable
+                        onPress={() => setShowNewForm(true)}
+                        style={({ pressed }) => [styles.addButton, pressed && styles.buttonPressed]}
+                    >
+                        <IconSymbol name="plus" size={24} color={activeColor} />
+                    </Pressable>
+                }
+            />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 {/* New Template Form */}
@@ -368,9 +360,12 @@ export default function TemplatesScreen() {
                                                                 </View>
                                                                 <Pressable
                                                                     onPress={() => handleRemoveExercise(item.id, template.id)}
-                                                                    style={styles.removeButton}
+                                                                    style={({ pressed }) => [
+                                                                        styles.removeButton,
+                                                                        pressed && styles.buttonPressed,
+                                                                    ]}
                                                                 >
-                                                                    <IconSymbol name="minus.circle.fill" size={20} color="#FF3B30" />
+                                                                    <IconSymbol name="xmark" size={16} color="#FF3B30" />
                                                                 </Pressable>
                                                             </View>
                                                         ))
@@ -474,28 +469,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        marginBottom: 24,
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
     addButton: {
-        width: 44,
-        height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: '700',
+        padding: 8,
     },
     buttonPressed: {
         opacity: 0.7,
@@ -505,7 +480,7 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     section: {
-        marginBottom: 24,
+        marginBottom: 12,
     },
     sectionTitle: {
         fontSize: 14,
@@ -632,7 +607,8 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     removeButton: {
-        padding: 4,
+        padding: 8,
+        marginRight: -4,
     },
     noExercises: {
         fontSize: 14,
