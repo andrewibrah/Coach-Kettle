@@ -140,7 +140,7 @@ export default function AuthCallback() {
   return (
     <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <ActivityIndicator size="large" />
-      <ThemedText style={{ marginTop: 16 }}>Verifying...</ThemedText>
+      <ThemedText style={{ marginTop: 16 }}>{status}</ThemedText>
     </ThemedView>
   );
 }

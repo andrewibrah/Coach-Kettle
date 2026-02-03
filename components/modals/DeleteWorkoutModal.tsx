@@ -2,7 +2,6 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { BlurView } from "expo-blur";
 import React from "react";
 import { Modal, Pressable, StyleSheet, Text, View, useColorScheme } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
     visible: boolean;
@@ -11,7 +10,6 @@ type Props = {
 };
 
 export function DeleteWorkoutModal({ visible, onClose, onConfirm }: Props) {
-    const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const cardBg = useThemeColor({}, 'cardBackground');
@@ -19,7 +17,6 @@ export function DeleteWorkoutModal({ visible, onClose, onConfirm }: Props) {
     const secondaryText = useThemeColor({}, 'placeholder');
     const buttonBg = useThemeColor({}, 'inputBackground');
     const danger = useThemeColor({}, 'danger');
-    const buttonText = useThemeColor({}, 'text');
 
     return (
         <Modal

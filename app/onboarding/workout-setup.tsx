@@ -180,7 +180,7 @@ export default function WorkoutSetupScreen() {
               style={[styles.choiceButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
               onPress={handleYes}
             >
-              <ThemedText style={styles.choiceButtonText}>Yes, let's set them up</ThemedText>
+              <ThemedText style={styles.choiceButtonText}>Yes, let&apos;s set them up</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity

@@ -96,7 +96,6 @@ export default function WorkoutDetail() {
   const isDark = colorScheme === 'dark';
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
-  const iconColor = useThemeColor({}, 'icon');
   const cardColor = isDark ? '#1C1C1E' : '#F9FAFB';
   const secondaryTextColor = isDark ? '#9CA3AF' : '#6B7280';
 

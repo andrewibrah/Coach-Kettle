@@ -16,8 +16,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
-  useColorScheme
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -43,8 +42,6 @@ export function CoachModal({
   onClose,
 }: Props) {
   const disabled = loading || !question.trim();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'border');
@@ -135,7 +132,7 @@ export function CoachModal({
             try {
               await clearAllChatHistory();
               setHistory([]);
-            } catch (err) {
+            } catch {
               Alert.alert("Error", "Failed to clear chat history.");
             }
           }

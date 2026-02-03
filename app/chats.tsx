@@ -15,7 +15,6 @@ export default function ChatsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeColor({}, 'background');
-  const textColor = useThemeColor({}, 'text');
   const iconColor = useThemeColor({}, 'text');
   const placeholder = useThemeColor({}, 'placeholder');
   const { session } = useAuth();

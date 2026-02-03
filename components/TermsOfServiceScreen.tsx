@@ -74,7 +74,7 @@ export function TermsOfServiceScreen() {
 
                     <ThemedText type="defaultSemiBold">4. Liability</ThemedText>
                     <ThemedText style={styles.paragraph}>
-                        WorkoutTracker is provide "as is". Use at your own risk. Consult a physician before starting any exercise program.
+                        WorkoutTracker is provided &quot;as is&quot;. Use at your own risk. Consult a physician before starting any exercise program.
                     </ThemedText>
 
                     <ThemedText type="defaultSemiBold">5. Updates to Terms</ThemedText>

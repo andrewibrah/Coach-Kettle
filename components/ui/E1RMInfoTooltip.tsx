@@ -40,7 +40,7 @@ export function E1RMInfoTooltip({ style }: E1RMInfoTooltipProps) {
 
             <ThemedText style={styles.body}>
               Estimated 1RM uses the proven Epley formula to predict your one-rep max.
-              It's most accurate with moderate rep ranges (5-10 reps).
+              It&apos;s most accurate with moderate rep ranges (5-10 reps).
               {'\n\n'}
               Single-rep maxes are exact, while higher reps (12+) provide useful estimates
               of your strength progression.

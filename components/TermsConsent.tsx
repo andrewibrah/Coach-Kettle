@@ -38,7 +38,6 @@ export function TermsConsent({ accepted, onAcceptedChange }: TermsConsentProps) 
   const [viewingDoc, setViewingDoc] = useState<LegalDoc>(null);
 
   const primaryColor = useThemeColor({}, 'tint');
-  const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'border');
 
   const handleCheckboxPress = () => {
@@ -169,8 +168,6 @@ function LegalDocumentModal({ visible, document, onClose }: LegalDocumentModalPr
  * Handles: # headings, ## subheadings, **bold**, • bullets
  */
 function MarkdownText({ content }: { content: string }) {
-  const textColor = useThemeColor({}, 'text');
-
   const lines = content.split('\n');
 
   return (

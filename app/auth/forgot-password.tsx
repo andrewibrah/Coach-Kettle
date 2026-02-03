@@ -53,7 +53,7 @@ export default function ForgotPassword() {
           <Ionicons name="mail-outline" size={64} color={primaryColor} />
           <ThemedText type="title" style={styles.successTitle}>Check Your Email</ThemedText>
           <ThemedText style={styles.successText}>
-            We've sent a password reset link to {email}. Please check your inbox and follow the instructions.
+            We&apos;ve sent a password reset link to {email}. Please check your inbox and follow the instructions.
           </ThemedText>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: primaryColor }]}
@@ -78,7 +78,7 @@ export default function ForgotPassword() {
           <View style={styles.header}>
             <ThemedText type="title" style={styles.title}>Reset Password</ThemedText>
             <ThemedText style={styles.subtitle}>
-              Enter your email and we'll send you a link to reset your password
+              Enter your email and we&apos;ll send you a link to reset your password
             </ThemedText>
           </View>
 

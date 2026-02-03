@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
+import { supabaseUrl } from './supabase';
+import { fetchWithAuth } from './auth';
 
 const PROFILE_CACHE_KEY = 'cached_profile';
 const API_BASE = `${supabaseUrl}/functions/v1`;
@@ -76,76 +77,6 @@ export interface WorkoutTemplateItem {
   display_order: number;
   notes: string | null;
   created_at: string;
-}
-
-// Get auth headers for API calls - with robust token refresh
-async function getAuthHeaders(): Promise<HeadersInit> {
-  // Try to get current session
-  let { data: { session }, error } = await supabase.auth.getSession();
-
-  // If no session or error, try to refresh
-  if (!session || error) {
-    console.log('[Profile] No session or error, attempting refresh...');
-    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-
-    if (refreshError || !refreshedSession) {
-      console.error('[Profile] Session refresh failed:', refreshError);
-      throw new Error('Not authenticated - please sign in');
-    }
-    session = refreshedSession;
-  }
-
-  // Check if token expires soon (within 5 minutes) - proactive refresh
-  if (session.expires_at) {
-    const expiresAt = session.expires_at * 1000;
-    const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
-
-    if (expiresAt < fiveMinutesFromNow) {
-      console.log('[Profile] Token expires soon, refreshing proactively...');
-      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-
-      if (!refreshError && refreshedSession) {
-        session = refreshedSession;
-      }
-    }
-  }
-
-  if (!session?.access_token) {
-    console.error('[Profile] No access token available after refresh attempts');
-    throw new Error('Not authenticated - please sign in');
-  }
-
-  return {
-    'Authorization': `Bearer ${session.access_token}`,
-    'apikey': supabaseAnonKey,
-    'Content-Type': 'application/json',
-  };
-}
-
-// Helper to handle 401 retries for profile API calls
-async function fetchWithAuth(url: string, options: RequestInit, retries = 1): Promise<Response> {
-  const headers = await getAuthHeaders();
-
-  const res = await fetch(url, {
-    ...options,
-    headers: { ...headers, ...options.headers },
-  });
-
-  // If 401 and we have retries left, try refreshing the session
-  if (res.status === 401 && retries > 0) {
-    console.log(`[Profile] Got 401 from ${url}, refreshing session and retrying...`);
-    const { data, error } = await supabase.auth.refreshSession();
-
-    if (error || !data.session) {
-      console.error('[Profile] Session refresh failed:', error);
-      return res;
-    }
-
-    console.log('[Profile] Session refreshed, retrying request...');
-    return fetchWithAuth(url, options, retries - 1);
-  }
-
-  return res;
 }
 
 // Cache profile locally

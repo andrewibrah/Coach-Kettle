@@ -29,7 +29,6 @@ export function WorkoutCard({
 }: Props) {
     const isSyncing = row.status === 'syncing';
     const inputRef = useRef<TextInput>(null);
-    const textColor = useThemeColor({}, 'text');
     const cardBg = useThemeColor({}, 'cardBackground');
     const borderColor = useThemeColor({}, 'border');
 

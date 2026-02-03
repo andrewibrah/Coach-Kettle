@@ -404,7 +404,7 @@ export default function PRTrackingScreen() {
             ) : (
               <>
                 <ThemedText style={styles.stepLabel}>
-                  Set initial PR for "{newLiftName}" (optional)
+                  Set initial PR for &quot;{newLiftName}&quot; (optional)
                 </ThemedText>
                 <View style={styles.prInputRow}>
                   <TextInput

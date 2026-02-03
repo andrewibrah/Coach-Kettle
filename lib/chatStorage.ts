@@ -1,5 +1,6 @@
 // Chat History Storage - Supabase integration with user-scoped data
-import { supabase } from './supabase';
+import { supabaseUrl } from './supabase';
+import { getJsonAuthHeaders } from './auth';
 
 export type ChatRole = 'user' | 'assistant';
 export type ChatSource = 'workout_chat' | 'coach_modal';
@@ -19,27 +20,14 @@ export interface ChatsByDate {
     messages: ChatMessage[];
 }
 
-const SUPABASE_FUNCTION_URL = 'https://vjfteiuxsdqdozhljxhd.supabase.co/functions/v1';
-
-async function getAuthHeaders(): Promise<HeadersInit> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-        throw new Error('Not authenticated');
-    }
-    return {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-    };
-}
+const API_BASE = `${supabaseUrl}/functions/v1`;
 
 /**
  * Sanitize content to prevent XSS and limit length
  */
 function sanitizeContent(content: string): string {
-    // Limit length to prevent abuse
     const maxLength = 5000;
     const trimmed = content.slice(0, maxLength);
-    // Basic sanitization - remove control characters
     return trimmed.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }
 
@@ -47,15 +35,14 @@ function sanitizeContent(content: string): string {
  * Save chat messages to Supabase
  */
 export async function saveChatMessages(messages: Omit<ChatMessage, 'id' | 'user_id'>[]): Promise<void> {
-    // Validate and sanitize messages
     const sanitizedMessages = messages.map(msg => ({
         ...msg,
         content: sanitizeContent(msg.content),
     }));
 
-    const headers = await getAuthHeaders();
+    const headers = await getJsonAuthHeaders();
 
-    const response = await fetch(`${SUPABASE_FUNCTION_URL}/chat-history`, {
+    const response = await fetch(`${API_BASE}/chat-history`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ messages: sanitizedMessages }),
@@ -71,9 +58,9 @@ export async function saveChatMessages(messages: Omit<ChatMessage, 'id' | 'user_
  * Fetch chat history for the current user
  */
 export async function fetchChatHistory(source?: ChatSource): Promise<ChatMessage[]> {
-    const headers = await getAuthHeaders();
+    const headers = await getJsonAuthHeaders();
 
-    let url = `${SUPABASE_FUNCTION_URL}/chat-history`;
+    let url = `${API_BASE}/chat-history`;
     if (source) {
         url += `?source=${source}`;
     }
@@ -85,7 +72,6 @@ export async function fetchChatHistory(source?: ChatSource): Promise<ChatMessage
 
     if (!response.ok) {
         const text = await response.text();
-        console.error(`[fetchChatHistory] Failed: ${response.status} ${text}`);
         let errorMessage = `Failed to fetch chat history (${response.status})`;
         try {
             const json = JSON.parse(text);
@@ -103,9 +89,9 @@ export async function fetchChatHistory(source?: ChatSource): Promise<ChatMessage
  * Delete a chat message
  */
 export async function deleteChatMessage(chatId: string): Promise<void> {
-    const headers = await getAuthHeaders();
+    const headers = await getJsonAuthHeaders();
 
-    const response = await fetch(`${SUPABASE_FUNCTION_URL}/chat-history?id=${chatId}`, {
+    const response = await fetch(`${API_BASE}/chat-history?id=${chatId}`, {
         method: 'DELETE',
         headers,
     });
@@ -120,9 +106,9 @@ export async function deleteChatMessage(chatId: string): Promise<void> {
  * Clear all chat history for the current user
  */
 export async function clearAllChatHistory(): Promise<void> {
-    const headers = await getAuthHeaders();
+    const headers = await getJsonAuthHeaders();
 
-    const response = await fetch(`${SUPABASE_FUNCTION_URL}/chat-history?clear_all=true`, {
+    const response = await fetch(`${API_BASE}/chat-history?clear_all=true`, {
         method: 'DELETE',
         headers,
     });
@@ -150,14 +136,12 @@ export function groupChatsByDate(messages: ChatMessage[]): ChatsByDate[] {
         groups.get(date)!.push(msg);
     }
 
-    // Convert to array and sort by date ascending (oldest first)
     const result: ChatsByDate[] = [];
     const sortedDates = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b));
 
     for (const date of sortedDates) {
-        const messages = groups.get(date)!;
-        // Sort messages within each day by time (oldest first for chat flow)
-        messages.sort((a, b) => {
+        const dateMessages = groups.get(date)!;
+        dateMessages.sort((a, b) => {
             const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
             const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
             return timeA - timeB;
@@ -166,7 +150,7 @@ export function groupChatsByDate(messages: ChatMessage[]): ChatsByDate[] {
         result.push({
             date,
             displayDate: formatDisplayDate(date),
-            messages,
+            messages: dateMessages,
         });
     }
 

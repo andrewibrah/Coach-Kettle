@@ -38,7 +38,6 @@ export function WorkoutBottomBar({
 }: Props) {
   const colorScheme = useColorScheme();
   const textColor = useThemeColor({}, 'text');
-  const backgroundColor = useThemeColor({}, 'background');
   const isDark = colorScheme === 'dark';
 
   const disabledSend = !workoutActive || loading || !messageInput.trim();

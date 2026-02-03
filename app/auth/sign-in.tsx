@@ -31,7 +31,6 @@ export default function SignIn() {
   const router = useRouter();
 
   const primaryColor = useThemeColor({}, 'tint');
-  const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
 
   // Helper: Complete auth and navigate based on terms acceptance

@@ -53,8 +53,8 @@ export default function HistoryScreen() {
       // newest first
       const sorted = [...data].sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
       setItems(sorted);
-    } catch (e) {
-      // alert?
+    } catch {
+      // silently fail
     }
   };
 
@@ -69,8 +69,8 @@ export default function HistoryScreen() {
     try {
       await api.deleteWorkout(selectedId);
       await load();
-    } catch (e) {
-      // alert?
+    } catch {
+      // silently fail
     } finally {
       setDeleteModalVisible(false);
       setSelectedId(null);

@@ -167,7 +167,6 @@ function ConfettiPiece({ index }: ConfettiPieceProps) {
   const scale = useSharedValue(1);
 
   const startX = Math.random() * SCREEN_WIDTH;
-  const endX = startX + (Math.random() * 200 - 100);
   const duration = 2000 + Math.random() * 1000;
 
   useEffect(() => {

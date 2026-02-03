@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useColorScheme,
   useWindowDimensions,
   View
 } from "react-native";
@@ -48,11 +47,9 @@ export default function HomeScreen() {
   const router = useRouter();
 
 
-  const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
   const compact = width < 380;
   const backgroundColor = useThemeColor({}, 'background');
-  const iconColor = useThemeColor({}, 'text');
 
   const scrollRef = useRef<ScrollView | null>(null);
 
@@ -62,7 +59,7 @@ export default function HomeScreen() {
   const [undoState, setUndoState] = useState<{ row: LogRow; index: number } | null>(null);
   const [messageInput, setMessageInput] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<{ message: string; reason?: string } | null>(null);
+  const [, setError] = useState<{ message: string; reason?: string } | null>(null);
   const [aiBubbleText, setAiBubbleText] = useState<string | null>(null);
 
   const [coachOpen, setCoachOpen] = useState(false);
@@ -714,7 +711,6 @@ export default function HomeScreen() {
 
     // Capture state
     const rowsToSave = [...committedRows];
-    const previousRows = [...rows];
 
     // Build stored rows
     const storedRows = rowsToSave.map((row) => ({
@@ -1000,7 +996,7 @@ export default function HomeScreen() {
           setRows((prev) => prev.filter((r) => r.id !== ghostId).concat(newRows));
           requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
         }
-      } catch (e) {
+      } catch {
         setRows((prev) => prev.filter((r) => r.id !== ghostId));
         // Error occurred but continue silently - parsing logic intact
       } finally {
