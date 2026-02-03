@@ -3,7 +3,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -13,12 +12,14 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
 
-interface JWTPayload {
-    sub: string;
-    [key: string]: unknown;
-}
+// Create a single service role client for the function
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+});
 
 async function verifyAuth(req: Request): Promise<string> {
     const authHeader = req.headers.get("Authorization");
@@ -27,55 +28,52 @@ async function verifyAuth(req: Request): Promise<string> {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    try {
-        const { payload } = await jwtVerify(token, JWKS, {
-            issuer: `${supabaseUrl}/auth/v1`,
-            audience: "authenticated",
-        });
-        return (payload as JWTPayload).sub;
-    } catch (error) {
-        console.error("[workout-templates] JWT verification failed:", error);
+
+    // Use the admin client to verify the user token
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !user) {
+        console.error("[workout-templates] Auth verification failed:", error);
         throw new Error("Unauthorized");
     }
-}
 
-function createSupabaseClient() {
-    return createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { persistSession: false },
-    });
+    return user.id;
 }
 
 serve(async (req) => {
-    console.log("[workout-templates] Function started");
-
+    // Handle CORS preflight
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
 
+    // Verify auth and get user ID
     let userId: string;
     try {
         userId = await verifyAuth(req);
     } catch (e) {
+        console.error("[workout-templates] Auth failed:", e);
         return new Response(
             JSON.stringify({ error: "Unauthorized" }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 
-    const supabase = createSupabaseClient();
+    // Use the admin client for database operations (RLS bypass enabled by service key)
+    // We filter by user_id manually in queries to ensure safety
+    const supabase = supabaseAdmin;
 
     try {
         if (req.method === "GET") {
             const url = new URL(req.url);
             const action = url.searchParams.get("action");
+            console.log("[workout-templates] GET action:", action);
 
             if (action === "list") {
                 const { data, error } = await supabase
                     .from("workout_templates")
                     .select("*")
                     .eq("user_id", userId)
-                    .eq("is_active", true)
-                    .order("display_order", { ascending: true });
+                    .order("created_at", { ascending: false });
 
                 if (error) {
                     console.error("[workout-templates] Error fetching templates:", error);
@@ -95,7 +93,7 @@ serve(async (req) => {
                 const templateId = url.searchParams.get("template_id");
                 if (!templateId) {
                     return new Response(
-                        JSON.stringify({ error: "template_id is required" }),
+                        JSON.stringify({ error: "template_id required" }),
                         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -129,6 +127,7 @@ serve(async (req) => {
         if (req.method === "POST") {
             const body = await req.json();
             const { action } = body;
+            console.log("[workout-templates] POST action:", action);
 
             if (action === "create") {
                 const { name, description } = body;
@@ -137,7 +136,7 @@ serve(async (req) => {
                     .insert({
                         user_id: userId,
                         name,
-                        description: description || null,
+                        description,
                     })
                     .select()
                     .single();
@@ -160,8 +159,9 @@ serve(async (req) => {
                 const { template_id } = body;
                 const { error } = await supabase
                     .from("workout_templates")
-                    .update({ is_active: false })
-                    .eq("id", template_id);
+                    .delete()
+                    .eq("id", template_id)
+                    .eq("user_id", userId);
 
                 if (error) {
                     console.error("[workout-templates] Error deleting template:", error);
@@ -182,14 +182,13 @@ serve(async (req) => {
                 const { data, error } = await supabase
                     .from("workout_template_items")
                     .insert({
-                        user_id: userId,
                         template_id,
                         lift_name,
-                        target_sets: target_sets ?? null,
-                        target_reps: target_reps ?? null,
-                        target_weight: target_weight ?? null,
-                        notes: notes ?? null,
-                        display_order: display_order ?? 0,
+                        target_sets,
+                        target_reps,
+                        target_weight,
+                        notes,
+                        display_order,
                     })
                     .select()
                     .single();

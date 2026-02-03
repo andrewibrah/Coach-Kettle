@@ -66,9 +66,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    // Clear all local caches before signing out
-    await clearAllCaches();
-    await supabase.auth.signOut();
+    console.log('[AuthProvider] signOut called');
+    try {
+      // Try to clear caches but don't let it block signOut
+      await clearAllCaches();
+    } catch (e) {
+      console.warn('[AuthProvider] Cache clearing failed, continuing with signOut:', e);
+    }
+
+    try {
+      await supabase.auth.signOut();
+      console.log('[AuthProvider] signOut completed');
+    } catch (e) {
+      console.error('[AuthProvider] signOut error:', e);
+      // Force clear session state even if Supabase signOut fails
+      setSession(null);
+    }
   };
 
   return (

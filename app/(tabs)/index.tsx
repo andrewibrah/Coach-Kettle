@@ -280,11 +280,11 @@ export default function HomeScreen() {
   const handleSelectTemplateForStart = (template: WorkoutTemplate, items: WorkoutTemplateItem[]) => {
     setNameModalVisible(false);
     startWorkoutSession([template.name]);
-    
+
     // Expand template items into skeleton rows
     const skeletonRows = expandTemplateToRows(items);
     setRows(skeletonRows);
-    
+
     setMessageInput("");
     setError(null);
     setEditingCell(null);
@@ -303,10 +303,10 @@ export default function HomeScreen() {
   // Import routine into current workout (or start new one if not active)
   const handleImportRoutine = (template: WorkoutTemplate, items: WorkoutTemplateItem[]) => {
     setRoutineModalVisible(false);
-    
+
     // Expand template items into skeleton rows
     const skeletonRows = expandTemplateToRows(items);
-    
+
     if (!workoutActive) {
       // Start workout with template name
       startWorkoutSession([template.name]);
@@ -804,7 +804,7 @@ export default function HomeScreen() {
     // Don't set loading yet, as we try fast parse synchronously
 
     // Local synchronous parse - pass currentRows for routine-aware parsing
-    const gateDecision = decideAndParse(message, { 
+    const gateDecision = decideAndParse(message, {
       lastExercise: getLastExerciseFromRows(currentRows),
       currentRows: currentRows.map(r => ({
         id: r.id,
@@ -829,7 +829,7 @@ export default function HomeScreen() {
         return next;
       });
       setMessageInput("");
-      
+
       // Sync the filled row to backend for PR tracking
       const filledRow = rows[targetRowIndex];
       if (filledRow) {
@@ -858,55 +858,55 @@ export default function HomeScreen() {
         // Parsing failed but continue silently - parsing logic intact
         return;
       }
-        const addOrFillRow = (rowData: ParsedRow, setOverride?: number) => {
-          const normalizedExercise = rowData.exercise.trim().toLowerCase();
-          for (let i = next.length - 1; i >= 0; i -= 1) {
-            const candidate = next[i];
-            if (!candidate?.exercise) continue;
-            if (candidate.exercise.trim().toLowerCase() !== normalizedExercise) continue;
+      const addOrFillRow = (rowData: ParsedRow, setOverride?: number) => {
+        const normalizedExercise = rowData.exercise.trim().toLowerCase();
+        for (let i = next.length - 1; i >= 0; i -= 1) {
+          const candidate = next[i];
+          if (!candidate?.exercise) continue;
+          if (candidate.exercise.trim().toLowerCase() !== normalizedExercise) continue;
 
-            const missingWeight = !candidate.weightLbs;
-            const missingReps = !candidate.reps;
-            const missingNotes = !candidate.notes;
-            const canFillWeight = missingWeight && !!rowData.weightLbs;
-            const canFillReps = missingReps && !!rowData.reps;
-            const canFillNotes = missingNotes && !!rowData.notes;
+          const missingWeight = !candidate.weightLbs;
+          const missingReps = !candidate.reps;
+          const missingNotes = !candidate.notes;
+          const canFillWeight = missingWeight && !!rowData.weightLbs;
+          const canFillReps = missingReps && !!rowData.reps;
+          const canFillNotes = missingNotes && !!rowData.notes;
 
-            if (canFillWeight || canFillReps || canFillNotes) {
-              const updated = { ...candidate };
-              if (canFillWeight) updated.weightLbs = rowData.weightLbs;
-              if (canFillReps) updated.reps = rowData.reps;
-              if (canFillNotes) updated.notes = rowData.notes;
-              next[i] = updated;
-              return;
-            }
-
-            break;
+          if (canFillWeight || canFillReps || canFillNotes) {
+            const updated = { ...candidate };
+            if (canFillWeight) updated.weightLbs = rowData.weightLbs;
+            if (canFillReps) updated.reps = rowData.reps;
+            if (canFillNotes) updated.notes = rowData.notes;
+            next[i] = updated;
+            return;
           }
 
-          const setVal =
-            typeof setOverride === "number"
-              ? setOverride
-              : rowData.kind === "warmup"
-                ? 0
-                : nextSetNumberForExercise(next, rowData.exercise);
+          break;
+        }
 
-          next = [
-            ...next,
-            {
-              id: makeId(),
-              exercise: rowData.exercise,
-              set: setVal,
-              weightLbs: rowData.weightLbs,
-              reps: rowData.reps,
-              notes: rowData.notes,
-              timestamp: Date.now(),
-              status: "committed",
-            },
-          ];
-        };
+        const setVal =
+          typeof setOverride === "number"
+            ? setOverride
+            : rowData.kind === "warmup"
+              ? 0
+              : nextSetNumberForExercise(next, rowData.exercise);
 
-          parsedRows.forEach((row) => addOrFillRow(row));
+        next = [
+          ...next,
+          {
+            id: makeId(),
+            exercise: rowData.exercise,
+            set: setVal,
+            weightLbs: rowData.weightLbs,
+            reps: rowData.reps,
+            notes: rowData.notes,
+            timestamp: Date.now(),
+            status: "committed",
+          },
+        ];
+      };
+
+      parsedRows.forEach((row) => addOrFillRow(row));
       setRows(next);
       setMessageInput("");
       setLoading(false);
@@ -1095,6 +1095,7 @@ export default function HomeScreen() {
           onNavigateHistory={() => router.push("/history")}
           onNavigateChats={() => router.push("/chats")}
           onNavigateSettings={() => router.push("/settings")}
+          onNavigateTemplates={() => router.push("/settings/templates")}
           onOpenCoach={openCoach}
         />
 

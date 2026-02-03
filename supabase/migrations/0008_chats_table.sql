@@ -13,3 +13,4 @@ create table if not exists public.chats (
 create index if not exists idx_chats_created_at on public.chats ("createdAt" desc);
 create index if not exists idx_chats_source on public.chats (source);
 
+

@@ -3,7 +3,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -13,12 +12,15 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
 
-interface JWTPayload {
-    sub: string;
-    [key: string]: unknown;
-}
+// Create a single service role client for the function
+// We use this for both auth verification and database operations
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+});
 
 async function verifyAuth(req: Request): Promise<string> {
     const authHeader = req.headers.get("Authorization");
@@ -27,27 +29,20 @@ async function verifyAuth(req: Request): Promise<string> {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    try {
-        const { payload } = await jwtVerify(token, JWKS, {
-            issuer: `${supabaseUrl}/auth/v1`,
-            audience: "authenticated",
-        });
-        return (payload as JWTPayload).sub;
-    } catch (error) {
-        console.error("[profile] JWT verification failed:", error);
+
+    // Use the admin client to verify the user token
+    // This is the most reliable method as it checks directly with Supabase Auth
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !user) {
+        console.error("[profile] Auth verification failed:", error);
         throw new Error("Unauthorized");
     }
-}
 
-function createSupabaseClient() {
-    return createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { persistSession: false },
-    });
+    return user.id;
 }
 
 serve(async (req) => {
-    console.log("[profile] Function started");
-
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
@@ -58,13 +53,16 @@ serve(async (req) => {
     try {
         userId = await verifyAuth(req);
     } catch (e) {
+        console.error("[profile] Verification error:", e);
         return new Response(
             JSON.stringify({ error: "Unauthorized" }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 
-    const supabase = createSupabaseClient();
+    // Use the admin client for database operations (RLS bypass enabled by service key)
+    // We filter by user_id manually in queries to ensure safety
+    const supabase = supabaseAdmin;
 
     try {
         if (req.method === "GET") {

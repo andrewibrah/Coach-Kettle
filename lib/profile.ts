@@ -83,6 +83,10 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
+  if (!token) {
+    console.warn('[Profile] No auth token available - session may not be loaded yet');
+  }
+
   return {
     'Authorization': token ? `Bearer ${token}` : '',
     'apikey': supabaseAnonKey,

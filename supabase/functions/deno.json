@@ -2,14 +2,22 @@
   "compilerOptions": {
     "strict": true,
     "allowJs": true,
-    "lib": ["deno.window"],
+    "lib": [
+      "deno.window"
+    ],
     "jsx": "react-jsx",
     "jsxImportSource": "react"
+  },
+  "imports": {
+    "https://deno.land/std@0.168.0/": "https://deno.land/std@0.168.0/",
+    "https://esm.sh/": "https://esm.sh/"
   },
   "importMap": "./import_map.json",
   "lint": {
     "rules": {
-      "tags": ["recommended"]
+      "tags": [
+        "recommended"
+      ]
     }
   },
   "fmt": {

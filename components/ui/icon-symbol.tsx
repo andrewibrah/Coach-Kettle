@@ -38,6 +38,8 @@ const MAPPING = {
   'eye.fill': 'visibility',
   'eye.slash.fill': 'visibility-off',
   'info.circle': 'info-outline',
+  'doc.text.fill': 'description',
+  'minus.circle.fill': 'remove-circle',
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;

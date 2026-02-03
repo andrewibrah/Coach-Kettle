@@ -10,10 +10,11 @@ type Props = {
     onNavigateHistory: () => void;
     onNavigateChats: () => void;
     onNavigateSettings: () => void;
+    onNavigateTemplates: () => void;
     onOpenCoach: () => void;
 };
 
-export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats, onNavigateSettings, onOpenCoach }: Props) {
+export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats, onNavigateSettings, onNavigateTemplates, onOpenCoach }: Props) {
 
     const colorScheme = useColorScheme();
     const textColor = useThemeColor({}, 'text');
@@ -41,6 +42,13 @@ export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats
                             onPress={() => { onClose(); onNavigateChats(); }}
                         >
                             <Text style={[styles.buttonText, { color: textColor }]}>Chats</Text>
+                        </Pressable>
+
+                        <Pressable
+                            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                            onPress={() => { onClose(); onNavigateTemplates(); }}
+                        >
+                            <Text style={[styles.buttonText, { color: textColor }]}>Templates</Text>
                         </Pressable>
 
                         <Pressable
