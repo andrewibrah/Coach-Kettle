@@ -1,0 +1,139 @@
+{
+  "docs": [
+    {
+      "id": "00-architecture",
+      "title": "Architecture Overview",
+      "file": "00-architecture.md",
+      "keywords": ["architecture", "structure", "overview", "data flow", "provider"],
+      "keyFiles": ["app/_layout.tsx"],
+      "relatedDocs": ["02-providers", "06-api"]
+    },
+    {
+      "id": "01-auth",
+      "title": "Authentication System",
+      "file": "01-auth.md",
+      "keywords": ["auth", "authentication", "login", "session", "jwt", "biometric", "supabase", "oauth"],
+      "keyFiles": ["lib/auth.ts", "lib/authLock.ts", "components/AuthProvider.tsx", "components/AuthLockProvider.tsx", "lib/biometrics.ts"],
+      "relatedDocs": ["02-providers", "06-api"]
+    },
+    {
+      "id": "02-providers",
+      "title": "Provider Hierarchy",
+      "file": "02-providers.md",
+      "keywords": ["provider", "context", "state", "hierarchy", "theme", "auth", "profile"],
+      "keyFiles": ["app/_layout.tsx", "components/ThemeProvider.tsx", "components/AuthProvider.tsx", "contexts/ProfileContext.tsx"],
+      "relatedDocs": ["01-auth", "14-theming"]
+    },
+    {
+      "id": "03-workout-flow",
+      "title": "Workout Logging Flow",
+      "file": "03-workout-flow.md",
+      "keywords": ["workout", "exercise", "set", "rep", "logging", "session", "LogRow"],
+      "keyFiles": ["app/(tabs)/index.tsx", "hooks/useWorkoutSession.ts", "hooks/useRowActions.ts", "components/workout/WorkoutTable.tsx"],
+      "relatedDocs": ["04-parsing", "05-storage", "08-hooks"]
+    },
+    {
+      "id": "04-parsing",
+      "title": "Input Parsing System",
+      "file": "04-parsing.md",
+      "keywords": ["parse", "parsing", "input", "regex", "structuredGate", "NLP", "pattern", "AI"],
+      "keyFiles": ["lib/structuredGate.ts"],
+      "relatedDocs": ["03-workout-flow", "06-api"]
+    },
+    {
+      "id": "05-storage",
+      "title": "Data Storage",
+      "file": "05-storage.md",
+      "keywords": ["storage", "AsyncStorage", "save", "load", "persist", "local", "sync", "cloud"],
+      "keyFiles": ["lib/workoutStorage.ts", "lib/chatStorage.ts"],
+      "relatedDocs": ["03-workout-flow", "06-api"]
+    },
+    {
+      "id": "06-api",
+      "title": "API Layer",
+      "file": "06-api.md",
+      "keywords": ["api", "fetch", "endpoint", "supabase", "edge function", "request", "response"],
+      "keyFiles": ["lib/api.ts", "lib/supabase.ts"],
+      "relatedDocs": ["01-auth", "15-edge-functions"]
+    },
+    {
+      "id": "07-components",
+      "title": "UI Components",
+      "file": "07-components.md",
+      "keywords": ["component", "ui", "button", "text", "view", "header", "themed"],
+      "keyFiles": ["components/ui/Header.tsx", "components/ui/themed-text.tsx", "components/ui/themed-view.tsx"],
+      "relatedDocs": ["14-theming", "09-modals"]
+    },
+    {
+      "id": "08-hooks",
+      "title": "Custom Hooks",
+      "file": "08-hooks.md",
+      "keywords": ["hook", "useWorkoutSession", "useRowActions", "useCoachLogic", "useCellEditing", "useThemeColor"],
+      "keyFiles": ["hooks/useWorkoutSession.ts", "hooks/useRowActions.ts", "hooks/useCoachLogic.ts", "hooks/useCellEditing.ts"],
+      "relatedDocs": ["03-workout-flow", "07-components"]
+    },
+    {
+      "id": "09-modals",
+      "title": "Modal Dialogs",
+      "file": "09-modals.md",
+      "keywords": ["modal", "dialog", "popup", "edit", "coach", "menu", "review"],
+      "keyFiles": ["components/modals/EditSetModal.tsx", "components/modals/CoachModal.tsx", "components/modals/MenuModal.tsx", "components/modals/SessionReviewModal.tsx"],
+      "relatedDocs": ["07-components", "03-workout-flow"]
+    },
+    {
+      "id": "10-onboarding",
+      "title": "User Onboarding",
+      "file": "10-onboarding.md",
+      "keywords": ["onboarding", "quiz", "setup", "welcome", "profile", "new user"],
+      "keyFiles": ["app/onboarding/index.tsx", "components/onboarding/QuizContainer.tsx", "lib/profile.ts"],
+      "relatedDocs": ["02-providers", "11-settings"]
+    },
+    {
+      "id": "11-settings",
+      "title": "Settings Screens",
+      "file": "11-settings.md",
+      "keywords": ["settings", "profile", "preference", "edit", "account"],
+      "keyFiles": ["app/settings/index.tsx", "app/settings/profile.tsx", "app/settings/templates.tsx", "app/settings/pr-tracking.tsx"],
+      "relatedDocs": ["10-onboarding", "12-pr-tracking", "13-templates"]
+    },
+    {
+      "id": "12-pr-tracking",
+      "title": "PR Tracking & Celebration",
+      "file": "12-pr-tracking.md",
+      "keywords": ["pr", "personal record", "celebration", "confetti", "e1rm", "max", "breakthrough"],
+      "keyFiles": ["lib/prTracking.ts", "components/celebration/PRCelebration.tsx", "contexts/PRCelebrationContext.tsx"],
+      "relatedDocs": ["03-workout-flow", "02-providers"]
+    },
+    {
+      "id": "13-templates",
+      "title": "Workout Templates",
+      "file": "13-templates.md",
+      "keywords": ["template", "routine", "preset", "workout plan", "skeleton"],
+      "keyFiles": ["lib/profile.ts", "app/settings/templates.tsx", "components/modals/RoutineModal.tsx"],
+      "relatedDocs": ["03-workout-flow", "11-settings"]
+    },
+    {
+      "id": "14-theming",
+      "title": "Theming System",
+      "file": "14-theming.md",
+      "keywords": ["theme", "color", "dark", "light", "style", "mode"],
+      "keyFiles": ["constants/theme.ts", "hooks/use-theme-color.ts", "components/ThemeProvider.tsx"],
+      "relatedDocs": ["02-providers", "07-components"]
+    },
+    {
+      "id": "15-edge-functions",
+      "title": "Supabase Edge Functions",
+      "file": "15-edge-functions.md",
+      "keywords": ["edge function", "supabase", "serverless", "backend", "deno", "api"],
+      "keyFiles": ["supabase/functions/chat/index.ts", "supabase/functions/history/index.ts", "supabase/functions/parse/index.ts"],
+      "relatedDocs": ["06-api", "01-auth"]
+    }
+  ],
+  "areas": {
+    "auth": ["01-auth", "02-providers"],
+    "workout": ["03-workout-flow", "04-parsing", "05-storage", "08-hooks"],
+    "ui": ["07-components", "09-modals", "14-theming"],
+    "data": ["05-storage", "06-api", "15-edge-functions"],
+    "user": ["10-onboarding", "11-settings", "12-pr-tracking", "13-templates"]
+  }
+}
