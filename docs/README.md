@@ -1,96 +1,121 @@
-# Coach Kettle - Developer Documentation
+# Coach Kettle - Developer Docs
 
-> The anatomy and physiology of the WorkoutTracker app.
-> Find exactly what you need, understand how it works, then go implement.
-
-## Quick Navigation
-
-| I need to work on... | Read this |
-|---------------------|-----------|
-| App architecture & data flow | [00-architecture.md](./00-architecture.md) |
-| Auth, sessions, or login | [01-auth.md](./01-auth.md) |
-| Provider hierarchy or context | [02-providers.md](./02-providers.md) |
-| Main workout logging flow | [03-workout-flow.md](./03-workout-flow.md) |
-| Input parsing (NLP/regex) | [04-parsing.md](./04-parsing.md) |
-| Data storage (local/cloud) | [05-storage.md](./05-storage.md) |
-| API calls & Edge Functions | [06-api.md](./06-api.md) |
-| UI components | [07-components.md](./07-components.md) |
-| Custom hooks | [08-hooks.md](./08-hooks.md) |
-| Modal dialogs | [09-modals.md](./09-modals.md) |
-| User onboarding | [10-onboarding.md](./10-onboarding.md) |
-| Settings screens | [11-settings.md](./11-settings.md) |
-| PR tracking & celebrations | [12-pr-tracking.md](./12-pr-tracking.md) |
-| Workout templates | [13-templates.md](./13-templates.md) |
-| Theming (light/dark) | [14-theming.md](./14-theming.md) |
-| Supabase Edge Functions | [15-edge-functions.md](./15-edge-functions.md) |
+> Find your area → Read the doc → Implement
 
 ---
 
-## Project Overview
+## Doc Index
 
-**Coach Kettle** is an Expo/React Native workout tracking app with Supabase backend. Users log exercises via natural language input (e.g., "Bench 185 x 8") which is parsed locally via regex or via AI for complex input.
-
-**Platforms:** iOS, Android, Web
-
-**Tech Stack:**
-- Frontend: Expo (React Native) with TypeScript
-- Routing: Expo Router (file-based)
-- Backend: Supabase (Auth, Database, Edge Functions, Realtime)
-- Storage: AsyncStorage (local-first) + Supabase (sync)
+| Area | Doc | Key Files |
+|------|-----|-----------|
+| **Architecture** | [00-architecture](./00-architecture.md) | `app/_layout.tsx` |
+| **Auth & Sessions** | [01-auth](./01-auth.md) | `lib/auth.ts`, `lib/authLock.ts`, `components/AuthProvider.tsx` |
+| **Providers** | [02-providers](./02-providers.md) | `components/*Provider.tsx`, `contexts/` |
+| **Workout Flow** | [03-workout-flow](./03-workout-flow.md) | `app/(tabs)/index.tsx`, `hooks/useWorkoutSession.ts` |
+| **Input Parsing** | [04-parsing](./04-parsing.md) | `lib/structuredGate.ts` |
+| **Storage** | [05-storage](./05-storage.md) | `lib/workoutStorage.ts` |
+| **API Layer** | [06-api](./06-api.md) | `lib/api.ts` |
+| **Components** | [07-components](./07-components.md) | `components/ui/`, `components/workout/` |
+| **Hooks** | [08-hooks](./08-hooks.md) | `hooks/` |
+| **Modals** | [09-modals](./09-modals.md) | `components/modals/` |
+| **Onboarding** | [10-onboarding](./10-onboarding.md) | `app/onboarding/`, `components/onboarding/` |
+| **Settings** | [11-settings](./11-settings.md) | `app/settings/` |
+| **PR Tracking** | [12-pr-tracking](./12-pr-tracking.md) | `lib/prTracking.ts`, `components/celebration/` |
+| **Templates** | [13-templates](./13-templates.md) | `lib/profile.ts` (template functions) |
+| **Theming** | [14-theming](./14-theming.md) | `constants/theme.ts`, `hooks/use-theme-color.ts` |
+| **Edge Functions** | [15-edge-functions](./15-edge-functions.md) | `supabase/functions/` |
 
 ---
 
-## File Structure At-a-Glance
+## File Structure
 
 ```
 WorkoutTracker/
-├── app/                    # Screens (Expo Router)
-│   ├── (tabs)/            # Main tab screens
-│   ├── auth/              # Auth screens
-│   ├── onboarding/        # Onboarding flow
-│   ├── settings/          # Settings screens
-│   └── history/[id].tsx   # Dynamic routes
-├── components/            # UI Components
-│   ├── ui/               # Generic UI
-│   ├── workout/          # Workout-specific
-│   ├── modals/           # Modal dialogs
-│   └── onboarding/       # Onboarding UI
-├── hooks/                 # Custom React hooks
-├── contexts/              # Context providers
-├── lib/                   # Business logic & utilities
-├── types/                 # TypeScript definitions
-├── constants/             # Theme & config
-└── supabase/functions/    # Edge Functions
+├── app/                    # Screens (Expo Router file-based routing)
+│   ├── (tabs)/            # Main tabs: index.tsx (workout), history.tsx
+│   ├── auth/              # sign-in, sign-up, forgot-password, callback
+│   ├── onboarding/        # 10-step user setup flow
+│   ├── settings/          # profile, pr-tracking, templates
+│   └── _layout.tsx        # Root layout with provider hierarchy
+├── components/
+│   ├── ui/                # Header, ThemedText, ThemedView, etc.
+│   ├── workout/           # WorkoutTable, WorkoutCard, WorkoutBottomBar
+│   ├── modals/            # EditSetModal, CoachModal, MenuModal, etc.
+│   ├── onboarding/        # Quiz components
+│   └── *Provider.tsx      # Auth, Theme, AuthLock providers
+├── hooks/                 # useWorkoutSession, useRowActions, useCoachLogic, etc.
+├── contexts/              # ProfileContext, PRCelebrationContext
+├── lib/                   # Business logic
+│   ├── api.ts            # Edge Function client
+│   ├── structuredGate.ts # Input parsing (regex → AI fallback)
+│   ├── workoutStorage.ts # AsyncStorage + sync
+│   ├── prTracking.ts     # PR detection
+│   └── auth.ts           # JWT handling
+├── types/workout.ts       # LogRow, WorkoutSession, BodyPart
+├── constants/theme.ts     # Colors
+└── supabase/functions/    # Backend Edge Functions
 ```
 
 ---
 
-## Common Commands
+## Core Patterns
+
+### Provider Hierarchy
+```
+ThemeProvider → AuthProvider → ProfileProvider → PRCelebrationProvider → AuthLockProvider
+```
+
+### Data Flow
+```
+User Input → structuredGate.ts (regex) → Fast parse OR AI fallback
+                    ↓
+              LogRow added to state
+                    ↓
+         AsyncStorage (immediate) + Supabase (async)
+```
+
+### Key Types
+```typescript
+type LogRow = { id, exercise, set, weightLbs, reps, notes, timestamp, status? }
+type WorkoutSession = { id, dateISO, part, rows, createdAt, review? }
+type BodyPart = "Push" | "Pull" | "Legs" | "Chest" | "Back" | ...
+```
+
+---
+
+## Commands
 
 ```bash
-npm install          # Install dependencies
-npx expo start       # Start dev server
-npm run lint         # Run ESLint
+npm install           # Install
+npx expo start        # Dev (i=iOS, a=Android, w=web)
+npm run lint          # Lint
+npx expo start --clear # Clear cache
 ```
 
 ---
 
-## Key Patterns to Know
+## Rules
 
-1. **Local-First Storage** - Data saves to AsyncStorage immediately, syncs to Supabase async
-2. **Structured Gate** - Fast regex parsing before AI fallback (`lib/structuredGate.ts`)
-3. **Provider Hierarchy** - Theme → Auth → Profile → PRCelebration → AuthLock
-4. **Edge Functions Only** - All mutations go through authenticated Supabase Edge Functions
-5. **Pending Edit Pattern** - Commit inline edits before state mutations
+| Rule | Why |
+|------|-----|
+| Use `@/` imports | Path aliases configured in tsconfig |
+| Use `useThemeColor()` | Supports light/dark mode |
+| Mutations via Edge Functions | Never direct DB access from client |
+| `commitPendingAndGet()` before API calls | Inline editing requires commit first |
+| No hardcoded colors | Theme consistency |
 
 ---
 
-## Import Convention
+## Quick Answers
 
-Always use `@/` prefix for imports:
+**Where's the main workout screen?** `app/(tabs)/index.tsx`
 
-```typescript
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/components/AuthProvider';
-import { LogRow } from '@/types/workout';
-```
+**Where's input parsing?** `lib/structuredGate.ts`
+
+**Where are API calls made?** `lib/api.ts`
+
+**Where's auth handled?** `components/AuthProvider.tsx` + `lib/auth.ts`
+
+**Where are PRs detected?** `lib/prTracking.ts`
+
+**Where are workouts saved?** `lib/workoutStorage.ts` (local) + `lib/api.ts` (remote)
