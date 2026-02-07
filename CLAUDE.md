@@ -2,28 +2,36 @@
 
 **Coach Kettle** - Expo/React Native workout tracker with Supabase backend. Natural language input ("Bench 185 x 8") parsed locally or via AI.
 
-## How to Work on This Codebase
+## MCP Tools (if available)
 
-1. **Read `docs/README.md`** - Full navigation, file structure, patterns
-2. **Find your area** - Use the doc index to locate the relevant guide
-3. **Read the specific doc** - Each doc has key files, code examples, implementation steps
-4. **Implement** - Follow existing patterns in the codebase
+| Tool | When |
+|------|------|
+| `guide(task)` | **Start here** - returns doc + file skeletons |
+| `skeleton(path)` | Understand a file's exports/imports/hooks |
+| `map(path)` | See directory structure |
+| `area(name)` | Deep dive: auth, workout, parsing, etc |
+
+## Without MCP
+
+1. Read `docs/README.md` - navigation + patterns
+2. Find relevant doc from index
+3. Follow the patterns
 
 ## Commands
 
 ```bash
 npm install        # Install deps
-npx expo start     # Dev server (i=iOS, a=Android, w=web)
-npm run lint       # Lint check
+npx expo start     # Dev (i=iOS, a=Android, w=web)
+npm run lint       # Lint
 ```
 
-## Critical Rules
+## Rules
 
-- **Imports**: Always use `@/` prefix (`import { x } from '@/lib/api'`)
-- **Colors**: Use `useThemeColor()`, never hardcode
-- **Mutations**: All DB writes go through Edge Functions, never direct
-- **Pending edits**: Call `commitPendingAndGet()` before API calls with row data
+- `@/` imports only
+- `useThemeColor()` for colors
+- Mutations via Edge Functions
+- `commitPendingAndGet()` before API calls
 
-## App Vibe
+## Vibe
 
-Fast, minimal, gym-friendly. Local parsing before AI. Big touch targets. PRs get confetti.
+Fast. Minimal. Gym-friendly. PRs get confetti.
