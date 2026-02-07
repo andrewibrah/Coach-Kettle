@@ -1,212 +1,48 @@
-# Architecture Overview
+# Architecture
 
-> High-level system architecture and data flow patterns.
+## Stack
+- **Frontend**: Expo (React Native) + TypeScript
+- **Backend**: Supabase (Auth, Postgres, Edge Functions, Realtime)
+- **Storage**: AsyncStorage (local-first) + Supabase (sync)
 
----
-
-## System Diagram
-
+## Provider Hierarchy
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         EXPO APP                                 │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                    PROVIDER HIERARCHY                        ││
-│  │  ThemeProvider → AuthProvider → ProfileProvider →            ││
-│  │  PRCelebrationProvider → AuthLockProvider                    ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                              │                                   │
-│  ┌───────────────┬───────────┴───────────┬───────────────┐      │
-│  │   SCREENS     │      COMPONENTS       │    HOOKS      │      │
-│  │  (app/)       │    (components/)      │   (hooks/)    │      │
-│  └───────┬───────┴───────────┬───────────┴───────┬───────┘      │
-│          │                   │                   │               │
-│  ┌───────┴───────────────────┴───────────────────┴───────┐      │
-│  │                    LIB (Business Logic)                │      │
-│  │  api.ts │ structuredGate.ts │ workoutStorage.ts │ ... │      │
-│  └───────────────────────────┬───────────────────────────┘      │
-│                              │                                   │
-└──────────────────────────────┼───────────────────────────────────┘
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                         SUPABASE                                  │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐  │
-│  │    Auth    │  │  Database  │  │   Edge     │  │  Realtime  │  │
-│  │  (OAuth)   │  │ (Postgres) │  │ Functions  │  │ (PR events)│  │
-│  └────────────┘  └────────────┘  └────────────┘  └────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
+ThemeProvider → AuthProvider → ProfileProvider → PRCelebrationProvider → AuthLockProvider
 ```
 
----
+## Data Flow
 
-## Core Data Flow
-
-### 1. User Input → Parsed Rows
-
+### Input → Rows
 ```
-User types: "Bench 185 x 8"
-       │
-       ▼
-┌─────────────────────────┐
-│   structuredGate.ts     │
-│   (Local regex parser)  │
-└───────────┬─────────────┘
-            │
-    ┌───────┴───────┐
-    │               │
-    ▼               ▼
- FAST PATH       AI PATH
- (regex match)   (complex input)
-    │               │
-    ▼               ▼
- LogRow[]        /chat or /parse
-    │            Edge Function
-    │               │
-    └───────┬───────┘
-            │
-            ▼
-    rows state updated
-    (HomeScreen)
+"Bench 185 x 8" → structuredGate.ts → regex match? → LogRow[]
+                                    → no match? → /chat API → LogRow[]
 ```
 
-### 2. Workout Save Flow
-
+### Save Workout
 ```
-User ends workout
-       │
-       ▼
-┌─────────────────────────┐
-│ buildWorkoutToSave()    │
-│ (useWorkoutSession.ts)  │
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│ workoutStorage.ts       │
-│ saveWorkout(session)    │
-└───────────┬─────────────┘
-            │
-    ┌───────┴───────┐
-    │               │
-    ▼               ▼
- AsyncStorage    /history POST
- (immediate)     (background sync)
+End workout → buildWorkoutToSave() → AsyncStorage (immediate)
+                                   → /history POST (background)
 ```
 
-### 3. PR Detection Flow
-
+### PR Detection
 ```
-Set logged with weight/reps
-       │
-       ▼
-┌─────────────────────────┐
-│ checkForPR()            │
-│ (lib/prTracking.ts)     │
-└───────────┬─────────────┘
-            │
-            ▼
-   Calculate E1RM (Epley)
-   Compare to current PR
-            │
-            ▼ (if new PR)
-   Insert to pr_history table
-            │
-            ▼
-┌─────────────────────────┐
-│ Supabase Realtime       │
-│ Channel listener        │
-└───────────┬─────────────┘
-            │
-            ▼
-   PRCelebration overlay
-   (confetti animation)
+Set logged → checkForPR() → E1RM calc → new PR? → Supabase Realtime → confetti
 ```
 
----
+## Key Files
 
-## Key Files by Layer
+| Layer | Files |
+|-------|-------|
+| Screens | `app/(tabs)/index.tsx`, `app/auth/sign-in.tsx` |
+| Components | `components/workout/WorkoutTable.tsx`, `components/modals/*` |
+| Hooks | `hooks/useWorkoutSession.ts`, `hooks/useRowActions.ts` |
+| Lib | `lib/api.ts`, `lib/structuredGate.ts`, `lib/workoutStorage.ts` |
 
-### Screens (app/)
-| File | Purpose |
-|------|---------|
-| `app/_layout.tsx` | Root layout, provider hierarchy |
-| `app/(tabs)/index.tsx` | Main workout screen |
-| `app/(tabs)/history.tsx` | Workout history list |
-| `app/auth/sign-in.tsx` | Login screen |
-| `app/settings/profile.tsx` | Edit profile |
+## Design Decisions
 
-### Components (components/)
-| File | Purpose |
-|------|---------|
-| `AuthProvider.tsx` | Auth context & session |
-| `ThemeProvider.tsx` | Theme context |
-| `workout/WorkoutTable.tsx` | Workout row display |
-| `modals/EditSetModal.tsx` | Edit set dialog |
-
-### Hooks (hooks/)
-| File | Purpose |
-|------|---------|
-| `useWorkoutSession.ts` | Session state management |
-| `useRowActions.ts` | Row CRUD operations |
-| `useCoachLogic.ts` | AI coach modal logic |
-
-### Lib (lib/)
-| File | Purpose |
-|------|---------|
-| `api.ts` | Supabase Edge Function client |
-| `structuredGate.ts` | Input parsing logic |
-| `workoutStorage.ts` | Local + cloud storage |
-| `prTracking.ts` | PR detection logic |
-
----
-
-## Architectural Decisions
-
-### 1. Local-First Storage
-**Why:** Ensures data isn't lost on network failures. Immediate UX feedback.
-**How:** AsyncStorage for all workout data, background sync to Supabase.
-
-### 2. Edge Functions for Mutations
-**Why:** Security - no direct database access from client.
-**How:** All writes go through authenticated Edge Functions.
-
-### 3. Structured Gate Pattern
-**Why:** Speed - most inputs can be parsed without AI round-trip.
-**How:** Regex patterns first, AI fallback for complex queries.
-
-### 4. Provider Hierarchy
-**Why:** Clean dependency chain - auth before profile, profile before features.
-**How:** Nested providers in `app/_layout.tsx`.
-
-### 5. 4-Hour Session TTL
-**Why:** Security with convenience - biometric unlock within TTL window.
-**How:** `AuthLockProvider` tracks last auth timestamp.
-
----
-
-## Module Dependencies
-
-```
-app/_layout.tsx
-    └── ThemeProvider
-        └── AuthProvider
-            └── ProfileProvider
-                └── PRCelebrationProvider
-                    └── AuthLockProvider
-                        └── Expo Router Stack
-
-app/(tabs)/index.tsx
-    ├── useWorkoutSession (hooks/)
-    ├── useRowActions (hooks/)
-    ├── useCoachLogic (hooks/)
-    ├── structuredGate (lib/)
-    ├── api (lib/)
-    └── WorkoutTable, Modals (components/)
-```
-
----
-
-## Related Docs
-- [02-providers.md](./02-providers.md) - Provider hierarchy details
-- [03-workout-flow.md](./03-workout-flow.md) - Main workout flow
-- [06-api.md](./06-api.md) - API layer details
+| Decision | Why |
+|----------|-----|
+| Local-first storage | No data loss on network failure |
+| Edge Functions only | Security - no direct DB access |
+| Regex before AI | Speed - 90% parsed locally |
+| 4-hour session TTL | Security + convenience balance |
