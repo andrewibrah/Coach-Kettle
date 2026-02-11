@@ -5,7 +5,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -15,12 +14,14 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
 
-interface JWTPayload {
-    sub: string;
-    [key: string]: unknown;
-}
+// Singleton admin client for auth verification and DB operations
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+    },
+});
 
 interface WorkoutRow {
     exercise: string;
@@ -37,22 +38,14 @@ async function verifyAuth(req: Request): Promise<string> {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    try {
-        const { payload } = await jwtVerify(token, JWKS, {
-            issuer: `${supabaseUrl}/auth/v1`,
-            audience: "authenticated",
-        });
-        return (payload as JWTPayload).sub;
-    } catch (error) {
-        console.error("[log-set] JWT verification failed:", error);
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !data.user) {
+        console.error("[log-set] Auth verification failed:", error?.message);
         throw new Error("Unauthorized");
     }
-}
 
-function createSupabaseClient() {
-    return createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { persistSession: false },
-    });
+    return data.user.id;
 }
 
 serve(async (req) => {
@@ -98,13 +91,10 @@ serve(async (req) => {
         );
     }
 
-    // Use service role client to bypass RLS for insert
-    const supabase = createSupabaseClient();
-
     try {
         const today = new Date().toISOString().split("T")[0];
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
             .from("workout_log")
             .insert({
                 workout_id: `live-${today}`,

@@ -2,7 +2,7 @@
 // OpenAI-powered coach Q&A
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.2.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -35,7 +35,14 @@ Keep answers under 60 words.
 Do NOT use bold text (stars), italics, or markdown formatting. Use plain text only.`;
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+    },
+});
 
 async function verifyAuth(req: Request) {
     const authHeader = req.headers.get("Authorization");
@@ -44,13 +51,10 @@ async function verifyAuth(req: Request) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    try {
-        await jwtVerify(token, JWKS, {
-            issuer: `${supabaseUrl}/auth/v1`,
-            audience: "authenticated",
-        });
-    } catch (error) {
-        console.error("[coach] JWT verification failed:", error);
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !data.user) {
+        console.error("[coach] Auth verification failed:", error?.message);
         throw new Error("Unauthorized");
     }
 }

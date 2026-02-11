@@ -26,7 +26,30 @@ enable_signup = true
 file_size_limit = "50MB"
 
 [functions]
-  [functions.default]
-  # Disabled: Supabase now issues ES256 user tokens, incompatible with legacy HS256 verify_jwt
-  # JWT verification is now handled manually in each function using JWKS
+  # JWT verification handled manually in each function via supabaseAdmin.auth.getUser()
+  [functions.chat]
+  verify_jwt = false
+  [functions.chat-history]
+  verify_jwt = false
+  [functions.chats]
+  verify_jwt = false
+  [functions.coach]
+  verify_jwt = false
+  [functions.health]
+  verify_jwt = false
+  [functions.history]
+  verify_jwt = false
+  [functions.log-set]
+  verify_jwt = false
+  [functions.observability]
+  verify_jwt = false
+  [functions.parse]
+  verify_jwt = false
+  [functions.pr-tracking]
+  verify_jwt = false
+  [functions.profile]
+  verify_jwt = false
+  [functions.terms-acceptance]
+  verify_jwt = false
+  [functions.workout-templates]
   verify_jwt = false

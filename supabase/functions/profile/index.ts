@@ -2,7 +2,7 @@
 // Handles all profile-related database operations
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -40,7 +40,7 @@ async function verifyAuth(req: Request): Promise<string> {
 
     if (error) {
         console.error("[profile] Auth verification ERROR details:", JSON.stringify(error));
-        throw new Error(`Unauthorized: ${error.message} (Token len: ${token.length}, start: ${token.substring(0, 10)}...)`);
+        throw new Error(`Unauthorized: ${error.message}`);
     }
 
     if (!data.user) {
