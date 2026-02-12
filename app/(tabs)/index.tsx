@@ -35,6 +35,7 @@ import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow } from "@/lib/api";
 import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { type WorkoutTemplate, type WorkoutTemplateItem } from "@/lib/profile";
+import { checkForPR } from "@/lib/prTracking";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
 import { expandTemplateToRows, getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
 import { type SessionReview } from "@/lib/workoutStorage";
@@ -129,6 +130,7 @@ export default function HomeScreen() {
   // Subscribe to PR breakthrough notifications
   const { session } = useAuth();
   const { showCelebration } = usePRCelebration();
+  const lastCelebratedRef = useRef<string>('');
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -147,8 +149,13 @@ export default function HomeScreen() {
           filter: `user_id=eq.${userId}`,
         },
         async (payload) => {
-          console.log('[PR] New PR detected!', payload.new);
+          console.log('[PR] New PR detected via Realtime!', payload.new);
           const prData = payload.new as any;
+
+          // Deduplicate against client-side PR check
+          const dedupKey = `${prData.lift_name}-${prData.weight_lbs}-${prData.reps}`;
+          if (lastCelebratedRef.current === dedupKey) return;
+          lastCelebratedRef.current = dedupKey;
 
           // Show celebration
           showCelebration({
@@ -211,7 +218,7 @@ export default function HomeScreen() {
       notes: row.notes,
     }));
 
-  const submitCoachQuestion = async () => {
+  const submitCoachQuestion = async (chatHistory?: { role: string; content: string }[]) => {
     const q = coachQuestion.trim();
     if (!q || coachLoading) return;
     setCoachLoading(true);
@@ -222,11 +229,17 @@ export default function HomeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
+    // Build recent conversation context (last 10 messages for token efficiency)
+    const recentHistory = (chatHistory || [])
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .slice(-10)
+      .map(m => ({ role: m.role, content: m.content }));
+
     try {
       // Stream the response
       const res = await api.askCoach(q, toApiRows(rows), (chunk) => {
         setCoachAnswer((prev) => (prev || "") + chunk);
-      });
+      }, recentHistory);
       const answerText = res.answer?.trim() || "Coach had no response.";
       setCoachAnswer(answerText);
 
@@ -836,6 +849,23 @@ export default function HomeScreen() {
           reps: reps || filledRow.reps,
           notes: filledRow.notes || "",
         }).catch(err => console.error("Failed to sync skeleton fill", err));
+
+        // Client-side PR check fallback
+        const skUserId = session?.user?.id;
+        const skW = parseFloat(weight);
+        const skR = parseInt(reps || filledRow.reps);
+        if (skUserId && !isNaN(skW) && !isNaN(skR) && skW > 0 && skR > 0) {
+          checkForPR(skUserId, filledRow.exercise, skW, skR)
+            .then(result => {
+              if (result && result.isPR) {
+                const dedupKey = `${result.liftName}-${result.weight}-${result.reps}`;
+                if (lastCelebratedRef.current === dedupKey) return;
+                lastCelebratedRef.current = dedupKey;
+                showCelebration(result);
+              }
+            })
+            .catch(err => console.error('[PR] Client-side check failed:', err));
+        }
       }
 
       if (Platform.OS === "ios") {
@@ -917,6 +947,26 @@ export default function HomeScreen() {
           notes: row.notes
         }).catch(err => console.error("Failed to sync row", err));
       });
+
+      // Client-side PR check fallback
+      const prUserId = session?.user?.id;
+      if (prUserId) {
+        parsedRows.forEach(row => {
+          const w = parseFloat(row.weightLbs);
+          const r = parseInt(row.reps);
+          if (!row.weightLbs || !row.reps || isNaN(w) || isNaN(r) || w <= 0 || r <= 0) return;
+          checkForPR(prUserId, row.exercise, w, r)
+            .then(result => {
+              if (result && result.isPR) {
+                const dedupKey = `${result.liftName}-${result.weight}-${result.reps}`;
+                if (lastCelebratedRef.current === dedupKey) return;
+                lastCelebratedRef.current = dedupKey;
+                showCelebration(result);
+              }
+            })
+            .catch(err => console.error('[PR] Client-side check failed:', err));
+        });
+      }
 
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
       return;

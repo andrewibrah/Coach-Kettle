@@ -29,7 +29,6 @@ Coach Kettle helps you track your workouts using natural language. You type or s
 
 **We provide:**
 - Secure authentication via email/password, Apple Sign-In, or Google Sign-In
-- Optional biometric unlock (Face ID / Touch ID) for convenience
 - Automatic session expiration after 4 hours of inactivity
 
 ## 3. How Authentication Works
@@ -40,13 +39,6 @@ Your password is hashed before storage. We never store or see your plain-text pa
 ### Apple & Google Sign-In
 We use OAuth 2.0, the industry standard. We receive only your email and a unique identifier—never your Apple or Google password.
 
-### Biometric Unlock (Face ID / Touch ID)
-If you enable this feature:
-- Your biometric data **never leaves your device**
-- We don't store or transmit any biometric information
-- Your device's secure enclave handles all biometric verification
-- This is purely a convenience feature to unlock the app faster
-
 ## 4. Your Data
 
 ### What we store:
@@ -56,7 +48,6 @@ If you enable this feature:
 - Basic usage analytics (app opens, feature usage)
 
 ### What we DON'T store:
-- Your biometric data (handled entirely by your device)
 - Your Apple or Google password
 - Payment information (we don't process payments)
 
@@ -127,7 +118,6 @@ Your privacy matters. Here's exactly what data we collect and why.
 
 ## Data We Don't Collect
 
-- **Biometric data**: Face ID / Touch ID verification happens entirely on your device
 - **Location data**: We don't track where you work out
 - **Health app data**: We don't sync with Apple Health or Google Fit
 - **Contacts**: We don't access your address book
@@ -160,7 +150,7 @@ You can:
 - **Access** your data at any time through the app
 - **Export** your workout history (feature coming soon)
 - **Delete** your account and all data by contacting us
-- **Opt out** of optional features like biometric unlock
+- **Opt out** of optional features
 
 ## Children's Privacy
 
@@ -194,17 +184,6 @@ By creating an account, you acknowledge that:
 
 • Your workout data will be stored securely in the cloud
 • We may use AI services to help parse your workout input
-• If you enable biometric unlock, it only works on your device—we never see your biometric data
 • You can delete your account and data at any time
 `.trim();
 
-export const BIOMETRIC_EXPLANATION = `
-When enabled, you can unlock Coach Kettle using Face ID, Touch ID, or your device passcode instead of entering your credentials each time.
-
-**How it works:**
-• Your biometric data stays on your device—we never receive or store it
-• Your device's secure enclave verifies your identity
-• If verification fails, you can always sign in with your credentials
-
-**Note:** This feature requires biometrics or a passcode to be set up on your device.
-`.trim();

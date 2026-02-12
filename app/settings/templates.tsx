@@ -27,6 +27,8 @@ import {
     deleteWorkoutTemplate,
     addTemplateItem,
     removeTemplateItem,
+    updateTemplateItem,
+    reorderTemplateItems,
 } from '@/lib/profile';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
@@ -61,6 +63,13 @@ export default function TemplatesScreen() {
     const [newExerciseReps, setNewExerciseReps] = useState('');
     const [newExerciseWeight, setNewExerciseWeight] = useState('');
 
+    // Edit exercise state
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editSets, setEditSets] = useState('');
+    const [editReps, setEditReps] = useState('');
+    const [editWeight, setEditWeight] = useState('');
+
     const loadTemplates = useCallback(async () => {
         if (!session?.user?.id) return;
 
@@ -82,10 +91,12 @@ export default function TemplatesScreen() {
     const handleExpand = async (templateId: string) => {
         if (expandedId === templateId) {
             setExpandedId(null);
+            setEditingItemId(null);
             return;
         }
 
         setExpandedId(templateId);
+        setEditingItemId(null);
 
         if (!expandedItems[templateId]) {
             setLoadingItems(templateId);
@@ -175,15 +186,96 @@ export default function TemplatesScreen() {
     };
 
     const handleRemoveExercise = async (itemId: string, templateId: string) => {
+        Alert.alert(
+            'Delete Exercise',
+            'Are you sure you want to remove this exercise?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await removeTemplateItem(itemId);
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setExpandedItems((prev) => ({
+                                ...prev,
+                                [templateId]: prev[templateId].filter((i) => i.id !== itemId),
+                            }));
+                            if (editingItemId === itemId) setEditingItemId(null);
+                        } catch (error) {
+                            console.error('[Templates] Error removing exercise:', error);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleStartEdit = (item: WorkoutTemplateItem) => {
+        setEditingItemId(item.id);
+        setEditName(item.lift_name);
+        setEditSets(item.target_sets?.toString() || '');
+        setEditReps(item.target_reps?.toString() || '');
+        setEditWeight(item.target_weight?.toString() || '');
+    };
+
+    const handleSaveEdit = async (itemId: string, templateId: string) => {
+        if (!editName.trim()) return;
+
         try {
-            await removeTemplateItem(itemId);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setExpandedItems((prev) => ({
-                ...prev,
-                [templateId]: prev[templateId].filter((i) => i.id !== itemId),
-            }));
+            const updated = await updateTemplateItem(itemId, {
+                lift_name: editName.trim(),
+                target_sets: editSets ? parseInt(editSets, 10) : null,
+                target_reps: editReps ? parseInt(editReps, 10) : null,
+                target_weight: editWeight ? parseFloat(editWeight) : null,
+            });
+
+            if (updated) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setExpandedItems((prev) => ({
+                    ...prev,
+                    [templateId]: prev[templateId].map((i) =>
+                        i.id === itemId ? updated : i
+                    ),
+                }));
+            }
+            setEditingItemId(null);
         } catch (error) {
-            console.error('[Templates] Error removing exercise:', error);
+            console.error('[Templates] Error updating exercise:', error);
+            Alert.alert('Error', 'Failed to update exercise');
+        }
+    };
+
+    const handleMoveItem = async (templateId: string, itemId: string, direction: 'up' | 'down') => {
+        const items = expandedItems[templateId];
+        if (!items) return;
+
+        const idx = items.findIndex((i) => i.id === itemId);
+        if (idx < 0) return;
+        if (direction === 'up' && idx === 0) return;
+        if (direction === 'down' && idx === items.length - 1) return;
+
+        const newItems = [...items];
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+        [newItems[idx], newItems[swapIdx]] = [newItems[swapIdx], newItems[idx]];
+
+        // Optimistic update
+        setExpandedItems((prev) => ({ ...prev, [templateId]: newItems }));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        // Persist to backend
+        const reorderPayload = newItems.map((item, i) => ({
+            id: item.id,
+            display_order: i + 1,
+        }));
+
+        try {
+            await reorderTemplateItems(reorderPayload);
+        } catch (error) {
+            console.error('[Templates] Error reordering:', error);
+            // Revert on failure
+            setExpandedItems((prev) => ({ ...prev, [templateId]: items }));
         }
     };
 
@@ -193,6 +285,19 @@ export default function TemplatesScreen() {
         setNewExerciseSets('');
         setNewExerciseReps('');
         setNewExerciseWeight('');
+    };
+
+    // Get exercise count for a template (from API response or expanded items)
+    const getExerciseCount = (template: WorkoutTemplate): number => {
+        const expanded = expandedItems[template.id];
+        if (expanded) return expanded.length;
+
+        // Use count from the list query (Supabase returns { count: N } in the join)
+        const countData = (template as any).workout_template_items;
+        if (Array.isArray(countData) && countData.length > 0 && countData[0].count !== undefined) {
+            return countData[0].count;
+        }
+        return 0;
     };
 
     if (loading) {
@@ -293,6 +398,7 @@ export default function TemplatesScreen() {
                             const isExpanded = expandedId === template.id;
                             const items = expandedItems[template.id] || [];
                             const isLoadingItems = loadingItems === template.id;
+                            const exerciseCount = getExerciseCount(template);
 
                             return (
                                 <Animated.View
@@ -312,7 +418,7 @@ export default function TemplatesScreen() {
                                                 </ThemedText>
                                             )}
                                             <ThemedText style={styles.exerciseCount}>
-                                                {items.length || '?'} exercises
+                                                {exerciseCount} exercise{exerciseCount !== 1 ? 's' : ''}
                                             </ThemedText>
                                         </View>
                                         <View style={styles.templateActions}>
@@ -341,32 +447,126 @@ export default function TemplatesScreen() {
                                             ) : (
                                                 <>
                                                     {items.length > 0 ? (
-                                                        items.map((item) => (
+                                                        items.map((item, idx) => (
                                                             <View key={item.id} style={styles.exerciseRow}>
-                                                                <View style={styles.exerciseInfo}>
-                                                                    <ThemedText style={styles.exerciseName}>
-                                                                        {item.lift_name}
-                                                                    </ThemedText>
-                                                                    <ThemedText style={styles.exerciseDetails}>
-                                                                        {item.target_sets && item.target_reps
-                                                                            ? `${item.target_sets} × ${item.target_reps}`
-                                                                            : item.target_sets
-                                                                                ? `${item.target_sets} sets`
-                                                                                : item.target_reps
-                                                                                    ? `${item.target_reps} reps`
-                                                                                    : ''}
-                                                                        {item.target_weight ? ` @ ${item.target_weight} lbs` : ''}
-                                                                    </ThemedText>
-                                                                </View>
-                                                                <Pressable
-                                                                    onPress={() => handleRemoveExercise(item.id, template.id)}
-                                                                    style={({ pressed }) => [
-                                                                        styles.removeButton,
-                                                                        pressed && styles.buttonPressed,
-                                                                    ]}
-                                                                >
-                                                                    <IconSymbol name="xmark" size={16} color="#FF3B30" />
-                                                                </Pressable>
+                                                                {editingItemId === item.id ? (
+                                                                    // Edit mode
+                                                                    <View style={styles.editForm}>
+                                                                        <TextInput
+                                                                            style={[styles.exerciseInput, { color: textColor, backgroundColor: inputBg }]}
+                                                                            value={editName}
+                                                                            onChangeText={setEditName}
+                                                                            placeholder="Exercise name"
+                                                                            placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                            autoFocus
+                                                                        />
+                                                                        <View style={styles.exerciseInputRow}>
+                                                                            <TextInput
+                                                                                style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
+                                                                                value={editSets}
+                                                                                onChangeText={setEditSets}
+                                                                                placeholder="Sets"
+                                                                                placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                                keyboardType="numeric"
+                                                                            />
+                                                                            <TextInput
+                                                                                style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
+                                                                                value={editReps}
+                                                                                onChangeText={setEditReps}
+                                                                                placeholder="Reps"
+                                                                                placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                                keyboardType="numeric"
+                                                                            />
+                                                                            <TextInput
+                                                                                style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
+                                                                                value={editWeight}
+                                                                                onChangeText={setEditWeight}
+                                                                                placeholder="Weight"
+                                                                                placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                                keyboardType="decimal-pad"
+                                                                            />
+                                                                        </View>
+                                                                        <View style={styles.editActions}>
+                                                                            <Pressable
+                                                                                style={[styles.editActionButton, { backgroundColor: '#FF3B30' }]}
+                                                                                onPress={() => handleRemoveExercise(item.id, template.id)}
+                                                                            >
+                                                                                <ThemedText style={styles.editActionText}>Delete</ThemedText>
+                                                                            </Pressable>
+                                                                            <View style={styles.editActionsRight}>
+                                                                                <Pressable
+                                                                                    style={styles.cancelButton}
+                                                                                    onPress={() => setEditingItemId(null)}
+                                                                                >
+                                                                                    <ThemedText>Cancel</ThemedText>
+                                                                                </Pressable>
+                                                                                <Pressable
+                                                                                    style={[
+                                                                                        styles.confirmButton,
+                                                                                        { backgroundColor: activeColor },
+                                                                                        !editName.trim() && styles.disabledButton,
+                                                                                    ]}
+                                                                                    onPress={() => handleSaveEdit(item.id, template.id)}
+                                                                                    disabled={!editName.trim()}
+                                                                                >
+                                                                                    <ThemedText style={styles.confirmButtonText}>Save</ThemedText>
+                                                                                </Pressable>
+                                                                            </View>
+                                                                        </View>
+                                                                    </View>
+                                                                ) : (
+                                                                    // Display mode
+                                                                    <>
+                                                                        {/* Reorder buttons */}
+                                                                        <View style={styles.reorderButtons}>
+                                                                            <Pressable
+                                                                                onPress={() => handleMoveItem(template.id, item.id, 'up')}
+                                                                                style={[styles.reorderBtn, idx === 0 && styles.reorderBtnDisabled]}
+                                                                                disabled={idx === 0}
+                                                                            >
+                                                                                <IconSymbol name="chevron.up" size={14} color={idx === 0 ? sectionTitleColor : textColor} />
+                                                                            </Pressable>
+                                                                            <Pressable
+                                                                                onPress={() => handleMoveItem(template.id, item.id, 'down')}
+                                                                                style={[styles.reorderBtn, idx === items.length - 1 && styles.reorderBtnDisabled]}
+                                                                                disabled={idx === items.length - 1}
+                                                                            >
+                                                                                <IconSymbol name="chevron.down" size={14} color={idx === items.length - 1 ? sectionTitleColor : textColor} />
+                                                                            </Pressable>
+                                                                        </View>
+
+                                                                        <View style={styles.exerciseInfo}>
+                                                                            <ThemedText style={styles.exerciseName}>
+                                                                                {item.lift_name}
+                                                                            </ThemedText>
+                                                                            <ThemedText style={styles.exerciseDetails}>
+                                                                                {item.target_sets && item.target_reps
+                                                                                    ? `${item.target_sets} × ${item.target_reps}`
+                                                                                    : item.target_sets
+                                                                                        ? `${item.target_sets} sets`
+                                                                                        : item.target_reps
+                                                                                            ? `${item.target_reps} reps`
+                                                                                            : ''}
+                                                                                {item.target_weight ? ` @ ${item.target_weight} lbs` : ''}
+                                                                            </ThemedText>
+                                                                        </View>
+
+                                                                        {/* Edit button */}
+                                                                        <Pressable
+                                                                            onPress={() => handleStartEdit(item)}
+                                                                            style={({ pressed }) => [
+                                                                                styles.editButton,
+                                                                                pressed && styles.buttonPressed,
+                                                                            ]}
+                                                                        >
+                                                                            <MaterialCommunityIcons
+                                                                                name="pencil-outline"
+                                                                                size={18}
+                                                                                color={activeColor}
+                                                                            />
+                                                                        </Pressable>
+                                                                    </>
+                                                                )}
                                                             </View>
                                                         ))
                                                     ) : (
@@ -452,7 +652,7 @@ export default function TemplatesScreen() {
 
                 <View style={styles.infoSection}>
                     <ThemedText style={styles.infoText}>
-                        💡 Tip: Your templates can be loaded from the main workout screen to quickly start a routine.
+                        Tip: Your templates can be loaded from the main workout screen to quickly start a routine.
                     </ThemedText>
                 </View>
             </ScrollView>
@@ -590,7 +790,6 @@ const styles = StyleSheet.create({
     exerciseRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         paddingVertical: 10,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(128, 128, 128, 0.1)',
@@ -606,9 +805,43 @@ const styles = StyleSheet.create({
         fontSize: 13,
         opacity: 0.6,
     },
-    removeButton: {
+    editButton: {
         padding: 8,
-        marginRight: -4,
+        marginLeft: 4,
+    },
+    reorderButtons: {
+        marginRight: 10,
+        alignItems: 'center',
+        gap: 2,
+    },
+    reorderBtn: {
+        padding: 4,
+    },
+    reorderBtnDisabled: {
+        opacity: 0.3,
+    },
+    editForm: {
+        flex: 1,
+        gap: 8,
+    },
+    editActions: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    editActionsRight: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    editActionButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+    },
+    editActionText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
     },
     noExercises: {
         fontSize: 14,
@@ -651,6 +884,10 @@ const styles = StyleSheet.create({
     addExerciseText: {
         fontSize: 14,
         fontWeight: '500',
+    },
+    removeButton: {
+        padding: 8,
+        marginRight: -4,
     },
     infoSection: {
         marginTop: 8,

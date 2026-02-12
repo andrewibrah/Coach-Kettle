@@ -6,33 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Coach Kettle** - Expo/React Native workout tracker with Supabase backend. Users log sets via natural language ("Bench 185 x 8") parsed locally (regex) or via AI fallback.
 
-## Commands
-
-```bash
-npm install               # Install deps
-npx expo start            # Dev (i=iOS, a=Android, w=web)
-npx expo start --tunnel   # Dev with tunnel (for physical devices)
-npx expo start --clear    # Dev with cache clear
-npm run lint              # Lint
-
-# Supabase (user runs manually)
-supabase db push                    # Push migrations
-supabase functions deploy           # Deploy all Edge Functions
-supabase functions deploy <name>    # Deploy single function
-supabase functions serve <name> --env-file .env.local  # Local dev
-```
-
-## Architecture
-
-### Stack
-- **Frontend**: Expo 54 + React Native + TypeScript
-- **Backend**: Supabase (Auth, Postgres, Edge Functions, Realtime)
-- **Storage**: AsyncStorage (local-first) + Supabase (sync)
-
-### Provider Hierarchy
-```
-ThemeProvider → AuthProvider → ProfileProvider → PRCelebrationProvider → AuthLockProvider
-```
+## warnings 
+As is well-established, AI coding agents optimize for fluent output, not system truth. The following points define the highest-risk failure modes that must be actively constrained when delegating code generation to agents.”
+1. AI will confidently fabricate logic, APIs, and edge-case behavior—never trust output without verification.
+2. Generated code often passes happy paths while silently failing under real load, concurrency, or malformed input.
+3. Security assumptions made by AI are naïve by default—assume missing auth, validation, and threat modeling.
+4. AI optimizes for plausibility, not correctness—“looks right” is a red flag, not a signal.
+5. Subtle bugs hide in glue code, state transitions, and error handling—exactly where AI hand-waves.
+6. Dependency usage may be outdated, deprecated, or unsafe even if syntactically valid.
+7. AI will mirror your prompt’s blind spots—unclear constraints guarantee flawed implementations.
+8. Performance characteristics are rarely considered unless explicitly forced—expect inefficient defaults.
+9. Generated abstractions tend toward over-complexity or leaky simplicity—both increase long-term cost.
+10. The more you defer thinking to the agent, the faster you lose system-level understanding and control.
 
 ### Data Flow
 ```

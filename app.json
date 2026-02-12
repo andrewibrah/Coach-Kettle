@@ -13,7 +13,6 @@
       "bundleIdentifier": "com.coachkettle.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Allow Coach Kettle to use Face ID to unlock your session"
       }
     },
     "android": {
@@ -43,12 +42,6 @@
           "dark": {
             "backgroundColor": "#000000"
           }
-        }
-      ],
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Allow Coach Kettle to use Face ID to unlock your session"
         }
       ],
       "@react-native-community/datetimepicker",

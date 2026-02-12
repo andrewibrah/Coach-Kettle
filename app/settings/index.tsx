@@ -1,4 +1,3 @@
-import { useAuthLock } from '@/components/AuthLockProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -8,18 +7,12 @@ import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { getBiometricDisplayName } from '@/lib/biometrics';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 export default function SettingsScreen() {
     const { signOut, session, clearAllCaches } = useAuth();
-    const {
-        biometricStatus,
-        biometricEnabled,
-        setBiometricEnabled,
-    } = useAuthLock();
     const { profile } = useProfile();
     const { themeMode, setThemeMode, isDark } = useTheme();
     const router = useRouter();
@@ -31,37 +24,8 @@ export default function SettingsScreen() {
     // Dynamic colors for dark mode
     const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
     const sectionTitleColor = isDark ? '#8E8E93' : '#8E8E93';
-    const warningBg = isDark ? '#3d2d00' : '#FFF8E6';
-    const warningTextColor = isDark ? '#FFD60A' : '#996600';
-    const infoBg = isDark ? '#0a2540' : '#E8F4FD';
-    const infoTextColor = isDark ? '#64B5F6' : '#0066CC';
     const cacheBg = isDark ? '#3d2d00' : '#FFF8E6';
     const logoutBg = isDark ? '#3d1515' : '#FFF1F0';
-
-    // Check if biometrics can be used
-    const canUseBiometrics = biometricStatus?.isEnrolled || biometricStatus?.canUsePasscode;
-    const biometricName = biometricStatus
-        ? getBiometricDisplayName(biometricStatus.biometricType)
-        : 'Biometrics';
-
-    const handleBiometricToggle = async (value: boolean) => {
-        if (value && !canUseBiometrics) {
-            Alert.alert(
-                'Not Available',
-                'Please set up Face ID, Touch ID, or a device passcode in your device settings first.'
-            );
-            return;
-        }
-
-        await setBiometricEnabled(value);
-
-        if (value) {
-            Alert.alert(
-                `${biometricName} Enabled`,
-                'Your session will now require biometric verification after 4 hours of inactivity.'
-            );
-        }
-    };
 
     const handleLogout = async () => {
         try {
@@ -183,49 +147,6 @@ export default function SettingsScreen() {
                             <IconSymbol name="checkmark" size={20} color={activeColor} />
                         )}
                     </Pressable>
-                </View>
-
-                {/* Security Section */}
-                <View style={styles.section}>
-                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Security</ThemedText>
-
-                    {/* Biometric Toggle */}
-                    <View style={[styles.settingRow, { backgroundColor: cardBg }]}>
-                        <View style={styles.settingInfo}>
-                            <ThemedText style={styles.settingLabel}>
-                                Use {biometricName} for faster login
-                            </ThemedText>
-                            <ThemedText style={styles.settingDescription}>
-                                Require verification after 4 hours of inactivity
-                            </ThemedText>
-                        </View>
-                        <Switch
-                            value={biometricEnabled}
-                            onValueChange={handleBiometricToggle}
-                            trackColor={{ false: '#767577', true: activeColor }}
-                            thumbColor="#fff"
-                            disabled={!canUseBiometrics && !biometricEnabled}
-                        />
-                    </View>
-
-                    {/* Biometric Explanation */}
-                    {biometricEnabled && (
-                        <View style={[styles.infoBox, { backgroundColor: infoBg }]}>
-                            <IconSymbol name="lock.shield" size={16} color={activeColor} />
-                            <Text style={[styles.infoText, { color: infoTextColor }]}>
-                                Your biometric data never leaves your device. Coach Kettle only receives a success/fail result from your device&apos;s secure enclave.
-                            </Text>
-                        </View>
-                    )}
-
-                    {!canUseBiometrics && (
-                        <View style={[styles.warningBox, { backgroundColor: warningBg }]}>
-                            <IconSymbol name="exclamationmark.triangle" size={16} color={isDark ? '#FFD60A' : '#FF9500'} />
-                            <Text style={[styles.warningText, { color: warningTextColor }]}>
-                                Set up Face ID, Touch ID, or a device passcode in Settings to enable this feature.
-                            </Text>
-                        </View>
-                    )}
                 </View>
 
                 {/* Data Section */}

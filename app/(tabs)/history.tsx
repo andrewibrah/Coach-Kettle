@@ -5,6 +5,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
 import { ScreenHeader } from "@/components/ui/screen-header";
+import { ThemedView } from "@/components/ui/themed-view";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { api } from "@/lib/api";
 import { type WorkoutSession } from "@/lib/workoutStorage";
 
@@ -46,6 +49,15 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const backgroundColor = isDark ? Colors.dark.background : Colors.light.background;
+  const textColor = isDark ? Colors.dark.text : Colors.light.text;
+  const cardBg = isDark ? Colors.dark.cardBackground : Colors.light.cardBackground;
+  const borderColor = isDark ? Colors.dark.border : Colors.light.border;
+  const secondaryTextColor = isDark ? Colors.dark.placeholder : Colors.light.placeholder;
+  const chevronColor = isDark ? Colors.dark.icon : Colors.light.icon;
 
   const load = async () => {
     try {
@@ -123,33 +135,34 @@ export default function HistoryScreen() {
         }}
         style={({ pressed }) => [
           styles.card,
+          { backgroundColor: cardBg, borderColor },
           pressed && styles.cardPressed,
         ]}
       >
         <View style={styles.cardRow}>
           <View style={styles.cardMain}>
-            <Text style={styles.cardTitle} numberOfLines={1}>
+            <Text style={[styles.cardTitle, { color: textColor }]} numberOfLines={1}>
               {item.part?.trim() ? item.part.trim() : "Workout"}
             </Text>
 
             <View style={styles.metaRow}>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaChipText}>{stats.exercises} Exercises</Text>
+              <View style={[styles.metaChip, { backgroundColor: cardBg, borderColor }]}>
+                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.exercises} Exercises</Text>
               </View>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaChipText}>{stats.sets} Sets</Text>
+              <View style={[styles.metaChip, { backgroundColor: cardBg, borderColor }]}>
+                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.sets} Sets</Text>
               </View>
             </View>
           </View>
 
-          <Text style={styles.chevron}>›</Text>
+          <Text style={[styles.chevron, { color: chevronColor }]}>›</Text>
         </View>
       </Pressable>
     );
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+    <ThemedView style={[styles.screen, { paddingTop: insets.top + 12, backgroundColor }]}>
       <ScreenHeader
         title="History"
         subtitle={`${headerStats.totalWorkouts} workouts • ${headerStats.totalSets} sets`}
@@ -166,13 +179,13 @@ export default function HistoryScreen() {
         renderItem={renderWorkoutCard}
         renderSectionHeader={({ section: { title } }) => (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{formatDateHeader(title)}</Text>
+            <Text style={[styles.sectionHeaderText, { color: secondaryTextColor }]}>{formatDateHeader(title)}</Text>
           </View>
         )}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyTitle}>No saved workouts yet</Text>
-            <Text style={styles.emptyHint}>
+            <Text style={[styles.emptyTitle, { color: textColor }]}>No saved workouts yet</Text>
+            <Text style={[styles.emptyHint, { color: secondaryTextColor }]}>
               Start a workout, log a few sets, then hit End.
             </Text>
           </View>
@@ -184,7 +197,7 @@ export default function HistoryScreen() {
         onClose={() => setDeleteModalVisible(false)}
         onConfirm={handleDelete}
       />
-    </View>
+    </ThemedView>
   );
 }
 
@@ -192,7 +205,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: 16,
-    backgroundColor: "#F7F7F8",
   },
   header: {
     marginBottom: 12,
@@ -204,10 +216,8 @@ const styles = StyleSheet.create({
 
   card: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
     borderRadius: 16,
     padding: 12,
-    backgroundColor: "#FFFFFF",
   },
   cardPressed: {
     opacity: 0.92,
@@ -225,7 +235,6 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#111827",
   },
 
   metaRow: {
@@ -236,35 +245,18 @@ const styles = StyleSheet.create({
   },
   metaChip: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#FFFFFF",
   },
   metaChipText: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#111827",
-  },
-  metaChipDark: {
-    borderWidth: 1,
-    borderColor: "#111827",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#111827",
-  },
-  metaChipTextDark: {
-    fontSize: 12,
-    fontWeight: "900",
-    color: "#FFFFFF",
   },
 
   chevron: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#9CA3AF",
     marginLeft: 2,
   },
 
@@ -276,7 +268,6 @@ const styles = StyleSheet.create({
   sectionHeaderText: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#6B7280",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -290,13 +281,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#111827",
   },
   emptyHint: {
     marginTop: 6,
     fontSize: 13,
     fontWeight: "600",
-    color: "#6B7280",
     textAlign: "center",
   },
 });

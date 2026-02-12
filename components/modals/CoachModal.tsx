@@ -27,7 +27,7 @@ type Props = {
   loading: boolean;
   answer: string | null;
   error: string | null;
-  onSubmit: () => void;
+  onSubmit: (chatHistory: ChatMessage[]) => void;
   onClose: () => void;
 };
 
@@ -109,10 +109,11 @@ export function CoachModal({
       source: 'coach_modal',
       created_at: new Date().toISOString()
     };
-    setHistory(prev => [...prev, userMsg]);
+    const updatedHistory = [...history, userMsg];
+    setHistory(updatedHistory);
 
-    // Call parent submit logic
-    onSubmit();
+    // Call parent submit logic with chat history for multi-turn context
+    onSubmit(updatedHistory);
     // Input is cleared by parent
     onChangeQuestion("");
   };
@@ -141,26 +142,22 @@ export function CoachModal({
     );
   };
 
-  // Combine history with current streaming answer
-  const displayData = [...history];
-  if (loading || answer) {
-    if (answer) {
-      displayData.push({
-        role: 'assistant',
-        content: answer,
-        source: 'coach_modal',
-        created_at: new Date().toISOString()
-      });
-    } else if (loading) {
-      // Show loading placeholder if no answer yet
+  // Track whether the current answer has been committed to history
+  const committedRef = useRef(false);
+
+  // Reset committed flag when a new question starts loading
+  useEffect(() => {
+    if (loading) {
+      committedRef.current = false;
     }
-  }
+  }, [loading]);
 
   // Effect to commit the answer to history once streaming is done
   const wasLoading = useRef(loading);
   useEffect(() => {
     if (wasLoading.current && !loading && answer) {
-      // Just finished loading a valid answer
+      // Just finished loading a valid answer — commit to history
+      committedRef.current = true;
       const aiMsg: ChatMessage = {
         role: 'assistant',
         content: answer,
@@ -171,6 +168,20 @@ export function CoachModal({
     }
     wasLoading.current = loading;
   }, [loading, answer]);
+
+  // Combine history with current streaming answer
+  // Only append streaming answer if it hasn't been committed to history yet
+  const displayData = [...history];
+  if ((loading || answer) && !committedRef.current) {
+    if (answer) {
+      displayData.push({
+        role: 'assistant',
+        content: answer,
+        source: 'coach_modal',
+        created_at: new Date().toISOString()
+      });
+    }
+  }
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>

@@ -3,7 +3,7 @@
  *
  * Manages the TTL-based session lock system. Sessions remain unlocked
  * for 4 hours after authentication. After TTL expires, user must
- * re-authenticate via biometrics or full login.
+ * re-authenticate via full login.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,7 +14,6 @@ export const AUTH_TTL_MS = 4 * 60 * 60 * 1000;
 // Storage keys
 export const STORAGE_KEYS = {
   LAST_AUTHENTICATED_AT: 'auth_last_authenticated_at',
-  BIOMETRIC_ENABLED: 'auth_biometric_enabled',
   TERMS_ACCEPTED_AT: 'auth_terms_accepted_at',
   TERMS_VERSION: 'auth_terms_version',
 } as const;
@@ -84,30 +83,6 @@ export function getTimeUntilExpiry(lastAuthenticatedAt: number | null): number {
   }
   const remaining = AUTH_TTL_MS - (Date.now() - lastAuthenticatedAt);
   return Math.max(0, remaining);
-}
-
-/**
- * Get/set biometric preference
- */
-export async function getBiometricEnabled(): Promise<boolean> {
-  try {
-    const value = await AsyncStorage.getItem(STORAGE_KEYS.BIOMETRIC_ENABLED);
-    return value === 'true';
-  } catch (error) {
-    console.error('[authLock] Failed to get biometric setting:', error);
-    return false;
-  }
-}
-
-export async function setBiometricEnabled(enabled: boolean): Promise<void> {
-  try {
-    await AsyncStorage.setItem(
-      STORAGE_KEYS.BIOMETRIC_ENABLED,
-      enabled ? 'true' : 'false'
-    );
-  } catch (error) {
-    console.error('[authLock] Failed to set biometric setting:', error);
-  }
 }
 
 /**
@@ -201,7 +176,6 @@ export async function clearAuthLockStorage(): Promise<void> {
   try {
     await AsyncStorage.multiRemove([
       STORAGE_KEYS.LAST_AUTHENTICATED_AT,
-      // Note: We keep BIOMETRIC_ENABLED as a user preference
       // Note: We keep TERMS_ACCEPTED_AT/VERSION as that's account-agnostic
     ]);
   } catch (error) {

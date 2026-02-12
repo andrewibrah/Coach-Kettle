@@ -99,15 +99,20 @@ export const api = {
         return (await res.json()) as { rows: ApiWorkoutRow[]; answer?: string };
     },
 
-    askCoach: async (question: string, rows: ApiWorkoutRow[], onChunk?: (chunk: string) => void) => {
-        // Get user profile context for personalized responses
-        const profile = await getCachedProfile('');
-        const profileContext = buildAIContextString(profile);
-        const enhancedQuestion = question + profileContext;
-
+    askCoach: async (
+        question: string,
+        rows: ApiWorkoutRow[],
+        onChunk?: (chunk: string) => void,
+        chatHistory?: { role: string; content: string }[]
+    ) => {
+        // Profile context is now fetched server-side by the coach edge function
         const res = await fetchWithAuth(`${API_BASE}/coach`, {
             method: 'POST',
-            body: JSON.stringify({ question: enhancedQuestion, rows }),
+            body: JSON.stringify({
+                question,
+                rows,
+                ...(chatHistory && chatHistory.length > 0 ? { chatHistory } : {}),
+            }),
         });
 
         if (!res.ok) {

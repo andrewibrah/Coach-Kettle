@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { PRCelebration, PRCelebrationData } from '@/components/celebration/PRCelebration';
 
 interface PRCelebrationContextType {
@@ -17,14 +17,18 @@ export function PRCelebrationProvider({ children }: { children: React.ReactNode 
   const [celebrationData, setCelebrationData] = useState<PRCelebrationData | null>(null);
   const [queue, setQueue] = useState<PRCelebrationData[]>([]);
 
+  // Use ref so the callback stays stable (no dependency on celebrationData)
+  const celebrationDataRef = useRef<PRCelebrationData | null>(null);
+  celebrationDataRef.current = celebrationData;
+
   const showCelebration = useCallback((data: PRCelebrationData) => {
-    if (celebrationData) {
+    if (celebrationDataRef.current) {
       // Queue the celebration if one is already showing
       setQueue((prev) => [...prev, data]);
     } else {
       setCelebrationData(data);
     }
-  }, [celebrationData]);
+  }, []);
 
   const hideCelebration = useCallback(() => {
     setCelebrationData(null);

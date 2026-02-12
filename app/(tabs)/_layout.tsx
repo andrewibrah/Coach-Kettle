@@ -3,7 +3,6 @@ import React from 'react';
 
 import { useAuthLock } from '@/components/AuthLockProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { LockScreen } from '@/components/LockScreen';
 import { HapticTab } from '@/components/ui/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedView } from '@/components/ui/themed-view';
@@ -15,7 +14,7 @@ import { ActivityIndicator } from 'react-native';
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { session, loading } = useAuth();
-  const { isLocked, isCheckingLock, needsTermsAcceptance } = useAuthLock();
+  const { isCheckingLock, needsTermsAcceptance } = useAuthLock();
   const { profileLoading, needsOnboarding } = useProfile();
 
   // Show loading while checking auth state, lock state, or profile state
@@ -30,11 +29,6 @@ export default function TabLayout() {
   // No session - redirect to sign in
   if (!session) {
     return <Redirect href={"/auth/sign-in" as any} />;
-  }
-
-  // Session exists but is locked - show lock screen
-  if (isLocked) {
-    return <LockScreen />;
   }
 
   // Redirect to ToS if needed (before onboarding)

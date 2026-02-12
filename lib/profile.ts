@@ -567,3 +567,55 @@ export async function removeTemplateItem(itemId: string): Promise<boolean> {
     return false;
   }
 }
+
+// Update template item via Edge Function
+export async function updateTemplateItem(
+  itemId: string,
+  updates: {
+    lift_name?: string;
+    target_sets?: number | null;
+    target_reps?: number | null;
+    target_weight?: number | null;
+    notes?: string | null;
+  }
+): Promise<WorkoutTemplateItem | null> {
+  try {
+    const response = await fetchWithAuth(`${API_BASE}/workout-templates`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'update_item', item_id: itemId, ...updates }),
+    });
+
+    if (!response.ok) {
+      console.error('[Profile] Error updating template item:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.item;
+  } catch (error) {
+    console.error('[Profile] Error updating template item:', error);
+    return null;
+  }
+}
+
+// Reorder template items via Edge Function
+export async function reorderTemplateItems(
+  items: Array<{ id: string; display_order: number }>
+): Promise<boolean> {
+  try {
+    const response = await fetchWithAuth(`${API_BASE}/workout-templates`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reorder_items', items }),
+    });
+
+    if (!response.ok) {
+      console.error('[Profile] Error reordering template items:', response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[Profile] Error reordering template items:', error);
+    return false;
+  }
+}

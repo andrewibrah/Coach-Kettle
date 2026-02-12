@@ -71,7 +71,7 @@ serve(async (req) => {
             if (action === "list") {
                 const { data, error } = await supabase
                     .from("workout_templates")
-                    .select("*")
+                    .select("*, workout_template_items(count)")
                     .eq("user_id", userId)
                     .order("created_at", { ascending: false });
 
@@ -220,6 +220,67 @@ serve(async (req) => {
                     console.error("[workout-templates] Error removing item:", error);
                     return new Response(
                         JSON.stringify({ error: error.message }),
+                        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+
+                return new Response(
+                    JSON.stringify({ ok: true }),
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+            }
+
+            if (action === "update_item") {
+                const { item_id, lift_name, target_sets, target_reps, target_weight, notes } = body;
+                const updateData: Record<string, unknown> = {};
+                if (lift_name !== undefined) updateData.lift_name = lift_name;
+                if (target_sets !== undefined) updateData.target_sets = target_sets;
+                if (target_reps !== undefined) updateData.target_reps = target_reps;
+                if (target_weight !== undefined) updateData.target_weight = target_weight;
+                if (notes !== undefined) updateData.notes = notes;
+
+                const { data, error } = await supabase
+                    .from("workout_template_items")
+                    .update(updateData)
+                    .eq("id", item_id)
+                    .eq("user_id", userId)
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error("[workout-templates] Error updating item:", error);
+                    return new Response(
+                        JSON.stringify({ error: error.message }),
+                        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+
+                return new Response(
+                    JSON.stringify({ item: data }),
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+            }
+
+            if (action === "reorder_items") {
+                const { items } = body; // Array of { id, display_order }
+                const errors: string[] = [];
+
+                for (const item of items) {
+                    const { error } = await supabase
+                        .from("workout_template_items")
+                        .update({ display_order: item.display_order })
+                        .eq("id", item.id)
+                        .eq("user_id", userId);
+
+                    if (error) {
+                        errors.push(`${item.id}: ${error.message}`);
+                    }
+                }
+
+                if (errors.length > 0) {
+                    console.error("[workout-templates] Reorder errors:", errors);
+                    return new Response(
+                        JSON.stringify({ error: "Some items failed to reorder", details: errors }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
