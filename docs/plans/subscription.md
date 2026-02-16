@@ -29,10 +29,15 @@ app/(tabs)/_layout.tsx Redirect Chain:
   !session?        → /auth/sign-in
   needsTerms?      → /terms-of-service
   needsOnboarding? → /onboarding
+  needsPaywall?    → /paywall (initial offer OR expired trial/sub)
   else             → Render tabs (index, history)
 ```
 
-**Gating insertion point**: After `needsOnboarding` check in `app/(tabs)/_layout.tsx`, add `needsSubscription` check → redirect to `/paywall`.
+**Gating insertion points**:
+1. After `needsOnboarding` check in `app/(tabs)/_layout.tsx`, add `needsPaywall` check → redirect to `/paywall`
+2. The paywall screen serves **two purposes**:
+   - **Initial offer** (right after signup/onboarding): "Subscribe Now — 1 week free" OR "Skip — try 1 week free"
+   - **Expired gate** (after trial ends): "Subscribe to continue" with no skip option
 
 ### Supabase Usage Patterns
 
@@ -154,33 +159,43 @@ Purchase (future) → client calls StoreKit, writes to AsyncStorage + server
 
 #### Data Flow Diagrams
 
-**Trial Bootstrap (on first signup)**:
+**New Account Flow (signup → paywall offer → trial)**:
 ```
 1. User completes signup (sign-up.tsx)
 2. AuthProvider detects session
-3. ProfileProvider calls ensureProfile(userId)
-4. Profile edge function creates profile row
-5. Client calls POST /entitlements/bootstrap (idempotent)
-6. Edge function checks: trial_grant exists for user?
-   a. YES → return existing entitlement (no-op)
-   b. NO  → INSERT trial_grants row (trial_started_at = NOW(), trial_expires_at = NOW() + 7 days)
-          → UPSERT user_entitlements row (status = 'trial_active', expires_at = trial_expires_at)
-          → return entitlement state
-7. EntitlementProvider caches result; app renders main content
+3. ProfileProvider calls ensureProfile(userId) → creates profile row
+4. User completes onboarding (10-step wizard)
+5. EntitlementProvider calls GET /entitlements → no entitlement exists
+6. EntitlementProvider auto-bootstraps: POST /entitlements { action: "bootstrap" }
+7. Edge function creates trial_grant + user_entitlements with:
+   - status = 'trial_active'
+   - paywall_dismissed = FALSE        ← NEW FIELD
+   - trial_expires_at = NOW() + 7 days
+8. EntitlementProvider sees paywall_dismissed = false → sets needsInitialPaywall = true
+9. Tab layout redirects to /paywall (initial offer mode)
+10. Paywall shows TWO options:
+    a. "Subscribe Now" — $3/mo, 1 week free (purchase button — stubbed until Apple is ready)
+    b. "Skip — Try 1 Week Free" — starts trial without subscription
+11. User picks either:
+    a. Subscribe → (future) StoreKit purchase + receipt verification → sub_active + paywall_dismissed = true
+    b. Skip → POST /entitlements { action: "dismiss_paywall" } → paywall_dismissed = true
+12. EntitlementProvider refreshes → needsInitialPaywall = false → app renders /(tabs)
 ```
 
 **Access Check (on app open / foreground)**:
 ```
 1. App opens or returns to foreground
-2. EntitlementProvider calls GET /entitlements/me
+2. EntitlementProvider calls GET /entitlements
 3. Edge function queries user_entitlements WHERE user_id = auth.uid()
 4. If trial_expires_at < NOW() AND status = 'trial_active':
    → UPDATE user_entitlements SET status = 'trial_expired'
    → return { status: 'trial_expired' }
-5. Return entitlement state to client
-6. Client routes based on status:
-   - trial_active / sub_active  → /(tabs)
-   - trial_expired / sub_expired → /paywall
+5. Return entitlement state (including paywall_dismissed flag) to client
+6. Client routes based on state:
+   - paywall_dismissed = false           → /paywall (initial offer mode)
+   - trial_active + paywall_dismissed    → /(tabs) with trial banner
+   - sub_active                          → /(tabs)
+   - trial_expired / sub_expired         → /paywall (expired mode, no skip)
 ```
 
 **Future Purchase Flow (deferred)**:
@@ -213,36 +228,50 @@ Purchase (future) → client calls StoreKit, writes to AsyncStorage + server
 ```
                         ┌─────────────────────┐
   New Account ─────────►│    TRIAL_ACTIVE      │
-  (bootstrap)           │ (7-day window)       │
+  (bootstrap)           │ paywall_dismissed=F  │
                         └──────────┬──────────┘
                                    │
-                          trial_expires_at < NOW()
+                          /paywall shown (initial offer)
+                          User picks "Subscribe" or "Skip"
                                    │
-                                   ▼
-                        ┌─────────────────────┐
-                        │   TRIAL_EXPIRED      │◄──── access gated
-                        │                      │
-                        └──────────┬──────────┘
-                                   │
-                          subscription purchased
-                                   │
-                                   ▼
-                        ┌─────────────────────┐
-                        │    SUB_ACTIVE        │◄──── auto-renew
-                        │                      │─────────┐
-                        └──────────┬──────────┘         │
-                                   │                     │
-                          subscription expires /          │
-                          fails to renew                  │
-                                   │                     │
-                                   ▼                     │
-                        ┌─────────────────────┐         │
-                        │    SUB_EXPIRED       │         │
-                        │                      │─────────┘
-                        └─────────────────────┘  re-subscribe
+                    ┌──────────────┴──────────────┐
+                    │                              │
+              "Subscribe Now"               "Skip — Try Free"
+              (future StoreKit)             dismiss_paywall action
+                    │                              │
+                    ▼                              ▼
+         ┌──────────────────┐          ┌─────────────────────┐
+         │   SUB_ACTIVE     │          │    TRIAL_ACTIVE      │
+         │ paywall_dismissed │          │ paywall_dismissed=T  │
+         │ (1-wk free then  │          │ (7-day window)       │
+         │  $3/mo auto)     │          └──────────┬──────────┘
+         └────────┬─────────┘                     │
+                  │                      trial_expires_at < NOW()
+                  │                               │
+                  │                               ▼
+                  │                    ┌─────────────────────┐
+                  │                    │   TRIAL_EXPIRED      │◄── gated (no skip)
+                  │                    │                      │
+                  │                    └──────────┬──────────┘
+                  │                               │
+                  │                     subscription purchased
+                  │                               │
+                  │◄──────────────────────────────┘
+                  │
+                  │ subscription expires / fails to renew
+                  ▼
+         ┌──────────────────┐
+         │   SUB_EXPIRED    │───── re-subscribe ──►  SUB_ACTIVE
+         └──────────────────┘
 ```
 
 **Valid states**: `trial_active`, `trial_expired`, `sub_active`, `sub_expired`
+
+**`paywall_dismissed` flag** (on `user_entitlements`):
+- `false` = user has NOT yet seen the initial subscribe-or-skip paywall → must show it
+- `true` = user has made their choice (subscribe or skip) → don't show initial paywall again
+- This flag is independent of the entitlement status; it only controls the *initial* paywall offer
+- When trial expires, the paywall is shown again but in "expired" mode (no skip option)
 
 **Source-of-truth rules**:
 1. `user_entitlements.status` is the single source of truth for access decisions
@@ -305,12 +334,14 @@ CREATE TABLE public.user_entitlements (
     source          TEXT NOT NULL CHECK (source IN ('trial', 'subscription', 'manual'))
                     DEFAULT 'trial',
     expires_at      TIMESTAMPTZ,
+    paywall_dismissed BOOLEAN NOT NULL DEFAULT FALSE,
     subscription_id UUID REFERENCES public.subscriptions(id) ON DELETE SET NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 COMMENT ON TABLE public.user_entitlements IS 'Materialized entitlement state. Single source of truth for access gating. Only writable by service-role.';
+COMMENT ON COLUMN public.user_entitlements.paywall_dismissed IS 'Whether user has seen and dismissed the initial post-signup paywall offer. False = must show subscribe-or-skip screen.';
 ```
 
 ##### `subscription_events` — Audit log for subscription lifecycle events
@@ -399,6 +430,7 @@ CREATE TABLE IF NOT EXISTS public.user_entitlements (
     source          TEXT NOT NULL CHECK (source IN ('trial', 'subscription', 'manual'))
                     DEFAULT 'trial',
     expires_at      TIMESTAMPTZ,
+    paywall_dismissed BOOLEAN NOT NULL DEFAULT FALSE,
     subscription_id UUID REFERENCES public.subscriptions(id) ON DELETE SET NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -499,7 +531,8 @@ CREATE OR REPLACE FUNCTION public.bootstrap_trial(p_user_id UUID)
 RETURNS TABLE(
     entitlement_status TEXT,
     expires_at TIMESTAMPTZ,
-    is_new_trial BOOLEAN
+    is_new_trial BOOLEAN,
+    paywall_dismissed BOOLEAN
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -509,14 +542,15 @@ DECLARE
     v_trial_exists BOOLEAN;
     v_trial_expires TIMESTAMPTZ;
     v_entitlement_status TEXT;
+    v_paywall_dismissed BOOLEAN;
 BEGIN
     -- Check if trial already exists
     SELECT EXISTS(SELECT 1 FROM trial_grants WHERE user_id = p_user_id) INTO v_trial_exists;
 
     IF v_trial_exists THEN
         -- Return existing entitlement
-        SELECT ue.status, ue.expires_at
-        INTO v_entitlement_status, v_trial_expires
+        SELECT ue.status, ue.expires_at, ue.paywall_dismissed
+        INTO v_entitlement_status, v_trial_expires, v_paywall_dismissed
         FROM user_entitlements ue WHERE ue.user_id = p_user_id;
 
         -- If no entitlement row exists (edge case), create one from trial
@@ -524,39 +558,40 @@ BEGIN
             SELECT tg.trial_expires_at INTO v_trial_expires
             FROM trial_grants tg WHERE tg.user_id = p_user_id;
 
-            INSERT INTO user_entitlements (user_id, status, source, expires_at)
+            INSERT INTO user_entitlements (user_id, status, source, expires_at, paywall_dismissed)
             VALUES (
                 p_user_id,
                 CASE WHEN v_trial_expires > NOW() THEN 'trial_active' ELSE 'trial_expired' END,
                 'trial',
-                v_trial_expires
+                v_trial_expires,
+                FALSE
             )
             ON CONFLICT (user_id) DO NOTHING;
 
-            SELECT ue.status, ue.expires_at
-            INTO v_entitlement_status, v_trial_expires
+            SELECT ue.status, ue.expires_at, ue.paywall_dismissed
+            INTO v_entitlement_status, v_trial_expires, v_paywall_dismissed
             FROM user_entitlements ue WHERE ue.user_id = p_user_id;
         END IF;
 
-        RETURN QUERY SELECT v_entitlement_status, v_trial_expires, FALSE;
+        RETURN QUERY SELECT v_entitlement_status, v_trial_expires, FALSE, COALESCE(v_paywall_dismissed, FALSE);
         RETURN;
     END IF;
 
-    -- Create new trial
+    -- Create new trial (paywall_dismissed = FALSE so initial offer is shown)
     v_trial_expires := NOW() + INTERVAL '7 days';
 
     INSERT INTO trial_grants (user_id, trial_started_at, trial_expires_at)
     VALUES (p_user_id, NOW(), v_trial_expires);
 
-    INSERT INTO user_entitlements (user_id, status, source, expires_at)
-    VALUES (p_user_id, 'trial_active', 'trial', v_trial_expires)
+    INSERT INTO user_entitlements (user_id, status, source, expires_at, paywall_dismissed)
+    VALUES (p_user_id, 'trial_active', 'trial', v_trial_expires, FALSE)
     ON CONFLICT (user_id) DO UPDATE
         SET status = 'trial_active',
             source = 'trial',
             expires_at = v_trial_expires,
             updated_at = NOW();
 
-    RETURN QUERY SELECT 'trial_active'::TEXT, v_trial_expires, TRUE;
+    RETURN QUERY SELECT 'trial_active'::TEXT, v_trial_expires, TRUE, FALSE;
 END;
 $$;
 
@@ -567,7 +602,8 @@ RETURNS TABLE(
     entitlement_source TEXT,
     expires_at TIMESTAMPTZ,
     trial_days_remaining INTEGER,
-    subscription_id UUID
+    subscription_id UUID,
+    paywall_dismissed BOOLEAN
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -581,7 +617,7 @@ BEGIN
 
     IF v_row IS NULL THEN
         -- No entitlement exists; return null state (caller should bootstrap)
-        RETURN QUERY SELECT NULL::TEXT, NULL::TEXT, NULL::TIMESTAMPTZ, NULL::INTEGER, NULL::UUID;
+        RETURN QUERY SELECT NULL::TEXT, NULL::TEXT, NULL::TIMESTAMPTZ, NULL::INTEGER, NULL::UUID, FALSE;
         RETURN;
     END IF;
 
@@ -615,7 +651,8 @@ BEGIN
         v_row.source,
         v_row.expires_at,
         v_days_remaining,
-        v_row.subscription_id;
+        v_row.subscription_id,
+        v_row.paywall_dismissed;
 END;
 $$;
 ```
@@ -669,7 +706,7 @@ APP_STORE_ENVIRONMENT=sandbox  # Change to 'production' for release
 
 **Contract**:
 ```typescript
-// Request
+// Request: Bootstrap trial
 POST /entitlements
 Authorization: Bearer <jwt>
 Content-Type: application/json
@@ -679,12 +716,28 @@ Content-Type: application/json
 {
   "ok": true,
   "data": {
-    "status": "trial_active",      // | "trial_expired" | "sub_active" | "sub_expired"
-    "source": "trial",             // | "subscription" | "manual"
+    "status": "trial_active",
+    "source": "trial",
     "expires_at": "2026-02-22T00:00:00Z",
     "trial_days_remaining": 7,
     "is_new_trial": true,
+    "paywall_dismissed": false,     // false = must show initial offer paywall
     "subscription_id": null
+  }
+}
+
+// Request: Dismiss initial paywall (user tapped "Skip — Try 1 Week Free")
+POST /entitlements
+Authorization: Bearer <jwt>
+Content-Type: application/json
+{ "action": "dismiss_paywall" }
+
+// Response 200
+{
+  "ok": true,
+  "data": {
+    "status": "trial_active",
+    "paywall_dismissed": true
   }
 }
 ```
@@ -742,7 +795,26 @@ Deno.serve(async (req: Request) => {
                         status: row.entitlement_status,
                         expires_at: row.expires_at,
                         is_new_trial: row.is_new_trial,
+                        paywall_dismissed: row.paywall_dismissed,
                     }
+                }), {
+                    status: 200,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+            }
+
+            if (action === "dismiss_paywall") {
+                // User tapped "Skip — Try 1 Week Free" on initial paywall
+                const { error } = await supabaseAdmin
+                    .from("user_entitlements")
+                    .update({ paywall_dismissed: true })
+                    .eq("user_id", userId);
+
+                if (error) throw error;
+
+                return new Response(JSON.stringify({
+                    ok: true,
+                    data: { status: "trial_active", paywall_dismissed: true }
                 }), {
                     status: 200,
                     headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -774,6 +846,7 @@ Deno.serve(async (req: Request) => {
                         expires_at: bRow.expires_at,
                         trial_days_remaining: 7,
                         subscription_id: null,
+                        paywall_dismissed: bRow.paywall_dismissed,
                     }
                 }), {
                     status: 200,
@@ -789,6 +862,7 @@ Deno.serve(async (req: Request) => {
                     expires_at: row.expires_at,
                     trial_days_remaining: row.trial_days_remaining,
                     subscription_id: row.subscription_id,
+                    paywall_dismissed: row.paywall_dismissed,
                 }
             }), {
                 status: 200,
@@ -1031,13 +1105,16 @@ interface EntitlementState {
   expiresAt: string | null;
   trialDaysRemaining: number | null;
   subscriptionId: string | null;
+  paywallDismissed: boolean;
 }
 
 interface EntitlementContextType {
   entitlement: EntitlementState;
   isLoading: boolean;
-  hasAccess: boolean;             // true if trial_active or sub_active
-  needsPaywall: boolean;          // true if trial_expired or sub_expired
+  hasAccess: boolean;             // true if trial_active or sub_active (AND paywall dismissed)
+  needsPaywall: boolean;          // true if trial_expired or sub_expired (hard gate)
+  needsInitialPaywall: boolean;   // true if new user hasn't seen subscribe-or-skip offer
+  dismissPaywall: () => Promise<void>;  // user tapped "Skip — Try 1 Week Free"
   refreshEntitlement: () => Promise<void>;
 }
 
@@ -1047,6 +1124,7 @@ const defaultState: EntitlementState = {
   expiresAt: null,
   trialDaysRemaining: null,
   subscriptionId: null,
+  paywallDismissed: false,
 };
 
 const EntitlementContext = createContext<EntitlementContextType>({
@@ -1054,6 +1132,8 @@ const EntitlementContext = createContext<EntitlementContextType>({
   isLoading: true,
   hasAccess: false,
   needsPaywall: false,
+  needsInitialPaywall: false,
+  dismissPaywall: async () => {},
   refreshEntitlement: async () => {},
 });
 
@@ -1092,6 +1172,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
           expiresAt: getBody.data.expires_at,
           trialDaysRemaining: getBody.data.trial_days_remaining,
           subscriptionId: getBody.data.subscription_id,
+          paywallDismissed: getBody.data.paywall_dismissed ?? false,
         });
         setIsLoading(false);
         return;
@@ -1117,6 +1198,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
           expiresAt: postBody.data.expires_at,
           trialDaysRemaining: 7,
           subscriptionId: null,
+          paywallDismissed: postBody.data.paywall_dismissed ?? false,
         });
       } else {
         setEntitlement({ ...defaultState, status: 'unknown' });
@@ -1150,8 +1232,30 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
     return () => subscription.remove();
   }, [fetchEntitlement]);
 
-  const hasAccess = entitlement.status === 'trial_active' || entitlement.status === 'sub_active';
+  // Derived access flags
+  const isActiveStatus = entitlement.status === 'trial_active' || entitlement.status === 'sub_active';
+  const hasAccess = isActiveStatus && entitlement.paywallDismissed;
   const needsPaywall = entitlement.status === 'trial_expired' || entitlement.status === 'sub_expired';
+  const needsInitialPaywall = isActiveStatus && !entitlement.paywallDismissed;
+
+  // Called when user taps "Skip — Try 1 Week Free"
+  const dismissPaywall = useCallback(async () => {
+    if (!session?.access_token) return;
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/entitlements`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseAnonKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'dismiss_paywall' }),
+      });
+      setEntitlement(prev => ({ ...prev, paywallDismissed: true }));
+    } catch (error) {
+      console.error('[EntitlementProvider] Error dismissing paywall:', error);
+    }
+  }, [session?.access_token]);
 
   return (
     <EntitlementContext.Provider value={{
@@ -1159,6 +1263,8 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
       isLoading,
       hasAccess,
       needsPaywall,
+      needsInitialPaywall,
+      dismissPaywall,
       refreshEntitlement: fetchEntitlement,
     }}>
       {children}
@@ -1193,7 +1299,7 @@ Add entitlement check after onboarding check:
 import { useEntitlement } from '@/contexts/EntitlementContext';
 
 // Inside TabLayout component, after existing checks:
-const { needsPaywall, isLoading: entitlementLoading, entitlement } = useEntitlement();
+const { needsPaywall, needsInitialPaywall, isLoading: entitlementLoading } = useEntitlement();
 
 // Add to loading check:
 if (loading || isCheckingLock || profileLoading || entitlementLoading) {
@@ -1201,21 +1307,70 @@ if (loading || isCheckingLock || profileLoading || entitlementLoading) {
 }
 
 // After needsOnboarding check, before rendering tabs:
-if (needsPaywall) {
+// Shows initial offer paywall (subscribe-or-skip) for new users
+// Shows expired paywall (subscribe-only) for expired trials/subs
+if (needsInitialPaywall || needsPaywall) {
   return <Redirect href="/paywall" />;
 }
 ```
 
 #### New Screens
 
-##### PaywallScreen
+##### PaywallScreen (Dual-Mode: Initial Offer + Expired Gate)
 
 **New file**: `app/paywall.tsx`
 
+The paywall screen operates in two modes determined by `needsInitialPaywall` vs `needsPaywall`:
+
+**Mode 1 — Initial Offer (right after signup/onboarding)**:
+```
+┌─────────────────────────────────────┐
+│                                     │
+│     🏋️ Welcome to Coach Kettle     │
+│                                     │
+│   Track workouts, crush PRs,        │
+│   and get AI coaching.              │
+│                                     │
+│         $3/month                    │
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │  Subscribe Now               │    │
+│  │  Get 1 week free, then $3/mo │    │ ← Primary CTA (stubbed until Apple ready)
+│  └─────────────────────────────┘    │
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │  Skip — Try 1 Week Free      │    │ ← Secondary CTA (always functional)
+│  └─────────────────────────────┘    │
+│                                     │
+│         Restore Purchases           │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Mode 2 — Expired Gate (trial/subscription ended)**:
+```
+┌─────────────────────────────────────┐
+│                                     │
+│    Your Free Trial Has Ended        │
+│                                     │
+│   Subscribe to continue tracking    │
+│   workouts, PRs, and AI coaching.   │
+│                                     │
+│         $3/month                    │
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │  Subscribe Now — $3/month    │    │ ← Primary CTA (stubbed until Apple ready)
+│  └─────────────────────────────┘    │
+│                                     │
+│     Check Again · Restore · Sign Out│ ← NO skip option
+│                                     │
+└─────────────────────────────────────┘
+```
+
 ```typescript
 // app/paywall.tsx
-import { useCallback } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Pressable, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ui/themed-text';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -1224,13 +1379,56 @@ import { useAuth } from '@/components/AuthProvider';
 
 export default function PaywallScreen() {
   const backgroundColor = useThemeColor({}, 'background');
-  const { entitlement, refreshEntitlement, hasAccess } = useEntitlement();
+  const tintColor = useThemeColor({}, 'tint');
+  const {
+    entitlement,
+    refreshEntitlement,
+    hasAccess,
+    needsInitialPaywall,
+    needsPaywall,
+    dismissPaywall,
+  } = useEntitlement();
   const { signOut } = useAuth();
   const router = useRouter();
+  const [dismissing, setDismissing] = useState(false);
 
+  // Determine which mode we're in
+  const isInitialOffer = needsInitialPaywall;
+  const isExpiredGate = needsPaywall;
+
+  // If access was restored, redirect to main app
+  if (hasAccess) {
+    router.replace('/(tabs)');
+    return null;
+  }
+
+  // "Subscribe Now" — stubbed until Apple Dev account is ready
+  const handleSubscribe = useCallback(async () => {
+    // FUTURE: Initiate StoreKit purchase here
+    // For now, show a placeholder alert
+    Alert.alert(
+      'Coming Soon',
+      'Subscription purchases will be available shortly. Tap "Skip" to start your free trial.',
+      [{ text: 'OK' }]
+    );
+  }, []);
+
+  // "Skip — Try 1 Week Free" — dismisses paywall, starts trial
+  const handleSkipTrial = useCallback(async () => {
+    setDismissing(true);
+    try {
+      await dismissPaywall();
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setDismissing(false);
+    }
+  }, [dismissPaywall, router]);
+
+  // "Check Again" — re-fetches entitlement from server
   const handleCheckAgain = useCallback(async () => {
     await refreshEntitlement();
-    // If access is restored, the tab layout redirect will handle navigation
   }, [refreshEntitlement]);
 
   const handleSignOut = useCallback(async () => {
@@ -1238,50 +1436,74 @@ export default function PaywallScreen() {
     router.replace('/auth/sign-in');
   }, [signOut, router]);
 
-  // If access was restored (e.g., subscription activated), redirect
-  if (hasAccess) {
-    router.replace('/(tabs)');
-    return null;
-  }
-
   return (
     <View style={[styles.container, { backgroundColor }]}>
       <View style={styles.content}>
+
+        {/* HEADER — different per mode */}
         <ThemedText type="title" style={styles.title}>
-          Your Free Trial Has Ended
+          {isInitialOffer ? 'Welcome to Coach Kettle' : 'Your Free Trial Has Ended'}
         </ThemedText>
 
         <ThemedText style={styles.body}>
-          Your 7-day free trial of Coach Kettle has expired.
-          Subscribe to continue tracking your workouts, PRs, and getting AI coaching.
+          {isInitialOffer
+            ? 'Track workouts, crush PRs, and get AI coaching — all in one place.'
+            : 'Subscribe to continue tracking your workouts, PRs, and getting AI coaching.'}
         </ThemedText>
 
-        <ThemedText style={styles.price}>
-          $3/month
-        </ThemedText>
+        <ThemedText style={styles.price}>$3/month</ThemedText>
 
-        {/* NO purchase button — will be added when Apple Dev account is active */}
-        <ThemedText style={styles.comingSoon}>
-          Subscription coming soon. Check back for updates.
-        </ThemedText>
-
-        {/* Check Again button — allows user to refresh if subscription was activated externally */}
-        <Pressable onPress={handleCheckAgain} style={styles.checkAgainButton}>
-          <ThemedText style={styles.checkAgainText}>Check Again</ThemedText>
+        {/* PRIMARY CTA — Subscribe Now */}
+        <Pressable
+          onPress={handleSubscribe}
+          style={[styles.primaryButton, { backgroundColor: tintColor }]}
+        >
+          <ThemedText style={styles.primaryButtonText}>
+            {isInitialOffer ? 'Subscribe Now' : 'Subscribe Now — $3/month'}
+          </ThemedText>
+          {isInitialOffer && (
+            <ThemedText style={styles.primaryButtonSubtext}>
+              Get 1 week free, then $3/mo
+            </ThemedText>
+          )}
         </Pressable>
 
-        {/* Restore Purchases placeholder */}
-        <Pressable onPress={handleCheckAgain} style={styles.restoreButton}>
-          <ThemedText style={styles.restoreText}>Restore Purchases</ThemedText>
-        </Pressable>
+        {/* SECONDARY CTA — Skip (initial offer only) */}
+        {isInitialOffer && (
+          <Pressable
+            onPress={handleSkipTrial}
+            disabled={dismissing}
+            style={styles.secondaryButton}
+          >
+            <ThemedText style={[styles.secondaryButtonText, { color: tintColor }]}>
+              {dismissing ? 'Starting trial...' : 'Skip — Try 1 Week Free'}
+            </ThemedText>
+          </Pressable>
+        )}
 
-        <Pressable onPress={handleSignOut} style={styles.signOutButton}>
-          <ThemedText style={styles.signOutText}>Sign Out</ThemedText>
-        </Pressable>
+        {/* UTILITY LINKS */}
+        <View style={styles.utilityRow}>
+          {isExpiredGate && (
+            <Pressable onPress={handleCheckAgain} style={styles.utilityLink}>
+              <ThemedText style={styles.utilityText}>Check Again</ThemedText>
+            </Pressable>
+          )}
+          <Pressable onPress={handleCheckAgain} style={styles.utilityLink}>
+            <ThemedText style={styles.utilityText}>Restore Purchases</ThemedText>
+          </Pressable>
+          {isExpiredGate && (
+            <Pressable onPress={handleSignOut} style={styles.utilityLink}>
+              <ThemedText style={styles.utilityText}>Sign Out</ThemedText>
+            </Pressable>
+          )}
+        </View>
+
       </View>
     </View>
   );
 }
+
+// StyleSheet would use useThemeColor() for all colors — no hardcoded hex values
 ```
 
 ##### Trial Banner Component
@@ -1647,22 +1869,25 @@ In App Store Connect → Your App → App Information → App Store Server Notif
 
 | # | Test | Expected Result | Verification Method |
 |---|------|-----------------|---------------------|
-| 1 | New signup → trial starts | `trial_grants` row created; `user_entitlements.status = 'trial_active'`; app shows main content with trial banner | Create new account; check DB; observe UI |
-| 2 | Trial banner shows days remaining | Banner displays "Free trial: 7 days remaining" (or fewer) | Check TrialBanner component on home screen |
-| 3 | Trial expired simulation → gated | Set `trial_expires_at` to past date in DB; reopen app → redirected to `/paywall` | Manually update DB; reopen app |
-| 4 | Paywall shows correct messaging | "Your Free Trial Has Ended" + price + "Check Again" button + "Restore Purchases" | Visual inspection of paywall screen |
-| 5 | "Check Again" refreshes entitlement | Tapping "Check Again" calls `GET /entitlements`; if subscription was activated, navigates back to `/(tabs)` | Activate subscription in DB; tap "Check Again" |
-| 6 | Server marks subscription active → access granted | Set `user_entitlements.status = 'sub_active'` in DB; app refreshes → paywall dismissed | Update DB; reopen app or tap "Check Again" |
-| 7 | Client cannot forge premium status | No RLS INSERT/UPDATE/DELETE policy on `user_entitlements`, `subscriptions`, or `trial_grants` for `authenticated` role | Attempt `supabase.from('user_entitlements').update(...)` from client → should fail |
-| 8 | RLS prevents cross-user access | User A cannot SELECT User B's entitlement/subscription/trial | Query with User A's JWT for User B's data → empty result |
-| 9 | RLS prevents client writes to subscription tables | Client-side INSERT/UPDATE/DELETE on `subscriptions`, `user_entitlements`, `trial_grants` → denied | Test from client Supabase SDK |
-| 10 | Bootstrap is idempotent | Calling `POST /entitlements { action: "bootstrap" }` twice returns same trial, does not extend expiry | Call bootstrap twice; verify `trial_expires_at` unchanged |
-| 11 | Settings shows entitlement status | Settings screen displays "Trial (Xd left)" or "Active" or "Trial Expired" | Navigate to Settings; verify label |
-| 12 | No purchase button exists | Paywall has NO functional purchase initiation; only "Check Again" and informational text | Visual inspection |
-| 13 | Existing users get trial on update | User with existing workouts opens updated app → gets 7-day trial (or is grandfathered if backfill was run) | Login as existing user after migration |
-| 14 | Offline behavior: cached access | With `trial_active` cached, go offline → app remains accessible | Enable airplane mode; verify app works |
-| 15 | Offline behavior: cached expired | With `trial_expired` cached, go offline → paywall remains shown | Enable airplane mode; verify paywall persists |
-| 16 | Edge function auth failure | Call `/entitlements` without JWT → 401 error | `curl` without Authorization header |
+| 1 | New signup → initial paywall shown | After onboarding completes, user sees paywall with "Subscribe Now" + "Skip — Try 1 Week Free" | Create new account; complete onboarding; observe paywall |
+| 2 | "Skip — Try 1 Week Free" starts trial | Tapping skip → `paywall_dismissed = true` in DB → app navigates to `/(tabs)` → trial banner visible | Tap skip; check DB; observe home screen |
+| 3 | "Subscribe Now" shows placeholder | Tapping subscribe shows "Coming Soon" alert (until Apple Dev is active) | Tap subscribe; observe alert |
+| 4 | Trial banner shows days remaining | After skipping, banner displays "Free trial: 7 days remaining" (or fewer) on home screen | Check TrialBanner component |
+| 5 | Initial paywall NOT shown on subsequent opens | After dismissing paywall, reopening app goes straight to `/(tabs)` (no paywall again) | Close and reopen app |
+| 6 | Trial expired → expired paywall (no skip) | Set `trial_expires_at` to past; reopen app → paywall shows "Your Free Trial Has Ended" with NO skip button | Manually update DB; reopen app |
+| 7 | "Check Again" refreshes entitlement | On expired paywall, tapping "Check Again" calls `GET /entitlements`; if subscription activated, navigates to `/(tabs)` | Activate subscription in DB; tap "Check Again" |
+| 8 | Server marks subscription active → access granted | Set `user_entitlements.status = 'sub_active'` in DB; app refreshes → paywall dismissed | Update DB; reopen app |
+| 9 | Client cannot forge premium status | No RLS INSERT/UPDATE/DELETE policy on `user_entitlements`, `subscriptions`, or `trial_grants` for `authenticated` role | Attempt `supabase.from('user_entitlements').update(...)` from client → should fail |
+| 10 | Client cannot dismiss paywall via DB | Client-side `UPDATE user_entitlements SET paywall_dismissed = true` → denied by RLS | Test from client SDK |
+| 11 | RLS prevents cross-user access | User A cannot SELECT User B's entitlement/subscription/trial | Query with User A's JWT for User B's data → empty result |
+| 12 | Bootstrap is idempotent | Calling `POST /entitlements { action: "bootstrap" }` twice returns same trial, does not extend expiry | Call bootstrap twice; verify `trial_expires_at` unchanged |
+| 13 | Settings shows entitlement status | Settings screen displays "Trial (Xd left)" or "Active" or "Trial Expired" | Navigate to Settings; verify label |
+| 14 | No functional purchase exists yet | "Subscribe Now" does NOT initiate a real purchase — shows placeholder only | Tap on both paywall modes |
+| 15 | Existing users see initial paywall on update | Existing user opens updated app → trial bootstrapped with `paywall_dismissed = false` → sees initial offer | Login as existing user after migration |
+| 16 | Existing users can skip to continue | Existing user taps "Skip — Try 1 Week Free" → gets 7-day trial → proceeds to app | Tap skip as existing user |
+| 17 | Offline behavior: cached access | With `trial_active + paywall_dismissed` cached, go offline → app remains accessible | Enable airplane mode; verify app works |
+| 18 | Offline behavior: cached expired | With `trial_expired` cached, go offline → paywall remains shown | Enable airplane mode; verify paywall persists |
+| 19 | Edge function auth failure | Call `/entitlements` without JWT → 401 error | `curl` without Authorization header |
 
 #### Security Verification Queries
 
@@ -1678,6 +1903,10 @@ INSERT INTO user_entitlements (user_id, status) VALUES (auth.uid(), 'sub_active'
 
 -- Should FAIL (no UPDATE policy for authenticated)
 UPDATE user_entitlements SET status = 'sub_active' WHERE user_id = auth.uid();
+-- Expected: 0 rows affected (no UPDATE policy)
+
+-- Should FAIL (client cannot dismiss paywall directly)
+UPDATE user_entitlements SET paywall_dismissed = true WHERE user_id = auth.uid();
 -- Expected: 0 rows affected (no UPDATE policy)
 
 -- Should FAIL (no DELETE policy for authenticated)

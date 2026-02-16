@@ -10,13 +10,13 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.coachkettle.app",
+      "bundleIdentifier": "com.coachkettle.coachkettle",
       "usesAppleSignIn": true,
       "infoPlist": {
       }
     },
     "android": {
-      "package": "com.coachkettle.app",
+      "package": "com.coachkettle.coachkettle",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
