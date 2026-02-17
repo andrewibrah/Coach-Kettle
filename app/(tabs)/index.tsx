@@ -987,68 +987,58 @@ export default function HomeScreen() {
     }
 
     if (gateDecision.kind === "ai") {
-      // Check if this is a conversational question - handle without ghost row
-      if (gateDecision.reason === "conversational_question") {
-        setMessageInput("");
-        setLoading(true);
+      // For questions we skip the ghost row (no workout data expected).
+      // For parse attempts we show a ghost row while the AI responds.
+      const isQuestion = gateDecision.reason === "conversational_question";
+      const ghostId = isQuestion ? null : makeId();
 
-        try {
-          const res = await api.askCoach(message, toApiRows(currentRows));
-          const answerText = res.answer?.trim() || "I'm not sure how to answer that.";
-          setAiBubbleText(answerText);
-
-          // Save to Supabase chat history
-          saveWorkoutChatQA(message, answerText, Date.now()).catch(err =>
-            console.warn("[Workout] Failed to save chat history:", err)
-          );
-
-          if (Platform.OS === "ios") {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        } catch (e) {
-          console.error("[sendMessage] Coach question failed:", e);
-          setAiBubbleText("Sorry, I couldn't get an answer right now. Try again.");
-        } finally {
-          setLoading(false);
-        }
-        return;
-      }
-
-      const ghostId = makeId();
-      const optimisticRow: LogRow = {
-        id: ghostId,
-        exercise: message.length > 20 ? message.slice(0, 17) + "..." : message,
-        set: 1,
-        weightLbs: "...",
-        reps: "...",
-        notes: "Parsing...",
-        timestamp: Date.now(),
-        status: "syncing",
-      };
-
-      setRows((prev) => [...prev, optimisticRow]);
       setMessageInput("");
       setLoading(true);
 
+      if (ghostId) {
+        const optimisticRow: LogRow = {
+          id: ghostId,
+          exercise: message.length > 20 ? message.slice(0, 17) + "..." : message,
+          set: 1,
+          weightLbs: "...",
+          reps: "...",
+          notes: "Parsing...",
+          timestamp: Date.now(),
+          status: "syncing",
+        };
+        setRows((prev) => [...prev, optimisticRow]);
+      }
+
       try {
-        const res = await api.chat(message, toApiRows(currentRows));
+        const lastExercise = getLastExerciseFromRows(currentRows);
+        const res = await api.chat(message, toApiRows(currentRows), lastExercise);
 
         if (res.answer) {
+          // AI answered a question or couldn't parse — show the response bubble
           setAiBubbleText(res.answer);
-          setRows((prev) => prev.filter((r) => r.id !== ghostId));
+          if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));
 
-          // Save to Supabase chat history
-          saveWorkoutChatQA(message, res.answer, optimisticRow.timestamp).catch(err =>
+          saveWorkoutChatQA(message, res.answer, Date.now()).catch((err) =>
             console.warn("[Workout] Failed to save chat history:", err)
           );
-        } else {
-          const newRows = buildRowsFromApi(res.rows).map(r => ({ ...r, status: 'committed' as const }));
-          setRows((prev) => prev.filter((r) => r.id !== ghostId).concat(newRows));
+        } else if (res.rows && res.rows.length > 0) {
+          // AI parsed workout rows — add them to the session
+          const newRows = buildRowsFromApi(res.rows).map((r) => ({
+            ...r,
+            status: "committed" as const,
+          }));
+          setRows((prev) =>
+            ghostId
+              ? prev.filter((r) => r.id !== ghostId).concat(newRows)
+              : prev.concat(newRows)
+          );
           requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+        } else {
+          // Empty response — remove ghost row silently
+          if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));
         }
       } catch {
-        setRows((prev) => prev.filter((r) => r.id !== ghostId));
-        // Error occurred but continue silently - parsing logic intact
+        if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));
       } finally {
         setLoading(false);
       }

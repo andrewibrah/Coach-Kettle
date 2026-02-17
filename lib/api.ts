@@ -85,18 +85,23 @@ export type CoachResponse = {
 };
 
 export const api = {
-    chat: async (message: string, rows: ApiWorkoutRow[]) => {
+    chat: async (message: string, rows: ApiWorkoutRow[], lastExercise?: string) => {
         const res = await fetchWithAuth(`${API_BASE}/chat`, {
             method: 'POST',
-            body: JSON.stringify({ message, rows }),
+            body: JSON.stringify({
+                message,
+                rows,
+                ...(lastExercise ? { lastExercise } : {}),
+            }),
         });
+        
 
         if (!res.ok) {
             const body = await res.text();
             throw new Error(`HTTP ${res.status}: ${body}`);
         }
 
-        return (await res.json()) as { rows: ApiWorkoutRow[]; answer?: string };
+        return (await res.json()) as { rows?: ApiWorkoutRow[]; answer?: string };
     },
 
     askCoach: async (

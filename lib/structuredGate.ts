@@ -11,9 +11,6 @@ export type ParsedRow = {
 export type GateDecisionReason =
   | "empty_message"
   | "multiple_entries_or_sets"
-  | "ambiguous_same_as_previous"
-  | "unsupported_units"
-  | "non_lift_units"
   | "missing_exercise"
   | "missing_reps"
   | "conversational_question"
@@ -30,7 +27,7 @@ export type GateDecision =
     rows: ParsedRow[];
     meta?: { pattern?: FastPattern };
   }
-  | { kind: "ai"; reason: GateDecisionReason; userHint?: string }
+  | { kind: "ai"; reason: GateDecisionReason }
   | { kind: "end_workout"; reason: "end_workout_intent" }
   | {
     kind: "fill_skeleton";
@@ -40,7 +37,6 @@ export type GateDecision =
     targetRowIndex: number;
   };
 
-// Row interface for routine-aware parsing
 export interface SkeletonRow {
   id: string;
   exercise: string;
@@ -53,14 +49,14 @@ type GateContext = {
   currentRows?: SkeletonRow[];
 };
 
-const MULTI_REASON: GateDecisionReason = "multiple_entries_or_sets";
 const KG_TO_LB = 2.20462;
-const PLATE_WEIGHT = 45; // per plate
+const PLATE_WEIGHT = 45;
 const BAR_WEIGHT = 45;
 
 const numberRegex = /\d/;
 
-// Patterns that indicate user wants to end their workout
+// ─── End-workout detection ───────────────────────────────────────────────────
+
 const END_WORKOUT_PATTERNS = [
   /^(i'?m\s+)?done$/i,
   /^(i'?m\s+)?finished$/i,
@@ -81,87 +77,43 @@ const END_WORKOUT_PATTERNS = [
   /^time\s+to\s+(go|leave|end)$/i,
 ];
 
-const isEndWorkoutIntent = (message: string): boolean => {
-  const lower = message.toLowerCase().trim();
-  for (const pattern of END_WORKOUT_PATTERNS) {
-    if (pattern.test(lower)) {
-      return true;
-    }
-  }
-  return false;
-};
+const isEndWorkoutIntent = (message: string): boolean =>
+  END_WORKOUT_PATTERNS.some((p) => p.test(message));
 
-// Patterns that indicate conversational questions rather than workout logging
-const QUESTION_PATTERNS = [
-  /^what\s+should\s+i/i,
-  /^what\s+do\s+i/i,
-  /^what\s+next/i,
-  /^what\s+now/i,
-  /^what\s+else/i,
-  /^what's\s+next/i,
-  /^what\s+about/i,
-  /^what\s+can\s+i/i,
-  /^what\s+exercise/i,
-  /^now\s+what/i,
-  /^next\s+exercise/i,
-  /^next\s+set/i,
-  /^how\s+many/i,
-  /^how\s+much/i,
-  /^should\s+i/i,
-  /^can\s+i/i,
-  /^is\s+it\s+ok/i,
-  /^is\s+this/i,
-  /^am\s+i/i,
-  /^do\s+i/i,
-  /^why/i,
-  /^when/i,
-  /^where/i,
-  /^which/i,
-  /^who/i,
-  /^help/i,
-  /^suggest/i,
-  /^recommend/i,
-  /^advice/i,
-  /^tips?\s*(for|on)?/i,
-  /\?$/,  // Ends with question mark
-];
+// ─── Same-set detection ──────────────────────────────────────────────────────
 
+const SAME_SET_RE = /^(?:same|again|same\s+set|same\s+weight)$/i;
+
+const isSameSet = (message: string): boolean => SAME_SET_RE.test(message.trim());
+
+// ─── Conversational question detection ──────────────────────────────────────
+// Only catches clearly non-workout inputs (no digits at all, or strong question signals).
+
+const QUESTION_PREFIX_RE =
+  /^(?:what(?:'?s)?|how|should|can|is|am|do|why|when|where|which|who|help|suggest|recommend|advice|tips?)\b/i;
 
 const isConversationalQuestion = (message: string): boolean => {
-  const lower = message.toLowerCase().trim();
-  const hasNumbers = /\d/.test(message);
-
-  // If message has NO numbers, it's likely a conversation/question
-  // (e.g. "What next", "Bench press", "I am tired")
-  // Exception: short exercise names might be here, but we default to AI coach
-  if (!hasNumbers) {
-    return true;
-  }
-
-  // Even if it has numbers ("How many reps for 135?"), check question patterns
-  for (const pattern of QUESTION_PATTERNS) {
-    if (pattern.test(lower)) {
-      return true;
-    }
-  }
-
-  // If message ends with ? and doesn't look like a workout entry
-  if (message.trim().endsWith('?')) {
-    return true;
-  }
-
+  const trimmed = message.trim();
+  // No digits → not a workout entry
+  if (!numberRegex.test(trimmed)) return true;
+  // Explicit question word prefix
+  if (QUESTION_PREFIX_RE.test(trimmed)) return true;
+  // Ends with ?
+  if (trimmed.endsWith("?")) return true;
   return false;
 };
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const normalizeSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
 
-const formatWeight = (num: number) => {
+const formatWeight = (num: number): string => {
   if (!Number.isFinite(num)) return "";
   const rounded = Math.round(num * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 };
 
-const normalizeWeightToLbs = (value: string, unit?: string) => {
+const normalizeWeightToLbs = (value: string, unit?: string): string => {
   const raw = parseFloat(value);
   if (!Number.isFinite(raw)) return "";
   if (!unit) return formatWeight(raw);
@@ -174,37 +126,41 @@ const normalizeWeightToLbs = (value: string, unit?: string) => {
 const makeAiDecision = (reason: GateDecisionReason): GateDecision => ({
   kind: "ai",
   reason,
-  userHint: userHintForReason(reason),
 });
 
-const userHintForReason = (reason: GateDecisionReason): string | undefined => {
-  switch (reason) {
-    case "empty_message":
-      return 'Try something like "Bench 185 x 8".';
-    case "multiple_entries_or_sets":
-      return "One exercise per message. Format: Exercise Weight Reps.";
-    case "ambiguous_same_as_previous":
-      return "Say the exercise name or repeat the full set.";
-    case "unsupported_units":
-      return "Use lbs or kg (we convert). Skip plate math if unsure.";
-    case "non_lift_units":
-      return 'If cardio, try "Elliptical 15 min". Otherwise log weight/reps.';
-    case "missing_exercise":
-      return 'What exercise? Try "Bench 185 8" or just "135 10".';
-    case "missing_reps":
-      return "Add reps. Example: Exercise Weight Reps.";
-    case "conversational_question":
-      return undefined; // No hint needed, AI will respond
-    default:
-      return undefined;
-  }
-};
+const buildFastDecision = (rows: ParsedRow[], pattern?: FastPattern): GateDecision => ({
+  kind: "fast",
+  reason: "success",
+  rows,
+  meta: pattern ? { pattern } : undefined,
+});
+
+// ─── Pair parsing ─────────────────────────────────────────────────────────────
 
 type NumberPair = { weight: string; reps: string };
 type ParsedPairs = { pairs: NumberPair[]; leftoverNumericCount: number; numberCount: number };
 
 const parsePairsFromTail = (tail: string): ParsedPairs => {
   const pairs: NumberPair[] = [];
+
+  // Handle alternating comma-separated pairs: "100,10,120,10" → [(100,10),(120,10)]
+  // Requires ≥4 comma-separated pure numbers (even count).
+  const commaTokens = tail.trim().split(/\s*,\s*/);
+  if (
+    commaTokens.length >= 4 &&
+    commaTokens.length % 2 === 0 &&
+    commaTokens.every((v) => /^\d+(?:\.\d+)?$/.test(v.trim()))
+  ) {
+    for (let i = 0; i < commaTokens.length; i += 2) {
+      pairs.push({
+        weight: normalizeWeightToLbs(commaTokens[i].trim()),
+        reps: commaTokens[i + 1].trim(),
+      });
+    }
+    return { pairs, leftoverNumericCount: 0, numberCount: commaTokens.length };
+  }
+
+  // Standard regex: matches "weight [unit] [x] reps" pairs
   const pairRegex =
     /(\d+(?:\.\d+)?)(?:\s*(kg|kgs?|lb|lbs?|plates?|plate))?\s*(?:x|×)?\s*(\d+(?:\.\d+)?)(?:\s*reps?)?/gi;
   let match: RegExpExecArray | null;
@@ -214,10 +170,13 @@ const parsePairsFromTail = (tail: string): ParsedPairs => {
       reps: match[3],
     });
   }
+
   const numberCount = (tail.match(/\d+(?:\.\d+)?/g) ?? []).length;
   const leftoverNumericCount = Math.max(0, numberCount - pairs.length * 2);
   return { pairs, leftoverNumericCount, numberCount };
 };
+
+// ─── Exercise extraction ──────────────────────────────────────────────────────
 
 const extractExercises = (segment: string, allowMultiple: boolean): string[] => {
   const cleaned = segment.replace(/\bsuperset\b/gi, "").replace(/\bss\b/gi, "").trim();
@@ -227,70 +186,83 @@ const extractExercises = (segment: string, allowMultiple: boolean): string[] => 
     .split(/\band\b|\/|,/i)
     .map((p) => normalizeSpaces(p))
     .filter(Boolean);
-  if (parts.length) return parts;
-  return [cleaned];
+  return parts.length ? parts : [cleaned];
 };
 
-const hasMultipleExerciseSignals = (segment: string) =>
+const hasMultipleExerciseSignals = (segment: string): boolean =>
   /\b(and|&)\b/.test(segment) || /[,/]/.test(segment);
 
-const hasCardioSignals = (lower: string) =>
+const hasCardioSignals = (lower: string): boolean =>
   /\bcardio\b|\belliptical\b|\btreadmill\b|\bbike\b|\brow(er)?\b|\brun\b|\bjog\b/.test(lower) ||
   /\bmins?\b|\bminutes?\b|\bmiles?\b|\bkm\b/.test(lower);
 
-const buildFastDecision = (rows: ParsedRow[], pattern?: FastPattern): GateDecision => ({
-  kind: "fast",
-  reason: "success",
-  rows,
-  meta: pattern ? { pattern } : undefined,
-});
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 export function decideAndParse(message: string, context: GateContext): GateDecision {
   const trimmed = message.trim();
+
   if (!trimmed) return makeAiDecision("empty_message");
 
-  // Check for end workout intent first
-  if (isEndWorkoutIntent(trimmed)) {
+  if (isEndWorkoutIntent(trimmed.toLowerCase())) {
     return { kind: "end_workout", reason: "end_workout_intent" };
   }
 
-  // ========== ROUTINE-AWARE WEIGHT-ONLY PARSING ==========
-  // When skeleton rows exist (from imported routine), allow weight-only or weight+reps input
-  // to fill the next empty-weight row sequentially.
-  // Format: "150" (weight only) or "150 8" (weight + override reps)
+  // "Same" → duplicate the last row that has weight + reps
+  if (isSameSet(trimmed)) {
+    if (context.currentRows && context.currentRows.length > 0) {
+      const lastFilled = [...context.currentRows]
+        .reverse()
+        .find((r) => r.exercise && r.weightLbs && r.reps);
+      if (lastFilled) {
+        return buildFastDecision(
+          [
+            {
+              exercise: lastFilled.exercise,
+              weightLbs: lastFilled.weightLbs,
+              reps: lastFilled.reps,
+              notes: "",
+              kind: "normal",
+            },
+          ],
+          "single"
+        );
+      }
+    }
+    // No prior row to duplicate — let AI handle it
+    return makeAiDecision("conversational_question");
+  }
+
+  // ─── Skeleton fill (routine-aware) ─────────────────────────────────────────
   if (context.currentRows && context.currentRows.length > 0) {
-    // Find next row with empty weight
     const nextEmptyIdx = context.currentRows.findIndex(
       (row) => row.exercise && !row.weightLbs
     );
 
     if (nextEmptyIdx !== -1) {
-      // Check if message is just a number (weight only)
       const weightOnlyMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:lbs?|kg)?$/i);
       if (weightOnlyMatch) {
-        const weight = normalizeWeightToLbs(weightOnlyMatch[1],
-          trimmed.toLowerCase().includes('kg') ? 'kg' : undefined
-        );
         return {
           kind: "fill_skeleton",
           reason: "fill_skeleton_row",
-          weight: weight,
+          weight: normalizeWeightToLbs(
+            weightOnlyMatch[1],
+            trimmed.toLowerCase().includes("kg") ? "kg" : undefined
+          ),
           targetRowIndex: nextEmptyIdx,
         };
       }
 
-      // Check if message is weight + reps (e.g., "150 8" or "150x8" or "150 for 8")
       const weightRepsMatch = trimmed.match(
         /^(\d+(?:\.\d+)?)\s*(?:lbs?|kg)?\s*(?:x|×|for|,)?\s*(\d+)(?:\s*reps?)?$/i
       );
       if (weightRepsMatch) {
-        const weight = normalizeWeightToLbs(weightRepsMatch[1],
-          trimmed.toLowerCase().includes('kg') ? 'kg' : undefined
-        );
         return {
           kind: "fill_skeleton",
           reason: "fill_skeleton_row",
-          weight: weight,
+          weight: normalizeWeightToLbs(
+            weightRepsMatch[1],
+            trimmed.toLowerCase().includes("kg") ? "kg" : undefined
+          ),
           reps: weightRepsMatch[2],
           targetRowIndex: nextEmptyIdx,
         };
@@ -298,30 +270,28 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
     }
   }
 
-  // Check for conversational questions - route to AI for coach response
+  // ─── Conversational / question → AI ────────────────────────────────────────
   if (isConversationalQuestion(trimmed)) {
     return makeAiDecision("conversational_question");
   }
 
-  if (trimmed.includes("\n")) return makeAiDecision(MULTI_REASON);
+  if (trimmed.includes("\n")) return makeAiDecision("multiple_entries_or_sets");
 
   const normalized = normalizeSpaces(trimmed);
   const lower = normalized.toLowerCase();
-
   const tokens = normalized.split(" ");
+
   const firstNumberIdx = tokens.findIndex((tok) => numberRegex.test(tok));
   const warmupFlag = /\bwarm\s*-?\s*up\b/.test(lower);
   const isSuperset = /\bsuperset\b/.test(lower) || /\bss\b/.test(lower);
   const isDropset = /\bdrops?et\b/.test(lower) || /\bdrop set\b/.test(lower);
   const isCardio = hasCardioSignals(lower);
 
-  if (/\bsame as\b/.test(lower)) return makeAiDecision("ambiguous_same_as_previous");
-
   const exerciseSegment =
     firstNumberIdx > -1 ? tokens.slice(0, firstNumberIdx).join(" ") : normalized;
 
   if (!isSuperset && exerciseSegment && hasMultipleExerciseSignals(exerciseSegment)) {
-    return makeAiDecision(MULTI_REASON);
+    return makeAiDecision("multiple_entries_or_sets");
   }
 
   const exercises = extractExercises(exerciseSegment, isSuperset);
@@ -330,24 +300,20 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
     exercises.push(context.lastExercise.trim());
   }
   if (!exercises.length) return makeAiDecision("missing_exercise");
-  if (!isSuperset && exercises.length > 1) return makeAiDecision(MULTI_REASON);
+  if (!isSuperset && exercises.length > 1) return makeAiDecision("multiple_entries_or_sets");
 
   const tail = firstNumberIdx > -1 ? tokens.slice(firstNumberIdx).join(" ") : "";
 
-  // Check for single number first (bodyweight exercise: reps only)
-  // This must happen BEFORE parsePairsFromTail to prevent "20" being split into "2" and "0"
+  // Bodyweight: single number only → reps with no weight
   const singleNumberMatch = tail.match(/^(?:x\s*)?(\d+)$/);
   if (singleNumberMatch && !isSuperset && !isDropset && !isCardio) {
-    const reps = singleNumberMatch[1];
-    const baseNotes: string[] = [];
-    if (warmupFlag) baseNotes.push("warmup");
     return buildFastDecision(
       [
         {
           exercise: exercises[0],
           weightLbs: "0",
-          reps: reps,
-          notes: baseNotes.join(" "),
+          reps: singleNumberMatch[1],
+          notes: warmupFlag ? "warmup" : "",
           kind: warmupFlag ? "warmup" : "normal",
         },
       ],
@@ -357,13 +323,14 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
 
   const { pairs, leftoverNumericCount, numberCount } = parsePairsFromTail(tail);
 
+  // ─── Cardio ─────────────────────────────────────────────────────────────────
   if (isCardio) {
     const minutesMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:min|mins|minutes)/);
     const distanceMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mile|miles|km)/);
     const hrMatch = lower.match(/hr\s*(\d+(?:\.\d+)?)/);
     const reps = minutesMatch?.[1] ?? distanceMatch?.[1] ?? pairs[0]?.reps ?? pairs[0]?.weight ?? "";
     const intensity = pairs[0]?.weight ?? "";
-    const notesParts = ["cardio"];
+    const notesParts: string[] = ["cardio"];
     if (hrMatch?.[1]) notesParts.push(`HR ${hrMatch[1]}`);
     return buildFastDecision(
       [
@@ -379,54 +346,55 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
     );
   }
 
+  // ─── Superset ───────────────────────────────────────────────────────────────
   if (isSuperset) {
-    if (exercises.length < 2) return makeAiDecision(MULTI_REASON);
+    if (exercises.length < 2) return makeAiDecision("multiple_entries_or_sets");
     if (pairs.length < 2) return makeAiDecision("missing_reps");
     const rows: ParsedRow[] = [
       { exercise: exercises[0], weightLbs: pairs[0].weight, reps: pairs[0].reps, notes: "SS", kind: "superset" },
       { exercise: exercises[1], weightLbs: pairs[1].weight, reps: pairs[1].reps, notes: "SS", kind: "superset" },
     ];
     if (rows.some((r) => !r.reps)) return makeAiDecision("missing_reps");
-    if (leftoverNumericCount > 0 && pairs.length < 2) return makeAiDecision(MULTI_REASON);
     return buildFastDecision(rows, "superset");
   }
 
+  // ─── Dropset ─────────────────────────────────────────────────────────────────
   if (isDropset && exercises.length === 1) {
-    if (pairs.length < 2) return makeAiDecision(MULTI_REASON);
+    if (pairs.length < 2) return makeAiDecision("multiple_entries_or_sets");
     const rows: ParsedRow[] = pairs.map((pair) => ({
       exercise: exercises[0],
       weightLbs: pair.weight,
       reps: pair.reps,
       notes: "DS",
-      kind: "dropset",
+      kind: "dropset" as ParsedRowKind,
     }));
     if (rows.some((r) => !r.reps)) return makeAiDecision("missing_reps");
     return buildFastDecision(rows, "dropset");
   }
 
+  // ─── Multiple sets (e.g. "bench 100 10 120 10 140 6" or "100,10,120,10") ───
   if (pairs.length > 1) {
     const rows: ParsedRow[] = pairs.map((pair) => ({
       exercise: exercises[0],
       weightLbs: pair.weight,
       reps: pair.reps,
       notes: "",
-      kind: "normal",
+      kind: "normal" as ParsedRowKind,
     }));
     if (rows.some((r) => !r.reps)) return makeAiDecision("missing_reps");
-    if (leftoverNumericCount > 0) return makeAiDecision(MULTI_REASON);
+    if (leftoverNumericCount > 0) return makeAiDecision("multiple_entries_or_sets");
     return buildFastDecision(rows, "multi");
   }
 
+  // ─── Single set ─────────────────────────────────────────────────────────────
   if (pairs.length === 1) {
-    const baseNotes: string[] = [];
-    if (warmupFlag) baseNotes.push("warmup");
     return buildFastDecision(
       [
         {
           exercise: exercises[0],
           weightLbs: pairs[0].weight,
           reps: pairs[0].reps,
-          notes: baseNotes.join(" "),
+          notes: warmupFlag ? "warmup" : "",
           kind: warmupFlag ? "warmup" : "normal",
         },
       ],
@@ -434,12 +402,13 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
     );
   }
 
-  if (numberCount > 0) {
-    return makeAiDecision("missing_reps");
-  }
+  // Numbers present but no valid pairs found → let AI handle
+  if (numberCount > 0) return makeAiDecision("missing_reps");
 
   return makeAiDecision("missing_reps");
 }
+
+// ─── Dev tests (runs in __DEV__ only) ────────────────────────────────────────
 
 type DevTestCase = {
   message: string;
@@ -454,95 +423,58 @@ type DevTestCase = {
 
 function runDevStructuredGateTests() {
   const cases: DevTestCase[] = [
+    // Basic single set
+    { message: "Bench 135 8", expectKind: "fast", expectRowCount: 1, expectExercise: "Bench", expectWeight: "135", expectReps: "8" },
+    { message: "Lat pulldown 120x10", expectKind: "fast", expectRowCount: 1, expectExercise: "Lat pulldown", expectWeight: "120", expectReps: "10" },
+    // Shorthand with lastExercise
+    { message: "100 10", context: { lastExercise: "Bench" }, expectKind: "fast", expectRowCount: 1, expectExercise: "Bench", expectWeight: "100", expectReps: "10" },
+    // Multi-set space-separated
+    { message: "Bench 135 8 155 6", expectKind: "fast", expectRowCount: 2, expectPattern: "multi" },
+    // Multi-set comma-pair format
+    { message: "Bench 100,10,120,10", expectKind: "fast", expectRowCount: 2, expectPattern: "multi" },
+    // Multi-set space pairs shorthand
+    { message: "130 10 140 10 200 6", context: { lastExercise: "Squat" }, expectKind: "fast", expectRowCount: 3, expectPattern: "multi" },
+    // Dropset
+    { message: "Bench 185 8 165 10 dropset", expectKind: "fast", expectRowCount: 2, expectPattern: "dropset" },
+    // Superset
+    { message: "Bench and Push Ups superset 135 10 0 15", expectKind: "fast", expectRowCount: 2, expectPattern: "superset" },
+    // Cardio
+    { message: "Elliptical 15 min HR 150", expectKind: "fast", expectRowCount: 1, expectPattern: "cardio" },
+    // Warmup
+    { message: "Curls 20 10 warmup", expectKind: "fast", expectRowCount: 1, expectPattern: "warmup" },
+    // kg conversion
+    { message: "Squat 100kg 5", expectKind: "fast", expectRowCount: 1 },
+    // Questions → AI
+    { message: "What exercise should I do?", expectKind: "ai" },
+    { message: "How many reps for bench?", expectKind: "ai" },
+    { message: "", expectKind: "ai" },
+    // Multiple exercises → AI
+    { message: "Bench and Leg press 135 8", expectKind: "ai" },
+    // Same → fast (with context)
     {
-      message: "Bench 135 8",
+      message: "same",
+      context: { currentRows: [{ id: "1", exercise: "Bench Press", weightLbs: "185", reps: "8" }] },
       expectKind: "fast",
       expectRowCount: 1,
-      expectExercise: "Bench",
-      expectWeight: "135",
+      expectExercise: "Bench Press",
+      expectWeight: "185",
       expectReps: "8",
     },
-    {
-      message: "Lat pulldown 120x10",
-      expectKind: "fast",
-      expectRowCount: 1,
-      expectExercise: "Lat pulldown",
-      expectWeight: "120",
-      expectReps: "10",
-    },
-    {
-      message: "100 10",
-      context: { lastExercise: "Bench" },
-      expectKind: "fast",
-      expectRowCount: 1,
-      expectExercise: "Bench",
-      expectWeight: "100",
-      expectReps: "10",
-    },
-    {
-      message: "Bench 135 8, 155 6",
-      expectKind: "fast",
-      expectRowCount: 2,
-      expectPattern: "multi",
-    },
-    {
-      message: "Bench 185 8 then 165 10 dropset",
-      expectKind: "fast",
-      expectRowCount: 2,
-      expectPattern: "dropset",
-    },
-    {
-      message: "Bench and Push Ups superset 135 10 0 15",
-      expectKind: "fast",
-      expectRowCount: 2,
-      expectPattern: "superset",
-    },
-    {
-      message: "Elliptical 15 min HR 150",
-      expectKind: "fast",
-      expectRowCount: 1,
-      expectPattern: "cardio",
-    },
-    {
-      message: "Curls 20 10 warmup",
-      expectKind: "fast",
-      expectRowCount: 1,
-      expectPattern: "warmup",
-    },
-    {
-      message: "Squat 100kg 5",
-      expectKind: "fast",
-      expectRowCount: 1,
-    },
-    { message: "Bench and Leg press 135 8", expectKind: "ai" },
-    { message: "", expectKind: "ai" },
-    // Routine-aware skeleton fill tests
+    // Skeleton fill
     {
       message: "150",
-      context: {
-        currentRows: [
-          { id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" },
-          { id: "2", exercise: "Bench Press", weightLbs: "", reps: "10" },
-        ],
-      },
+      context: { currentRows: [{ id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" }] },
       expectKind: "fill_skeleton",
     },
     {
       message: "150 8",
-      context: {
-        currentRows: [
-          { id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" },
-        ],
-      },
+      context: { currentRows: [{ id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" }] },
       expectKind: "fill_skeleton",
     },
+    // Explicit exercise with skeleton context → fast (not skeleton fill)
     {
       message: "Bench 185 8",
-      context: {
-        currentRows: [
-          { id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" },
-        ],
-      },
+      context: { currentRows: [{ id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" }] },
       expectKind: "fast",
       expectRowCount: 1,
       expectExercise: "Bench",
@@ -556,42 +488,34 @@ function runDevStructuredGateTests() {
   for (const test of cases) {
     const res = decideAndParse(test.message, test.context ?? {});
     if (res.kind !== test.expectKind) {
-      failures.push(`"${test.message}" -> expected ${test.expectKind}, got ${res.kind}`);
+      failures.push(`"${test.message}" → expected ${test.expectKind}, got ${res.kind}`);
       continue;
     }
     if (res.kind === "fast") {
       if (test.expectRowCount !== undefined && res.rows.length !== test.expectRowCount) {
-        failures.push(`"${test.message}" rows mismatch: expected ${test.expectRowCount}, got ${res.rows.length}`);
+        failures.push(`"${test.message}" rows: expected ${test.expectRowCount}, got ${res.rows.length}`);
       }
       if (test.expectExercise && res.rows[0]?.exercise !== test.expectExercise) {
-        failures.push(
-          `"${test.message}" exercise mismatch: expected "${test.expectExercise}" got "${res.rows[0]?.exercise}"`
-        );
+        failures.push(`"${test.message}" exercise: expected "${test.expectExercise}" got "${res.rows[0]?.exercise}"`);
       }
       if (test.expectWeight !== undefined && res.rows[0]?.weightLbs !== test.expectWeight) {
-        failures.push(
-          `"${test.message}" weight mismatch: expected "${test.expectWeight}" got "${res.rows[0]?.weightLbs}"`
-        );
+        failures.push(`"${test.message}" weight: expected "${test.expectWeight}" got "${res.rows[0]?.weightLbs}"`);
       }
       if (test.expectReps && res.rows[0]?.reps !== test.expectReps) {
-        failures.push(
-          `"${test.message}" reps mismatch: expected "${test.expectReps}" got "${res.rows[0]?.reps}"`
-        );
+        failures.push(`"${test.message}" reps: expected "${test.expectReps}" got "${res.rows[0]?.reps}"`);
       }
       if (test.expectPattern && res.meta?.pattern !== test.expectPattern) {
-        failures.push(
-          `"${test.message}" pattern mismatch: expected "${test.expectPattern}" got "${res.meta?.pattern}"`
-        );
+        failures.push(`"${test.message}" pattern: expected "${test.expectPattern}" got "${res.meta?.pattern}"`);
       }
     }
   }
 
   if (failures.length) {
     // eslint-disable-next-line no-console
-    console.warn("[structuredGate] dev tests failed:", failures);
+    console.warn("[structuredGate] tests FAILED:", failures);
   } else {
     // eslint-disable-next-line no-console
-    console.log("[structuredGate] dev tests passed");
+    console.log("[structuredGate] all tests passed ✓");
   }
 }
 

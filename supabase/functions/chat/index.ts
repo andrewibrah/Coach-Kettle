@@ -1,5 +1,5 @@
 // Edge Function: chat
-// OpenAI-powered workout row parsing
+// Dual-mode: parses workout input OR answers fitness questions
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -20,24 +20,40 @@ interface WorkoutRow {
 interface ChatRequest {
     message: string;
     rows: WorkoutRow[];
+    lastExercise?: string;
 }
 
 interface ChatResponse {
-    rows: WorkoutRow[];
+    rows?: WorkoutRow[];
+    answer?: string;
 }
 
-const SYSTEM_PROMPT = `You are a Gym Workout Tracker parser.
+// System prompt handles two modes:
+// PARSE MODE → returns { rows: [...] }
+// ANSWER MODE → returns { answer: "..." } (max 50 words)
+const SYSTEM_PROMPT = `You are a gym workout tracker assistant. Given a user message, choose one of two modes:
 
-Return a JSON object with a single key "rows" containing an array of workout rows.
-Each row must include: exercise (string), set (integer), weightLbs (string), reps (string), notes (string).
-If a field is missing, return an empty string.
-If weights are mentioned, convert to numeric pounds with no units.
-Set numbers must auto-increment per exercise based on existing rows provided.
-Return only new rows inferred from the message.
-Do not include extra keys, text, or markdown.`;
+PARSE MODE — if the message describes one or more workout sets:
+Return: {"rows":[{"exercise":"string","set":1,"weightLbs":"string","reps":"string","notes":"string"}]}
+Rules:
+- Convert weights to numeric pounds (no units). kg × 2.205. Plates: (plates × 45 × 2) + 45.
+- Auto-increment set numbers per exercise based on existing_rows provided.
+- Return ONLY new rows inferred from the message.
+- If no exercise name is given, use last_exercise from context (if provided).
+- "same" or "again" means repeat the last row's exercise, weight, and reps as a new set.
+- Multiple sets in one message (e.g. "bench 100 10 120 10" or "100,10,120,10"): return one row per set.
+- Empty weightLbs or reps should be "".
+- notes: use "warmup", "DS" (dropset), "SS" (superset), or "" as appropriate.
+
+ANSWER MODE — if the message is a question, conversational, or cannot be parsed as a workout:
+Return: {"answer":"your response here"}
+Rules:
+- Maximum 50 words. Be direct and gym-focused.
+- No markdown. Plain text only.
+
+Return valid JSON only. No markdown fences, no extra keys, no explanation outside the JSON.`;
 
 serve(async (req) => {
-    // Handle CORS preflight
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
@@ -52,7 +68,7 @@ serve(async (req) => {
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiApiKey) {
         return new Response(
-            JSON.stringify({ error: "OPENAI_API_KEY is not set on the server" }),
+            JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
@@ -67,8 +83,8 @@ serve(async (req) => {
         );
     }
 
-    const { message, rows = [] } = payload;
-    if (!message) {
+    const { message, rows = [], lastExercise } = payload;
+    if (!message?.trim()) {
         return new Response(
             JSON.stringify({ error: "message is required" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -78,6 +94,7 @@ serve(async (req) => {
     const context = {
         message,
         existing_rows: rows,
+        ...(lastExercise ? { last_exercise: lastExercise } : {}),
     };
 
     try {
@@ -94,7 +111,8 @@ serve(async (req) => {
                     { role: "user", content: JSON.stringify(context) },
                 ],
                 response_format: { type: "json_object" },
-                max_tokens: 1000,
+                max_tokens: 600,
+                temperature: 0.2,
             }),
         });
 
@@ -112,12 +130,34 @@ serve(async (req) => {
 
         if (!content) {
             return new Response(
-                JSON.stringify({ error: "Model did not return structured output" }),
+                JSON.stringify({ error: "No response from model" }),
                 { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
         const parsed: ChatResponse = JSON.parse(content);
+
+        // Validate: must have rows OR answer
+        if (!parsed.rows && !parsed.answer) {
+            console.error("[chat] Model returned neither rows nor answer:", content);
+            return new Response(
+                JSON.stringify({ answer: "I couldn't understand that. Try: Exercise Weight Reps." }),
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        // Sanitize rows if present
+        if (parsed.rows) {
+            parsed.rows = parsed.rows
+                .filter((r) => r.exercise?.trim())
+                .map((r) => ({
+                    exercise: String(r.exercise).trim(),
+                    set: Number.isInteger(r.set) && r.set > 0 ? r.set : 1,
+                    weightLbs: String(r.weightLbs ?? "").trim(),
+                    reps: String(r.reps ?? "").trim(),
+                    notes: String(r.notes ?? "").trim(),
+                }));
+        }
 
         return new Response(
             JSON.stringify(parsed),
@@ -126,7 +166,7 @@ serve(async (req) => {
     } catch (error) {
         console.error("[chat] Error:", error);
         return new Response(
-            JSON.stringify({ error: "OpenAI request failed" }),
+            JSON.stringify({ error: "Internal server error" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
