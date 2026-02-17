@@ -1,5 +1,8 @@
 {
-  "cli": { "version": ">= 3.0.0" },
+  "cli": {
+    "version": ">= 3.0.0",
+    "appVersionSource": "remote"
+  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -16,7 +19,7 @@
     "production": {
       "ios": {
         "appleId": "andrew.ibrahem04@icloud.com",
-        "ascAppId": "com.coachkettle.coachkettle",
+        "ascAppId": "6759267330",
         "appleTeamId": "8X53RC8X57"
       }
     }

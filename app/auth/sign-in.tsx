@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import { Link, useRouter } from 'expo-router';
@@ -207,7 +208,43 @@ export default function SignIn() {
     }
   }
 
-  async function signInWithOAuth(provider: 'google' | 'apple') {
+  async function signInWithAppleNative() {
+    setLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('No identity token received from Apple');
+      }
+
+      console.log('[SignIn] Apple credential received, signing in with Supabase...');
+
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+
+      if (error) throw error;
+
+      await completeAuthAndNavigate();
+    } catch (err: any) {
+      if (err.code === 'ERR_REQUEST_CANCELED') {
+        console.log('[SignIn] User cancelled Apple Sign In');
+      } else {
+        console.error('[SignIn] Apple Sign In error:', err);
+        Alert.alert('Apple Sign In Failed', err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function signInWithOAuth(provider: 'google') {
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -222,7 +259,6 @@ export default function SignIn() {
 
       if (data?.url) {
         console.log('[SignIn] Opening OAuth URL:', data.url);
-        console.log('[SignIn] Expected redirect:', redirectTo);
 
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
@@ -230,13 +266,9 @@ export default function SignIn() {
           { showInRecents: true }
         );
 
-        console.log('[SignIn] WebBrowser result:', result.type);
-
         if (result.type === 'success' && result.url) {
-          console.log('[SignIn] Success URL:', result.url);
           let { queryParams } = Linking.parse(result.url);
 
-          // Manual hash parsing if queryParams is empty but hash exists
           if ((!queryParams || Object.keys(queryParams).length === 0) && result.url.includes('#')) {
             const hashPart = result.url.split('#')[1];
             if (hashPart) {
@@ -251,41 +283,32 @@ export default function SignIn() {
             }
           }
 
-          // Handle code exchange (PKCE flow)
           if (queryParams?.code) {
             const { error: sessionError } = await supabase.auth.exchangeCodeForSession(
               queryParams.code as string
             );
             if (sessionError) throw sessionError;
-
             await completeAuthAndNavigate();
             return;
           }
 
-          // Handle access_token (implicit flow fallback)
           if (queryParams?.access_token) {
-            console.log('[SignIn] Found access_token in URL, setting session manually');
             const { error: sessionError } = await supabase.auth.setSession({
               access_token: queryParams.access_token as string,
               refresh_token: (queryParams.refresh_token as string) || '',
             });
             if (sessionError) throw sessionError;
-
             await completeAuthAndNavigate();
             return;
           }
 
-          // Handle error from OAuth provider
           if (queryParams?.error) {
             throw new Error(
               (queryParams.error_description as string) ||
               (queryParams.error as string)
             );
           }
-        } else if (result.type === 'cancel') {
-          console.log('[SignIn] User cancelled OAuth');
         } else if (result.type === 'dismiss') {
-          // Browser was dismissed - check if session was established via deep link
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
             await completeAuthAndNavigate();
@@ -357,7 +380,7 @@ export default function SignIn() {
               <View style={styles.line} />
             </View>
 
-            <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('apple')}>
+            <TouchableOpacity style={styles.oauthButton} onPress={signInWithAppleNative}>
               <Ionicons name="logo-apple" size={24} color={textColor} />
               <ThemedText style={styles.oauthText}>Sign in with Apple</ThemedText>
             </TouchableOpacity>

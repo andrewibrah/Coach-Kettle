@@ -13,6 +13,8 @@
       "bundleIdentifier": "com.coachkettle.coachkettle",
       "usesAppleSignIn": true,
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "Coach Kettle uses Face ID to keep your workout session secure"
       }
     },
     "android": {
@@ -45,11 +47,19 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-font"
+      "expo-font",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a4ff8075-fefc-49d1-9a19-2e9b96df2fb0"
+      }
+    },
+    "owner": "aibrah"
   }
 }

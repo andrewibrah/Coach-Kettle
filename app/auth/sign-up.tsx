@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import { Link, useRouter } from 'expo-router';
@@ -106,7 +107,50 @@ export default function SignUp() {
     }
   }
 
-  async function signInWithOAuth(provider: 'google' | 'apple') {
+  async function signUpWithAppleNative() {
+    if (!termsAccepted) {
+      Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy to continue');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('No identity token received from Apple');
+      }
+
+      console.log('[SignUp] Apple credential received, signing in with Supabase...');
+
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+
+      if (error) throw error;
+
+      await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
+      syncTermsAcceptanceToServer().catch(console.error);
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      if (err.code === 'ERR_REQUEST_CANCELED') {
+        console.log('[SignUp] User cancelled Apple Sign In');
+      } else {
+        console.error('[SignUp] Apple Sign In error:', err);
+        Alert.alert('Apple Sign In Failed', err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function signInWithOAuth(provider: 'google') {
     if (!termsAccepted) {
       Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy to continue');
       return;
@@ -125,22 +169,15 @@ export default function SignUp() {
       if (error) throw error;
 
       if (data?.url) {
-        console.log('[SignUp] Opening OAuth URL:', data.url);
-        console.log('[SignUp] Expected redirect:', redirectTo);
-
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectTo,
           { showInRecents: true }
         );
 
-        console.log('[SignUp] WebBrowser result:', result.type);
-
         if (result.type === 'success' && result.url) {
-          console.log('[SignUp] Success URL:', result.url);
           const parsed = Linking.parse(result.url);
 
-          // Handle code exchange (PKCE flow)
           if (parsed.queryParams?.code) {
             const { error: sessionError } = await supabase.auth.exchangeCodeForSession(
               parsed.queryParams.code as string
@@ -153,7 +190,6 @@ export default function SignUp() {
             return;
           }
 
-          // Handle access_token (implicit flow fallback)
           if (parsed.queryParams?.access_token) {
             const { error: sessionError } = await supabase.auth.setSession({
               access_token: parsed.queryParams.access_token as string,
@@ -167,17 +203,13 @@ export default function SignUp() {
             return;
           }
 
-          // Handle error from OAuth provider
           if (parsed.queryParams?.error) {
             throw new Error(
               (parsed.queryParams.error_description as string) ||
               (parsed.queryParams.error as string)
             );
           }
-        } else if (result.type === 'cancel') {
-          console.log('[SignUp] User cancelled OAuth');
         } else if (result.type === 'dismiss') {
-          // Browser was dismissed - check if session was established via deep link
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
             await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
@@ -245,7 +277,7 @@ export default function SignUp() {
               <View style={styles.line} />
             </View>
 
-            <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('apple')}>
+            <TouchableOpacity style={styles.oauthButton} onPress={signUpWithAppleNative}>
               <Ionicons name="logo-apple" size={24} color={textColor} />
               <ThemedText style={styles.oauthText}>Sign up with Apple</ThemedText>
             </TouchableOpacity>
