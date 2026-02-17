@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
@@ -44,6 +44,7 @@ function sessionStats(s: WorkoutSession) {
 
 export default function HistoryScreen() {
   const [items, setItems] = useState<WorkoutSession[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -61,12 +62,13 @@ export default function HistoryScreen() {
 
   const load = async () => {
     try {
+      setLoadError(false);
       const data = await api.getHistory();
       // newest first
       const sorted = [...data].sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
       setItems(sorted);
     } catch {
-      // silently fail
+      setLoadError(true);
     }
   };
 
@@ -82,7 +84,7 @@ export default function HistoryScreen() {
       await api.deleteWorkout(selectedId);
       await load();
     } catch {
-      // silently fail
+      Alert.alert("Error", "Failed to delete workout. Please try again.");
     } finally {
       setDeleteModalVisible(false);
       setSelectedId(null);
@@ -168,6 +170,12 @@ export default function HistoryScreen() {
         subtitle={`${headerStats.totalWorkouts} workouts • ${headerStats.totalSets} sets`}
         skipSafeArea
       />
+
+      {loadError && (
+        <Text style={[styles.errorBanner, { color: textColor }]}>
+          Failed to load workouts. Pull to refresh.
+        </Text>
+      )}
 
       <SectionList
         sections={groupedItems}
@@ -287,5 +295,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     textAlign: "center",
+  },
+  errorBanner: {
+    textAlign: "center",
+    fontSize: 13,
+    fontWeight: "600",
+    paddingVertical: 12,
+    opacity: 0.7,
   },
 });

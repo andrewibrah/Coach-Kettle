@@ -146,6 +146,7 @@ async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<R
         .from("workouts")
         .select("id, dateISO, part, createdAt, rows_json")
         .eq("user_id", userId)
+        .limit(50)
         .order("createdAt", { ascending: false });
 
     if (error) {
@@ -256,7 +257,7 @@ serve(async (req) => {
         return respondJson({ error: "Method not allowed" }, 405);
     } catch (error) {
         console.error("[history] Error:", error);
-        const message = error instanceof Error ? error.message : "Internal server error";
-        return respondJson({ error: message }, 500);
+        // error logged above; return generic message to avoid leaking internals
+        return respondJson({ error: "Internal server error" }, 500);
     }
 });

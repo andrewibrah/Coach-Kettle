@@ -10,6 +10,7 @@ import {
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useState } from "react";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   ActivityIndicator,
   Alert,
@@ -19,7 +20,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useColorScheme,
 } from "react-native";
 import Animated, { FadeIn, FadeOut, Layout } from "react-native-reanimated";
 

@@ -143,14 +143,14 @@ serve(async (req) => {
         const [profileResult, workoutsResult, prLiftsResult] = await Promise.all([
             supabaseAdmin
                 .from("profiles")
-                .select("display_name, ai_context, focus, experience, training_days")
-                .eq("id", userId)
+                .select("focus, focus_other, ai_context, current_weight, goal_weight, weight_unit, height_value, height_unit, dob")
+                .eq("user_id", userId)
                 .single(),
             supabaseAdmin
                 .from("workouts")
-                .select("part, rows, created_at")
+                .select("part, rows_json, createdAt")
                 .eq("user_id", userId)
-                .order("created_at", { ascending: false })
+                .order("createdAt", { ascending: false })
                 .limit(10),
             supabaseAdmin
                 .from("pr_lifts")
@@ -161,6 +161,10 @@ serve(async (req) => {
         if (profileResult.data) userContext.profile = profileResult.data;
         if (workoutsResult.data) userContext.recentWorkouts = workoutsResult.data;
         if (prLiftsResult.data) userContext.prLifts = prLiftsResult.data;
+
+        if (profileResult.error) console.warn("[coach] Profile query error:", profileResult.error.message);
+        if (workoutsResult.error) console.warn("[coach] Workouts query error:", workoutsResult.error.message);
+        if (prLiftsResult.error) console.warn("[coach] PR lifts query error:", prLiftsResult.error.message);
 
         console.log(`[coach] Context loaded: profile=${!!profileResult.data}, workouts=${workoutsResult.data?.length ?? 0}, PRs=${prLiftsResult.data?.length ?? 0}`);
     } catch (dbError) {
@@ -173,11 +177,25 @@ serve(async (req) => {
     if (userContext.profile) {
         const p = userContext.profile;
         const profileLines: string[] = [];
-        if (p.display_name) profileLines.push(`Name: ${p.display_name}`);
-        if (p.focus) profileLines.push(`Focus: ${p.focus}`);
-        if (p.experience) profileLines.push(`Experience: ${p.experience}`);
-        if (p.training_days) profileLines.push(`Training days/week: ${p.training_days}`);
-        if (p.ai_context) profileLines.push(`User notes: ${p.ai_context}`);
+        if (p.focus) {
+            const focusLabel = p.focus === "lean_muscle" ? "lean muscle" : p.focus === "fat_loss" ? "fat loss" : p.focus;
+            profileLines.push(`Fitness focus: ${p.focus === "other" && p.focus_other ? p.focus_other : focusLabel}`);
+        }
+        if (p.height_value && p.height_unit) profileLines.push(`Height: ${p.height_value}${p.height_unit}`);
+        if (p.current_weight && p.weight_unit) profileLines.push(`Body weight: ${p.current_weight}${p.weight_unit}`);
+        if (p.goal_weight && p.weight_unit) profileLines.push(`Goal weight: ${p.goal_weight}${p.weight_unit}`);
+        if (p.dob) {
+            const age = Math.floor((Date.now() - new Date(p.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+            profileLines.push(`Age: ${age}`);
+        }
+        if (p.ai_context && typeof p.ai_context === "object") {
+            const ctx = p.ai_context as Record<string, unknown>;
+            const notes = Object.entries(ctx)
+                .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+                .join(", ");
+            if (notes) profileLines.push(`Additional context: ${notes}`);
+        }
         if (profileLines.length > 0) {
             contextParts.push("USER PROFILE:\n" + profileLines.join("\n"));
         }
@@ -192,14 +210,19 @@ serve(async (req) => {
 
     if (userContext.recentWorkouts.length > 0) {
         const workoutSummaries = userContext.recentWorkouts.map((w: any) => {
-            const date = w.created_at ? new Date(w.created_at).toLocaleDateString() : "unknown date";
+            // createdAt is a bigint (epoch ms), rows_json is a JSON text string
+            const date = w.createdAt ? new Date(Number(w.createdAt)).toLocaleDateString() : "unknown date";
             const part = w.part || "General";
-            const rowCount = Array.isArray(w.rows) ? w.rows.length : 0;
 
-            // Summarize exercises from rows
+            let parsedRows: any[] = [];
+            if (w.rows_json) {
+                try { parsedRows = JSON.parse(w.rows_json); } catch { /* ignore */ }
+            }
+            const rowCount = parsedRows.length;
+
             let exerciseSummary = "";
-            if (Array.isArray(w.rows) && w.rows.length > 0) {
-                const exercises = [...new Set(w.rows.map((r: any) => r.exercise).filter(Boolean))];
+            if (parsedRows.length > 0) {
+                const exercises = [...new Set(parsedRows.map((r: any) => r.exercise).filter(Boolean))] as string[];
                 exerciseSummary = exercises.slice(0, 5).join(", ");
                 if (exercises.length > 5) exerciseSummary += ` (+${exercises.length - 5} more)`;
             }

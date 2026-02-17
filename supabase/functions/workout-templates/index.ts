@@ -78,7 +78,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[workout-templates] Error fetching templates:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -107,7 +107,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[workout-templates] Error fetching items:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -144,7 +144,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[workout-templates] Error creating template:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -166,7 +166,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[workout-templates] Error deleting template:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -197,7 +197,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[workout-templates] Error adding item:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -219,7 +219,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[workout-templates] Error removing item:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -250,7 +250,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[workout-templates] Error updating item:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -273,14 +273,14 @@ serve(async (req) => {
                         .eq("user_id", userId);
 
                     if (error) {
-                        errors.push(`${item.id}: ${error.message}`);
+                        errors.push(item.id);
                     }
                 }
 
                 if (errors.length > 0) {
                     console.error("[workout-templates] Reorder errors:", errors);
                     return new Response(
-                        JSON.stringify({ error: "Some items failed to reorder", details: errors }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -304,7 +304,7 @@ serve(async (req) => {
     } catch (error) {
         console.error("[workout-templates] Error:", error);
         return new Response(
-            JSON.stringify({ error: "Internal server error", details: String(error) }),
+            JSON.stringify({ error: "Internal server error" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

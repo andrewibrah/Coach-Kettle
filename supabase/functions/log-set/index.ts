@@ -86,8 +86,8 @@ serve(async (req) => {
 
     if (!exercise || !weightLbs || !reps) {
         return new Response(
-            JSON.stringify({ ok: true }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ error: "Missing required fields" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 
@@ -110,10 +110,9 @@ serve(async (req) => {
 
         if (error) {
             console.error("[log-set] DB insert error:", error);
-            // Don't fail the client - log-set is fire-and-forget
             return new Response(
-                JSON.stringify({ ok: true, pr_check: false }),
-                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                JSON.stringify({ error: "Failed to save set" }),
+                { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
@@ -126,8 +125,8 @@ serve(async (req) => {
     } catch (error) {
         console.error("[log-set] Error:", error);
         return new Response(
-            JSON.stringify({ ok: true, pr_check: false }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ error: "Failed to save set" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 });

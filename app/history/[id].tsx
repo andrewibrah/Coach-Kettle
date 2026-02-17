@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from "react-native";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -99,6 +100,14 @@ export default function WorkoutDetail() {
   const cardColor = isDark ? '#1C1C1E' : '#F9FAFB';
   const secondaryTextColor = isDark ? '#9CA3AF' : '#6B7280';
 
+  // Dynamic colors for dark mode
+  const setIndicatorBg = isDark ? '#374151' : '#E5E7EB';
+  const setIndicatorText = isDark ? '#9CA3AF' : '#6B7280';
+  const noteTextColor = isDark ? '#9CA3AF' : '#4B5563';
+  const backBtnPressedBg = isDark ? '#374151' : '#E5E7EB';
+  const statSepColor = isDark ? '#4B5563' : '#D1D5DB';
+  const mutedTextColor = isDark ? '#9CA3AF' : '#6B7280';
+
   useEffect(() => {
     (async () => {
       try {
@@ -120,9 +129,9 @@ export default function WorkoutDetail() {
 
   if (!workout) {
     return (
-      <View style={[styles.screen, { paddingTop: Math.max(insets.top, 16) }]}>
+      <View style={[styles.screen, { paddingTop: Math.max(insets.top, 16), backgroundColor }]}>
         <Stack.Screen options={{ title: "Workout", headerBackTitle: "Back" }} />
-        <Text style={styles.notFound}>Workout not found.</Text>
+        <Text style={[styles.notFound, { color: mutedTextColor }]}>Workout not found.</Text>
       </View>
     );
   }
@@ -136,7 +145,7 @@ export default function WorkoutDetail() {
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}>
+          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: backBtnPressedBg }]}>
             <IconSymbol name="chevron.left" size={24} color={textColor} />
           </Pressable>
           <View>
@@ -153,7 +162,7 @@ export default function WorkoutDetail() {
         )}
 
         {groups.length === 0 ? (
-          <Text style={styles.emptyText}>No exercises logged.</Text>
+          <Text style={[styles.emptyText, { color: mutedTextColor }]}>No exercises logged.</Text>
         ) : (
           groups.map((group, gIdx) => (
             <View key={`group_${gIdx}`} style={[styles.exerciseGroup, { backgroundColor: cardColor }]}>
@@ -164,14 +173,14 @@ export default function WorkoutDetail() {
               <View style={styles.setsContainer}>
                 {group.sets.map(({ row, setNum }, sIdx) => (
                   <View key={`set_${sIdx}`} style={styles.setRow}>
-                    <View style={styles.setIndicator}>
-                      <Text style={styles.setIndicatorText}>{setNum}</Text>
+                    <View style={[styles.setIndicator, { backgroundColor: setIndicatorBg }]}>
+                      <Text style={[styles.setIndicatorText, { color: setIndicatorText }]}>{setNum}</Text>
                     </View>
                     <View style={styles.setContent}>
                       <View style={styles.statsRow}>
                         <Text style={[styles.statValue, { color: textColor }]}>{row.weightLbs || "—"}</Text>
                         <Text style={[styles.statUnit, { color: secondaryTextColor }]}>lb</Text>
-                        <Text style={[styles.statSep, { color: secondaryTextColor }]}>×</Text>
+                        <Text style={[styles.statSep, { color: statSepColor }]}>×</Text>
                         <Text style={[styles.statValue, { color: textColor }]}>{row.reps || "—"}</Text>
                         {row.timestamp ? (
                           <Text style={[styles.timestamp, { color: secondaryTextColor }]}>
@@ -180,7 +189,7 @@ export default function WorkoutDetail() {
                         ) : null}
                       </View>
                       {row.notes ? (
-                        <Text style={styles.noteText}>{row.notes}</Text>
+                        <Text style={[styles.noteText, { color: noteTextColor }]}>{row.notes}</Text>
                       ) : null}
                     </View>
                   </View>
@@ -198,7 +207,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: 20,
-    backgroundColor: "#FFFFFF",
   },
   listContent: {
     paddingTop: 16,
@@ -220,25 +228,19 @@ const styles = StyleSheet.create({
     marginLeft: -8,
     borderRadius: 999,
   },
-  backBtnPressed: {
-    backgroundColor: '#E5E7EB',
-  },
   title: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#111827",
   },
   dateSubtitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#6B7280",
     textAlign: "center",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   exerciseGroup: {
-    backgroundColor: "#F9FAFB",
     borderRadius: 14,
     padding: 12,
   },
@@ -252,11 +254,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     marginBottom: 4,
-    color: "#111827",
   },
   setCount: {
     fontSize: 13,
-    color: "#6B7280",
     fontWeight: "700",
   },
   setsContainer: {
@@ -272,12 +272,10 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 6,
-    backgroundColor: "#E5E7EB",
     alignItems: "center",
     justifyContent: "center",
   },
   setIndicatorText: {
-    color: "#6B7280",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -293,27 +291,22 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
   },
   statUnit: {
     fontSize: 11,
     fontWeight: "500",
-    color: "#9CA3AF",
     marginRight: 2,
   },
   statSep: {
     fontSize: 13,
-    color: "#D1D5DB",
     marginHorizontal: 2,
   },
   notFound: {
     fontSize: 16,
-    color: "#6B7280",
     marginTop: 20,
   },
   emptyText: {
     fontSize: 14,
-    color: "#6B7280",
     textAlign: "center",
     marginTop: 40,
   },
@@ -325,7 +318,6 @@ const styles = StyleSheet.create({
   noteText: {
     fontSize: 13,
     fontStyle: "italic",
-    color: "#4B5563",
   },
   // Review Card styles
   reviewCard: {

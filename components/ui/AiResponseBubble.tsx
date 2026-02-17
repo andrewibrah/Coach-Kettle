@@ -1,10 +1,11 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import * as Haptics from "expo-haptics";
 import React, { useEffect } from "react";
-import { Platform, Pressable, StyleSheet, useColorScheme, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 
 type Props = {

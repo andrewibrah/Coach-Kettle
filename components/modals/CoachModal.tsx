@@ -1,6 +1,7 @@
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { ChatMessage, clearAllChatHistory, fetchChatHistory } from "@/lib/chatStorage";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -16,7 +17,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -42,6 +43,8 @@ export function CoachModal({
   onClose,
 }: Props) {
   const disabled = loading || !question.trim();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'border');
@@ -49,6 +52,14 @@ export function CoachModal({
   const inputBackground = useThemeColor({}, 'inputBackground');
   const placeholderColor = useThemeColor({}, 'placeholder');
   const chatBackground = useThemeColor({}, 'secondaryBackground');
+
+  // Fix: Ensure internal content contrasts with the container background
+  const sendBtnColor = isDark ? '#FFFFFF' : '#111827';
+  const sendArrowColor = isDark ? '#111827' : '#FFFFFF'; // Dark arrow on white btn, White arrow on dark btn
+  
+  const userBubbleColor = isDark ? '#FFFFFF' : '#111827';
+  const userBubbleTextColor = isDark ? '#111827' : '#FFFFFF'; // Inverse text color for user bubbles
+  const userBubbleBorderColor = isDark ? '#FFFFFF' : '#111827';
 
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -86,11 +97,14 @@ export function CoachModal({
         <ThemedView style={[
           styles.bubble,
           isUser ? styles.userBubble : styles.aiBubble,
-          { borderColor: isUser ? "#111827" : borderColor }
+          {
+            borderColor: isUser ? userBubbleBorderColor : borderColor,
+            ...(isUser && { backgroundColor: userBubbleColor }),
+          }
         ]}>
           <ThemedText style={[
             styles.messageText,
-            isUser && styles.userMessageText
+            isUser && { color: userBubbleTextColor }
           ]}>
             {item.content}
           </ThemedText>
@@ -242,12 +256,12 @@ export function CoachModal({
                 disabled={disabled}
                 style={({ pressed }) => [
                   styles.sendBtn,
-                  { backgroundColor: "#111827" },
+                  { backgroundColor: sendBtnColor },
                   disabled && styles.sendBtnDisabled,
                   pressed && !disabled && { opacity: 0.8 }
                 ]}
               >
-                <Text style={styles.sendArrow}>↑</Text>
+                <Text style={[styles.sendArrow, { color: sendArrowColor }]}>↑</Text>
               </Pressable>
             </ThemedView>
           </KeyboardAvoidingView>
@@ -295,7 +309,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   userBubble: {
-    backgroundColor: '#111827', // Dark/Primary
     borderBottomRightRadius: 4,
   },
   aiBubble: {
@@ -304,9 +317,6 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 15,
     lineHeight: 22,
-  },
-  userMessageText: {
-    color: '#ffffff',
   },
   inputFooter: {
     flexDirection: "row",
@@ -336,7 +346,6 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   sendArrow: {
-    color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "800",
     marginTop: -2,

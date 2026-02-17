@@ -14,6 +14,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from 'react-native';
 
 import { TermsConsent } from '@/components/TermsConsent';
@@ -33,8 +34,13 @@ export default function SignUp() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const router = useRouter();
 
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const primaryColor = useThemeColor({}, 'tint');
   const textColor = useThemeColor({}, 'text');
+  const inputBorderColor = isDark ? Colors.dark.icon : Colors.light.icon;
+  const placeholderColor = isDark ? Colors.dark.placeholder : Colors.light.placeholder;
+  const oauthBorderColor = isDark ? Colors.dark.border : Colors.light.border;
 
   // Create redirect URL
   // In Expo Go: uses exp:// scheme (dynamic URL)
@@ -241,11 +247,11 @@ export default function SignUp() {
             <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Email</ThemedText>
               <TextInput
-                style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
+                style={[styles.input, { color: textColor, borderColor: inputBorderColor }]}
                 onChangeText={setEmail}
                 value={email}
                 placeholder="user@example.com"
-                placeholderTextColor="#999"
+                placeholderTextColor={placeholderColor}
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
@@ -254,11 +260,11 @@ export default function SignUp() {
             <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Password</ThemedText>
               <TextInput
-                style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
+                style={[styles.input, { color: textColor, borderColor: inputBorderColor }]}
                 onChangeText={setPassword}
                 value={password}
                 placeholder="Create a password"
-                placeholderTextColor="#999"
+                placeholderTextColor={placeholderColor}
                 secureTextEntry
               />
             </View>
@@ -277,12 +283,12 @@ export default function SignUp() {
               <View style={styles.line} />
             </View>
 
-            <TouchableOpacity style={styles.oauthButton} onPress={signUpWithAppleNative}>
+            <TouchableOpacity style={[styles.oauthButton, { borderColor: oauthBorderColor }]} onPress={signUpWithAppleNative}>
               <Ionicons name="logo-apple" size={24} color={textColor} />
               <ThemedText style={styles.oauthText}>Sign up with Apple</ThemedText>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.oauthButton} onPress={() => signInWithOAuth('google')}>
+            <TouchableOpacity style={[styles.oauthButton, { borderColor: oauthBorderColor }]} onPress={() => signInWithOAuth('google')}>
               <Ionicons name="logo-google" size={24} color={textColor} />
               <ThemedText style={styles.oauthText}>Sign up with Google</ThemedText>
             </TouchableOpacity>
@@ -385,7 +391,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: 50,
     borderWidth: 1,
-    borderColor: '#ccc',
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',

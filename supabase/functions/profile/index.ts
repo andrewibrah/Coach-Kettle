@@ -163,9 +163,13 @@ serve(async (req) => {
 
             if (action === "update") {
                 const { updates } = body;
+                const ALLOWED_FIELDS = ['display_name', 'focus', 'experience', 'training_days', 'ai_context', 'unit_preference'];
+                const safeUpdates = Object.fromEntries(
+                    Object.entries(updates).filter(([key]) => ALLOWED_FIELDS.includes(key))
+                );
                 const { data, error } = await supabase
                     .from("profiles")
-                    .update(updates)
+                    .update(safeUpdates)
                     .eq("user_id", userId)
                     .select()
                     .single();

@@ -1,5 +1,6 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';

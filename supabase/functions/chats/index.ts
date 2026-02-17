@@ -155,16 +155,17 @@ serve(async (req) => {
 
     const { supabase, userId } = authContext;
     const url = new URL(req.url);
-    const path = url.pathname;
+    const pathParts = url.pathname.split("/").filter(p => p);
+    // Path format: /functions/v1/chats or /functions/v1/chats/{id}
+    const chatId = pathParts.length > 1 ? pathParts[pathParts.length - 1] : null;
 
     try {
-        if (req.method === "GET" && path === "/chats") {
+        if (req.method === "GET") {
             return await listChats(supabase, userId);
-        } else if (req.method === "POST" && path === "/chats") {
+        } else if (req.method === "POST") {
             const payload: ChatItem = await req.json();
             return await saveChat(payload, supabase, userId);
-        } else if (req.method === "DELETE" && path.startsWith("/chats/")) {
-            const chatId = path.split("/chats/")[1];
+        } else if (req.method === "DELETE") {
             if (!chatId) {
                 return respondJson({ error: "Chat ID is required" }, 400);
             }

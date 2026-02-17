@@ -1,7 +1,8 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { BlurView } from "expo-blur";
 import React from "react";
-import { Modal, Pressable, StyleSheet, Text, View, useColorScheme } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 
 type Props = {

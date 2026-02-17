@@ -1,5 +1,6 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Dispatch, SetStateAction } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as Haptics from "expo-haptics";
@@ -103,12 +104,12 @@ export function WorkoutBottomBar({
           onPress={workoutActive ? handleEndWorkout : handleStartWorkout}
           style={({ pressed }) => [
             styles.pillButton,
-            styles.pillPrimary,
+            { backgroundColor: isDark ? '#F5F5F5' : '#111827', borderColor: isDark ? '#F5F5F5' : '#111827' },
             workoutActive && styles.pillDanger,
             pressed && styles.pillPressed,
           ]}
         >
-          <Text style={[styles.pillText, styles.pillPrimaryText]}>
+          <Text style={[styles.pillText, { color: workoutActive ? '#FFFFFF' : (isDark ? '#111827' : '#FFFFFF') }]}>
             {workoutActive ? "End" : "Start"}
           </Text>
         </Pressable>
@@ -117,15 +118,15 @@ export function WorkoutBottomBar({
           onPress={handleSend}
           style={({ pressed }) => [
             styles.pillButton,
-            styles.sendButtonPill,
+            { backgroundColor: isDark ? '#F5F5F5' : '#111827', borderColor: isDark ? '#F5F5F5' : '#111827' },
             disabledSend && styles.pillDisabled,
             pressed && !disabledSend && styles.pillPressed,
           ]}
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={isDark ? '#111827' : '#FFFFFF'} />
           ) : (
-            <Text style={[styles.pillText, styles.pillPrimaryText]}>Send</Text>
+            <Text style={[styles.pillText, { color: isDark ? '#111827' : '#FFFFFF' }]}>Send</Text>
           )}
         </Pressable>
       </View>
@@ -133,7 +134,7 @@ export function WorkoutBottomBar({
       {startToastOpen ? (
         <View style={styles.toastWrap} pointerEvents="none">
           <View style={styles.toastCard}>
-            <Text style={styles.toastText}>Start a workout to send your first set</Text>
+            <Text style={[styles.toastText, { color: isDark ? '#E5E7EB' : '#374151' }]}>Start a workout to send your first set</Text>
           </View>
         </View>
       ) : null}
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
   clearText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#9CA3AF',
   },
   inputTapCatcher: {
     position: "absolute",
@@ -197,8 +198,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   sendButtonPill: {
-    backgroundColor: "#111827",
-    borderColor: "#111827",
+    // backgroundColor and borderColor set dynamically via isDark inline styles
   },
   bottomButtons: {
     flexDirection: "row",
@@ -209,15 +209,13 @@ const styles = StyleSheet.create({
   pillButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
     borderRadius: 14,
     paddingVertical: 10,
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    // backgroundColor and borderColor set dynamically via isDark inline styles
   },
   pillPrimary: {
-    backgroundColor: "#111827",
-    borderColor: "#111827",
+    // backgroundColor and borderColor set dynamically via isDark inline styles
   },
   pillDanger: {
     backgroundColor: "#B91C1C",
@@ -232,10 +230,10 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#111827",
+    // color set dynamically via isDark inline styles
   },
   pillPrimaryText: {
-    color: "#FFFFFF",
+    // color set dynamically via isDark inline styles
   },
   toastWrap: {
     position: "absolute",
@@ -248,9 +246,9 @@ const styles = StyleSheet.create({
     // transparent
   },
   toastText: {
-    color: "#374151",
     fontSize: 18,
     fontWeight: "600",
+    // color set dynamically via isDark inline styles
   },
   errorText: {
     color: "#B00020",

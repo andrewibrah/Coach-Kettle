@@ -2,6 +2,7 @@
 // Fast local parsing without AI - implements structured_gate.py logic in TypeScript
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -68,6 +69,20 @@ const MULTI_REASON: GateDecisionReason = "multiple_entries_or_sets";
 const KG_TO_LB = 2.20462;
 const PLATE_WEIGHT = 45;
 const BAR_WEIGHT = 45;
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase env vars");
+}
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+    },
+});
 
 // --- Helper Functions ---
 
@@ -382,6 +397,28 @@ serve(async (req) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
+
+    // JWT verification
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+        return new Response(
+            JSON.stringify({ error: "Unauthorized" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !data.user) {
+        console.error("[parse] Auth verification failed:", authError?.message);
+        return new Response(
+            JSON.stringify({ error: "Unauthorized" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+
+    console.log("[parse] User verified:", data.user.id);
 
     if (req.method !== "POST") {
         return new Response(

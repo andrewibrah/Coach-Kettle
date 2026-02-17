@@ -9,17 +9,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // TTL: 4 hours in milliseconds
-export const AUTH_TTL_MS = 4 * 60 * 60 * 1000;
+const AUTH_TTL_MS = 4 * 60 * 60 * 1000;
 
 // Storage keys
-export const STORAGE_KEYS = {
+const STORAGE_KEYS = {
   LAST_AUTHENTICATED_AT: 'auth_last_authenticated_at',
   TERMS_ACCEPTED_AT: 'auth_terms_accepted_at',
   TERMS_VERSION: 'auth_terms_version',
 } as const;
 
 // Current terms version - increment when ToS changes significantly
-export const CURRENT_TERMS_VERSION = '1.0.0';
+const CURRENT_TERMS_VERSION = '1.0.0';
 
 /**
  * Get the timestamp of last successful authentication
@@ -77,7 +77,7 @@ export function isSessionExpired(lastAuthenticatedAt: number | null): boolean {
 /**
  * Get time remaining until session expires (in ms)
  */
-export function getTimeUntilExpiry(lastAuthenticatedAt: number | null): number {
+function getTimeUntilExpiry(lastAuthenticatedAt: number | null): number {
   if (lastAuthenticatedAt === null) {
     return 0;
   }
@@ -88,7 +88,7 @@ export function getTimeUntilExpiry(lastAuthenticatedAt: number | null): number {
 /**
  * Terms acceptance tracking
  */
-export async function getTermsAcceptance(): Promise<{ acceptedAt: number; version: string } | null> {
+async function getTermsAcceptance(): Promise<{ acceptedAt: number; version: string } | null> {
   try {
     const [acceptedAt, version] = await Promise.all([
       AsyncStorage.getItem(STORAGE_KEYS.TERMS_ACCEPTED_AT),
@@ -163,7 +163,7 @@ export async function checkServerTermsAcceptance(): Promise<{
   }
 }
 
-export async function hasAcceptedCurrentTerms(): Promise<boolean> {
+async function hasAcceptedCurrentTerms(): Promise<boolean> {
   const acceptance = await getTermsAcceptance();
   if (!acceptance) return false;
   return acceptance.version === CURRENT_TERMS_VERSION;
@@ -172,7 +172,7 @@ export async function hasAcceptedCurrentTerms(): Promise<boolean> {
 /**
  * Clear all auth lock related storage (used on logout)
  */
-export async function clearAuthLockStorage(): Promise<void> {
+async function clearAuthLockStorage(): Promise<void> {
   try {
     await AsyncStorage.multiRemove([
       STORAGE_KEYS.LAST_AUTHENTICATED_AT,

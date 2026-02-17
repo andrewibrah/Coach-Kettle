@@ -2,6 +2,7 @@
 // Dual-mode: parses workout input OR answers fitness questions
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -53,10 +54,47 @@ Rules:
 
 Return valid JSON only. No markdown fences, no extra keys, no explanation outside the JSON.`;
 
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase env vars");
+}
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+    },
+});
+
 serve(async (req) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
+
+    // JWT verification
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+        return new Response(
+            JSON.stringify({ error: "Unauthorized" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !data.user) {
+        console.error("[chat] Auth verification failed:", authError?.message);
+        return new Response(
+            JSON.stringify({ error: "Unauthorized" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+
+    const userId = data.user.id;
+    console.log("[chat] User verified:", userId);
 
     if (req.method !== "POST") {
         return new Response(
@@ -135,7 +173,16 @@ serve(async (req) => {
             );
         }
 
-        const parsed: ChatResponse = JSON.parse(content);
+        let parsed: ChatResponse;
+        try {
+            parsed = JSON.parse(content);
+        } catch {
+            console.error('[chat] Failed to parse OpenAI response:', content);
+            return new Response(
+                JSON.stringify({ answer: "I couldn't understand that. Try: Exercise Weight Reps." }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
 
         // Validate: must have rows OR answer
         if (!parsed.rows && !parsed.answer) {

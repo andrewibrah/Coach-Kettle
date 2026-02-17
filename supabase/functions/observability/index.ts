@@ -37,6 +37,23 @@ serve(async (req) => {
         return new Response("ok", { headers: corsHeaders });
     }
 
+    // JWT verification
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+        return respondJson({ error: "Unauthorized" }, 401);
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !data.user) {
+        console.error("[observability] Auth verification failed:", authError?.message);
+        return respondJson({ error: "Unauthorized" }, 401);
+    }
+
+    const userId = data.user.id;
+    console.log("[observability] User verified:", userId);
+
     if (req.method !== "POST") {
         return respondJson({ error: "Method not allowed" }, 405);
     }
@@ -46,7 +63,6 @@ serve(async (req) => {
         level?: string;
         message?: string;
         context?: Record<string, unknown>;
-        user_id?: string;
     };
 
     try {
@@ -55,7 +71,7 @@ serve(async (req) => {
         return respondJson({ error: "Invalid JSON" }, 400);
     }
 
-    const { source, level, message, context, user_id } = payload || {};
+    const { source, level, message, context } = payload || {};
     if (!source || !level || !message) {
         return respondJson({ error: "source, level, and message are required" }, 400);
     }
@@ -65,7 +81,7 @@ serve(async (req) => {
         level,
         message,
         context: context ?? null,
-        user_id: user_id ? user_id : null,
+        user_id: userId,
     });
 
     if (error) {

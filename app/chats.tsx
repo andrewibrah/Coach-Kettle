@@ -1,3 +1,4 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuth } from "@/components/AuthProvider";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
@@ -5,7 +6,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchChatHistory, groupChatsByDate, type ChatMessage, type ChatsByDate } from "@/lib/chatStorage";
 import { Stack, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, useColorScheme, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ChatsScreen() {
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   botBubble: {
-    backgroundColor: '#1F2937',
+    // backgroundColor set dynamically via botBubbleBg (isDark ternary)
     borderBottomLeftRadius: 4,
   },
   sourceLabel: {
@@ -250,7 +251,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   botText: {
-    color: '#F3F4F6',
+    // color set dynamically via botTextColor (isDark ternary)
   },
   timeText: {
     fontSize: 10,

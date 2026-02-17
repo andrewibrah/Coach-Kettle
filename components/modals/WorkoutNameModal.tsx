@@ -6,6 +6,7 @@ import {
     type WorkoutTemplateItem,
 } from "@/lib/profile";
 import { BlurView } from "expo-blur";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -18,7 +19,6 @@ import {
     Text,
     TextInput,
     View,
-    useColorScheme,
 } from "react-native";
 
 type Props = {

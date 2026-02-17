@@ -840,7 +840,7 @@ export default function HomeScreen() {
       setMessageInput("");
 
       // Sync the filled row to backend for PR tracking
-      const filledRow = rows[targetRowIndex];
+      const filledRow = currentRows[targetRowIndex];
       if (filledRow) {
         api.logSet({
           exercise: filledRow.exercise,

@@ -1,3 +1,4 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { LogRow } from "@/types/workout";
@@ -32,6 +33,18 @@ export function WorkoutCard({
     const cardBg = useThemeColor({}, 'cardBackground');
     const borderColor = useThemeColor({}, 'border');
 
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
+    // Dynamic colors
+    const inputTextColor = isDark ? '#FFFFFF' : '#000000';
+    const inputBg = isDark ? '#374151' : '#FFFFFF';
+    const inputPlaceholderColor = isDark ? '#9CA3AF' : '#6B7280';
+    const labelColor = isDark ? '#9CA3AF' : '#6B7280';
+    const dividerColor = isDark ? '#374151' : '#D1D5DB';
+    const noteColor = isDark ? '#9CA3AF' : '#4B5563';
+    const setLabelColor = isDark ? '#9CA3AF' : '#6B7280';
+    const setLabelBg = isDark ? 'rgba(156, 163, 175, 0.15)' : 'rgba(107, 114, 128, 0.1)';
 
     useEffect(() => {
         if (editingField && inputRef.current) {
@@ -45,8 +58,8 @@ export function WorkoutCard({
             style={[
                 styles.input,
                 {
-                    color: '#000000',
-                    backgroundColor: '#FFFFFF',
+                    color: inputTextColor,
+                    backgroundColor: inputBg,
                     minWidth: 40,
                     paddingHorizontal: 6,
                     paddingVertical: 2,
@@ -58,7 +71,7 @@ export function WorkoutCard({
             onBlur={onCommitEditCell}
             onSubmitEditing={onCommitEditCell}
             placeholder={placeholder}
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={inputPlaceholderColor}
             keyboardType={keyboardType}
             returnKeyType="done"
         />
@@ -87,7 +100,7 @@ export function WorkoutCard({
                     disabled={isSyncing}
                 >
                     {editingField === "set" ? renderInput("Set", "numeric") : (
-                        <ThemedText style={[styles.set, isSyncing && styles.syncingText]}>Set {row.set}</ThemedText>
+                        <ThemedText style={[styles.set, { color: setLabelColor, backgroundColor: setLabelBg }, isSyncing && styles.syncingText]}>Set {row.set}</ThemedText>
                     )}
                 </Pressable>
             </View>
@@ -101,13 +114,13 @@ export function WorkoutCard({
                         <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)}>
                             <ThemedText style={styles.detailValue}>
                                 {row.weightLbs && row.weightLbs !== "0" ? row.weightLbs : "—"}
-                                <ThemedText style={styles.detailLabel}> lbs</ThemedText>
+                                <ThemedText style={[styles.detailLabel, { color: labelColor }]}> lbs</ThemedText>
                             </ThemedText>
                         </Pressable>
                     )}
                 </View>
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
                 {/* Reps */}
                 <View style={styles.detailItem}>
@@ -117,7 +130,7 @@ export function WorkoutCard({
                         <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)}>
                             <ThemedText style={styles.detailValue}>
                                 {row.reps || "—"}
-                                <ThemedText style={styles.detailLabel}> reps</ThemedText>
+                                <ThemedText style={[styles.detailLabel, { color: labelColor }]}> reps</ThemedText>
                             </ThemedText>
                         </Pressable>
                     )}
@@ -131,7 +144,7 @@ export function WorkoutCard({
                         renderInput("Add a note...")
                     ) : (
                         <Pressable onPress={() => onBeginEditCell?.(row.id, "notes", row.notes)}>
-                            <ThemedText style={styles.noteText}>{row.notes}</ThemedText>
+                            <ThemedText style={[styles.noteText, { color: noteColor }]}>{row.notes}</ThemedText>
                         </Pressable>
                     )}
                 </View>
@@ -169,9 +182,7 @@ const styles = StyleSheet.create({
     },
     set: {
         fontSize: 13,
-        color: "#6B7280",
         fontWeight: "600",
-        backgroundColor: "rgba(107, 114, 128, 0.1)",
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 6,
@@ -192,12 +203,10 @@ const styles = StyleSheet.create({
     detailLabel: {
         fontSize: 14,
         fontWeight: "400",
-        color: "#6B7280",
     },
     divider: {
         width: 1,
         height: 16,
-        backgroundColor: "#D1D5DB",
         marginHorizontal: 16,
     },
     notes: {
@@ -207,7 +216,6 @@ const styles = StyleSheet.create({
     noteText: {
         fontSize: 14,
         fontStyle: "italic",
-        color: "#4B5563",
     },
     input: {
         fontSize: 16,

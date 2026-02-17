@@ -41,7 +41,7 @@ async function verifyAuth(req: Request): Promise<string> {
 
     if (error) {
         console.error("[pr-tracking] Auth verification ERROR:", JSON.stringify(error));
-        throw new Error("Unauthorized: " + error.message);
+        throw new Error("Unauthorized");
     }
 
     if (!data.user) {
@@ -66,7 +66,7 @@ serve(async (req) => {
     } catch (e) {
         console.error("[pr-tracking] Verification exception:", e);
         return new Response(
-            JSON.stringify({ error: "Unauthorized", details: String(e) }),
+            JSON.stringify({ error: "Unauthorized" }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
@@ -88,7 +88,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[pr-tracking] Error fetching tracked lifts:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -109,7 +109,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[pr-tracking] Error fetching PR lifts:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -137,7 +137,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[pr-tracking] Error fetching PR history:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -204,7 +204,7 @@ serve(async (req) => {
                     }
                     console.error("[pr-tracking] Error adding tracked lift:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -220,12 +220,13 @@ serve(async (req) => {
                 const { error } = await supabase
                     .from("pr_tracked_lifts")
                     .delete()
-                    .eq("id", lift_id);
+                    .eq("id", lift_id)
+                    .eq("user_id", userId);
 
                 if (error) {
                     console.error("[pr-tracking] Error removing tracked lift:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -241,12 +242,13 @@ serve(async (req) => {
                 const { error } = await supabase
                     .from("pr_tracked_lifts")
                     .update({ is_active })
-                    .eq("id", lift_id);
+                    .eq("id", lift_id)
+                    .eq("user_id", userId);
 
                 if (error) {
                     console.error("[pr-tracking] Error toggling tracked lift:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -282,7 +284,7 @@ serve(async (req) => {
                 if (error) {
                     console.error("[pr-tracking] Error setting PR:", error);
                     return new Response(
-                        JSON.stringify({ error: error.message }),
+                        JSON.stringify({ error: "Internal server error" }),
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
@@ -306,7 +308,7 @@ serve(async (req) => {
     } catch (error) {
         console.error("[pr-tracking] Error:", error);
         return new Response(
-            JSON.stringify({ error: "Internal server error", details: String(error) }),
+            JSON.stringify({ error: "Internal server error" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

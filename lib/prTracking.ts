@@ -11,7 +11,7 @@ export interface PRCheckResult {
 }
 
 // Calculate Epley 1RM
-export function calculateE1rm(weight: number, reps: number): number {
+function calculateE1rm(weight: number, reps: number): number {
   if (reps <= 0) return weight;
   return Math.round(weight * (1 + reps / 30) * 10) / 10;
 }
@@ -68,7 +68,7 @@ export async function checkForPR(
 }
 
 // Subscribe to PR breakthroughs via Supabase Realtime (optional advanced feature)
-export function subscribeToPRBreakthroughs(
+function subscribeToPRBreakthroughs(
   userId: string,
   onPR: (data: PRCheckResult) => void
 ): () => void {
@@ -103,7 +103,7 @@ export function subscribeToPRBreakthroughs(
 }
 
 // Batch check for PRs (useful when logging multiple sets)
-export async function checkBatchForPRs(
+async function checkBatchForPRs(
   userId: string,
   sets: Array<{ exercise: string; weightLbs: number; reps: number }>
 ): Promise<PRCheckResult[]> {

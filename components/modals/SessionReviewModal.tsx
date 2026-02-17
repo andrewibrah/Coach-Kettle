@@ -37,6 +37,8 @@ export function SessionReviewModal({
   const backgroundColor = useThemeColor({}, "background");
   const textColor = useThemeColor({}, "text");
   const cardBg = isDark ? "#1C1C1E" : "#F3F4F6";
+  const doneButtonBg = isDark ? "#FFFFFF" : "#111827";
+  const doneButtonTextColor = isDark ? "#111827" : "#FFFFFF";
   const accentColor = "#10B981"; // Green for positive
   const warningColor = "#F59E0B"; // Orange for improvement
 
@@ -155,11 +157,12 @@ export function SessionReviewModal({
               <Pressable
                 style={({ pressed }) => [
                   styles.doneButton,
+                  { backgroundColor: doneButtonBg },
                   pressed && styles.doneButtonPressed,
                 ]}
                 onPress={onClose}
               >
-                <Text style={styles.doneButtonText}>Done</Text>
+                <Text style={[styles.doneButtonText, { color: doneButtonTextColor }]}>Done</Text>
               </Pressable>
             </ScrollView>
           ) : (
@@ -170,11 +173,12 @@ export function SessionReviewModal({
               <Pressable
                 style={({ pressed }) => [
                   styles.doneButton,
+                  { backgroundColor: doneButtonBg },
                   pressed && styles.doneButtonPressed,
                 ]}
                 onPress={onClose}
               >
-                <Text style={styles.doneButtonText}>Close</Text>
+                <Text style={[styles.doneButtonText, { color: doneButtonTextColor }]}>Close</Text>
               </Pressable>
             </View>
           )}
@@ -282,7 +286,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   doneButton: {
-    backgroundColor: "#111827",
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
@@ -292,7 +295,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   doneButtonText: {
-    color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "700",
   },
