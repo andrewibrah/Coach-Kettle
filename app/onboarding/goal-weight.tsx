@@ -6,6 +6,7 @@ import {
   QuizQuestion,
 } from '@/components/onboarding';
 import { ThemedView } from '@/components/ui/themed-view';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -18,14 +19,16 @@ const CURRENT_STEP = 4;
 
 export default function GoalWeightScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile, updateOnboardingStep } = useProfile();
+  const { profile } = useProfile();
+  const { draft, updateDraft } = useOnboarding();
 
-  // Inherit unit from current weight step
-  const inheritedUnit = profile?.weight_unit || 'lb';
-  const [value, setValue] = useState(profile?.goal_weight?.toString() || '');
+  // Inherit unit from current weight step (draft first, then profile)
+  const inheritedUnit = draft.weight_unit ?? profile?.weight_unit ?? 'lb';
+  const initialGoalWeight = draft.goal_weight ?? profile?.goal_weight;
+
+  const [value, setValue] = useState(initialGoalWeight?.toString() || '');
   const [unit, setUnit] = useState<string>(inheritedUnit);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const validateWeight = (): boolean => {
     const numValue = parseFloat(value);
@@ -58,25 +61,18 @@ export default function GoalWeightScreen() {
       return;
     }
 
-    setLoading(true);
-    try {
-      if (value.trim()) {
-        await updateProfile({
-          goal_weight: parseFloat(value),
-        });
-      }
-      await updateOnboardingStep(CURRENT_STEP);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.push('/onboarding/focus' as any);
-    } catch (err) {
-      console.error('Error saving goal weight:', err);
-    } finally {
-      setLoading(false);
-    }
+    // Save to draft (local) - no API call, instant navigation
+    await updateDraft({
+      goal_weight: value.trim() ? parseFloat(value) : null,
+      current_step: CURRENT_STEP,
+    });
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/onboarding/focus' as any);
   };
 
   const handleSkip = async () => {
-    await updateOnboardingStep(CURRENT_STEP);
+    await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/onboarding/focus' as any);
   };
@@ -92,7 +88,6 @@ export default function GoalWeightScreen() {
             onSkip={handleSkip}
             onContinue={handleContinue}
             continueDisabled={!!error}
-            continueLoading={loading}
           />
         }
       >

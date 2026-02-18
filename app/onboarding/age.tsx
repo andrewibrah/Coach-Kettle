@@ -1,12 +1,12 @@
-
 import {
-    QuizButtonGroup,
-    QuizContainer,
-    QuizInput,
-    QuizProgress,
-    QuizQuestion,
+  QuizButtonGroup,
+  QuizContainer,
+  QuizInput,
+  QuizProgress,
+  QuizQuestion,
 } from '@/components/onboarding';
 import { ThemedView } from '@/components/ui/themed-view';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -19,16 +19,17 @@ const CURRENT_STEP = 2;
 
 export default function AgeScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile, updateOnboardingStep } = useProfile();
+  const { profile } = useProfile();
+  const { draft, updateDraft } = useOnboarding();
 
-  // Calculate generic age if DOB exists
-  const initialAge = profile?.dob 
-    ? (new Date().getFullYear() - new Date(profile.dob).getFullYear()).toString() 
+  // Calculate generic age from draft or profile DOB
+  const existingDob = draft.dob ?? profile?.dob;
+  const initialAge = existingDob
+    ? (new Date().getFullYear() - new Date(existingDob).getFullYear()).toString()
     : '';
 
   const [age, setAge] = useState(initialAge);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const validateAge = (): boolean => {
     if (!age.trim()) return true; // Empty is valid (skip)
@@ -49,31 +50,28 @@ export default function AgeScreen() {
       return;
     }
 
-    setLoading(true);
-    try {
-      if (age.trim()) {
-        const ageNum = parseInt(age, 10);
-        const currentYear = new Date().getFullYear();
-        const birthYear = currentYear - ageNum;
-        // Set to approx date: Jan 1st of that year
-        const dob = `${birthYear}-01-01`;
+    let dob: string | null = null;
 
-        await updateProfile({
-          dob: dob,
-        });
-      }
-      await updateOnboardingStep(CURRENT_STEP);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.push('/onboarding/current-weight' as any);
-    } catch (err) {
-      console.error('Error saving age:', err);
-    } finally {
-      setLoading(false);
+    if (age.trim()) {
+      const ageNum = parseInt(age, 10);
+      const currentYear = new Date().getFullYear();
+      const birthYear = currentYear - ageNum;
+      // Set to approx date: Jan 1st of that year
+      dob = `${birthYear}-01-01`;
     }
+
+    // Save to draft (local) - no API call, instant navigation
+    await updateDraft({
+      dob,
+      current_step: CURRENT_STEP,
+    });
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/onboarding/current-weight' as any);
   };
 
   const handleSkip = async () => {
-    await updateOnboardingStep(CURRENT_STEP);
+    await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/onboarding/current-weight' as any);
   };
@@ -89,7 +87,6 @@ export default function AgeScreen() {
             onSkip={handleSkip}
             onContinue={handleContinue}
             continueDisabled={!!error}
-            continueLoading={loading}
           />
         }
       >

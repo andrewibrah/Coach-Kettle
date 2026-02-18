@@ -29,6 +29,14 @@ interface WorkoutRow {
     weightLbs: string;
     reps: string;
     notes: string;
+    // Cardio fields
+    isCardio?: boolean;
+    durationMins?: number;
+    distance?: number;
+    distanceUnit?: 'miles' | 'km' | 'meters';
+    heartRate?: number;
+    calories?: number;
+    level?: number;
 }
 
 async function verifyAuth(req: Request): Promise<string> {
@@ -82,9 +90,10 @@ serve(async (req) => {
         );
     }
 
-    const { exercise, set, weightLbs, reps, notes } = payload;
+    const { exercise, set, weightLbs, reps, notes, isCardio, durationMins, distance, distanceUnit, heartRate, calories, level } = payload;
 
-    if (!exercise || !weightLbs || !reps) {
+    // Cardio entries may not have weightLbs/reps, so only require them for non-cardio
+    if (!exercise || (!isCardio && !weightLbs && !reps)) {
         return new Response(
             JSON.stringify({ error: "Missing required fields" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -102,10 +111,18 @@ serve(async (req) => {
                 user_id: userId,
                 exercise: exercise,
                 set_number: set || 1,
-                weight_lbs: weightLbs,
-                reps: reps,
+                weight_lbs: weightLbs || '0',
+                reps: reps || '0',
                 notes: notes || null,
                 created_at: new Date().toISOString(),
+                // Cardio fields
+                is_cardio: isCardio ?? false,
+                duration_mins: durationMins ?? null,
+                distance: distance ?? null,
+                distance_unit: distanceUnit ?? null,
+                heart_rate: heartRate ?? null,
+                calories: calories ?? null,
+                level: level ?? null,
             });
 
         if (error) {
@@ -116,7 +133,10 @@ serve(async (req) => {
             );
         }
 
-        console.log(`[log-set] Inserted: ${exercise} ${weightLbs}x${reps} for user ${userId}`);
+        const logMsg = isCardio
+            ? `[log-set] Inserted cardio: ${exercise} ${durationMins ?? ''}min ${distance ?? ''}${distanceUnit ?? ''} for user ${userId}`
+            : `[log-set] Inserted: ${exercise} ${weightLbs}x${reps} for user ${userId}`;
+        console.log(logMsg);
 
         return new Response(
             JSON.stringify({ ok: true, pr_check: true }),

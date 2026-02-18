@@ -10,6 +10,7 @@ import { AuthLockProvider } from '@/components/AuthLockProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { Colors } from '@/constants/theme';
+import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { PRCelebrationProvider } from '@/contexts/PRCelebrationContext';
 import { ProfileProvider } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -23,13 +24,15 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <ProfileProvider>
-          <PRCelebrationProvider>
-            <AuthLockProvider>
+          <OnboardingProvider>
+            <PRCelebrationProvider>
+              <AuthLockProvider>
               <GestureHandlerRootView style={{ flex: 1 }}>
                 <RootLayoutNav />
               </GestureHandlerRootView>
             </AuthLockProvider>
-          </PRCelebrationProvider>
+            </PRCelebrationProvider>
+          </OnboardingProvider>
         </ProfileProvider>
       </AuthProvider>
     </ThemeProvider>

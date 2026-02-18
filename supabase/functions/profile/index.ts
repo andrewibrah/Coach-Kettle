@@ -249,6 +249,177 @@ serve(async (req) => {
                 );
             }
 
+            // Batch onboarding - saves all onboarding data in one call
+            if (action === "batch_onboarding") {
+                console.log("[profile] Starting batch onboarding for user:", userId);
+                const {
+                    profile: profileData,
+                    tracked_lifts,
+                    pr_values,
+                    workout_templates,
+                } = body;
+
+                const errors: string[] = [];
+
+                // 1. Update profile fields (if any provided)
+                if (profileData && Object.keys(profileData).length > 0) {
+                    const ALLOWED_PROFILE_FIELDS = [
+                        'height_value', 'height_unit', 'dob',
+                        'current_weight', 'goal_weight', 'weight_unit',
+                        'focus', 'focus_other'
+                    ];
+                    const safeProfileUpdates = Object.fromEntries(
+                        Object.entries(profileData).filter(([key]) => ALLOWED_PROFILE_FIELDS.includes(key))
+                    );
+
+                    if (Object.keys(safeProfileUpdates).length > 0) {
+                        const { error: profileError } = await supabase
+                            .from("profiles")
+                            .update(safeProfileUpdates)
+                            .eq("user_id", userId);
+
+                        if (profileError) {
+                            console.error("[profile] Batch: Error updating profile:", profileError);
+                            errors.push(`profile: ${profileError.message}`);
+                        }
+                    }
+                }
+
+                // 2. Add tracked lifts (if any)
+                if (tracked_lifts && Array.isArray(tracked_lifts) && tracked_lifts.length > 0) {
+                    for (const liftName of tracked_lifts) {
+                        const { error: liftError } = await supabase
+                            .from("pr_tracked_lifts")
+                            .upsert(
+                                {
+                                    user_id: userId,
+                                    lift_name: liftName,
+                                    is_active: true,
+                                },
+                                { onConflict: "user_id,lift_name" }
+                            );
+
+                        if (liftError) {
+                            console.error("[profile] Batch: Error adding tracked lift:", liftError);
+                            errors.push(`tracked_lift(${liftName}): ${liftError.message}`);
+                        }
+                    }
+                }
+
+                // 3. Set PR values (if any)
+                if (pr_values && Array.isArray(pr_values) && pr_values.length > 0) {
+                    for (const pr of pr_values) {
+                        const { lift_name, weight_lbs, reps } = pr;
+                        // Calculate e1rm using Epley formula
+                        const estimated_1rm = reps <= 0 ? weight_lbs : Math.round(weight_lbs * (1 + reps / 30) * 10) / 10;
+
+                        const { error: prError } = await supabase
+                            .from("pr_lifts")
+                            .upsert(
+                                {
+                                    user_id: userId,
+                                    lift_name,
+                                    weight_lbs,
+                                    reps,
+                                    estimated_1rm,
+                                    achieved_at: new Date().toISOString(),
+                                },
+                                { onConflict: "user_id,lift_name" }
+                            );
+
+                        if (prError) {
+                            console.error("[profile] Batch: Error setting PR:", prError);
+                            errors.push(`pr(${lift_name}): ${prError.message}`);
+                        }
+                    }
+                }
+
+                // 4. Create workout templates (if any)
+                if (workout_templates && Array.isArray(workout_templates) && workout_templates.length > 0) {
+                    for (const template of workout_templates) {
+                        const { name, lifts } = template;
+
+                        // Create template
+                        const { data: templateData, error: templateError } = await supabase
+                            .from("workout_templates")
+                            .insert({
+                                user_id: userId,
+                                name,
+                            })
+                            .select("id")
+                            .single();
+
+                        if (templateError) {
+                            console.error("[profile] Batch: Error creating template:", templateError);
+                            errors.push(`template(${name}): ${templateError.message}`);
+                            continue;
+                        }
+
+                        // Add template items
+                        if (templateData && lifts && Array.isArray(lifts)) {
+                            for (let i = 0; i < lifts.length; i++) {
+                                const lift = lifts[i];
+                                const { error: itemError } = await supabase
+                                    .from("workout_template_items")
+                                    .insert({
+                                        template_id: templateData.id,
+                                        user_id: userId,
+                                        lift_name: lift.name,
+                                        target_sets: lift.sets,
+                                        target_reps: lift.reps,
+                                        display_order: i,
+                                    });
+
+                                if (itemError) {
+                                    console.error("[profile] Batch: Error adding template item:", itemError);
+                                    errors.push(`template_item(${lift.name}): ${itemError.message}`);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5. Mark onboarding as complete
+                const { error: completeError } = await supabase
+                    .from("profiles")
+                    .update({ onboarding_completed: true })
+                    .eq("user_id", userId);
+
+                if (completeError) {
+                    console.error("[profile] Batch: Error completing onboarding:", completeError);
+                    errors.push(`complete: ${completeError.message}`);
+                }
+
+                // 6. Refresh AI context (don't fail on this)
+                try {
+                    await supabase.rpc("refresh_ai_context", { p_user_id: userId });
+                } catch (aiError) {
+                    console.warn("[profile] Batch: AI context refresh failed (non-critical):", aiError);
+                }
+
+                // Return result
+                if (errors.length > 0) {
+                    console.error("[profile] Batch onboarding completed with errors:", errors);
+                    // Still return 200 if onboarding was marked complete (partial success)
+                    if (!completeError) {
+                        return new Response(
+                            JSON.stringify({ ok: true, warnings: errors }),
+                            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                        );
+                    }
+                    return new Response(
+                        JSON.stringify({ error: "Batch onboarding failed", details: errors }),
+                        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+
+                console.log("[profile] Batch onboarding completed successfully");
+                return new Response(
+                    JSON.stringify({ ok: true }),
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+            }
+
             return new Response(
                 JSON.stringify({ error: "Unknown action" }),
                 { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

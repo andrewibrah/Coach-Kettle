@@ -1,4 +1,3 @@
-import { useAuth } from '@/components/AuthProvider';
 import {
   QuizButtonGroup,
   QuizContainer,
@@ -8,9 +7,8 @@ import {
 } from '@/components/onboarding';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
-import { useProfile } from '@/contexts/ProfileContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { fetchTrackedLifts, PRTrackedLift, setPRLift } from '@/lib/profile';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -23,87 +21,94 @@ const CURRENT_STEP = 7;
 export default function PRValuesScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const { session } = useAuth();
-  const { updateOnboardingStep } = useProfile();
+  const { draft, updateDraft } = useOnboarding();
 
-  const [trackedLifts, setTrackedLifts] = useState<PRTrackedLift[]>([]);
+  // Get tracked lifts from draft
+  const trackedLifts = draft.tracked_lifts || [];
   const [currentLiftIndex, setCurrentLiftIndex] = useState(0);
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
 
-  useEffect(() => {
-    const loadLifts = async () => {
-      if (session?.user?.id) {
-        try {
-          const lifts = await fetchTrackedLifts(session.user.id);
-          setTrackedLifts(lifts);
-        } catch (err) {
-          console.error('Error loading tracked lifts:', err);
-        }
-      }
-      setInitialLoading(false);
-    };
-    loadLifts();
-  }, [session?.user?.id]);
+  // Store PR values locally as user enters them
+  const [prValues, setPrValues] = useState<Array<{ lift_name: string; weight_lbs: number; reps: number }>>(
+    draft.pr_values || []
+  );
 
   const currentLift = trackedLifts[currentLiftIndex];
   const isLastLift = currentLiftIndex >= trackedLifts.length - 1;
 
-  const handleSaveAndNext = async () => {
-    setLoading(true);
-    try {
-      // Save current lift's PR if values provided
-      if (session?.user?.id && currentLift && weight.trim() && reps.trim()) {
-        await setPRLift(
-          session.user.id,
-          currentLift.lift_name,
-          parseFloat(weight),
-          parseInt(reps, 10)
-        );
-      }
+  // Load existing PR value for current lift from draft
+  useEffect(() => {
+    const existingPR = prValues.find((pr) => pr.lift_name === currentLift);
+    if (existingPR) {
+      setWeight(existingPR.weight_lbs.toString());
+      setReps(existingPR.reps.toString());
+    } else {
+      setWeight('');
+      setReps('');
+    }
+  }, [currentLiftIndex, currentLift, prValues]);
 
-      if (isLastLift) {
-        // Done with all lifts
-        await updateOnboardingStep(CURRENT_STEP);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push('/onboarding/workout-setup' as any);
-      } else {
-        // Move to next lift
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setCurrentLiftIndex(currentLiftIndex + 1);
-        setWeight('');
-        setReps('');
-      }
-    } catch (err) {
-      console.error('Error saving PR:', err);
-    } finally {
-      setLoading(false);
+  const savePRValue = () => {
+    // Save current lift's PR if values provided
+    if (currentLift && weight.trim() && reps.trim()) {
+      const newPR = {
+        lift_name: currentLift,
+        weight_lbs: parseFloat(weight),
+        reps: parseInt(reps, 10),
+      };
+
+      // Update or add PR value
+      const updatedPRs = prValues.filter((pr) => pr.lift_name !== currentLift);
+      updatedPRs.push(newPR);
+      setPrValues(updatedPRs);
+      return updatedPRs;
+    }
+    return prValues;
+  };
+
+  const handleSaveAndNext = async () => {
+    const updatedPRs = savePRValue();
+
+    if (isLastLift) {
+      // Done with all lifts - save to draft and navigate
+      await updateDraft({
+        pr_values: updatedPRs,
+        current_step: CURRENT_STEP,
+      });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push('/onboarding/workout-setup' as any);
+    } else {
+      // Save current progress to draft and move to next lift
+      await updateDraft({ pr_values: updatedPRs });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setCurrentLiftIndex(currentLiftIndex + 1);
     }
   };
 
   const handleSkip = async () => {
     if (isLastLift) {
-      await updateOnboardingStep(CURRENT_STEP);
+      // Save whatever we have and move on
+      await updateDraft({
+        pr_values: prValues,
+        current_step: CURRENT_STEP,
+      });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       router.push('/onboarding/workout-setup' as any);
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setCurrentLiftIndex(currentLiftIndex + 1);
-      setWeight('');
-      setReps('');
     }
   };
 
   // If no lifts to track, skip to next screen
   useEffect(() => {
-    if (!initialLoading && trackedLifts.length === 0) {
+    if (trackedLifts.length === 0) {
       router.replace('/onboarding/workout-setup' as any);
     }
-  }, [initialLoading, trackedLifts.length]);
+  }, [trackedLifts.length]);
 
-  if (initialLoading || trackedLifts.length === 0) {
+  if (trackedLifts.length === 0) {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
         <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-lifts' as any)} />
@@ -121,14 +126,12 @@ export default function PRValuesScreen() {
           <QuizButtonGroup
             onSkip={handleSkip}
             onContinue={handleSaveAndNext}
-            continueLoading={loading}
             continueLabel={isLastLift ? 'Finish PRs' : 'Next Lift'}
-            skipDisabled={loading}
           />
         }
       >
         <QuizQuestion
-          question={`What's your current ${currentLift?.lift_name} PR?`}
+          question={`What's your current ${currentLift} PR?`}
           subtitle={`Lift ${currentLiftIndex + 1} of ${trackedLifts.length}`}
         />
 

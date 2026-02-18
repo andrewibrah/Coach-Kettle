@@ -1,4 +1,3 @@
-import { useAuth } from '@/components/AuthProvider';
 import {
   QuizButtonGroup,
   QuizContainer,
@@ -10,13 +9,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
-import { useProfile } from '@/contexts/ProfileContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { addTemplateItem, createWorkoutTemplate } from '@/lib/profile';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -34,15 +32,16 @@ interface WorkoutLift {
 export default function WorkoutSetupScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const { session } = useAuth();
-  const { updateOnboardingStep, completeOnboarding } = useProfile();
+  const { draft, updateDraft } = useOnboarding();
 
   const [step, setStep] = useState<Step>('initial');
   const [workoutName, setWorkoutName] = useState('');
   const [currentLift, setCurrentLift] = useState<WorkoutLift>({ name: '', sets: '3', reps: '10' });
   const [lifts, setLifts] = useState<WorkoutLift[]>([]);
-  const [savedWorkouts, setSavedWorkouts] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Track saved workouts locally (will be sent in batch at complete screen)
+  const [savedWorkouts, setSavedWorkouts] = useState<Array<{ name: string; lifts: Array<{ name: string; sets: number; reps: number }> }>>(
+    draft.workout_templates || []
+  );
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const handleYes = () => {
@@ -95,49 +94,25 @@ export default function WorkoutSetupScreen() {
   };
 
   const handleFinishWorkout = async () => {
-    setLoading(true);
-    try {
-      if (session?.user?.id && workoutName.trim()) {
-        // Create workout template
-        const template = await createWorkoutTemplate(session.user.id, workoutName);
+    if (workoutName.trim() && lifts.length > 0) {
+      // Save workout to local state (will be batched at complete screen)
+      const newWorkout = {
+        name: workoutName,
+        lifts: lifts.map((lift) => ({
+          name: lift.name,
+          sets: lift.sets ? parseInt(lift.sets, 10) : 3,
+          reps: lift.reps ? parseInt(lift.reps, 10) : 10,
+        })),
+      };
 
-        if (template) {
-          // Add all lifts to template with display_order
-          for (let i = 0; i < lifts.length; i++) {
-            const lift = lifts[i];
-            const result = await addTemplateItem(
-              session.user.id,
-              template.id,
-              lift.name,
-              lift.sets ? parseInt(lift.sets, 10) : 3,
-              lift.reps ? parseInt(lift.reps, 10) : 10,
-              undefined, // No weight during onboarding
-              undefined, // No notes
-              i          // display_order
-            );
-            
-            if (!result) {
-              throw new Error(`Failed to add exercise: ${lift.name}`);
-            }
-          }
-          
-          setSavedWorkouts([...savedWorkouts, workoutName]);
-        } else {
-          throw new Error('Failed to create workout template');
-        }
-      }
+      const updatedWorkouts = [...savedWorkouts, newWorkout];
+      setSavedWorkouts(updatedWorkouts);
+
+      // Save to draft
+      await updateDraft({ workout_templates: updatedWorkouts });
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setStep('addMore');
-    } catch (err) {
-      console.error('Error saving workout:', err);
-      Alert.alert(
-        'Save Failed',
-        'Could not save your workout routine. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -151,17 +126,13 @@ export default function WorkoutSetupScreen() {
   };
 
   const finishOnboarding = async () => {
-    setLoading(true);
-    try {
-      await updateOnboardingStep(CURRENT_STEP);
-      await completeOnboarding();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.push('/onboarding/complete' as any);
-    } catch (err) {
-      console.error('Error completing onboarding:', err);
-    } finally {
-      setLoading(false);
-    }
+    // Save current step and navigate to complete screen (batch save happens there)
+    await updateDraft({
+      workout_templates: savedWorkouts,
+      current_step: CURRENT_STEP,
+    });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    router.push('/onboarding/complete' as any);
   };
 
   // Initial choice screen
@@ -189,7 +160,6 @@ export default function WorkoutSetupScreen() {
                 { backgroundColor: colorScheme === 'dark' ? '#333' : '#e0e0e0' },
               ]}
               onPress={handleNo}
-              disabled={loading}
             >
               <ThemedText style={styles.choiceButtonTextSecondary}>Skip for now</ThemedText>
             </TouchableOpacity>
@@ -211,7 +181,6 @@ export default function WorkoutSetupScreen() {
               onSkip={finishOnboarding}
               onContinue={handleNameContinue}
               continueDisabled={!workoutName.trim()}
-              continueLoading={loading}
             />
           }
         >
@@ -242,7 +211,6 @@ export default function WorkoutSetupScreen() {
               onSkip={finishOnboarding}
               onContinue={handleFinishWorkout}
               continueDisabled={lifts.length === 0}
-              continueLoading={loading}
               continueLabel="Save Workout"
             />
           }
@@ -372,16 +340,16 @@ export default function WorkoutSetupScreen() {
         />
 
         <View style={styles.savedList}>
-          {savedWorkouts.map((name) => (
+          {savedWorkouts.map((workout, index) => (
             <View
-              key={name}
+              key={`${workout.name}-${index}`}
               style={[
                 styles.savedItem,
                 { backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5' },
               ]}
             >
               <IconSymbol name="checkmark.circle.fill" size={20} color={Colors[colorScheme ?? 'light'].tint} />
-              <ThemedText style={styles.savedName}>{name}</ThemedText>
+              <ThemedText style={styles.savedName}>{workout.name}</ThemedText>
             </View>
           ))}
         </View>
@@ -400,10 +368,9 @@ export default function WorkoutSetupScreen() {
               { backgroundColor: colorScheme === 'dark' ? '#333' : '#e0e0e0' },
             ]}
             onPress={finishOnboarding}
-            disabled={loading}
           >
             <ThemedText style={styles.choiceButtonTextSecondary}>
-              {loading ? 'Finishing...' : "I'm done"}
+              I&apos;m done
             </ThemedText>
           </TouchableOpacity>
         </View>

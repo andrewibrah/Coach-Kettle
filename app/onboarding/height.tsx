@@ -1,4 +1,3 @@
-
 import {
   QuizButtonGroup,
   QuizContainer,
@@ -9,6 +8,7 @@ import {
 } from '@/components/onboarding';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -21,9 +21,12 @@ const CURRENT_STEP = 1;
 
 export default function HeightScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile, updateOnboardingStep } = useProfile();
+  const { profile } = useProfile();
+  const { draft, updateDraft } = useOnboarding();
 
-  const [unit, setUnit] = useState<string>(profile?.height_unit || 'in');
+  // Prioritize draft, then profile
+  const initialUnit = draft.height_unit ?? profile?.height_unit ?? 'in';
+  const [unit, setUnit] = useState<string>(initialUnit);
 
   // Metric State
   const [cmValue, setCmValue] = useState('');
@@ -33,20 +36,24 @@ export default function HeightScreen() {
   const [inches, setInches] = useState('');
 
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  // Initialize values
+  // No loading state needed - draft saves are instant
+
+  // Initialize values from draft or profile
   useEffect(() => {
-    if (profile?.height_value) {
-      if (profile.height_unit === 'cm') {
-        setCmValue(profile.height_value.toString());
+    const heightValue = draft.height_value ?? profile?.height_value;
+    const heightUnit = draft.height_unit ?? profile?.height_unit;
+
+    if (heightValue) {
+      if (heightUnit === 'cm') {
+        setCmValue(heightValue.toString());
       } else {
-        const totalInches = profile.height_value;
+        const totalInches = heightValue;
         setFeet(Math.floor(totalInches / 12).toString());
         setInches(Math.round(totalInches % 12).toString());
       }
     }
-  }, [profile]);
+  }, [draft.height_value, draft.height_unit, profile?.height_value, profile?.height_unit]);
 
   const validateHeight = (): boolean => {
     if (unit === 'cm') {
@@ -83,44 +90,34 @@ export default function HeightScreen() {
       return;
     }
 
-    setLoading(true);
-    try {
-      let finalValue = 0;
-      let hasData = false;
+    let finalValue: number | null = null;
 
-      if (unit === 'cm') {
-        if (cmValue.trim()) {
-          finalValue = parseFloat(cmValue);
-          hasData = true;
-        }
-      } else {
-        if (feet.trim() || inches.trim()) {
-          const ft = parseFloat(feet || '0');
-          const inc = parseFloat(inches || '0');
-          finalValue = (ft * 12) + inc;
-          hasData = true;
-        }
+    if (unit === 'cm') {
+      if (cmValue.trim()) {
+        finalValue = parseFloat(cmValue);
       }
-
-      if (hasData) {
-        await updateProfile({
-          height_value: finalValue,
-          height_unit: unit as 'cm' | 'in',
-        });
+    } else {
+      if (feet.trim() || inches.trim()) {
+        const ft = parseFloat(feet || '0');
+        const inc = parseFloat(inches || '0');
+        finalValue = (ft * 12) + inc;
       }
-
-      await updateOnboardingStep(CURRENT_STEP);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.push('/onboarding/age' as any);
-    } catch (err) {
-      console.error('Error saving height:', err);
-    } finally {
-      setLoading(false);
     }
+
+    // Save to draft (local) - no API call, instant navigation
+    await updateDraft({
+      height_value: finalValue,
+      height_unit: finalValue !== null ? (unit as 'cm' | 'in') : null,
+      current_step: CURRENT_STEP,
+    });
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/onboarding/age' as any);
   };
 
   const handleSkip = async () => {
-    await updateOnboardingStep(CURRENT_STEP);
+    // Just update step tracking in draft
+    await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/onboarding/age' as any);
   };
@@ -136,7 +133,6 @@ export default function HeightScreen() {
             onSkip={handleSkip}
             onContinue={handleContinue}
             continueDisabled={!!error}
-            continueLoading={loading}
           />
         }
       >

@@ -17,6 +17,14 @@ interface WorkoutRow {
     reps: string;
     notes: string;
     timestamp?: number;
+    // Cardio-specific fields
+    isCardio?: boolean;
+    durationMins?: number;
+    distance?: number;
+    distanceUnit?: 'miles' | 'km' | 'meters';
+    heartRate?: number;
+    calories?: number;
+    level?: number;
 }
 
 interface WorkoutSession {
@@ -122,6 +130,14 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
             reps: row.reps || '0',
             notes: row.notes || null,
             created_at: new Date().toISOString(),
+            // Cardio-specific fields
+            is_cardio: row.isCardio ?? false,
+            duration_mins: row.durationMins ?? null,
+            distance: row.distance ?? null,
+            distance_unit: row.distanceUnit ?? null,
+            heart_rate: row.heartRate ?? null,
+            calories: row.calories ?? null,
+            level: row.level ?? null,
         }));
 
         // Use admin client to bypass RLS for workout_log insert

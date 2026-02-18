@@ -78,6 +78,14 @@ export type ApiWorkoutRow = {
     weightLbs: string;
     reps: string;
     notes: string;
+    // Cardio fields
+    isCardio?: boolean;
+    durationMins?: number;
+    distance?: number;
+    distanceUnit?: 'miles' | 'km' | 'meters';
+    heartRate?: number;
+    calories?: number;
+    level?: number;
 };
 
 export type CoachResponse = {

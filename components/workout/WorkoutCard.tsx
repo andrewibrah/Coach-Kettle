@@ -106,35 +106,83 @@ export function WorkoutCard({
             </View>
 
             <View style={[styles.details, { marginBottom: (row.notes || editingField === "notes") ? 12 : 0 }]}>
-                {/* Weight */}
-                <View style={styles.detailItem}>
-                    {editingField === "weightLbs" ? (
-                        renderInput("Lbs", "numeric")
-                    ) : (
-                        <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)}>
-                            <ThemedText style={styles.detailValue}>
-                                {row.weightLbs && row.weightLbs !== "0" ? row.weightLbs : "—"}
-                                <ThemedText style={[styles.detailLabel, { color: labelColor }]}> lbs</ThemedText>
-                            </ThemedText>
-                        </Pressable>
-                    )}
-                </View>
+                {row.isCardio ? (
+                    // Cardio display: duration, distance, calories, heart rate, level
+                    <View style={styles.cardioDetails}>
+                        {row.durationMins != null && (
+                            <View style={styles.cardioItem}>
+                                <ThemedText style={styles.detailValue}>
+                                    {row.durationMins}
+                                    <ThemedText style={[styles.detailLabel, { color: labelColor }]}> min</ThemedText>
+                                </ThemedText>
+                            </View>
+                        )}
+                        {row.distance != null && (
+                            <View style={styles.cardioItem}>
+                                <ThemedText style={styles.detailValue}>
+                                    {row.distance}
+                                    <ThemedText style={[styles.detailLabel, { color: labelColor }]}> {row.distanceUnit || 'mi'}</ThemedText>
+                                </ThemedText>
+                            </View>
+                        )}
+                        {row.calories != null && (
+                            <View style={styles.cardioItem}>
+                                <ThemedText style={styles.detailValue}>
+                                    {row.calories}
+                                    <ThemedText style={[styles.detailLabel, { color: labelColor }]}> cal</ThemedText>
+                                </ThemedText>
+                            </View>
+                        )}
+                        {row.heartRate != null && (
+                            <View style={styles.cardioItem}>
+                                <ThemedText style={styles.detailValue}>
+                                    {row.heartRate}
+                                    <ThemedText style={[styles.detailLabel, { color: labelColor }]}> bpm</ThemedText>
+                                </ThemedText>
+                            </View>
+                        )}
+                        {row.level != null && (
+                            <View style={styles.cardioItem}>
+                                <ThemedText style={styles.detailValue}>
+                                    Lvl {row.level}
+                                </ThemedText>
+                            </View>
+                        )}
+                    </View>
+                ) : (
+                    // Standard weight/reps display
+                    <>
+                        {/* Weight */}
+                        <View style={styles.detailItem}>
+                            {editingField === "weightLbs" ? (
+                                renderInput("Lbs", "numeric")
+                            ) : (
+                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)}>
+                                    <ThemedText style={styles.detailValue}>
+                                        {row.weightLbs && row.weightLbs !== "0" ? row.weightLbs : "—"}
+                                        <ThemedText style={[styles.detailLabel, { color: labelColor }]}> lbs</ThemedText>
+                                    </ThemedText>
+                                </Pressable>
+                            )}
+                        </View>
 
-                <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+                        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
-                {/* Reps */}
-                <View style={styles.detailItem}>
-                    {editingField === "reps" ? (
-                        renderInput("Reps", "numeric")
-                    ) : (
-                        <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)}>
-                            <ThemedText style={styles.detailValue}>
-                                {row.reps || "—"}
-                                <ThemedText style={[styles.detailLabel, { color: labelColor }]}> reps</ThemedText>
-                            </ThemedText>
-                        </Pressable>
-                    )}
-                </View>
+                        {/* Reps */}
+                        <View style={styles.detailItem}>
+                            {editingField === "reps" ? (
+                                renderInput("Reps", "numeric")
+                            ) : (
+                                <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)}>
+                                    <ThemedText style={styles.detailValue}>
+                                        {row.reps || "—"}
+                                        <ThemedText style={[styles.detailLabel, { color: labelColor }]}> reps</ThemedText>
+                                    </ThemedText>
+                                </Pressable>
+                            )}
+                        </View>
+                    </>
+                )}
             </View>
 
             {/* Notes */}
@@ -191,6 +239,16 @@ const styles = StyleSheet.create({
     details: {
         flexDirection: "row",
         alignItems: "center",
+    },
+    cardioDetails: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: 12,
+    },
+    cardioItem: {
+        flexDirection: "row",
+        alignItems: "baseline",
     },
     detailItem: {
         flexDirection: "row",

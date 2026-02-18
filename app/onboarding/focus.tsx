@@ -7,6 +7,7 @@ import {
   QuizQuestion,
 } from '@/components/onboarding';
 import { ThemedView } from '@/components/ui/themed-view';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -46,11 +47,15 @@ const FOCUS_OPTIONS = [
 
 export default function FocusScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile, updateOnboardingStep } = useProfile();
+  const { profile } = useProfile();
+  const { draft, updateDraft } = useOnboarding();
 
-  const [selected, setSelected] = useState<string | null>(profile?.focus || null);
-  const [otherText, setOtherText] = useState(profile?.focus_other || '');
-  const [loading, setLoading] = useState(false);
+  // Prioritize draft over profile
+  const initialFocus = draft.focus ?? profile?.focus ?? null;
+  const initialOther = draft.focus_other ?? profile?.focus_other ?? '';
+
+  const [selected, setSelected] = useState<string | null>(initialFocus);
+  const [otherText, setOtherText] = useState(initialOther);
 
   const handleSelect = (value: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -58,26 +63,19 @@ export default function FocusScreen() {
   };
 
   const handleContinue = async () => {
-    setLoading(true);
-    try {
-      if (selected) {
-        await updateProfile({
-          focus: selected as any,
-          focus_other: selected === 'other' ? otherText : null,
-        });
-      }
-      await updateOnboardingStep(CURRENT_STEP);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.push('/onboarding/pr-lifts' as any);
-    } catch (err) {
-      console.error('Error saving focus:', err);
-    } finally {
-      setLoading(false);
-    }
+    // Save to draft (local) - no API call, instant navigation
+    await updateDraft({
+      focus: selected ? (selected as 'strength' | 'lean_muscle' | 'fat_loss' | 'other') : null,
+      focus_other: selected === 'other' ? otherText : null,
+      current_step: CURRENT_STEP,
+    });
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/onboarding/pr-lifts' as any);
   };
 
   const handleSkip = async () => {
-    await updateOnboardingStep(CURRENT_STEP);
+    await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/onboarding/pr-lifts' as any);
   };
@@ -92,7 +90,6 @@ export default function FocusScreen() {
           <QuizButtonGroup
             onSkip={handleSkip}
             onContinue={handleContinue}
-            continueLoading={loading}
           />
         }
       >

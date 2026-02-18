@@ -6,6 +6,7 @@ import {
   QuizQuestion,
 } from '@/components/onboarding';
 import { ThemedView } from '@/components/ui/themed-view';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -18,12 +19,16 @@ const CURRENT_STEP = 3;
 
 export default function CurrentWeightScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile, updateOnboardingStep } = useProfile();
+  const { profile } = useProfile();
+  const { draft, updateDraft } = useOnboarding();
 
-  const [value, setValue] = useState(profile?.current_weight?.toString() || '');
-  const [unit, setUnit] = useState<string>(profile?.weight_unit || 'lb');
+  // Prioritize draft over profile
+  const initialWeight = draft.current_weight ?? profile?.current_weight;
+  const initialUnit = draft.weight_unit ?? profile?.weight_unit ?? 'lb';
+
+  const [value, setValue] = useState(initialWeight?.toString() || '');
+  const [unit, setUnit] = useState<string>(initialUnit);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const validateWeight = (): boolean => {
     const numValue = parseFloat(value);
@@ -56,26 +61,19 @@ export default function CurrentWeightScreen() {
       return;
     }
 
-    setLoading(true);
-    try {
-      if (value.trim()) {
-        await updateProfile({
-          current_weight: parseFloat(value),
-          weight_unit: unit as 'lb' | 'kg',
-        });
-      }
-      await updateOnboardingStep(CURRENT_STEP);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.push('/onboarding/goal-weight' as any);
-    } catch (err) {
-      console.error('Error saving weight:', err);
-    } finally {
-      setLoading(false);
-    }
+    // Save to draft (local) - no API call, instant navigation
+    await updateDraft({
+      current_weight: value.trim() ? parseFloat(value) : null,
+      weight_unit: value.trim() ? (unit as 'lb' | 'kg') : null,
+      current_step: CURRENT_STEP,
+    });
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/onboarding/goal-weight' as any);
   };
 
   const handleSkip = async () => {
-    await updateOnboardingStep(CURRENT_STEP);
+    await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/onboarding/goal-weight' as any);
   };
@@ -91,7 +89,6 @@ export default function CurrentWeightScreen() {
             onSkip={handleSkip}
             onContinue={handleContinue}
             continueDisabled={!!error}
-            continueLoading={loading}
           />
         }
       >

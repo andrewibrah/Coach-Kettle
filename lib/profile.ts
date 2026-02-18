@@ -219,6 +219,73 @@ export async function completeOnboarding(userId: string): Promise<boolean> {
   }
 }
 
+// Batch onboarding data structure
+export interface BatchOnboardingData {
+  profile?: {
+    height_value?: number | null;
+    height_unit?: 'cm' | 'in' | null;
+    dob?: string | null;
+    current_weight?: number | null;
+    goal_weight?: number | null;
+    weight_unit?: 'lb' | 'kg' | null;
+    focus?: 'strength' | 'lean_muscle' | 'fat_loss' | 'other' | null;
+    focus_other?: string | null;
+  };
+  tracked_lifts?: string[];
+  pr_values?: Array<{
+    lift_name: string;
+    weight_lbs: number;
+    reps: number;
+  }>;
+  workout_templates?: Array<{
+    name: string;
+    lifts: Array<{
+      name: string;
+      sets: number;
+      reps: number;
+    }>;
+  }>;
+}
+
+// Batch save all onboarding data in a single call
+export async function batchSaveOnboarding(
+  userId: string,
+  data: BatchOnboardingData
+): Promise<{ ok: boolean; warnings?: string[]; error?: string }> {
+  console.log('[Profile] Batch saving onboarding data for user:', userId);
+
+  try {
+    const response = await fetchWithAuth(`${API_BASE}/profile`, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'batch_onboarding',
+        profile: data.profile,
+        tracked_lifts: data.tracked_lifts,
+        pr_values: data.pr_values,
+        workout_templates: data.workout_templates,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('[Profile] Batch onboarding failed:', result);
+      return { ok: false, error: result.error || 'Batch save failed' };
+    }
+
+    if (result.warnings && result.warnings.length > 0) {
+      console.warn('[Profile] Batch onboarding completed with warnings:', result.warnings);
+      return { ok: true, warnings: result.warnings };
+    }
+
+    console.log('[Profile] Batch onboarding completed successfully');
+    return { ok: true };
+  } catch (error) {
+    console.error('[Profile] Error in batch onboarding:', error);
+    return { ok: false, error: 'Network error during batch save' };
+  }
+}
+
 // Update onboarding step via Edge Function
 export async function updateOnboardingStep(userId: string, step: number): Promise<boolean> {
   try {

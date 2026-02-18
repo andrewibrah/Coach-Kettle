@@ -2,19 +2,18 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
-import { useProfile } from '@/contexts/ProfileContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import React, { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
-    FadeIn,
-    FadeInDown,
-    useAnimatedStyle,
-    useSharedValue,
-    withDelay,
-    withSpring,
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,34 +21,30 @@ export default function CompleteScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { completeOnboarding } = useProfile();
+  const { batchSaveAndComplete } = useOnboarding();
+
+  const [saving, setSaving] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const checkScale = useSharedValue(0);
-  const ringScale = useSharedValue(0);
 
   useEffect(() => {
-    // Complete onboarding in database
-    completeOnboarding();
+    const saveData = async () => {
+      const result = await batchSaveAndComplete();
 
-    // Trigger success haptic
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (result.success) {
+        setSaving(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        checkScale.value = withDelay(200, withSpring(1, { damping: 12, stiffness: 100 }));
+      } else {
+        setSaving(false);
+        setError(result.error || 'Failed to save your data');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    };
 
-    // Animate ring first, then checkmark
-    ringScale.value = withDelay(100, withSpring(1, { damping: 12, stiffness: 100 }));
-    checkScale.value = withDelay(300, withSpring(1, { damping: 10, stiffness: 120 }));
-
-    // Auto-redirect after 3 seconds
-    const timer = setTimeout(() => {
-      router.replace('/(tabs)' as any);
-    }, 3000);
-
-    return () => clearTimeout(timer);
+    saveData();
   }, []);
-
-  const ringAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ringScale.value }],
-    opacity: ringScale.value,
-  }));
 
   const checkAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: checkScale.value }],
@@ -61,93 +56,94 @@ export default function CompleteScreen() {
     router.replace('/(tabs)' as any);
   };
 
+  const handleRetry = async () => {
+    setSaving(true);
+    setError(null);
+    const result = await batchSaveAndComplete();
+
+    if (result.success) {
+      setSaving(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      checkScale.value = withDelay(200, withSpring(1, { damping: 12, stiffness: 100 }));
+    } else {
+      setSaving(false);
+      setError(result.error || 'Failed to save your data');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
+  // Loading state
+  if (saving) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={[styles.centered, { paddingBottom: insets.bottom }]}>
+          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+          <ThemedText style={[styles.loadingText, { color: isDark ? '#999' : '#666' }]}>
+            Saving your profile...
+          </ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={[styles.centered, { paddingBottom: insets.bottom }]}>
+          <View style={[styles.iconCircle, { backgroundColor: '#FF3B30' }]}>
+            <IconSymbol name="xmark" size={32} color="#fff" />
+          </View>
+
+          <ThemedText style={styles.title}>Something went wrong</ThemedText>
+          <ThemedText style={[styles.message, { color: isDark ? '#999' : '#666' }]}>
+            {error}
+          </ThemedText>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+            onPress={handleRetry}
+            activeOpacity={0.8}
+          >
+            <ThemedText style={styles.buttonText}>Try Again</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </ThemedView>
+    );
+  }
+
+  // Success state
   return (
     <ThemedView style={styles.container}>
-      <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
-        {/* Success Icon */}
-        <View style={styles.iconWrapper}>
-          <Animated.View
-            style={[
-              styles.ring,
-              { borderColor: (Colors[colorScheme ?? 'light'].tint.length === 4 ? Colors[colorScheme ?? 'light'].tint.replace('#', '#000000').slice(0, 7) : Colors[colorScheme ?? 'light'].tint) + '30' },
-              ringAnimatedStyle,
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.checkCircle,
-              { backgroundColor: Colors[colorScheme ?? 'light'].tint },
-              checkAnimatedStyle,
-            ]}
-          >
-            <IconSymbol name="checkmark" size={40} color="#fff" />
-          </Animated.View>
-        </View>
+      <View style={[styles.centered, { paddingBottom: insets.bottom }]}>
+        <Animated.View
+          style={[
+            styles.iconCircle,
+            { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+            checkAnimatedStyle,
+          ]}
+        >
+          <IconSymbol name="checkmark" size={32} color="#fff" />
+        </Animated.View>
 
-        {/* Text Content */}
-        <Animated.View entering={FadeInDown.duration(500).delay(500)} style={styles.textContent}>
-          <ThemedText style={styles.title}>All Set!</ThemedText>
-          <ThemedText style={[styles.subtitle, { color: isDark ? '#999' : '#666' }]}>
-            Your profile is ready. Time to start tracking your workouts.
+        <Animated.View entering={FadeIn.duration(400).delay(400)} style={styles.textContainer}>
+          <ThemedText style={styles.title}>You're all set!</ThemedText>
+          <ThemedText style={[styles.message, { color: isDark ? '#999' : '#666' }]}>
+            Your profile has been saved. Ready to start tracking your workouts.
           </ThemedText>
         </Animated.View>
 
-        {/* Features List */}
-        <Animated.View entering={FadeIn.duration(400).delay(800)} style={styles.featuresList}>
-          <FeatureItem
-            icon="chart.line.uptrend.xyaxis"
-            text="Track your progress"
-            colorScheme={colorScheme}
-          />
-          <FeatureItem
-            icon="trophy.fill"
-            text="Hit new personal records"
-            colorScheme={colorScheme}
-          />
-          <FeatureItem
-            icon="brain.head.profile"
-            text="Get AI coaching tips"
-            colorScheme={colorScheme}
-          />
+        <Animated.View entering={FadeIn.duration(400).delay(600)} style={styles.buttonWrapper}>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+            onPress={handleContinue}
+            activeOpacity={0.8}
+          >
+            <ThemedText style={styles.buttonText}>Continue</ThemedText>
+          </TouchableOpacity>
         </Animated.View>
       </View>
-
-      {/* Bottom Button */}
-      <Animated.View
-        entering={FadeInDown.duration(400).delay(1000)}
-        style={[styles.buttonContainer, { paddingBottom: insets.bottom + 24 }]}
-      >
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
-          onPress={handleContinue}
-          activeOpacity={0.8}
-        >
-          <ThemedText style={styles.buttonText}>Start Training</ThemedText>
-        </TouchableOpacity>
-      </Animated.View>
     </ThemedView>
-  );
-}
-
-interface FeatureItemProps {
-  icon: string;
-  text: string;
-  colorScheme: 'light' | 'dark' | null;
-}
-
-function FeatureItem({ icon, text, colorScheme }: FeatureItemProps) {
-  const isDark = colorScheme === 'dark';
-  return (
-    <View style={styles.featureItem}>
-      <View style={[styles.featureIcon, { backgroundColor: isDark ? '#1c1c1e' : '#f5f5f5' }]}>
-        <IconSymbol
-          name={icon as any}
-          size={18}
-          color={Colors[colorScheme ?? 'light'].tint}
-        />
-      </View>
-      <ThemedText style={styles.featureText}>{text}</ThemedText>
-    </View>
   );
 }
 
@@ -155,79 +151,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
+  centered: {
     flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
   },
-  iconWrapper: {
-    width: 120,
-    height: 120,
+  iconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
-  ring: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-  },
-  checkCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textContent: {
+  textContainer: {
     alignItems: 'center',
     marginBottom: 48,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
-    marginBottom: 12,
     textAlign: 'center',
+    marginBottom: 12,
   },
-  subtitle: {
-    fontSize: 17,
+  message: {
+    fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
-    paddingHorizontal: 16,
   },
-  featuresList: {
-    width: '100%',
-    gap: 16,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  featureIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureText: {
+  loadingText: {
     fontSize: 16,
-    fontWeight: '500',
+    marginTop: 20,
   },
-  buttonContainer: {
-    paddingHorizontal: 24,
+  buttonWrapper: {
+    width: '100%',
   },
   button: {
-    paddingVertical: 18,
-    borderRadius: 14,
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
   },
 });

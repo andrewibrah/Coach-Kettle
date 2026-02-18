@@ -7,9 +7,8 @@ import {
   QuizQuestion,
 } from '@/components/onboarding';
 import { ThemedView } from '@/components/ui/themed-view';
-import { useProfile } from '@/contexts/ProfileContext';
-import { addTrackedLift, fetchTrackedLifts } from '@/lib/profile';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { fetchTrackedLifts } from '@/lib/profile';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -19,28 +18,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 6;
 
-const STORAGE_KEY = 'onboarding_pr_lifts';
-
 export default function PRLiftsScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { updateOnboardingStep } = useProfile();
+  const { draft, updateDraft } = useOnboarding();
 
-  const [lifts, setLifts] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Initialize from draft
+  const [lifts, setLifts] = useState<string[]>(draft.tracked_lifts || []);
 
-  // Load any previously selected lifts
+  // Load any previously selected lifts from DB if not in draft
   useEffect(() => {
     const loadLifts = async () => {
-      try {
-        // First check AsyncStorage for draft
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          setLifts(JSON.parse(stored));
-          return;
-        }
+      // If we already have draft lifts, use those
+      if (draft.tracked_lifts && draft.tracked_lifts.length > 0) {
+        setLifts(draft.tracked_lifts);
+        return;
+      }
 
-        // Otherwise fetch from DB
+      // Otherwise fetch from DB (for users resuming after previous sessions)
+      try {
         if (session?.user?.id) {
           const tracked = await fetchTrackedLifts(session.user.id);
           if (tracked.length > 0) {
@@ -52,55 +48,47 @@ export default function PRLiftsScreen() {
       }
     };
     loadLifts();
-  }, [session?.user?.id]);
-
-  // Save draft to AsyncStorage on changes
-  useEffect(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(lifts));
-  }, [lifts]);
+  }, [session?.user?.id, draft.tracked_lifts]);
 
   const handleAddLift = (liftName: string) => {
     if (!lifts.some((l) => l.toLowerCase() === liftName.toLowerCase())) {
-      setLifts([...lifts, liftName]);
+      const updated = [...lifts, liftName];
+      setLifts(updated);
+      // Also update draft so it persists if user navigates away
+      updateDraft({ tracked_lifts: updated });
     }
   };
 
   const handleRemoveLift = (liftName: string) => {
-    setLifts(lifts.filter((l) => l !== liftName));
+    const updated = lifts.filter((l) => l !== liftName);
+    setLifts(updated);
+    // Also update draft
+    updateDraft({ tracked_lifts: updated });
   };
 
   const handleContinue = async () => {
-    setLoading(true);
-    try {
-      // Save all lifts to database
-      if (session?.user?.id && lifts.length > 0) {
-        for (const lift of lifts) {
-          await addTrackedLift(session.user.id, lift);
-        }
-      }
+    // Save lifts to draft (local) - no API call, instant navigation
+    await updateDraft({
+      tracked_lifts: lifts,
+      current_step: CURRENT_STEP,
+    });
 
-      // Clear draft
-      await AsyncStorage.removeItem(STORAGE_KEY);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      await updateOnboardingStep(CURRENT_STEP);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      // If lifts were added, go to pr-values to enter current PRs
-      if (lifts.length > 0) {
-        router.push('/onboarding/pr-values' as any);
-      } else {
-        router.push('/onboarding/workout-setup' as any);
-      }
-    } catch (err) {
-      console.error('Error saving lifts:', err);
-    } finally {
-      setLoading(false);
+    // If lifts were added, go to pr-values to enter current PRs
+    if (lifts.length > 0) {
+      router.push('/onboarding/pr-values' as any);
+    } else {
+      router.push('/onboarding/workout-setup' as any);
     }
   };
 
   const handleSkip = async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-    await updateOnboardingStep(CURRENT_STEP);
+    // Clear tracked lifts and update step
+    await updateDraft({
+      tracked_lifts: [],
+      current_step: CURRENT_STEP,
+    });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/onboarding/workout-setup' as any);
   };
@@ -145,7 +133,6 @@ export default function PRLiftsScreen() {
           <QuizButtonGroup
             onSkip={handleSkip}
             onContinue={handleContinue}
-            continueLoading={loading}
             continueLabel={lifts.length > 0 ? 'Continue' : 'Skip PR Tracking'}
           />
         </View>

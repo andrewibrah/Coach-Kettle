@@ -1,12 +1,13 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,17 +15,33 @@ export default function OnboardingWelcome() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const { profile } = useProfile();
+  const { draft, skipOnboarding } = useOnboarding();
+  const [skipping, setSkipping] = useState(false);
 
   const handleGetStarted = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Resume from where user left off if they previously started
-    const step = profile?.onboarding_step || 0;
+    // Resume from where user left off if they previously started (check draft first, then profile)
+    const step = draft.current_step ?? profile?.onboarding_step ?? 0;
     const routes = ['height', 'age', 'current-weight', 'goal-weight', 'focus', 'pr-lifts', 'pr-values', 'workout-setup'];
 
     if (step > 0 && step < routes.length) {
       router.push(`/onboarding/${routes[step]}` as any);
     } else {
       router.push('/onboarding/height' as any);
+    }
+  };
+
+  const handleSkip = async () => {
+    setSkipping(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const result = await skipOnboarding();
+
+    if (result.success) {
+      router.replace('/(tabs)' as any);
+    } else {
+      console.error('Failed to skip onboarding:', result.error);
+      setSkipping(false);
     }
   };
 
@@ -49,11 +66,16 @@ export default function OnboardingWelcome() {
           <ThemedText style={styles.buttonText}>Get Started</ThemedText>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.skipButton} 
-          onPress={() => router.replace('/(tabs)' as any)}
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={handleSkip}
+          disabled={skipping}
         >
-          <ThemedText style={styles.skipButtonText}>Skip for now</ThemedText>
+          {skipping ? (
+            <ActivityIndicator size="small" color="#999" />
+          ) : (
+            <ThemedText style={styles.skipButtonText}>Skip for now</ThemedText>
+          )}
         </TouchableOpacity>
       </Animated.View>
     </ThemedView>

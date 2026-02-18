@@ -9,6 +9,14 @@ export type WorkoutRow = {
   reps: string;
   notes: string;
   timestamp?: number;
+  // Cardio fields
+  isCardio?: boolean;
+  durationMins?: number;
+  distance?: number;
+  distanceUnit?: 'miles' | 'km' | 'meters';
+  heartRate?: number;
+  calories?: number;
+  level?: number;
 };
 
 export type SessionReview = {

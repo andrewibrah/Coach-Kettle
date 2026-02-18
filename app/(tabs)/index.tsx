@@ -928,6 +928,14 @@ export default function HomeScreen() {
             notes: rowData.notes,
             timestamp: Date.now(),
             status: "committed",
+            // Cardio fields
+            isCardio: rowData.isCardio,
+            durationMins: rowData.durationMins,
+            distance: rowData.distance,
+            distanceUnit: rowData.distanceUnit,
+            heartRate: rowData.heartRate,
+            calories: rowData.calories,
+            level: rowData.level,
           },
         ];
       };
@@ -944,14 +952,22 @@ export default function HomeScreen() {
           set: 1, // approximate
           weightLbs: row.weightLbs,
           reps: row.reps,
-          notes: row.notes
+          notes: row.notes,
+          isCardio: row.isCardio,
+          durationMins: row.durationMins,
+          distance: row.distance,
+          distanceUnit: row.distanceUnit,
+          heartRate: row.heartRate,
+          calories: row.calories,
+          level: row.level,
         }).catch(err => console.error("Failed to sync row", err));
       });
 
-      // Client-side PR check fallback
+      // Client-side PR check fallback (skip cardio entries)
       const prUserId = session?.user?.id;
       if (prUserId) {
         parsedRows.forEach(row => {
+          if (row.isCardio) return; // Cardio doesn't have PRs
           const w = parseFloat(row.weightLbs);
           const r = parseInt(row.reps);
           if (!row.weightLbs || !row.reps || isNaN(w) || isNaN(r) || w <= 0 || r <= 0) return;

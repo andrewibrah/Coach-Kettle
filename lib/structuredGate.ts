@@ -6,6 +6,14 @@ export type ParsedRow = {
   reps: string;
   notes: string;
   kind?: ParsedRowKind;
+  // Cardio-specific fields
+  isCardio?: boolean;
+  durationMins?: number;
+  distance?: number;
+  distanceUnit?: 'miles' | 'km' | 'meters';
+  heartRate?: number;
+  calories?: number;
+  level?: number;
 };
 
 export type GateDecisionReason =
@@ -192,9 +200,16 @@ const extractExercises = (segment: string, allowMultiple: boolean): string[] => 
 const hasMultipleExerciseSignals = (segment: string): boolean =>
   /\b(and|&)\b/.test(segment) || /[,/]/.test(segment);
 
-const hasCardioSignals = (lower: string): boolean =>
-  /\bcardio\b|\belliptical\b|\btreadmill\b|\bbike\b|\brow(er)?\b|\brun\b|\bjog\b/.test(lower) ||
-  /\bmins?\b|\bminutes?\b|\bmiles?\b|\bkm\b/.test(lower);
+const hasCardioSignals = (lower: string): boolean => {
+  // Explicit "cardio" keyword always triggers cardio mode
+  if (/\bcardio\b/.test(lower)) return true;
+
+  // Must have BOTH a cardio machine/activity AND a time/distance indicator
+  const hasCardioActivity = /\belliptical\b|\btreadmill\b|\bbike\b|\brower\b|\brun\b|\bjog\b|\bstairmaster\b|\bstairclimber\b|\bcycling\b/.test(lower);
+  const hasTimeOrDistance = /\bmins?\b|\bminutes?\b|\bmiles?\b|\bkm\b|\bhour\b|\bhr\b/.test(lower);
+
+  return hasCardioActivity && hasTimeOrDistance;
+};
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
@@ -325,21 +340,55 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
 
   // ─── Cardio ─────────────────────────────────────────────────────────────────
   if (isCardio) {
-    const minutesMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:min|mins|minutes)/);
-    const distanceMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mile|miles|km)/);
-    const hrMatch = lower.match(/hr\s*(\d+(?:\.\d+)?)/);
-    const reps = minutesMatch?.[1] ?? distanceMatch?.[1] ?? pairs[0]?.reps ?? pairs[0]?.weight ?? "";
-    const intensity = pairs[0]?.weight ?? "";
-    const notesParts: string[] = ["cardio"];
-    if (hrMatch?.[1]) notesParts.push(`HR ${hrMatch[1]}`);
+    const minutesMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:min|mins|minutes?)/);
+    const milesMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mile|miles)/);
+    const kmMatch = lower.match(/(\d+(?:\.\d+)?)\s*km/);
+    const metersMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:m|meters?)\b/);
+    const hrMatch = lower.match(/(?:hr|heart\s*rate)\s*(\d+)/i);
+    const caloriesMatch = lower.match(/(\d+)\s*(?:cal|cals|calories?|kcal)/);
+    const levelMatch = lower.match(/(?:level|lvl|resistance|incline)\s*(\d+)/i);
+
+    // Extract cardio values
+    const durationMins = minutesMatch ? parseFloat(minutesMatch[1]) : undefined;
+    const distance = milesMatch ? parseFloat(milesMatch[1])
+      : kmMatch ? parseFloat(kmMatch[1])
+      : metersMatch ? parseFloat(metersMatch[1])
+      : undefined;
+    const distanceUnit: 'miles' | 'km' | 'meters' | undefined = milesMatch ? 'miles'
+      : kmMatch ? 'km'
+      : metersMatch ? 'meters'
+      : undefined;
+    const heartRate = hrMatch ? parseInt(hrMatch[1], 10) : undefined;
+    const calories = caloriesMatch ? parseInt(caloriesMatch[1], 10) : undefined;
+    const level = levelMatch ? parseInt(levelMatch[1], 10) : undefined;
+
+    // Build display values for backwards compat (reps shows duration, weightLbs shows distance)
+    const displayReps = durationMins ? `${durationMins}` : distance ? `${distance}` : "";
+    const displayWeight = distance && durationMins ? `${distance}` : "";
+
+    // Build notes
+    const notesParts: string[] = [];
+    if (durationMins) notesParts.push(`${durationMins} min`);
+    if (distance && distanceUnit) notesParts.push(`${distance} ${distanceUnit}`);
+    if (calories) notesParts.push(`${calories} cal`);
+    if (heartRate) notesParts.push(`HR ${heartRate}`);
+    if (level) notesParts.push(`Lvl ${level}`);
+
     return buildFastDecision(
       [
         {
           exercise: exercises[0],
-          weightLbs: intensity,
-          reps: reps || "",
-          notes: notesParts.join(" "),
+          weightLbs: displayWeight,
+          reps: displayReps,
+          notes: notesParts.join(", "),
           kind: "cardio",
+          isCardio: true,
+          durationMins,
+          distance,
+          distanceUnit,
+          heartRate,
+          calories,
+          level,
         },
       ],
       "cardio"
