@@ -74,6 +74,13 @@ function ReviewCard({
   );
 }
 
+function getRatingColor(rating: number) {
+  if (rating >= 8) return "#10B981";
+  if (rating >= 6) return "#3B82F6";
+  if (rating >= 4) return "#F59E0B";
+  return "#EF4444";
+}
+
 function groupByExercise(rows: WorkoutRow[]): ExerciseGroup[] {
   const groups: ExerciseGroup[] = [];
   rows.forEach((row) => {
@@ -90,6 +97,7 @@ function groupByExercise(rows: WorkoutRow[]): ExerciseGroup[] {
 export default function WorkoutDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
+  const [showReview, setShowReview] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -148,16 +156,40 @@ export default function WorkoutDetail() {
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: backBtnPressedBg }]}>
             <IconSymbol name="chevron.left" size={24} color={textColor} />
           </Pressable>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.title, { color: textColor }]}>{workoutName}</Text>
           </View>
+          {workout.review && (
+            <Pressable
+              onPress={() => setShowReview(!showReview)}
+              style={({ pressed }) => [
+                styles.reviewToggleBtn,
+                {
+                  backgroundColor: showReview
+                    ? getRatingColor(workout.review!.rating) + '20'
+                    : isDark ? '#1C1C1E' : '#F3F4F6',
+                  borderColor: showReview
+                    ? getRatingColor(workout.review!.rating)
+                    : isDark ? '#374151' : '#D1D5DB',
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Text style={[styles.reviewToggleRating, { color: getRatingColor(workout.review!.rating) }]}>
+                {workout.review!.rating}/10
+              </Text>
+              <Text style={[styles.reviewToggleLabel, { color: secondaryTextColor }]}>
+                {showReview ? 'Hide Review' : 'Workout Review'}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
 
-        {/* Session Review Card */}
-        {workout.review && (
+        {/* Session Review Card — toggled by header button */}
+        {workout.review && showReview && (
           <ReviewCard review={workout.review} isDark={isDark} cardColor={cardColor} textColor={textColor} secondaryTextColor={secondaryTextColor} />
         )}
 
@@ -231,6 +263,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: "800",
+  },
+  reviewToggleBtn: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  reviewToggleRating: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  reviewToggleLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
   },
   dateSubtitle: {
     fontSize: 14,

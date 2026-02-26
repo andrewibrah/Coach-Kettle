@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { clearWorkoutDraft } from '@/lib/workoutDraft';
 import { clearWorkouts } from '@/lib/workoutStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session } from '@supabase/supabase-js';
@@ -46,8 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clearAllCaches = async () => {
     console.log('[AuthProvider] Clearing all local caches...');
 
-    // Clear workout history cache
+    // Clear workout history cache + any in-progress draft
     await clearWorkouts();
+    await clearWorkoutDraft();
 
     // Clear all Supabase-related AsyncStorage keys
     const allKeys = await AsyncStorage.getAllKeys();

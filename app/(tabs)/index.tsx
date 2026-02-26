@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View
@@ -37,9 +38,10 @@ import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { type WorkoutTemplate, type WorkoutTemplateItem } from "@/lib/profile";
 import { checkForPR } from "@/lib/prTracking";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
-import { expandTemplateToRows, getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
+import { expandTemplateToRows, getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets, todayISO } from "@/lib/workoutRules";
 import { type SessionReview } from "@/lib/workoutStorage";
 import { type LogRow } from "@/types/workout";
+import { clearWorkoutDraft, getWorkoutDraft, saveWorkoutDraft } from "@/lib/workoutDraft";
 
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
@@ -52,7 +54,7 @@ export default function HomeScreen() {
   const compact = width < 380;
   const backgroundColor = useThemeColor({}, 'background');
 
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<FlatList<LogRow> | null>(null);
 
   const [rows, setRows] = useState<LogRow[]>([]);
   const [editingCell, setEditingCell] = useState<{ rowId: string; field: EditableField } | null>(null);
@@ -105,11 +107,22 @@ export default function HomeScreen() {
       clearTimeout(undoTimerRef.current);
       undoTimerRef.current = null;
     }
+    clearWorkoutDraft();
   }, []);
 
-  const { workoutActive, title, selectedPart, startWorkoutSession, endWorkoutSession, buildWorkoutToSave } = useWorkoutSession({
-    onResetForNewDay,
-  });
+  const {
+    workoutActive,
+    workoutId,
+    workoutCreatedAt,
+    workoutDateISO,
+    bodyParts,
+    title,
+    selectedPart,
+    startWorkoutSession,
+    restoreWorkoutSession,
+    endWorkoutSession,
+    buildWorkoutToSave,
+  } = useWorkoutSession({ onResetForNewDay });
 
   const showStartToast = useCallback(() => {
     setStartToastOpen(true);
@@ -126,6 +139,66 @@ export default function HomeScreen() {
       if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     };
   }, []);
+
+  // ── Draft persistence: restore on mount ──
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+
+    getWorkoutDraft().then((draft) => {
+      if (!draft) return;
+      if (draft.dateISO === todayISO()) {
+        // Same-day draft exists — restore it
+        setRows(draft.rows);
+        restoreWorkoutSession(
+          draft.bodyParts,
+          draft.workoutId,
+          draft.createdAt,
+          draft.dateISO
+        );
+        console.log('[WorkoutDraft] Restored draft with', draft.rows.length, 'rows');
+      } else {
+        // Stale draft from a different day — clear it silently
+        clearWorkoutDraft();
+        console.log('[WorkoutDraft] Cleared stale draft from', draft.dateISO);
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Draft persistence: debounced autosave on row changes ──
+  useEffect(() => {
+    if (!workoutActive || rows.length === 0 || !workoutId || !workoutDateISO) return;
+    const timer = setTimeout(() => {
+      saveWorkoutDraft({
+        workoutId,
+        dateISO: workoutDateISO,
+        bodyParts,
+        createdAt: workoutCreatedAt ?? Date.now(),
+        rows,
+        updatedAt: Date.now(),
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [rows, workoutActive, workoutId, workoutDateISO, bodyParts, workoutCreatedAt]);
+
+  // ── Draft persistence: immediate save on app background ──
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' && workoutActive && rows.length > 0 && workoutId && workoutDateISO) {
+        // Fire-and-forget — save immediately before iOS kills the process
+        saveWorkoutDraft({
+          workoutId,
+          dateISO: workoutDateISO,
+          bodyParts,
+          createdAt: workoutCreatedAt ?? Date.now(),
+          rows,
+          updatedAt: Date.now(),
+        });
+      }
+    });
+    return () => sub.remove();
+  }, [workoutActive, rows, workoutId, workoutDateISO, bodyParts, workoutCreatedAt]);
 
   // Subscribe to PR breakthrough notifications
   const { session } = useAuth();
@@ -541,34 +614,9 @@ export default function HomeScreen() {
     });
   };
 
-  const moveRow = (rowId: string, direction: "up" | "down") => {
-    withPendingRows((prev) => {
-      const idx = prev.findIndex((r) => r.id === rowId);
-      if (idx === -1) return prev;
-      const norm = normalizeExercise(prev[idx].exercise);
-      let swapWith = -1;
-      if (direction === "up") {
-        for (let i = idx - 1; i >= 0; i -= 1) {
-          if (normalizeExercise(prev[i].exercise) === norm) {
-            swapWith = i;
-            break;
-          }
-        }
-      } else {
-        for (let i = idx + 1; i < prev.length; i += 1) {
-          if (normalizeExercise(prev[i].exercise) === norm) {
-            swapWith = i;
-            break;
-          }
-        }
-      }
-      if (swapWith === -1) return prev;
-      const next = [...prev];
-      const [row] = next.splice(idx, 1);
-      next.splice(swapWith, 0, row);
-      return resequenceSets(next);
-    });
-  };
+  const handleReorderRows = useCallback((reordered: LogRow[]) => {
+    setRows(resequenceSets(reordered));
+  }, []);
 
   const handleOpenEditSet = (rowId: string) => {
     setTargetRowId(rowId);
@@ -618,6 +666,7 @@ export default function HomeScreen() {
             text: "End Session",
             style: "destructive",
             onPress: () => {
+              clearWorkoutDraft();
               endWorkoutSession();
               setRows([]);
               setMessageInput("");
@@ -638,7 +687,7 @@ export default function HomeScreen() {
     const proceed = await new Promise<boolean>((resolve) => {
       Alert.alert(
         "End workout?",
-        "This will save to History.",
+        "This will save and generate your workout review.",
         [
           {
             text: "Cancel",
@@ -655,58 +704,8 @@ export default function HomeScreen() {
     });
     if (!proceed) return;
 
-    // Capture state for rollback
-    const rowsToSave = [...committedRows];
-    const previousRows = [...rows];
-
-    // Optimistic: Clear UI immediately
-    endWorkoutSession();
-    setRows([]);
-    setMessageInput("");
-    setEditingCell(null);
-    setEditValue("");
-    setUndoState(null);
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
-
-    // Build payload
-    const storedRows = rowsToSave.map((row) => ({
-      exercise: row.exercise,
-      weightLbs: row.weightLbs,
-      reps: row.reps,
-      notes: row.notes,
-      timestamp: row.timestamp,
-    }));
-
-    // Save in background
-    try {
-      await api.saveWorkout(buildWorkoutToSave(storedRows));
-    } catch (error) {
-      console.error("[onEndWorkout] Failed to save workout:", error);
-
-      // Rollback UI
-      Alert.alert(
-        "Save Failed",
-        "Could not save to history. Your workout has been restored.",
-        [{
-          text: "OK",
-          onPress: () => {
-            // Restore session
-            // We can't easily restore the exact workoutActive state variable inside this closure 
-            // if hooks don't support it, but we can re-start a session or just put rows back.
-            // Since we called endWorkoutSession(), we need to re-start it to be "active" again 
-            // if we want to let them try saving again.
-            // Ideally useWorkoutSession would expose a restore function, but we can just start 
-            // a new one with the old data if needed, or just set rows back and letting them click "Start" if title lost. 
-            // But let's try to just restore rows so they are not lost.
-            setRows(previousRows);
-            startWorkoutSession([title]); // specific heuristic to try to restore title if possible or just generic
-          }
-        }]
-      );
-    }
+    // Route through the review flow — same path as typing "done"
+    handleEndWorkoutWithReview(committedRows);
   };
 
   // Handle end workout with auto-save and AI review generation
@@ -763,7 +762,8 @@ export default function HomeScreen() {
 
       await api.saveWorkout(workoutPayload);
 
-      // Clear UI after successful save
+      // Clear draft + UI after successful save
+      clearWorkoutDraft();
       endWorkoutSession();
       setRows([]);
       setMessageInput("");
@@ -785,6 +785,7 @@ export default function HomeScreen() {
       // Still try to save workout without review
       try {
         await api.saveWorkout(buildWorkoutToSave(storedRows));
+        clearWorkoutDraft();
         endWorkoutSession();
         setRows([]);
         setMessageInput("");
@@ -1085,7 +1086,7 @@ export default function HomeScreen() {
           onCommitEditCell={commitCellEdit}
           onDeleteRow={deleteRow}
           onDuplicateRow={duplicateRow}
-          onMoveRow={moveRow}
+          onReorderRows={handleReorderRows}
           onIncrementSet={onIncrementSet}
           onEditSet={handleOpenEditSet}
         />

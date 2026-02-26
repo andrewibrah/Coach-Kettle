@@ -67,6 +67,18 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
     setWorkoutDateISO(todayISO());
   }, []);
 
+  /** Restore a previously persisted draft session without generating new IDs. */
+  const restoreWorkoutSession = useCallback(
+    (parts: string[], id: string, createdAt: number, dateISO: string) => {
+      setBodyParts(parts);
+      setWorkoutActive(true);
+      setWorkoutId(id);
+      setWorkoutCreatedAt(createdAt);
+      setWorkoutDateISO(dateISO);
+    },
+    []
+  );
+
   const endWorkoutSession = useCallback(() => {
     console.log("[useWorkoutSession] endWorkoutSession called, setting workoutActive to false");
     setWorkoutActive(false);
@@ -97,6 +109,7 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
     title,
     selectedPart,
     startWorkoutSession,
+    restoreWorkoutSession,
     endWorkoutSession,
     resetSessionState,
     buildWorkoutToSave,

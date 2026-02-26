@@ -162,16 +162,28 @@ export const api = {
         const profile = await getCachedProfile('');
         const profileContext = buildAIContextString(profile);
 
-        const reviewPrompt = `Analyze this ${workoutPart || 'workout'} session and provide a JSON review with:${profileContext}
+        const reviewPrompt = `You are generating a structured workout review. OVERRIDE your usual response style: respond ONLY with valid JSON — no plain text, no markdown, no preamble.${profileContext}
 
-Consider the user's profile when evaluating and providing advice.
-- rating: number 1-10 based on volume, intensity, exercise selection
-- strengths: array of 2-3 brief positive points about the session
-- weakness: one area to improve (string)
-- nextSessionNote: one actionable tip for next session (string)
+Analyze the current session (provided as current_session_rows) against the workout history and profile already in your context. Apply these exact rating criteria:
 
-Respond ONLY with valid JSON, no other text. Example format:
-{"rating":8,"strengths":["Good volume on compound lifts","Progressive overload on bench"],"weakness":"Could add more isolation work","nextSessionNote":"Try adding a finisher set next time"}`;
+RATING (1-10):
+- Base: 5. A completed session with reasonable effort.
+- +1 if working weight is at or above 70% of e1RM for the primary compound lift (use PRs in context).
+- +1 if rep ranges match the user's goal: strength=3-6 reps, hypertrophy=8-12 reps, endurance=12+ reps.
+- +1 if total volume (sets x reps x weight) on the primary lift equals or exceeds the most recent same-part session in history.
+- +1 if compound-to-isolation set ratio is 60% or higher.
+- -1 if a late set shows a significant weight drop (20+ lbs) suggesting early failure.
+- -1 if fewer than 3 exercises were logged for a strength session.
+- Cap at 10, floor at 1.
+
+STRENGTHS (array of 2-3 strings): Cite specific numbers from current_session_rows. Example: "Hit 185lbs x 8 on bench — solid hypertrophy rep range." Generic praise is not acceptable.
+
+WEAKNESS (string): Name the specific problem and its evidence. Example: "Bench dropped from 185 to 165 on set 3 — cut to 2 working sets at this intensity next time." Do not write abstract feedback like "fatigue risk."
+
+NEXT_SESSION_NOTE (string): Give a specific progressive overload instruction using actual numbers from this session. Example: "All reps completed at 185lbs — try 190x8 next ${workoutPart || 'session'}." If reps were missed, suggest dropping volume instead of adding weight.
+
+JSON shape — respond with exactly this structure:
+{"rating": <number>,"strengths": [<string>, <string>],"weakness": <string>,"nextSessionNote": <string>}`;
 
         try {
             const res = await fetchWithAuth(`${API_BASE}/coach`, {

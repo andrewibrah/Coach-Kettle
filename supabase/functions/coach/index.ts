@@ -210,7 +210,6 @@ serve(async (req) => {
 
     if (userContext.recentWorkouts.length > 0) {
         const workoutSummaries = userContext.recentWorkouts.map((w: any) => {
-            // createdAt is a bigint (epoch ms), rows_json is a JSON text string
             const date = w.createdAt ? new Date(Number(w.createdAt)).toLocaleDateString() : "unknown date";
             const part = w.part || "General";
 
@@ -218,18 +217,43 @@ serve(async (req) => {
             if (w.rows_json) {
                 try { parsedRows = JSON.parse(w.rows_json); } catch { /* ignore */ }
             }
-            const rowCount = parsedRows.length;
 
-            let exerciseSummary = "";
-            if (parsedRows.length > 0) {
-                const exercises = [...new Set(parsedRows.map((r: any) => r.exercise).filter(Boolean))] as string[];
-                exerciseSummary = exercises.slice(0, 5).join(", ");
-                if (exercises.length > 5) exerciseSummary += ` (+${exercises.length - 5} more)`;
+            if (parsedRows.length === 0) {
+                return `${date} - ${part}: (no sets logged)`;
             }
 
-            return `${date} - ${part}: ${rowCount} sets${exerciseSummary ? ` [${exerciseSummary}]` : ""}`;
+            // Group rows by exercise, preserving order of first appearance
+            const exerciseMap = new Map<string, any[]>();
+            for (const row of parsedRows) {
+                const name = row.exercise || "Unknown";
+                if (!exerciseMap.has(name)) exerciseMap.set(name, []);
+                exerciseMap.get(name)!.push(row);
+            }
+
+            const exerciseLines: string[] = [];
+            for (const [name, sets] of exerciseMap) {
+                const firstSet = sets[0];
+                if (firstSet.isCardio) {
+                    const parts: string[] = [];
+                    if (firstSet.durationMins) parts.push(`${firstSet.durationMins} min`);
+                    if (firstSet.distance && firstSet.distanceUnit) parts.push(`${firstSet.distance} ${firstSet.distanceUnit}`);
+                    if (firstSet.heartRate) parts.push(`HR ${firstSet.heartRate} bpm`);
+                    if (firstSet.calories) parts.push(`${firstSet.calories} cal`);
+                    if (firstSet.level) parts.push(`level ${firstSet.level}`);
+                    exerciseLines.push(`  ${name}: ${parts.length > 0 ? parts.join(", ") : "(cardio)"}`);
+                } else {
+                    const setStrings = sets.map((s: any, i: number) => {
+                        const w = s.weightLbs || "BW";
+                        const r = s.reps || "?";
+                        return `Set ${i + 1}: ${w}x${r}`;
+                    });
+                    exerciseLines.push(`  ${name}: ${setStrings.join(", ")}`);
+                }
+            }
+
+            return `${date} - ${part}:\n${exerciseLines.join("\n")}`;
         });
-        contextParts.push("RECENT WORKOUTS (newest first):\n" + workoutSummaries.join("\n"));
+        contextParts.push("RECENT WORKOUTS (newest first):\n" + workoutSummaries.join("\n\n"));
     }
 
     const userContextStr = contextParts.length > 0

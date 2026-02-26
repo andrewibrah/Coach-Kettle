@@ -120,8 +120,16 @@ export default function HistoryScreen() {
     }
   };
 
+  const getRatingColor = (rating: number) => {
+    if (rating >= 8) return "#10B981";
+    if (rating >= 6) return "#3B82F6";
+    if (rating >= 4) return "#F59E0B";
+    return "#EF4444";
+  };
+
   const renderWorkoutCard = ({ item }: { item: WorkoutSession }) => {
     const stats = sessionStats(item);
+    const review = item.review;
 
     return (
       <Pressable
@@ -143,9 +151,16 @@ export default function HistoryScreen() {
       >
         <View style={styles.cardRow}>
           <View style={styles.cardMain}>
-            <Text style={[styles.cardTitle, { color: textColor }]} numberOfLines={1}>
-              {item.part?.trim() ? item.part.trim() : "Workout"}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.cardTitle, { color: textColor }]} numberOfLines={1}>
+                {item.part?.trim() ? item.part.trim() : "Workout"}
+              </Text>
+              {review && (
+                <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(review.rating) + '20', borderColor: getRatingColor(review.rating) }]}>
+                  <Text style={[styles.ratingBadgeText, { color: getRatingColor(review.rating) }]}>{review.rating}/10</Text>
+                </View>
+              )}
+            </View>
 
             <View style={styles.metaRow}>
               <View style={[styles.metaChip, { backgroundColor: cardBg, borderColor }]}>
@@ -240,8 +255,24 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 8,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   cardTitle: {
     fontSize: 16,
+    fontWeight: "800",
+    flexShrink: 1,
+  },
+  ratingBadge: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  ratingBadgeText: {
+    fontSize: 12,
     fontWeight: "800",
   },
 

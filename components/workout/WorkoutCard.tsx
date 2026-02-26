@@ -2,13 +2,15 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { LogRow } from "@/types/workout";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 type Props = {
     row: LogRow;
     onPress: () => void;
-    onLongPress: () => void;
+    onDoubleTap: () => void;
+    drag: () => void;
+    isActive: boolean;
     onIncrementSet: (rowId: string) => void;
     onBeginEditCell?: (rowId: string, field: "exercise" | "set" | "weightLbs" | "reps" | "notes", value: string) => void;
     editingField?: "exercise" | "set" | "weightLbs" | "reps" | "notes";
@@ -20,7 +22,9 @@ type Props = {
 export function WorkoutCard({
     row,
     onPress,
-    onLongPress,
+    onDoubleTap,
+    drag,
+    isActive,
     onIncrementSet,
     onBeginEditCell,
     editingField,
@@ -51,6 +55,19 @@ export function WorkoutCard({
             inputRef.current.focus();
         }
     }, [editingField]);
+
+    // Double-tap detection: opens row actions menu
+    const lastTapRef = useRef<number>(0);
+    const handlePress = useCallback(() => {
+        const now = Date.now();
+        if (now - lastTapRef.current < 300) {
+            // Double-tap detected — open row actions menu
+            lastTapRef.current = 0;
+            onDoubleTap();
+        } else {
+            lastTapRef.current = now;
+        }
+    }, [onDoubleTap]);
 
     const renderInput = (placeholder: string, keyboardType: "default" | "numeric" = "default") => (
         <TextInput
@@ -84,9 +101,10 @@ export function WorkoutCard({
                 { backgroundColor: cardBg, borderColor },
                 pressed && !isSyncing && !editingField && styles.pressed,
                 isSyncing && styles.syncingRow,
+                isActive && styles.dragging,
             ]}
-            onPress={isSyncing || editingField ? undefined : onPress}
-            onLongPress={isSyncing || editingField ? undefined : onLongPress}
+            onPress={isSyncing || editingField ? undefined : handlePress}
+            onLongPress={isSyncing || editingField ? undefined : drag}
             disabled={isSyncing}
         >
             <View style={styles.header}>
@@ -216,6 +234,13 @@ const styles = StyleSheet.create({
     pressed: {
         opacity: 0.95,
         transform: [{ scale: 0.995 }],
+    },
+    dragging: {
+        opacity: 0.9,
+        transform: [{ scale: 1.03 }],
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 8,
     },
     header: {
         flexDirection: "row",

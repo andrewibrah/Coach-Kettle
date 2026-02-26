@@ -40,6 +40,13 @@ export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats
 
                         <Pressable
                             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                            onPress={() => { onClose(); onOpenCoach(); }}
+                        >
+                            <Text style={[styles.buttonText, { color: textColor }]}>Ask Coach</Text>
+                        </Pressable>
+
+                        <Pressable
+                            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                             onPress={() => { onClose(); onNavigateChats(); }}
                         >
                             <Text style={[styles.buttonText, { color: textColor }]}>Chats</Text>
@@ -50,13 +57,6 @@ export function MenuModal({ visible, onClose, onNavigateHistory, onNavigateChats
                             onPress={() => { onClose(); onNavigateTemplates(); }}
                         >
                             <Text style={[styles.buttonText, { color: textColor }]}>Templates</Text>
-                        </Pressable>
-
-                        <Pressable
-                            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                            onPress={() => { onClose(); onOpenCoach(); }}
-                        >
-                            <Text style={[styles.buttonText, { color: textColor }]}>Ask Coach</Text>
                         </Pressable>
 
                         <Pressable

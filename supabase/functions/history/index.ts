@@ -27,12 +27,21 @@ interface WorkoutRow {
     level?: number;
 }
 
+interface SessionReview {
+    rating: number;
+    strengths: string[];
+    weakness: string;
+    nextSessionNote: string;
+    generatedAt: number;
+}
+
 interface WorkoutSession {
     id: string;
     dateISO: string;
     part: string;
     rows: WorkoutRow[];
     createdAt: number;
+    review?: SessionReview;
 }
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -100,6 +109,9 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
     const rows = Array.isArray(session.rows) ? session.rows : [];
     const rowsJson = JSON.stringify(rows);
 
+    // Serialize review if present
+    const reviewJson = session.review ? JSON.stringify(session.review) : null;
+
     const { data, error } = await supabase
         .from("workouts")
         .upsert({
@@ -108,6 +120,7 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
             part: session.part,
             createdAt: session.createdAt,
             rows_json: rowsJson,
+            review_json: reviewJson,
             user_id: userId,
         }, { onConflict: "id" })
         .select()
@@ -160,7 +173,7 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
 async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<Response> {
     const { data, error } = await supabase
         .from("workouts")
-        .select("id, dateISO, part, createdAt, rows_json")
+        .select("id, dateISO, part, createdAt, rows_json, review_json")
         .eq("user_id", userId)
         .limit(50)
         .order("createdAt", { ascending: false });
@@ -170,12 +183,19 @@ async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<R
         return respondJson({ error: "Database error" }, 500);
     }
 
-    const sessions: WorkoutSession[] = (data || []).map((row: any) => {
+    const sessions = (data || []).map((row: any) => {
         let rows: WorkoutRow[] = [];
         try {
             rows = JSON.parse(row.rows_json || "[]");
         } catch {
             rows = [];
+        }
+
+        let review: SessionReview | undefined;
+        if (row.review_json) {
+            try {
+                review = JSON.parse(row.review_json);
+            } catch { /* ignore malformed review */ }
         }
 
         return {
@@ -184,6 +204,7 @@ async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<R
             part: row.part,
             rows,
             createdAt: row.createdAt,
+            review,
         };
     });
 
