@@ -1,7 +1,8 @@
-import { RefObject, useCallback } from "react";
+import { RefObject, useCallback, useMemo } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, View } from "react-native";
-import DraggableFlatList, { type RenderItemParams } from "react-native-draggable-flatlist";
 import { Swipeable } from "react-native-gesture-handler";
+// TODO: DraggableFlatList disabled due to gesture conflicts with parent GestureDetector
+// import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
 
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
@@ -51,15 +52,38 @@ export function WorkoutTable({
         { text: "Cancel", style: "cancel" },
       ];
 
-      Alert.alert("Row actions", "Double-tap for menu, hold to drag.", actions);
+      Alert.alert("Row actions", "Double-tap for menu, swipe left for actions.", actions);
     },
     [rows, onEditSet, onBeginEditCell, onDuplicateRow, onDeleteRow]
   );
 
   const keyExtractor = useCallback((item: LogRow) => item.id, []);
 
+  const ListEmpty = useCallback(
+    () => (
+      <View style={styles.emptyState}>
+        <ThemedText style={styles.emptyText}>Add your first set below.</ThemedText>
+      </View>
+    ),
+    []
+  );
+
+  // Create a stable extraData value that changes when rows content changes
+  // This ensures DraggableFlatList properly re-renders on data updates
+  // Include full row data hash to catch skeleton fill updates
+  const extraData = useMemo(
+    () => ({
+      rowCount: rows.length,
+      // Include weight/reps in hash so skeleton fills trigger re-render
+      rowHash: rows.map((r) => `${r.id}:${r.weightLbs}:${r.reps}:${r.notes}`).join("|"),
+      editingCell,
+      editValue,
+    }),
+    [rows, editingCell, editValue]
+  );
+
   const renderItem = useCallback(
-    ({ item, drag, isActive }: RenderItemParams<LogRow>) => {
+    ({ item }: { item: LogRow }) => {
       const isSyncing = item.status === "syncing";
 
       const renderRightActions = () => {
@@ -83,64 +107,44 @@ export function WorkoutTable({
       };
 
       return (
-        <View style={isSyncing ? styles.syncingWrap : undefined}>
-          <Swipeable
-            renderRightActions={renderRightActions}
-            overshootRight={false}
-            enabled={!isSyncing && !isActive}
-          >
-            <WorkoutCard
-              row={item}
-              onPress={() => {}}
-              onDoubleTap={() => openRowMenu(item.id)}
-              drag={drag}
-              isActive={isActive}
-              onIncrementSet={onIncrementSet}
-              onBeginEditCell={(rowId, field, value) => onBeginEditCell(rowId, field as any, value)}
-              editingField={editingCell?.rowId === item.id ? (editingCell.field as any) : undefined}
-              editValue={editValue}
-              onChangeEditValue={onChangeEditValue}
-              onCommitEditCell={onCommitEditCell}
-            />
-          </Swipeable>
-        </View>
+        <Swipeable
+          renderRightActions={renderRightActions}
+          overshootRight={false}
+          enabled={!isSyncing}
+        >
+          <WorkoutCard
+            row={item}
+            onPress={() => {}}
+            onDoubleTap={() => openRowMenu(item.id)}
+            drag={() => {}}
+            isActive={false}
+            onIncrementSet={onIncrementSet}
+            onBeginEditCell={(rowId, field, value) => onBeginEditCell(rowId, field as any, value)}
+            editingField={editingCell?.rowId === item.id ? (editingCell.field as any) : undefined}
+            editValue={editValue}
+            onChangeEditValue={onChangeEditValue}
+            onCommitEditCell={onCommitEditCell}
+          />
+        </Swipeable>
       );
     },
-    [
-      editingCell,
-      editValue,
-      onBeginEditCell,
-      onChangeEditValue,
-      onCommitEditCell,
-      onDeleteRow,
-      onDuplicateRow,
-      onIncrementSet,
-      openRowMenu,
-    ]
+    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell]
   );
 
-  const ListEmpty = useCallback(
-    () => (
-      <View style={styles.emptyState}>
-        <ThemedText style={styles.emptyText}>Add your first set below.</ThemedText>
-      </View>
-    ),
-    []
-  );
-
+  // TODO: DraggableFlatList disabled - using regular FlatList
+  // Drag-to-reorder is not available until gesture conflict is resolved
   return (
     <ThemedView style={styles.tableWrap}>
-      <DraggableFlatList
-        ref={scrollRef as any}
+      <FlatList
+        ref={scrollRef}
         data={rows}
+        extraData={extraData}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        onDragEnd={({ data }) => onReorderRows(data)}
         ListEmptyComponent={ListEmpty}
         style={styles.tableBody}
         contentContainerStyle={styles.tableBodyContent}
         keyboardShouldPersistTaps="handled"
-        activationDistance={10}
       />
     </ThemedView>
   );

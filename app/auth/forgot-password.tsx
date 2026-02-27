@@ -3,6 +3,7 @@ import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -76,6 +77,11 @@ export default function ForgotPassword() {
           </TouchableOpacity>
 
           <View style={styles.header}>
+            <Image
+              source={require('@/assets/images/kettlebell-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <ThemedText type="title" style={styles.title}>Reset Password</ThemedText>
             <ThemedText style={styles.subtitle}>
               Enter your email and we&apos;ll send you a link to reset your password
@@ -141,6 +147,10 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 48,
+  },
+  logo: {
+    width: 100,
+    height: 100,
   },
   title: {
     marginTop: 16,

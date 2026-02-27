@@ -7,6 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -239,6 +240,11 @@ export default function SignUp() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
 
           <View style={styles.header}>
+            <Image
+              source={require('@/assets/images/kettlebell-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <ThemedText type="title" style={styles.title}>Create Account</ThemedText>
             <ThemedText style={styles.subtitle}>Join Coach Kettle today</ThemedText>
           </View>
@@ -328,6 +334,10 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 48,
+  },
+  logo: {
+    width: 120,
+    height: 120,
   },
   title: {
     marginTop: 16,

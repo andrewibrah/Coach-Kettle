@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   AppState,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,7 +12,7 @@ import {
 
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Directions, FlatList, Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 
 import { useAuth } from "@/components/AuthProvider";
@@ -86,6 +85,7 @@ export default function HomeScreen() {
   const [routineModalVisible, setRoutineModalVisible] = useState(false);
 
   const openMenu = () => setMenuOpen(true);
+
   const swipeRight = Gesture.Fling()
     .direction(Directions.RIGHT)
     .onEnd(() => {
@@ -1178,7 +1178,7 @@ export default function HomeScreen() {
           }}
         />
 
-      </KeyboardAvoidingView >
+      </KeyboardAvoidingView>
     </GestureDetector>
   );
 }

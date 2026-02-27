@@ -1,5 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
+import { Image, StyleSheet } from 'react-native';
 
 import { useAuthLock } from '@/components/AuthLockProvider';
 import { useAuth } from '@/components/AuthProvider';
@@ -9,7 +10,6 @@ import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { ActivityIndicator } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -20,8 +20,12 @@ export default function TabLayout() {
   // Show loading while checking auth state, lock state, or profile state
   if (loading || isCheckingLock || profileLoading) {
     return (
-      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+      <ThemedView style={styles.loadingContainer}>
+        <Image
+          source={require('@/assets/images/kettlebell-logo.png')}
+          style={styles.loadingLogo}
+          resizeMode="contain"
+        />
       </ThemedView>
     );
   }
@@ -66,3 +70,15 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingLogo: {
+    width: 150,
+    height: 150,
+  },
+});

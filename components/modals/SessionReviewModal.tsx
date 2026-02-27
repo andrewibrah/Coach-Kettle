@@ -1,4 +1,4 @@
-import { ScreenHeader } from "@/components/ui/screen-header";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -36,6 +36,8 @@ export function SessionReviewModal({
   const isDark = colorScheme === "dark";
   const backgroundColor = useThemeColor({}, "background");
   const textColor = useThemeColor({}, "text");
+  const iconColor = useThemeColor({}, "icon");
+  const subtextColor = useThemeColor({}, "placeholder");
   const cardBg = isDark ? "#1C1C1E" : "#F3F4F6";
   const doneButtonBg = isDark ? "#FFFFFF" : "#111827";
   const doneButtonTextColor = isDark ? "#111827" : "#FFFFFF";
@@ -49,61 +51,57 @@ export function SessionReviewModal({
     return "#EF4444"; // Red
   };
 
-  const getRatingEmoji = (rating: number) => {
-    if (rating >= 9) return "🔥";
-    if (rating >= 7) return "💪";
-    if (rating >= 5) return "👍";
-    if (rating >= 3) return "🙂";
-    return "😅";
-  };
+  // Format today's date
+  const today = new Date();
+  const dateStr = today.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <ThemedView
-          style={[
-            styles.container,
-            { backgroundColor, paddingBottom: insets.bottom + 20 },
-          ]}
-        >
-          {/* Header */}
-          <ScreenHeader
-            title="Session Review"
-            onBack={onClose}
-          />
+    <Modal visible={visible} animationType="slide">
+      <ThemedView
+        style={[
+          styles.container,
+          { backgroundColor, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 20 },
+        ]}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
+          >
+            <IconSymbol name="xmark" size={24} color={iconColor} />
+          </Pressable>
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: textColor }]}>Session Review</Text>
+            <Text style={[styles.headerSubtitle, { color: subtextColor }]}>
+              {workoutTitle} · {dateStr}
+            </Text>
+          </View>
+          <View style={styles.headerSpacer} />
+        </View>
 
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={textColor} />
-              <ThemedText style={styles.loadingText}>
-                Analyzing your workout...
-              </ThemedText>
-            </View>
-          ) : review ? (
-            <ScrollView
-              contentContainerStyle={styles.content}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Workout Title */}
-              <ThemedText style={styles.workoutTitle}>{workoutTitle}</ThemedText>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={textColor} />
+            <ThemedText style={styles.loadingText}>
+              Analyzing your workout...
+            </ThemedText>
+          </View>
+        ) : review ? (
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
 
               {/* Rating */}
               <View style={[styles.ratingCard, { backgroundColor: cardBg }]}>
-                <Text style={styles.ratingEmoji}>
-                  {getRatingEmoji(review.rating)}
-                </Text>
-                <View style={styles.ratingInfo}>
-                  <Text
-                    style={[
-                      styles.ratingValue,
-                      { color: getRatingColor(review.rating) },
-                    ]}
-                  >
-                    {review.rating}/10
-                  </Text>
-                  <ThemedText style={styles.ratingLabel}>
-                    Session Rating
-                  </ThemedText>
+                <ThemedText style={styles.ratingLabel}>Session Rating</ThemedText>
+                <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(review.rating) }]}>
+                  <Text style={styles.ratingValue}>{review.rating}/10</Text>
                 </View>
               </View>
 
@@ -182,26 +180,49 @@ export function SessionReviewModal({
               </Pressable>
             </View>
           )}
-        </ThemedView>
-      </View>
+      </ThemedView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
   container: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "90%",
+    flex: 1,
   },
-
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeBtnPressed: {
+    backgroundColor: "rgba(128,128,128,0.1)",
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  headerSubtitle: {
+    fontSize: 15,
+    marginTop: 4,
+  },
+  headerSpacer: {
+    width: 36,
+  },
   loadingContainer: {
-    padding: 60,
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
     gap: 16,
   },
@@ -211,36 +232,29 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingTop: 8,
+    paddingTop: 4,
     gap: 16,
-  },
-  workoutTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-    opacity: 0.7,
-    marginBottom: 8,
   },
   ratingCard: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
-    borderRadius: 16,
-    gap: 16,
-  },
-  ratingEmoji: {
-    fontSize: 48,
-  },
-  ratingInfo: {
-    flex: 1,
-  },
-  ratingValue: {
-    fontSize: 36,
-    fontWeight: "800",
+    padding: 16,
+    borderRadius: 14,
   },
   ratingLabel: {
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  ratingBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  ratingValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   section: {
     padding: 16,
@@ -253,12 +267,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionIcon: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "600",
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   bulletItem: {
     flexDirection: "row",
@@ -266,8 +280,8 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   bullet: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "600",
   },
   bulletText: {
     flex: 1,
@@ -283,7 +297,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     paddingLeft: 4,
-    fontStyle: "italic",
   },
   doneButton: {
     paddingVertical: 16,
@@ -299,8 +312,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   errorContainer: {
-    padding: 40,
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
+    padding: 40,
     gap: 20,
   },
   errorText: {
