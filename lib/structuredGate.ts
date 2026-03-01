@@ -319,9 +319,60 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
 
   const tail = firstNumberIdx > -1 ? tokens.slice(firstNumberIdx).join(" ") : "";
 
-  // Bodyweight: single number only → reps with no weight
+  // Single number input
   const singleNumberMatch = tail.match(/^(?:x\s*)?(\d+)$/);
   if (singleNumberMatch && !isSuperset && !isDropset && !isCardio) {
+    const singleNum = parseInt(singleNumberMatch[1], 10);
+
+    // ── Bare number shorthand (no exercise name typed) ──────────────────
+    // User typed just a number after previous sets, e.g. "150" after "bench 100 10"
+    // Heuristic:  > 20 → weight change, carry over last reps
+    //            ≤ 20 → rep count, carry over last weight
+    if (!exerciseSegment && context.currentRows?.length) {
+      const targetExLower = exercises[0].trim().toLowerCase();
+      const lastFilledForExercise = [...context.currentRows]
+        .reverse()
+        .find(
+          (r) =>
+            r.exercise.trim().toLowerCase() === targetExLower &&
+            r.weightLbs &&
+            r.reps
+        );
+
+      if (lastFilledForExercise) {
+        if (singleNum > 20) {
+          // Likely a weight — nobody does 21+ reps casually
+          return buildFastDecision(
+            [
+              {
+                exercise: exercises[0],
+                weightLbs: formatWeight(singleNum),
+                reps: lastFilledForExercise.reps,
+                notes: warmupFlag ? "warmup" : "",
+                kind: warmupFlag ? "warmup" : "normal",
+              },
+            ],
+            warmupFlag ? "warmup" : "single"
+          );
+        } else {
+          // Likely reps — carry over last weight
+          return buildFastDecision(
+            [
+              {
+                exercise: exercises[0],
+                weightLbs: lastFilledForExercise.weightLbs,
+                reps: String(singleNum),
+                notes: warmupFlag ? "warmup" : "",
+                kind: warmupFlag ? "warmup" : "normal",
+              },
+            ],
+            warmupFlag ? "warmup" : "single"
+          );
+        }
+      }
+    }
+
+    // Explicit exercise typed + single number → bodyweight reps (e.g. "pullups 15")
     return buildFastDecision(
       [
         {
@@ -529,6 +580,72 @@ function runDevStructuredGateTests() {
       expectExercise: "Bench",
       expectWeight: "185",
       expectReps: "8",
+    },
+    // ── Bare number shorthand (>20 = weight, ≤20 = reps) ──────────────
+    // Bare number > 20 after filled rows → weight change, carry reps
+    {
+      message: "150",
+      context: {
+        lastExercise: "Bench",
+        currentRows: [{ id: "1", exercise: "Bench", weightLbs: "100", reps: "10" }],
+      },
+      expectKind: "fast",
+      expectRowCount: 1,
+      expectExercise: "Bench",
+      expectWeight: "150",
+      expectReps: "10",
+    },
+    // Bare number ≤ 20 after filled rows → reps change, carry weight
+    {
+      message: "8",
+      context: {
+        lastExercise: "Bench",
+        currentRows: [{ id: "1", exercise: "Bench", weightLbs: "185", reps: "10" }],
+      },
+      expectKind: "fast",
+      expectRowCount: 1,
+      expectExercise: "Bench",
+      expectWeight: "185",
+      expectReps: "8",
+    },
+    // Bare "20" → reps (boundary case, ≤ 20)
+    {
+      message: "20",
+      context: {
+        lastExercise: "Squat",
+        currentRows: [{ id: "1", exercise: "Squat", weightLbs: "225", reps: "5" }],
+      },
+      expectKind: "fast",
+      expectRowCount: 1,
+      expectExercise: "Squat",
+      expectWeight: "225",
+      expectReps: "20",
+    },
+    // Bare "25" → weight (> 20)
+    {
+      message: "25",
+      context: {
+        lastExercise: "Curls",
+        currentRows: [{ id: "1", exercise: "Curls", weightLbs: "20", reps: "12" }],
+      },
+      expectKind: "fast",
+      expectRowCount: 1,
+      expectExercise: "Curls",
+      expectWeight: "25",
+      expectReps: "12",
+    },
+    // Explicit exercise + single number → still bodyweight reps (pullups 15)
+    {
+      message: "Pullups 15",
+      context: {
+        lastExercise: "Bench",
+        currentRows: [{ id: "1", exercise: "Bench", weightLbs: "185", reps: "10" }],
+      },
+      expectKind: "fast",
+      expectRowCount: 1,
+      expectExercise: "Pullups",
+      expectWeight: "0",
+      expectReps: "15",
     },
   ];
 

@@ -1,15 +1,36 @@
-import { RefObject, useCallback, useMemo } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, View } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
-// TODO: DraggableFlatList disabled due to gesture conflicts with parent GestureDetector
-// import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
+import { RefObject, useCallback, useMemo, useState } from "react";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, Swipeable } from "react-native-gesture-handler";
 
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { WorkoutCard } from "@/components/workout/WorkoutCard";
 import type { LogRow } from "@/types/workout";
+import Animated, { useSharedValue, useAnimatedStyle } from "react-native-reanimated";
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
+
+/** Cell wrapper that elevates the actively-dragged item above all siblings. */
+const CellWrapper = ({ children, index, activeDragIndex, style, onLayout }: {
+  children: React.ReactNode;
+  index: number;
+  activeDragIndex: { value: number };
+  style?: any;
+  onLayout?: (e: any) => void;
+}) => {
+  const animatedStyle = useAnimatedStyle(() => ({
+    zIndex: activeDragIndex.value === index ? 999 : 0,
+    elevation: activeDragIndex.value === index ? 999 : 0,
+  }));
+  return (
+    <Animated.View
+      style={[style, animatedStyle, { overflow: 'visible' as const }]}
+      onLayout={onLayout}
+    >
+      {children}
+    </Animated.View>
+  );
+};
 
 type Props = {
   rows: LogRow[];
@@ -22,7 +43,7 @@ type Props = {
   onCommitEditCell: () => void;
   onDeleteRow: (rowId: string) => void;
   onDuplicateRow: (rowId: string) => void;
-  onReorderRows: (reordered: LogRow[]) => void;
+  onReorderRow: (fromIndex: number, toIndex: number) => void;
   onIncrementSet: (rowId: string) => void;
   onEditSet: (rowId: string) => void;
 };
@@ -38,7 +59,7 @@ export function WorkoutTable({
   onCommitEditCell,
   onDeleteRow,
   onDuplicateRow,
-  onReorderRows,
+  onReorderRow,
   onIncrementSet,
   onEditSet,
 }: Props) {
@@ -69,7 +90,7 @@ export function WorkoutTable({
   );
 
   // Create a stable extraData value that changes when rows content changes
-  // This ensures DraggableFlatList properly re-renders on data updates
+  // This ensures FlatList properly re-renders on data updates
   // Include full row data hash to catch skeleton fill updates
   const extraData = useMemo(
     () => ({
@@ -82,8 +103,36 @@ export function WorkoutTable({
     [rows, editingCell, editValue]
   );
 
+  // ── Drag shared values ──
+  const activeDragIndex = useSharedValue(-1);
+  const dragTranslationY = useSharedValue(0);
+  // Dynamic row height — measured via onLayout in WorkoutCard, default ~100px
+  const measuredRowHeight = useSharedValue(100);
+
+  // ── Scroll lock during drag ──
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const onDragStart = useCallback(() => setScrollEnabled(false), []);
+  const onDragEnd = useCallback(() => setScrollEnabled(true), []);
+
+  const CellRendererComponent = useCallback(
+    (props: any) => (
+      <CellWrapper
+        index={props.index}
+        activeDragIndex={activeDragIndex}
+        style={props.style}
+        onLayout={props.onLayout}
+      >
+        {props.children}
+      </CellWrapper>
+    ),
+    [activeDragIndex]
+  );
+
+  // Swipeable container override — RNGH hardcodes overflow:'hidden' internally
+  const swipeableContainerStyle = useMemo(() => ({ overflow: 'visible' as const }), []);
+
   const renderItem = useCallback(
-    ({ item }: { item: LogRow }) => {
+    ({ item, index }: { item: LogRow; index: number }) => {
       const isSyncing = item.status === "syncing";
 
       const renderRightActions = () => {
@@ -111,13 +160,19 @@ export function WorkoutTable({
           renderRightActions={renderRightActions}
           overshootRight={false}
           enabled={!isSyncing}
+          containerStyle={swipeableContainerStyle}
         >
           <WorkoutCard
             row={item}
-            onPress={() => {}}
+            rowIndex={index}
+            rowHeight={100}
+            activeDragIndex={activeDragIndex}
+            dragTranslationY={dragTranslationY}
+            measuredRowHeight={measuredRowHeight}
+            onReorderRow={onReorderRow}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
             onDoubleTap={() => openRowMenu(item.id)}
-            drag={() => {}}
-            isActive={false}
             onIncrementSet={onIncrementSet}
             onBeginEditCell={(rowId, field, value) => onBeginEditCell(rowId, field as any, value)}
             editingField={editingCell?.rowId === item.id ? (editingCell.field as any) : undefined}
@@ -128,19 +183,20 @@ export function WorkoutTable({
         </Swipeable>
       );
     },
-    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell]
+    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle]
   );
 
-  // TODO: DraggableFlatList disabled - using regular FlatList
-  // Drag-to-reorder is not available until gesture conflict is resolved
   return (
     <ThemedView style={styles.tableWrap}>
       <FlatList
-        ref={scrollRef}
+        ref={scrollRef as any}
         data={rows}
         extraData={extraData}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        CellRendererComponent={CellRendererComponent}
+        removeClippedSubviews={false}
+        scrollEnabled={scrollEnabled}
         ListEmptyComponent={ListEmpty}
         style={styles.tableBody}
         contentContainerStyle={styles.tableBodyContent}
@@ -153,13 +209,16 @@ export function WorkoutTable({
 const styles = StyleSheet.create({
   tableWrap: {
     flex: 1,
+    overflow: 'visible',
   },
   tableBody: {
     flex: 1,
+    overflow: 'visible',
   },
   tableBodyContent: {
     paddingBottom: 6,
     paddingHorizontal: 16,
+    overflow: 'visible',
   },
   emptyState: {
     padding: 16,

@@ -4,7 +4,6 @@ import {
   AppState,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   useWindowDimensions,
   View
@@ -27,7 +26,6 @@ import { SessionReviewModal } from "@/components/modals/SessionReviewModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
 import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
 import { Header } from "@/components/ui/Header";
-import { ThemedText } from "@/components/ui/themed-text";
 import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
 import { WorkoutTable } from "@/components/workout/WorkoutTable";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -58,7 +56,6 @@ export default function HomeScreen() {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [editingCell, setEditingCell] = useState<{ rowId: string; field: EditableField } | null>(null);
   const [editValue, setEditValue] = useState<string>("");
-  const [undoState, setUndoState] = useState<{ row: LogRow; index: number } | null>(null);
   const [messageInput, setMessageInput] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [, setError] = useState<{ message: string; reason?: string } | null>(null);
@@ -74,7 +71,6 @@ export default function HomeScreen() {
   const [targetRowId, setTargetRowId] = useState<string | null>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Session review modal state
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
@@ -102,11 +98,6 @@ export default function HomeScreen() {
     setError(null);
     setEditingCell(null);
     setEditValue("");
-    setUndoState(null);
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
     clearWorkoutDraft();
   }, []);
 
@@ -136,7 +127,6 @@ export default function HomeScreen() {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     };
   }, []);
 
@@ -352,11 +342,6 @@ export default function HomeScreen() {
     setError(null);
     setEditingCell(null);
     setEditValue("");
-    setUndoState(null);
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
   };
 
   // Start workout from a template with skeleton rows
@@ -372,11 +357,6 @@ export default function HomeScreen() {
     setError(null);
     setEditingCell(null);
     setEditValue("");
-    setUndoState(null);
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
 
     if (Platform.OS === "ios") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -421,11 +401,6 @@ export default function HomeScreen() {
             setRows([]);
             setEditingCell(null);
             setEditValue("");
-            setUndoState(null);
-            if (undoTimerRef.current) {
-              clearTimeout(undoTimerRef.current);
-              undoTimerRef.current = null;
-            }
           },
         },
       ]
@@ -566,35 +541,9 @@ export default function HomeScreen() {
 
   const deleteRow = (rowId: string) => {
     withPendingRows((prev) => {
-      const idx = prev.findIndex((r) => r.id === rowId);
-      if (idx === -1) return prev;
-
-      const deletedRow = prev[idx];
       const nextRows = prev.filter((r) => r.id !== rowId);
-      setUndoState({ row: deletedRow, index: idx });
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = setTimeout(() => {
-        setUndoState(null);
-        undoTimerRef.current = null;
-      }, 5000);
-
       return resequenceSets(nextRows);
     });
-  };
-
-  const undoDelete = () => {
-    if (!undoState) return;
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
-    setRows((prev) => {
-      const insertAt = Math.min(Math.max(undoState.index, 0), prev.length);
-      const next = [...prev];
-      next.splice(insertAt, 0, undoState.row);
-      return resequenceSets(next);
-    });
-    setUndoState(null);
   };
 
   const duplicateRow = (rowId: string) => {
@@ -614,8 +563,15 @@ export default function HomeScreen() {
     });
   };
 
-  const handleReorderRows = useCallback((reordered: LogRow[]) => {
-    setRows(resequenceSets(reordered));
+  const handleReorderRow = useCallback((fromIndex: number, toIndex: number) => {
+    setRows(prev => {
+      const clamped = Math.max(0, Math.min(toIndex, prev.length - 1));
+      if (fromIndex === clamped) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(clamped, 0, moved);
+      return resequenceSets(next);
+    });
   }, []);
 
   const handleOpenEditSet = (rowId: string) => {
@@ -672,11 +628,6 @@ export default function HomeScreen() {
               setMessageInput("");
               setEditingCell(null);
               setEditValue("");
-              setUndoState(null);
-              if (undoTimerRef.current) {
-                clearTimeout(undoTimerRef.current);
-                undoTimerRef.current = null;
-              }
             },
           },
         ]
@@ -769,11 +720,6 @@ export default function HomeScreen() {
       setMessageInput("");
       setEditingCell(null);
       setEditValue("");
-      setUndoState(null);
-      if (undoTimerRef.current) {
-        clearTimeout(undoTimerRef.current);
-        undoTimerRef.current = null;
-      }
 
       if (Platform.OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1086,21 +1032,10 @@ export default function HomeScreen() {
           onCommitEditCell={commitCellEdit}
           onDeleteRow={deleteRow}
           onDuplicateRow={duplicateRow}
-          onReorderRows={handleReorderRows}
+          onReorderRow={handleReorderRow}
           onIncrementSet={onIncrementSet}
           onEditSet={handleOpenEditSet}
         />
-
-        {
-          undoState ? (
-            <View style={styles.undoBar}>
-              <ThemedText style={styles.undoText}>Row deleted</ThemedText>
-              <Pressable onPress={undoDelete} style={({ pressed }) => [styles.undoButton, pressed && styles.undoButtonPressed]}>
-                <ThemedText style={styles.undoButtonText}>Undo</ThemedText>
-              </Pressable>
-            </View>
-          ) : null
-        }
 
         <WorkoutBottomBar
           workoutActive={workoutActive}
@@ -1186,34 +1121,5 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-  },
-  undoBar: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  undoText: {
-    fontWeight: "600",
-    color: "#111827",
-  },
-  undoButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: "#111827",
-  },
-  undoButtonPressed: {
-    opacity: 0.85,
-  },
-  undoButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
   },
 });

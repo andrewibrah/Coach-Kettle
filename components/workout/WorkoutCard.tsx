@@ -3,14 +3,31 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { LogRow } from "@/types/workout";
 import { useCallback, useEffect, useRef } from "react";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { LayoutChangeEvent, StyleSheet, TextInput, View, Keyboard, Pressable } from "react-native";
+
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  runOnJS,
+  type SharedValue
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+
+const CARD_MARGIN_BOTTOM = 12;
 
 type Props = {
     row: LogRow;
-    onPress: () => void;
+    rowIndex: number;
+    rowHeight: number;
+    activeDragIndex: SharedValue<number>;
+    dragTranslationY: SharedValue<number>;
+    measuredRowHeight: SharedValue<number>;
+    onReorderRow: (from: number, to: number) => void;
+    onDragStart: () => void;
+    onDragEnd: () => void;
     onDoubleTap: () => void;
-    drag: () => void;
-    isActive: boolean;
     onIncrementSet: (rowId: string) => void;
     onBeginEditCell?: (rowId: string, field: "exercise" | "set" | "weightLbs" | "reps" | "notes", value: string) => void;
     editingField?: "exercise" | "set" | "weightLbs" | "reps" | "notes";
@@ -21,10 +38,15 @@ type Props = {
 
 export function WorkoutCard({
     row,
-    onPress,
+    rowIndex,
+    rowHeight,
+    activeDragIndex,
+    dragTranslationY,
+    measuredRowHeight,
+    onReorderRow,
+    onDragStart,
+    onDragEnd,
     onDoubleTap,
-    drag,
-    isActive,
     onIncrementSet,
     onBeginEditCell,
     editingField,
@@ -56,6 +78,23 @@ export function WorkoutCard({
         }
     }, [editingField]);
 
+    const triggerStartHaptic = useCallback(() => {
+        Keyboard.dismiss();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }, []);
+
+    // Measure actual card height for accurate displacement math
+    const onCardLayout = useCallback((e: LayoutChangeEvent) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 0) {
+            const totalHeight = h + CARD_MARGIN_BOTTOM;
+            // Only update if significantly different to avoid churn
+            if (Math.abs(totalHeight - measuredRowHeight.value) > 4) {
+                measuredRowHeight.value = totalHeight;
+            }
+        }
+    }, [measuredRowHeight]);
+
     // Double-tap detection: opens row actions menu
     const lastTapRef = useRef<number>(0);
     const handlePress = useCallback(() => {
@@ -68,6 +107,106 @@ export function WorkoutCard({
             lastTapRef.current = now;
         }
     }, [onDoubleTap]);
+
+    const translateY = useSharedValue(0);
+    const scale = useSharedValue(1);
+    const isDragging = useSharedValue(false);
+
+    const longPressPan = Gesture.Pan()
+        .activateAfterLongPress(300)
+        .failOffsetX([-10, 10])
+        .enabled(!isSyncing && !editingField)
+        .onStart(() => {
+            isDragging.value = true;
+            scale.value = withSpring(1.03);
+            activeDragIndex.value = rowIndex;
+            dragTranslationY.value = 0;
+            runOnJS(triggerStartHaptic)();
+            runOnJS(onDragStart)();
+        })
+        .onUpdate((e) => {
+            translateY.value = e.translationY;
+            dragTranslationY.value = e.translationY;
+        })
+        .onEnd((e) => {
+            // Calculate target using measured height (falls back to prop)
+            const h = measuredRowHeight.value > 0 ? measuredRowHeight.value : rowHeight;
+            const movedSlots = Math.round(e.translationY / h);
+            if (movedSlots !== 0) {
+                runOnJS(onReorderRow)(rowIndex, rowIndex + movedSlots);
+            }
+        })
+        .onFinalize(() => {
+            // Immediate reset — no springs, no setTimeout, no race conditions
+            translateY.value = 0;
+            scale.value = 1;
+            isDragging.value = false;
+            activeDragIndex.value = -1;
+            dragTranslationY.value = 0;
+            runOnJS(onDragEnd)();
+        });
+
+    const tap = Gesture.Tap()
+        .maxDuration(250)
+        .enabled(!isSyncing && !editingField)
+        .onEnd(() => {
+            runOnJS(handlePress)();
+        });
+
+    const gesture = Gesture.Exclusive(longPressPan, tap);
+
+    const animatedStyle = useAnimatedStyle(() => {
+        // Use measured height (reactive shared value) with fallback
+        const h = measuredRowHeight.value > 0 ? measuredRowHeight.value : rowHeight;
+
+        // No drag active — return to rest state
+        if (activeDragIndex.value === -1) {
+            return {
+                transform: [
+                    { translateY: translateY.value },
+                    { scale: scale.value },
+                ],
+                zIndex: isDragging.value ? 99 : 0,
+                elevation: isDragging.value ? 8 : 0,
+                shadowOpacity: isDragging.value ? 0.25 : 0,
+            };
+        }
+
+        // This card IS the dragged card
+        if (activeDragIndex.value === rowIndex) {
+            return {
+                transform: [
+                    { translateY: translateY.value },
+                    { scale: scale.value },
+                ],
+                zIndex: 99,
+                elevation: 8,
+                shadowOpacity: 0.25,
+            };
+        }
+
+        // This card is NOT dragged — calculate displacement
+        let targetY = 0;
+        const movedSlots = Math.round(dragTranslationY.value / h);
+
+        if (movedSlots > 0 && activeDragIndex.value < rowIndex && rowIndex <= activeDragIndex.value + movedSlots) {
+            // Dragging DOWN past this card → shift this card UP
+            targetY = -h;
+        } else if (movedSlots < 0 && activeDragIndex.value > rowIndex && rowIndex >= activeDragIndex.value + movedSlots) {
+            // Dragging UP past this card → shift this card DOWN
+            targetY = h;
+        }
+
+        return {
+            transform: [
+                { translateY: withSpring(targetY, { damping: 20, stiffness: 200 }) },
+                { scale: 1 },
+            ],
+            zIndex: 0,
+            elevation: 0,
+            shadowOpacity: 0,
+        };
+    });
 
     const renderInput = (placeholder: string, keyboardType: "default" | "numeric" = "default") => (
         <TextInput
@@ -95,18 +234,16 @@ export function WorkoutCard({
     );
 
     return (
-        <Pressable
-            style={({ pressed }) => [
-                styles.card,
-                { backgroundColor: cardBg, borderColor },
-                pressed && !isSyncing && !editingField && styles.pressed,
-                isSyncing && styles.syncingRow,
-                isActive && styles.dragging,
-            ]}
-            onPress={isSyncing || editingField ? undefined : handlePress}
-            onLongPress={isSyncing || editingField ? undefined : drag}
-            disabled={isSyncing}
-        >
+        <GestureDetector gesture={gesture}>
+            <Animated.View
+                onLayout={onCardLayout}
+                style={[
+                    styles.card,
+                    { backgroundColor: cardBg, borderColor },
+                    isSyncing && styles.syncingRow,
+                    animatedStyle,
+                ]}
+            >
             <View style={styles.header}>
                 <ThemedText type="defaultSemiBold" style={[styles.exercise, isSyncing && styles.syncingText]}>
                     {row.exercise}
@@ -215,7 +352,8 @@ export function WorkoutCard({
                     )}
                 </View>
             ) : null}
-        </Pressable>
+        </Animated.View>
+    </GestureDetector>
     );
 }
 
@@ -231,17 +369,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
-    pressed: {
-        opacity: 0.95,
-        transform: [{ scale: 0.995 }],
-    },
-    dragging: {
-        opacity: 0.9,
-        transform: [{ scale: 1.03 }],
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 8,
-    },
+
     header: {
         flexDirection: "row",
         justifyContent: "space-between",

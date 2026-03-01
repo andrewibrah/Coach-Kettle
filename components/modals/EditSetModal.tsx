@@ -59,8 +59,8 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                     <Pressable style={[styles.modalContent, { backgroundColor }]} onPress={(e) => e.stopPropagation()}>
                         <View style={styles.header}>
                             <ThemedText type="subtitle">Edit Set</ThemedText>
-                            <Pressable onPress={onClose} hitSlop={10}>
-                                <ThemedText style={{ color: placeholderColor }}>Cancel</ThemedText>
+                            <Pressable onPress={handleSave} hitSlop={10}>
+                                <ThemedText style={styles.doneButton}>Done</ThemedText>
                             </Pressable>
                         </View>
 
@@ -170,5 +170,10 @@ const styles = StyleSheet.create({
     },
     textArea: {
         minHeight: 80,
+    },
+    doneButton: {
+        color: "#3B82F6",
+        fontSize: 16,
+        fontWeight: "600",
     },
 });
