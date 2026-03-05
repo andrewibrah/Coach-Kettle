@@ -14,6 +14,7 @@
 | Modals | `components/modals/` | Dialog overlays |
 | Onboarding | `components/onboarding/` | Quiz components |
 | Celebration | `components/celebration/` | PR celebration |
+| Media | `components/media/` | Photo/video picker, reflection input |
 
 ---
 
@@ -146,6 +147,8 @@ import { AiResponseBubble } from '@/components/ui/AiResponseBubble';
 ### WorkoutTable
 Main workout row display with swipe actions.
 
+**Note:** Now uses FlatList instead of DraggableFlatList (drag disabled due to gesture conflicts with swipe-right menu).
+
 ```typescript
 // components/workout/WorkoutTable.tsx
 import WorkoutTable from '@/components/workout/WorkoutTable';
@@ -179,6 +182,8 @@ import WorkoutTable from '@/components/workout/WorkoutTable';
 
 ### WorkoutCard
 Individual set card within table.
+
+**Note:** Now uses flex-wrap layout to display cardio metrics (duration, distance, HR, calories, level) alongside standard weight/reps.
 
 ```typescript
 // components/workout/WorkoutCard.tsx
@@ -219,6 +224,58 @@ import WorkoutBottomBar from '@/components/workout/WorkoutBottomBar';
 - `onEndWorkout`: End workout handler
 - `loading`: Disable during API call
 - `workoutActive`: Show end button
+
+---
+
+## Media Components (`components/media/`)
+
+### MediaPickerBubble
+Horizontal scrolling thumbnail gallery with an add button for attaching gym photos/videos.
+
+**Location:** `components/media/MediaPickerBubble.tsx`
+
+```typescript
+import { MediaPickerBubble } from '@/components/media/MediaPickerBubble';
+
+<MediaPickerBubble
+  media={selectedMedia}           // Array of local/remote media items
+  onPickMedia={handlePickMedia}   // Opens device image picker
+  onRemoveMedia={handleRemove}    // Remove a selected item
+  maxItems={10}                   // Max 10 files per workout
+/>
+```
+
+**Features:**
+- Horizontal thumbnail scroll
+- "+" button to add more
+- Tap to preview
+- Swipe/tap to remove
+- Shows both local picks and remote URLs
+- Image and video support
+
+---
+
+### ReflectionInput
+Multiline text card for personal session notes/reflection.
+
+**Location:** `components/media/ReflectionInput.tsx`
+
+```typescript
+import { ReflectionInput } from '@/components/media/ReflectionInput';
+
+<ReflectionInput
+  value={reflection}
+  onChangeText={setReflection}
+  maxLength={2000}
+  placeholder="How did this session feel?"
+/>
+```
+
+**Features:**
+- Themed card styling
+- 2000 character limit
+- Character count display
+- Multiline with auto-grow
 
 ---
 

@@ -19,7 +19,7 @@ All backend logic runs as **Supabase Edge Functions** - Deno-based serverless fu
 | `/chat` | AI workout parsing | POST |
 | `/coach` | Streaming AI Q&A | POST |
 | `/parse` | Fast workout parsing | POST |
-| `/history` | Workout CRUD | GET, POST, DELETE |
+| `/history` | Workout CRUD | GET, POST, PATCH, DELETE |
 | `/log-set` | Log individual set | POST |
 | `/terms-acceptance` | ToS status | GET, POST |
 | `/chat-history` | Chat messages | GET, POST, DELETE |
@@ -29,6 +29,8 @@ All backend logic runs as **Supabase Edge Functions** - Deno-based serverless fu
 | `/workout-templates` | Templates CRUD | GET, POST, DELETE |
 | `/health` | Health check | GET |
 | `/observability` | Analytics | POST |
+
+**Note:** `/history` POST also inserts rows into the `workout_log` table, which triggers PR detection via database triggers/realtime.
 
 ---
 
@@ -238,14 +240,42 @@ serve(async (req) => {
       return jsonResponse(data);
 
     case 'POST':
-      // Save new workout
+      // Save new workout (upsert to workouts table)
       const workout = await req.json();
       const { data: saved } = await supabase
         .from('workouts')
         .upsert({ ...workout, user_id: user.id })
         .select()
         .single();
+
+      // Also insert rows into workout_log table.
+      // This triggers PR detection via database triggers/realtime.
+      if (workout.rows?.length) {
+        await supabase
+          .from('workout_log')
+          .insert(workout.rows.map((row: any) => ({
+            ...row,
+            workout_id: saved.id,
+            user_id: user.id,
+          })));
+      }
+
       return jsonResponse(saved);
+
+    case 'PATCH':
+      // Update workout metadata (reflection, etc.)
+      // URL: /history/{workoutId}
+      const url = new URL(req.url);
+      const workoutId = url.pathname.split('/').pop();
+      const updates = await req.json();
+      const { data: patched } = await supabase
+        .from('workouts')
+        .update(updates)
+        .eq('id', workoutId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+      return jsonResponse(patched);
 
     case 'DELETE':
       // Delete workout
@@ -389,3 +419,4 @@ export async function myNewFunction(params: Params): Promise<Result> {
 ## Related Docs
 - [06-api.md](./06-api.md) - Client API layer
 - [01-auth.md](./01-auth.md) - Authentication flow
+- [16-media-reflection.md](./16-media-reflection.md) - Media & reflection (uses PATCH /history)

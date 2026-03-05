@@ -23,8 +23,12 @@ The main workout flow happens on the **Home Screen** (`app/(tabs)/index.tsx`). U
 | `hooks/useRowActions.ts` | Row CRUD operations |
 | `lib/structuredGate.ts` | Input parsing |
 | `lib/workoutStorage.ts` | Save/load workouts |
+| `lib/mediaUpload.ts` | Media upload pipeline |
+| `lib/workoutDraft.ts` | Draft persistence |
 | `components/workout/WorkoutTable.tsx` | Row display |
 | `components/workout/WorkoutBottomBar.tsx` | Input bar |
+| `components/media/MediaPickerBubble.tsx` | Photo/video picker |
+| `components/media/ReflectionInput.tsx` | Reflection text input |
 | `types/workout.ts` | LogRow type |
 
 ---
@@ -43,6 +47,14 @@ export type LogRow = {
   notes: string;
   timestamp: number;
   status?: 'syncing' | 'committed';
+  // Cardio fields (v1.0.0+)
+  isCardio?: boolean;
+  durationMins?: number;
+  distance?: number;
+  distanceUnit?: 'miles' | 'km' | 'meters';
+  heartRate?: number;
+  calories?: number;
+  level?: number;
 }
 ```
 
@@ -100,9 +112,23 @@ interface WorkoutSession {
 │                    WORKOUT END                           │
 │  1. User taps "End Workout"                             │
 │  2. buildWorkoutToSave() creates WorkoutSession         │
-│  3. workoutStorage.saveWorkout() saves locally + remote │
-│  4. Optional: generateSessionReview() for AI feedback   │
-│  5. endWorkoutSession() resets state                    │
+│  3. saveWorkout() saves locally + remote                │
+│     (/history POST which also inserts workout_log       │
+│      rows for PR detection)                             │
+│  4. generateSessionReview(rows, bodyParts) →            │
+│     AI generates structured review                      │
+│  5. SessionReviewModal shows with:                      │
+│     - AI rating (1-10) with strengths/weakness/         │
+│       nextSessionNote                                   │
+│     - MediaPickerBubble for attaching gym               │
+│       photos/videos (up to 10)                          │
+│     - ReflectionInput for personal notes                │
+│       (2000 char max)                                   │
+│  6. On save: uploads media → records in DB →            │
+│     saves review_json + reflection via /history PATCH   │
+│  7. Draft persistence via workoutDraft.ts               │
+│     (restored on same-day relaunch)                     │
+│  8. endWorkoutSession() resets state                    │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -161,8 +187,11 @@ switch (decision.kind) {
 | Shorthand | "185 8" (after bench) | Uses last exercise |
 | Drop set | "185, 165, 145 x 8" | 3 rows, drop set |
 | Superset | "Bench 185 + Rows 135" | 2 rows, superset |
-| Cardio | "Run 2 miles" | 1 cardio row |
+| Cardio | "Run 30 min 3 miles" | Cardio with duration + distance |
+| Cardio (full) | "Treadmill 30 min 3 miles 300 cal hr 140 level 5" | Full cardio metrics |
 | Warmup | "Warmup bench 95 x 10" | 1 row, warmup note |
+
+Note: Cardio metric parsing is order-independent.
 
 ---
 

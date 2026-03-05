@@ -31,8 +31,9 @@ All API calls go through **Supabase Edge Functions**. No direct database access 
 | `/coach` | POST | Streaming AI coach Q&A |
 | `/parse` | POST | Fast workout parsing |
 | `/history` | GET | Fetch all workouts |
-| `/history` | POST | Save workout |
+| `/history` | POST | Save workout (also inserts into `workout_log` for PR triggers) |
 | `/history` | DELETE | Delete workout |
+| `/history/{id}` | PATCH | Update workout metadata (reflection) |
 | `/log-set` | POST | Log individual set |
 | `/terms-acceptance` | GET | Check ToS status |
 | `/terms-acceptance` | POST | Record ToS acceptance |
@@ -102,20 +103,21 @@ export async function chat(
 ```
 
 ### askCoach()
-Streaming AI coach response.
+Streaming AI coach response. Fetches user profile context server-side and accepts a `chatHistory` parameter for conversation continuity.
 
 ```typescript
 export async function askCoach(
   question: string,
   rows: LogRow[],
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  chatHistory?: ChatMessage[]
 ): Promise<void> {
   const headers = await getJsonAuthHeaders();
 
   const response = await fetch(`${supabaseUrl}/functions/v1/coach`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ question, rows })
+    body: JSON.stringify({ question, rows, chatHistory })
   });
 
   // Stream response
@@ -127,6 +129,34 @@ export async function askCoach(
     if (done) break;
     onChunk(decoder.decode(value));
   }
+}
+```
+
+### generateSessionReview()
+Generate an AI-powered review for a completed workout session.
+
+```typescript
+export async function generateSessionReview(
+  rows: LogRow[],
+  workoutPart: string
+): Promise<SessionReview | null> {
+  // Calls /chat with review prompt
+  // AI generates structured review with rating formula:
+  //   base 5 + bonuses (intensity, rep range, volume, compounds) - penalties
+  // Returns: { rating, strengths[], weakness, nextSessionNote }
+}
+```
+
+### updateWorkoutMeta()
+Update workout-level metadata such as reflection notes.
+
+```typescript
+export async function updateWorkoutMeta(
+  workoutId: string,
+  updates: { reflection?: string }
+): Promise<void> {
+  // PATCH /history/{id}
+  // Updates workout-level metadata (currently just reflection)
 }
 ```
 

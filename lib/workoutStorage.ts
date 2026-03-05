@@ -27,6 +27,16 @@ export type SessionReview = {
   generatedAt: number;
 };
 
+export type WorkoutMediaRecord = {
+  id: string;
+  workout_id: string;
+  storage_path: string;
+  media_type: 'image' | 'video';
+  file_size_bytes?: number;
+  created_at: string;
+  signed_url?: string | null; // Pre-signed URL from server (1hr TTL)
+};
+
 export type WorkoutSession = {
   id: string;
   dateISO: string; // YYYY-MM-DD
@@ -34,6 +44,8 @@ export type WorkoutSession = {
   rows: WorkoutRow[];
   createdAt: number;
   review?: SessionReview;
+  reflection?: string;
+  media?: WorkoutMediaRecord[];
 };
 
 const KEY = "workout_history_v1";

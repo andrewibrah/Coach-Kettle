@@ -7,7 +7,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
 };
 
 interface WorkoutRow {
@@ -42,6 +42,7 @@ interface WorkoutSession {
     rows: WorkoutRow[];
     createdAt: number;
     review?: SessionReview;
+    reflection?: string;
 }
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -101,9 +102,6 @@ async function getUserContext(authHeader: string | null): Promise<{ supabase: Su
 }
 
 
-
-
-
 // POST: Save/upsert workout session
 async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, userId: string): Promise<Response> {
     const rows = Array.isArray(session.rows) ? session.rows : [];
@@ -121,6 +119,7 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
             createdAt: session.createdAt,
             rows_json: rowsJson,
             review_json: reviewJson,
+            reflection: session.reflection ?? null,
             user_id: userId,
         }, { onConflict: "id" })
         .select()
@@ -173,7 +172,7 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
 async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<Response> {
     const { data, error } = await supabase
         .from("workouts")
-        .select("id, dateISO, part, createdAt, rows_json, review_json")
+        .select("id, dateISO, part, createdAt, rows_json, review_json, reflection")
         .eq("user_id", userId)
         .limit(50)
         .order("createdAt", { ascending: false });
@@ -181,6 +180,49 @@ async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<R
     if (error) {
         console.error("[history] Database error:", error);
         return respondJson({ error: "Database error" }, 500);
+    }
+
+    // Fetch all workout_media for this user in one query
+    const workoutIds = (data || []).map((row: any) => row.id);
+    let mediaByWorkout: Record<string, any[]> = {};
+
+    if (workoutIds.length > 0) {
+        const { data: mediaData, error: mediaError } = await supabase
+            .from("workout_media")
+            .select("id, workout_id, storage_path, media_type, file_size_bytes, created_at")
+            .in("workout_id", workoutIds)
+            .order("created_at", { ascending: true });
+
+        if (!mediaError && mediaData && mediaData.length > 0) {
+            // Generate signed URLs server-side using admin client (bypasses storage RLS).
+            // This is more reliable than client-side signed URL generation which
+            // depends on the user's JWT having SELECT access to storage.objects.
+            const allPaths = mediaData.map((m: any) => m.storage_path);
+            const signedUrlMap: Record<string, string> = {};
+
+            const { data: signedData, error: signedError } = await supabaseAdmin.storage
+                .from("workout-media")
+                .createSignedUrls(allPaths, 3600);
+
+            if (!signedError && signedData) {
+                for (let i = 0; i < allPaths.length; i++) {
+                    const item = signedData[i];
+                    if (item?.signedUrl) {
+                        signedUrlMap[allPaths[i]] = item.signedUrl;
+                    }
+                }
+            } else {
+                console.error("[history] Failed to generate signed URLs:", signedError);
+            }
+
+            for (const m of mediaData) {
+                if (!mediaByWorkout[m.workout_id]) mediaByWorkout[m.workout_id] = [];
+                mediaByWorkout[m.workout_id].push({
+                    ...m,
+                    signed_url: signedUrlMap[m.storage_path] || null,
+                });
+            }
+        }
     }
 
     const sessions = (data || []).map((row: any) => {
@@ -205,10 +247,42 @@ async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<R
             rows,
             createdAt: row.createdAt,
             review,
+            reflection: row.reflection ?? undefined,
+            media: mediaByWorkout[row.id] ?? [],
         };
     });
 
     return respondJson(sessions);
+}
+
+// PATCH: Update workout metadata (reflection, etc.)
+async function updateWorkoutMeta(
+    workoutId: string,
+    body: { reflection?: string },
+    supabase: SupabaseClient,
+    userId: string
+): Promise<Response> {
+    const updates: Record<string, unknown> = {};
+    if (body.reflection !== undefined) {
+        updates.reflection = body.reflection;
+    }
+
+    if (Object.keys(updates).length === 0) {
+        return respondJson({ error: "No fields to update" }, 400);
+    }
+
+    const { error } = await supabase
+        .from("workouts")
+        .update(updates)
+        .eq("id", workoutId)
+        .eq("user_id", userId);
+
+    if (error) {
+        console.error("[history] PATCH error:", error);
+        return respondJson({ error: "Database error" }, 500);
+    }
+
+    return respondJson({ ok: true });
 }
 
 // DELETE: Delete workout by ID
@@ -259,6 +333,27 @@ serve(async (req) => {
             }
 
             return await saveWorkout(payload, supabase, userId);
+        }
+
+        if (req.method === "PATCH") {
+            let body: { reflection?: string };
+            try {
+                body = await req.json();
+            } catch {
+                return respondJson({ error: "Invalid JSON" }, 400);
+            }
+
+            // Get workout ID from path or query param
+            let patchId = workoutId;
+            if (!patchId) {
+                patchId = url.searchParams.get("id");
+            }
+
+            if (!patchId) {
+                return respondJson({ error: "workout_id is required (pass as path param or ?id=)" }, 400);
+            }
+
+            return await updateWorkoutMeta(patchId, body, supabase, userId);
         }
 
         if (req.method === "GET") {

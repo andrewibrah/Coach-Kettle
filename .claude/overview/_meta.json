@@ -28,15 +28,15 @@
       "id": "03-workout-flow",
       "title": "Workout Logging Flow",
       "file": "03-workout-flow.md",
-      "keywords": ["workout", "exercise", "set", "rep", "logging", "session", "LogRow"],
-      "keyFiles": ["app/(tabs)/index.tsx", "hooks/useWorkoutSession.ts", "hooks/useRowActions.ts", "components/workout/WorkoutTable.tsx"],
+      "keywords": ["workout", "exercise", "set", "rep", "logging", "session", "LogRow", "cardio", "review", "media", "reflection"],
+      "keyFiles": ["app/(tabs)/index.tsx", "hooks/useWorkoutSession.ts", "hooks/useRowActions.ts", "components/workout/WorkoutTable.tsx", "lib/mediaUpload.ts"],
       "relatedDocs": ["04-parsing", "05-storage", "08-hooks"]
     },
     {
       "id": "04-parsing",
       "title": "Input Parsing System",
       "file": "04-parsing.md",
-      "keywords": ["parse", "parsing", "input", "regex", "structuredGate", "NLP", "pattern", "AI"],
+      "keywords": ["parse", "parsing", "input", "regex", "structuredGate", "NLP", "pattern", "AI", "cardio", "duration", "distance", "calories", "heart rate"],
       "keyFiles": ["lib/structuredGate.ts"],
       "relatedDocs": ["03-workout-flow", "06-api"]
     },
@@ -44,15 +44,15 @@
       "id": "05-storage",
       "title": "Data Storage",
       "file": "05-storage.md",
-      "keywords": ["storage", "AsyncStorage", "save", "load", "persist", "local", "sync", "cloud"],
-      "keyFiles": ["lib/workoutStorage.ts", "lib/chatStorage.ts"],
+      "keywords": ["storage", "AsyncStorage", "save", "load", "persist", "local", "sync", "cloud", "draft", "media", "reflection"],
+      "keyFiles": ["lib/workoutStorage.ts", "lib/chatStorage.ts", "lib/workoutDraft.ts", "lib/mediaUpload.ts"],
       "relatedDocs": ["03-workout-flow", "06-api"]
     },
     {
       "id": "06-api",
       "title": "API Layer",
       "file": "06-api.md",
-      "keywords": ["api", "fetch", "endpoint", "supabase", "edge function", "request", "response"],
+      "keywords": ["api", "fetch", "endpoint", "supabase", "edge function", "request", "response", "review", "media", "reflection", "meta"],
       "keyFiles": ["lib/api.ts", "lib/supabase.ts"],
       "relatedDocs": ["01-auth", "15-edge-functions"]
     },
@@ -76,8 +76,8 @@
       "id": "09-modals",
       "title": "Modal Dialogs",
       "file": "09-modals.md",
-      "keywords": ["modal", "dialog", "popup", "edit", "coach", "menu", "review"],
-      "keyFiles": ["components/modals/EditSetModal.tsx", "components/modals/CoachModal.tsx", "components/modals/MenuModal.tsx", "components/modals/SessionReviewModal.tsx"],
+      "keywords": ["modal", "dialog", "popup", "edit", "coach", "menu", "review", "media", "reflection", "rating"],
+      "keyFiles": ["components/modals/EditSetModal.tsx", "components/modals/CoachModal.tsx", "components/modals/MenuModal.tsx", "components/modals/SessionReviewModal.tsx", "components/media/MediaPickerBubble.tsx"],
       "relatedDocs": ["07-components", "03-workout-flow"]
     },
     {
@@ -124,9 +124,17 @@
       "id": "15-edge-functions",
       "title": "Supabase Edge Functions",
       "file": "15-edge-functions.md",
-      "keywords": ["edge function", "supabase", "serverless", "backend", "deno", "api"],
+      "keywords": ["edge function", "supabase", "serverless", "backend", "deno", "api", "media", "patch", "reflection"],
       "keyFiles": ["supabase/functions/chat/index.ts", "supabase/functions/history/index.ts", "supabase/functions/parse/index.ts"],
       "relatedDocs": ["06-api", "01-auth"]
+    },
+    {
+      "id": "16-media-reflection",
+      "title": "Media & Reflection",
+      "file": "16-media-reflection.md",
+      "keywords": ["media", "photo", "video", "upload", "reflection", "image", "storage", "signed url", "workout media"],
+      "keyFiles": ["lib/mediaUpload.ts", "components/media/MediaPickerBubble.tsx", "components/media/ReflectionInput.tsx", "plugins/withImagePicker.js"],
+      "relatedDocs": ["09-modals", "03-workout-flow", "05-storage"]
     }
   ],
   "areas": {
@@ -134,6 +142,7 @@
     "workout": ["03-workout-flow", "04-parsing", "05-storage", "08-hooks"],
     "ui": ["07-components", "09-modals", "14-theming"],
     "data": ["05-storage", "06-api", "15-edge-functions"],
-    "user": ["10-onboarding", "11-settings", "12-pr-tracking", "13-templates"]
+    "user": ["10-onboarding", "11-settings", "12-pr-tracking", "13-templates"],
+    "media": ["16-media-reflection", "09-modals", "05-storage"]
   }
 }

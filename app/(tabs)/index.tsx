@@ -77,6 +77,9 @@ export default function HomeScreen() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [sessionReview, setSessionReview] = useState<SessionReview | null>(null);
 
+  // Ref to preserve workoutId across endWorkoutSession (which clears it)
+  const savedWorkoutIdRef = useRef<string | null>(null);
+
   // Routine modal state
   const [routineModalVisible, setRoutineModalVisible] = useState(false);
 
@@ -667,6 +670,9 @@ export default function HomeScreen() {
       return;
     }
 
+    // Capture workoutId before endWorkoutSession clears it
+    savedWorkoutIdRef.current = workoutId ?? null;
+
     // Show review modal with loading state
     setReviewModalVisible(true);
     setReviewLoading(true);
@@ -1107,9 +1113,20 @@ export default function HomeScreen() {
           loading={reviewLoading}
           review={sessionReview}
           workoutTitle={title}
+          workoutId={savedWorkoutIdRef.current}
+          userId={session?.user?.id}
           onClose={() => {
             setReviewModalVisible(false);
             setSessionReview(null);
+            savedWorkoutIdRef.current = null;
+          }}
+          onSaveReflection={(text) => {
+            const wId = savedWorkoutIdRef.current;
+            if (wId && text) {
+              api.updateWorkoutMeta(wId, { reflection: text }).catch((err) =>
+                console.error("[SessionReview] Failed to save reflection:", err)
+              );
+            }
           }}
         />
 

@@ -271,6 +271,20 @@ JSON shape — respond with exactly this structure:
         }
     },
 
+    updateWorkoutMeta: async (workoutId: string, meta: { reflection?: string }) => {
+        const res = await fetchWithAuth(`${API_BASE}/history/${workoutId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(meta),
+        });
+
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`Failed to update workout: ${res.status} - ${body}`);
+        }
+
+        return (await res.json()) as { ok: boolean };
+    },
+
     checkTermsAcceptance: async () => {
         const res = await fetchWithAuth(`${API_BASE}/terms-acceptance`, { method: 'GET' });
 

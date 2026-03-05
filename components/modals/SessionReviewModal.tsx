@@ -1,11 +1,15 @@
+import { MediaPickerBubble, type MediaThumb } from "@/components/media/MediaPickerBubble";
+import { ReflectionInput } from "@/components/media/ReflectionInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { getSignedUrl, pickMedia, uploadAndRecordMedia } from "@/lib/mediaUpload";
 import { SessionReview } from "@/lib/workoutStorage";
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -21,7 +25,10 @@ type Props = {
   loading: boolean;
   review: SessionReview | null;
   workoutTitle: string;
+  workoutId?: string | null;
+  userId?: string;
   onClose: () => void;
+  onSaveReflection?: (reflection: string) => void;
 };
 
 export function SessionReviewModal({
@@ -29,7 +36,10 @@ export function SessionReviewModal({
   loading,
   review,
   workoutTitle,
+  workoutId,
+  userId,
   onClose,
+  onSaveReflection,
 }: Props) {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
@@ -43,6 +53,11 @@ export function SessionReviewModal({
   const doneButtonTextColor = isDark ? "#111827" : "#FFFFFF";
   const accentColor = "#10B981"; // Green for positive
   const warningColor = "#F59E0B"; // Orange for improvement
+
+  // Reflection + media state
+  const [reflection, setReflection] = useState("");
+  const [mediaItems, setMediaItems] = useState<MediaThumb[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const getRatingColor = (rating: number) => {
     if (rating >= 8) return "#10B981"; // Green
@@ -59,6 +74,89 @@ export function SessionReviewModal({
     day: "numeric",
   });
 
+  const handleAddMedia = useCallback(async () => {
+    try {
+      const assets = await pickMedia(mediaItems.length);
+      if (assets.length === 0) return;
+
+      // Add thumbnails immediately with local URIs
+      const newThumbs: MediaThumb[] = assets.map((a) => ({
+        uri: a.uri || "",
+        mediaType: a.type?.startsWith("video") ? "video" : "image",
+        uploading: true,
+      }));
+
+      setMediaItems((prev) => [...prev, ...newThumbs]);
+
+      // Upload each in parallel (if workoutId + userId available)
+      if (workoutId && userId) {
+        const startIdx = mediaItems.length;
+        await Promise.allSettled(
+          assets.map(async (asset, i) => {
+            try {
+              const result = await uploadAndRecordMedia(asset, userId, workoutId);
+              const signedUrl = await getSignedUrl(result.storagePath);
+              setMediaItems((prev) => {
+                const next = [...prev];
+                const targetIdx = startIdx + i;
+                if (next[targetIdx]) {
+                  next[targetIdx] = {
+                    ...next[targetIdx],
+                    uploading: false,
+                    uri: signedUrl || next[targetIdx].uri,
+                  };
+                }
+                return next;
+              });
+            } catch (err) {
+              console.error("[SessionReview] Upload failed:", err);
+              setMediaItems((prev) => {
+                const next = [...prev];
+                const targetIdx = startIdx + i;
+                if (next[targetIdx]) {
+                  next[targetIdx] = {
+                    ...next[targetIdx],
+                    uploading: false,
+                    error: "Upload failed",
+                  };
+                }
+                return next;
+              });
+            }
+          })
+        );
+      } else {
+        // No workoutId yet — just mark as done (local only)
+        setMediaItems((prev) =>
+          prev.map((item) => (item.uploading ? { ...item, uploading: false } : item))
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not access photos";
+      Alert.alert("Media Error", msg);
+    }
+  }, [mediaItems.length, workoutId, userId]);
+
+  const handleRemoveMedia = useCallback((index: number) => {
+    setMediaItems((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleDone = useCallback(async () => {
+    const trimmed = reflection.trim();
+    if (trimmed && onSaveReflection) {
+      setSaving(true);
+      try {
+        onSaveReflection(trimmed);
+      } finally {
+        setSaving(false);
+      }
+    }
+    // Reset local state
+    setReflection("");
+    setMediaItems([]);
+    onClose();
+  }, [reflection, onSaveReflection, onClose]);
+
   return (
     <Modal visible={visible} animationType="slide">
       <ThemedView
@@ -70,7 +168,7 @@ export function SessionReviewModal({
         {/* Header */}
         <View style={styles.header}>
           <Pressable
-            onPress={onClose}
+            onPress={handleDone}
             style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
           >
             <IconSymbol name="xmark" size={24} color={iconColor} />
@@ -95,6 +193,7 @@ export function SessionReviewModal({
           <ScrollView
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
 
               {/* Rating */}
@@ -151,16 +250,35 @@ export function SessionReviewModal({
                 </ThemedText>
               </View>
 
+              {/* ── NEW: Media Picker ── */}
+              <MediaPickerBubble
+                items={mediaItems}
+                onAdd={handleAddMedia}
+                onRemove={handleRemoveMedia}
+              />
+
+              {/* ── NEW: Session Reflection ── */}
+              <ReflectionInput
+                value={reflection}
+                onChangeText={setReflection}
+              />
+
               {/* Done Button */}
               <Pressable
                 style={({ pressed }) => [
                   styles.doneButton,
                   { backgroundColor: doneButtonBg },
                   pressed && styles.doneButtonPressed,
+                  saving && styles.doneButtonDisabled,
                 ]}
-                onPress={onClose}
+                onPress={handleDone}
+                disabled={saving}
               >
-                <Text style={[styles.doneButtonText, { color: doneButtonTextColor }]}>Done</Text>
+                {saving ? (
+                  <ActivityIndicator size="small" color={doneButtonTextColor} />
+                ) : (
+                  <Text style={[styles.doneButtonText, { color: doneButtonTextColor }]}>Done</Text>
+                )}
               </Pressable>
             </ScrollView>
           ) : (
@@ -168,13 +286,27 @@ export function SessionReviewModal({
               <ThemedText style={styles.errorText}>
                 Could not generate review. Your workout has been saved.
               </ThemedText>
+
+              {/* Still show media + reflection even without AI review */}
+              <View style={styles.errorMediaSection}>
+                <MediaPickerBubble
+                  items={mediaItems}
+                  onAdd={handleAddMedia}
+                  onRemove={handleRemoveMedia}
+                />
+                <ReflectionInput
+                  value={reflection}
+                  onChangeText={setReflection}
+                />
+              </View>
+
               <Pressable
                 style={({ pressed }) => [
                   styles.doneButton,
                   { backgroundColor: doneButtonBg },
                   pressed && styles.doneButtonPressed,
                 ]}
-                onPress={onClose}
+                onPress={handleDone}
               >
                 <Text style={[styles.doneButtonText, { color: doneButtonTextColor }]}>Close</Text>
               </Pressable>
@@ -307,6 +439,9 @@ const styles = StyleSheet.create({
   doneButtonPressed: {
     opacity: 0.8,
   },
+  doneButtonDisabled: {
+    opacity: 0.6,
+  },
   doneButtonText: {
     fontSize: 17,
     fontWeight: "700",
@@ -317,6 +452,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 40,
     gap: 20,
+  },
+  errorMediaSection: {
+    width: "100%",
+    gap: 16,
   },
   errorText: {
     fontSize: 16,

@@ -148,11 +148,35 @@ Example: "Warmup bench 95 x 10"
 Result:  { exercise: "Bench Press", notes: "warmup" }
 ```
 
-### 7. Cardio
+### 7. Cardio (Order-Independent Metrics)
+
+Cardio parsing now supports multiple metrics in any order:
+- Duration: `30 min` or `30 minutes`
+- Distance: `3 miles`, `5 km`, `400 meters` / `400 m`
+- Calories: `300 cal`
+- Heart rate: `hr 140`
+- Level/incline: `level 5`
+
+Examples:
 ```
-Pattern: /^(run|bike|row|swim|walk)\s+(\d+(?:\.\d+)?)\s*(mi|miles?|km|min|minutes?)$/i
-Example: "Run 2.5 miles"
-Result:  { exercise: "Run", distance: "2.5", unit: "miles" }
+"Run 30 min" → duration only
+"Run 3 miles" → distance only
+"Treadmill 30 min 3 miles 300 cal hr 140 level 5" → all metrics
+"Bike 45 min level 8 hr 155" → duration + level + HR (any order)
+```
+
+Result type for cardio:
+```typescript
+{
+  exercise: string;
+  isCardio: true;
+  durationMins?: number;
+  distance?: number;
+  distanceUnit?: 'miles' | 'km' | 'meters';
+  heartRate?: number;
+  calories?: number;
+  level?: number;
+}
 ```
 
 ### 8. Kilogram Conversion
@@ -238,6 +262,14 @@ interface ParsedRow {
   weightLbs?: string;
   reps?: string;
   notes?: string;
+  // Cardio fields (v1.0.0+)
+  isCardio?: boolean;
+  durationMins?: number;
+  distance?: number;
+  distanceUnit?: 'miles' | 'km' | 'meters';
+  heartRate?: number;
+  calories?: number;
+  level?: number;
 }
 
 // Convert to LogRow
@@ -249,7 +281,15 @@ function toLogRow(parsed: ParsedRow, rows: LogRow[]): LogRow {
     weightLbs: parsed.weightLbs || '',
     reps: parsed.reps || '',
     notes: parsed.notes || '',
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    // Cardio fields
+    isCardio: parsed.isCardio,
+    durationMins: parsed.durationMins,
+    distance: parsed.distance,
+    distanceUnit: parsed.distanceUnit,
+    heartRate: parsed.heartRate,
+    calories: parsed.calories,
+    level: parsed.level,
   };
 }
 ```

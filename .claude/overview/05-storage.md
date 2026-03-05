@@ -20,6 +20,9 @@ The app uses a **local-first** storage strategy:
 | `lib/workoutStorage.ts` | Workout save/load |
 | `lib/chatStorage.ts` | Chat history |
 | `lib/api.ts` | Remote sync API |
+| `lib/workoutDraft.ts` | Draft persistence |
+| `lib/mediaUpload.ts` | Media upload pipeline |
+| `lib/onboardingDraft.ts` | Onboarding draft backup |
 
 ---
 
@@ -34,6 +37,8 @@ The app uses a **local-first** storage strategy:
 | `last_authenticated_at` | Auth timestamp | `number` |
 | `biometric_enabled` | Biometric pref | `'true' \| 'false'` |
 | `terms_accepted` | ToS acceptance | `'true' \| 'false'` |
+| `workout_draft_v1` | In-progress workout draft | `WorkoutDraft` |
+| `onboarding_draft_v1` | Onboarding answer backup | `OnboardingDraft` |
 
 ---
 
@@ -50,7 +55,9 @@ export interface WorkoutSession {
   part: BodyPart;           // "Push"
   rows: WorkoutRow[];
   createdAt: number;
-  review?: SessionReview;   // Optional AI review
+  review?: SessionReview;   // AI-generated review
+  reflection?: string;      // User's personal notes (max 2000 chars)
+  media?: WorkoutMediaRecord[];  // Attached photos/videos
 }
 
 export interface WorkoutRow {
@@ -62,9 +69,29 @@ export interface WorkoutRow {
 }
 
 export interface SessionReview {
-  summary: string;
-  highlights: string[];
-  suggestions: string[];
+  rating: number;           // 1-10 AI-generated score
+  strengths: string[];      // What went well
+  weakness: string;         // Area to improve
+  nextSessionNote: string;  // Advice for next time
+  generatedAt: number;      // Timestamp
+}
+
+export interface WorkoutMediaRecord {
+  id: string;
+  workout_id: string;
+  storage_path: string;     // {userId}/{workoutId}/{uuid}.{ext}
+  media_type: 'image' | 'video';
+  file_size_bytes?: number;
+  created_at: string;
+}
+
+export interface WorkoutDraft {
+  workoutId: string;
+  dateISO: string;
+  bodyParts: string[];
+  createdAt: number;
+  rows: LogRow[];
+  updatedAt: number;
 }
 ```
 
@@ -240,6 +267,48 @@ export async function getHistory(): Promise<WorkoutSession[]> {
   return response.json();
 }
 ```
+
+---
+
+## Media Storage
+
+### Supabase Storage
+Media files are stored in a **private** Supabase Storage bucket with user-scoped paths.
+
+**Path format:** `{userId}/{workoutId}/{uuid}.{ext}`
+
+### Upload Pipeline (lib/mediaUpload.ts)
+1. `pickMedia()` - Opens device image/video picker (0.8 compression, multi-select, up to 10 files)
+2. `uploadMediaToStorage(file, userId, workoutId)` - Uploads to Supabase Storage
+3. `recordMediaInDb(record)` - Inserts into `workout_media` table
+4. `uploadAndRecordMedia(file, userId, workoutId)` - Combined flow
+
+### Retrieval
+- `getMediaSignedUrls(workoutId)` - Generates 1-hour TTL signed URLs for display
+- `deleteMedia(mediaId, storagePath)` - Removes from both storage bucket and DB
+
+### Constraints
+- Max 10 files per workout
+- Max 50MB per file
+- Allowed types: JPEG, PNG, HEIC, WebP, MP4, MOV
+- RLS: users can only access their own media
+
+---
+
+## Draft Persistence
+
+### Workout Draft (lib/workoutDraft.ts)
+Active workouts are persisted as drafts to prevent data loss:
+- Saves on every row change
+- Restored on app launch if same day
+- Cleared on workout end/save
+- Key: `workout_draft_v1`
+
+### Onboarding Draft (lib/onboardingDraft.ts)
+Onboarding answers are backed up before final submission:
+- Saved before batch API call
+- Restored on submission failure
+- Key: `onboarding_draft_v1`
 
 ---
 

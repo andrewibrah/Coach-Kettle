@@ -6,7 +6,7 @@
 
 ## Overview
 
-New users go through an 11-step onboarding flow to set up their profile before accessing the main app.
+New users go through a 10-step onboarding flow to set up their profile before accessing the main app. All answers are saved in a single batch API call on the complete screen.
 
 **Redirect Logic:** Tab layout redirects to `/onboarding` if `isOnboardingComplete === false`.
 
@@ -20,6 +20,7 @@ New users go through an 11-step onboarding flow to set up their profile before a
 | `components/onboarding/*.tsx` | Quiz UI components |
 | `lib/profile.ts` | Profile API |
 | `contexts/ProfileContext.tsx` | Profile state |
+| `lib/onboardingDraft.ts` | Local draft backup |
 
 ---
 
@@ -70,7 +71,7 @@ Tab Layout checks isOnboardingComplete
                       │
             ┌─────────┴─────────┐
             │   Complete        │
-            │ completeOnboarding│
+            │ batch save + done │
             └─────────┬─────────┘
                       │
                       ▼
@@ -96,6 +97,8 @@ interface ProfileContextValue {
 
 ### Usage in Onboarding
 
+Each onboarding screen stores answers in local state (ProfileContext) without making API calls. Navigation between steps only updates local state:
+
 ```typescript
 import { useProfile } from '@/contexts/ProfileContext';
 
@@ -106,7 +109,7 @@ function AgeScreen() {
   const handleNext = async () => {
     await updateProfile({
       dob: selectedDate,
-      onboarding_step: 3  // Move to next step
+      onboarding_step: 3  // Move to next step (local state only)
     });
     router.push('/onboarding/height');
   };
@@ -199,22 +202,9 @@ Lift selection for PR tracking.
 
 ## Completing Onboarding
 
-**Location:** `lib/profile.ts`
+**Location:** `app/onboarding/complete.tsx`
 
-```typescript
-export async function completeOnboarding(userId: string): Promise<void> {
-  await supabase
-    .from('profiles')
-    .update({
-      onboarding_completed: true,
-      onboarding_step: 10,
-      updated_at: new Date().toISOString()
-    })
-    .eq('user_id', userId);
-}
-```
-
-### In Complete Screen
+The complete screen gathers all accumulated profile data from ProfileContext and submits everything in a single batch API call:
 
 ```typescript
 // app/onboarding/complete.tsx
@@ -224,11 +214,16 @@ import { useProfile } from '@/contexts/ProfileContext';
 
 function CompleteScreen() {
   const { session } = useAuth();
-  const { refreshProfile } = useProfile();
+  const { profile, refreshProfile } = useProfile();
   const router = useRouter();
 
   const handleComplete = async () => {
-    await completeOnboarding(session.user.id);
+    // Batch save: profile data + PR lifts + PR values in one call
+    await completeOnboarding(session.user.id, {
+      ...profile,             // All accumulated onboarding answers
+      onboarding_completed: true,
+      onboarding_step: 10,
+    });
     await refreshProfile();  // Updates isOnboardingComplete
     router.replace('/(tabs)');  // Go to main app
   };
@@ -241,6 +236,27 @@ function CompleteScreen() {
   );
 }
 ```
+
+---
+
+## Batch Onboarding Save
+
+As of v1.0.0, onboarding uses a **single batch API call** on the complete screen instead of saving each step individually.
+
+### How it works
+1. Each onboarding screen stores answers in local state (ProfileContext)
+2. On the complete screen, ALL profile data + PR lifts + PR values are submitted in one API call
+3. A local draft backup (`lib/onboardingDraft.ts`) saves answers before submission
+4. On failure, the draft can be restored and retried
+
+### Benefits
+- Faster onboarding (no API latency between steps)
+- Atomic save (all-or-nothing)
+- Offline-friendly (answers stored locally until submit)
+- Draft backup prevents data loss on crash
+
+### Known Fix
+Previous versions had a bug where skipping onboarding could leave users in a redirect loop. This was fixed by ensuring `onboarding_completed: true` is always set even on skip.
 
 ---
 

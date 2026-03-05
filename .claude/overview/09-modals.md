@@ -117,9 +117,9 @@ import RoutineModal from '@/components/modals/RoutineModal';
 
 ## SessionReviewModal
 
-Displays AI-generated workout feedback after ending a workout.
+Full-screen modal for post-workout review with AI feedback, media, and reflection.
 
-**Location:** `components/modals/SessionReviewModal.tsx`
+**Location:** `components/modals/SessionReviewModal.tsx` (~13.4KB)
 
 ```typescript
 import SessionReviewModal from '@/components/modals/SessionReviewModal';
@@ -127,23 +127,38 @@ import SessionReviewModal from '@/components/modals/SessionReviewModal';
 <SessionReviewModal
   visible={showReview}
   review={sessionReview}
+  workoutName={title}
+  workoutDate={sessionDate}
+  workoutId={workoutId}
   onClose={() => setShowReview(false)}
-  onSave={async () => {
-    // Save review with workout
-    await updateWorkoutWithReview(workoutId, sessionReview);
+  onSave={async (reflection, media) => {
+    // Upload media in parallel
+    // Save review_json + reflection via API
+    // Record media in DB
     setShowReview(false);
   }}
 />
 ```
 
-**Review Content:**
+**Review Data:**
 ```typescript
 interface SessionReview {
-  summary: string;       // Overall assessment
-  highlights: string[];  // Good things
-  suggestions: string[]; // Improvements
+  rating: number;           // 1-10 AI score
+  strengths: string[];      // What went well
+  weakness: string;         // Area to improve
+  nextSessionNote: string;  // Advice for next time
+  generatedAt: number;
 }
 ```
+
+**Features:**
+- Full-screen modal with clean header (workout name + date)
+- AI-generated rating display (1-10 scale with emoji)
+- Strengths list, improvement area, next session advice
+- **MediaPickerBubble** - Attach up to 10 photos/videos from device
+- **ReflectionInput** - Personal notes (2000 char max)
+- Parallel media uploads with error handling
+- Save triggers: review_json + reflection stored in workouts table, media uploaded to Storage + recorded in workout_media table
 
 ---
 
