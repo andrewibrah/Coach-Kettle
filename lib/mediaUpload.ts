@@ -7,6 +7,7 @@
 
 import * as ImagePicker from 'expo-image-picker';
 import * as Crypto from 'expo-crypto';
+import { File as ExpoFile } from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
 
 const BUCKET = 'workout-media';
@@ -55,7 +56,9 @@ export async function pickMedia(currentCount: number = 0): Promise<PickedAsset[]
         allowsMultipleSelection: true,
         selectionLimit: remaining,
         quality: 0.8,
-        // No base64 — we fetch the file via URI for upload
+        // Force iOS to transcode HEIC → JPEG before returning URI
+        preferredAssetRepresentationMode:
+            ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
 
     if (result.canceled) {
@@ -83,20 +86,35 @@ export async function uploadMediaToStorage(
     const uri = asset.uri;
     if (!uri) throw new Error('No URI on asset');
 
-    const ext = getExtension(asset.fileName || uri, asset.type);
+    let ext = getExtension(asset.fileName || uri, asset.type);
+    // Force HEIC → JPEG (React Native <Image> can't reliably decode remote HEIC)
+    if (ext === 'heic') ext = 'jpg';
+
     const uuid = Crypto.randomUUID();
     const storagePath = `${userId}/${workoutId}/${uuid}.${ext}`;
 
     const mediaType: 'image' | 'video' = asset.type?.startsWith('video') ? 'video' : 'image';
-    const contentType = asset.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+    let contentType = asset.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+    // Override HEIC mime type to JPEG
+    if (contentType === 'image/heic' || contentType === 'image/heif') {
+        contentType = 'image/jpeg';
+    }
 
-    // Read file as blob
-    const response = await fetch(uri);
-    const blob = await response.blob();
+    // Read file via expo-file-system File API (reliable for all RN URI schemes)
+    const file = new ExpoFile(uri);
+    const arrayBuffer = await file.arrayBuffer();
 
+    // Validate — reject corrupt/empty files
+    if (arrayBuffer.byteLength < 100) {
+        throw new Error(`File appears empty or corrupt (${arrayBuffer.byteLength} bytes)`);
+    }
+
+    console.log(`[mediaUpload] Uploading ${storagePath} | ${contentType} | ${arrayBuffer.byteLength} bytes`);
+
+    // Upload ArrayBuffer (supabase-js accepts ArrayBuffer directly)
     const { error } = await supabase.storage
         .from(BUCKET)
-        .upload(storagePath, blob, {
+        .upload(storagePath, arrayBuffer, {
             contentType,
             upsert: false,
         });
@@ -109,7 +127,7 @@ export async function uploadMediaToStorage(
     return {
         storagePath,
         mediaType,
-        fileSizeBytes: asset.fileSize || blob.size,
+        fileSizeBytes: arrayBuffer.byteLength,
     };
 }
 
@@ -158,16 +176,23 @@ export async function uploadAndRecordMedia(
  */
 export async function getSignedUrl(storagePath: string): Promise<string | null> {
     try {
+        console.log('[mediaUpload] Requesting signed URL for:', storagePath);
         const { data, error } = await supabase.storage
             .from(BUCKET)
             .createSignedUrl(storagePath, SIGNED_URL_TTL);
 
         if (error) {
-            console.warn('[mediaUpload] getSignedUrl failed:', storagePath, error.message);
+            console.warn('[mediaUpload] getSignedUrl FAILED:', storagePath, '→', error.message);
             return null;
         }
 
-        return data?.signedUrl ?? null;
+        const url = data?.signedUrl ?? null;
+        if (url) {
+            console.log('[mediaUpload] Signed URL OK for:', storagePath, '→', url.substring(0, 80) + '...');
+        } else {
+            console.warn('[mediaUpload] getSignedUrl returned null data for:', storagePath);
+        }
+        return url;
     } catch (err) {
         console.error('[mediaUpload] getSignedUrl threw:', err);
         return null;
@@ -189,12 +214,13 @@ export async function getMediaSignedUrls(
     const result: Record<string, string> = {};
 
     try {
+        console.log('[mediaUpload] Batch createSignedUrls for', storagePaths.length, 'paths:', storagePaths);
         const { data, error } = await supabase.storage
             .from(BUCKET)
             .createSignedUrls(storagePaths, SIGNED_URL_TTL);
 
         if (error) {
-            console.warn('[mediaUpload] Batch signed URL error, falling back to individual:', error.message);
+            console.warn('[mediaUpload] Batch signed URL error:', error.message, '| Falling back to individual');
             // Fall through to individual fallback below
         } else {
             // Match by array index — response order matches input order.
@@ -272,7 +298,8 @@ function getExtension(filename: string, mimeType?: string | null): string {
     const mimeMap: Record<string, string> = {
         'image/jpeg': 'jpg',
         'image/png': 'png',
-        'image/heic': 'heic',
+        'image/heic': 'jpg',   // HEIC → jpg (RN can't decode remote HEIC reliably)
+        'image/heif': 'jpg',
         'image/webp': 'webp',
         'video/mp4': 'mp4',
         'video/quicktime': 'mov',

@@ -206,9 +206,11 @@ async function listWorkouts(supabase: SupabaseClient, userId: string): Promise<R
 
             if (!signedError && signedData) {
                 for (let i = 0; i < allPaths.length; i++) {
-                    const item = signedData[i];
-                    if (item?.signedUrl) {
-                        signedUrlMap[allPaths[i]] = item.signedUrl;
+                    const item = signedData[i] as any;
+                    // Handle both SDK versions: signedUrl (v2.5+) and signedURL (older)
+                    const url = item?.signedUrl || item?.signedURL || null;
+                    if (url) {
+                        signedUrlMap[allPaths[i]] = url;
                     }
                 }
             } else {

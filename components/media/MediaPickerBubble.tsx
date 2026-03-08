@@ -1,10 +1,11 @@
 /**
  * Horizontal thumbnail row with "+" add button for attaching gym photos/videos.
  * Renders inside SessionReviewModal and history detail.
+ * Tap a thumbnail to view full-screen.
  */
 
 import { useThemeColor } from "@/hooks/use-theme-color";
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -15,6 +16,7 @@ import {
   View,
   useColorScheme,
 } from "react-native";
+import { ImageViewerModal } from "@/components/media/ImageViewerModal";
 
 export type MediaThumb = {
   uri: string;
@@ -47,6 +49,24 @@ export function MediaPickerBubble({
 
   const canAdd = items.length < maxItems && !disabled;
 
+  // Full-screen viewer state
+  const [viewerUri, setViewerUri] = useState("");
+  const [viewerVisible, setViewerVisible] = useState(false);
+
+  // Track which thumbnails failed to load
+  const [failedUris, setFailedUris] = useState<Set<string>>(new Set());
+
+  const handleThumbPress = useCallback((item: MediaThumb) => {
+    // Don't open viewer for uploading, missing URI, or broken images
+    if (item.uploading || !item.uri || item.error || failedUris.has(item.uri)) return;
+    setViewerUri(item.uri);
+    setViewerVisible(true);
+  }, [failedUris]);
+
+  const handleImageError = useCallback((uri: string) => {
+    setFailedUris((prev) => new Set(prev).add(uri));
+  }, []);
+
   return (
     <View style={[styles.container, { backgroundColor: cardBg }]}>
       <View style={styles.header}>
@@ -64,49 +84,62 @@ export function MediaPickerBubble({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {items.map((item, idx) => (
-          <View key={idx} style={styles.thumbWrapper}>
-            <View style={[styles.thumb, { borderColor }]}>
-              {item.uploading ? (
-                <View style={styles.uploadingOverlay}>
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                </View>
-              ) : item.uri ? (
-                <Image
-                  source={{ uri: item.uri }}
-                  style={styles.thumbImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.brokenOverlay}>
-                  <Text style={styles.brokenIcon}>!</Text>
-                </View>
-              )}
-              {item.mediaType === "video" && !item.uploading && (
-                <View style={styles.videoBadge}>
-                  <Text style={styles.videoBadgeText}>▶</Text>
-                </View>
-              )}
-              {item.error && (
-                <View style={styles.errorBadge}>
-                  <Text style={styles.errorBadgeText}>!</Text>
-                </View>
+        {items.map((item, idx) => {
+          const hasFailed = failedUris.has(item.uri);
+          const showImage = !item.uploading && !!item.uri && !hasFailed;
+
+          return (
+            <View key={idx} style={styles.thumbWrapper}>
+              <Pressable
+                onPress={() => handleThumbPress(item)}
+                style={({ pressed }) => [
+                  styles.thumb,
+                  { borderColor },
+                  pressed && !item.uploading && styles.thumbPressed,
+                ]}
+              >
+                {item.uploading ? (
+                  <View style={styles.uploadingOverlay}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  </View>
+                ) : showImage ? (
+                  <Image
+                    source={{ uri: item.uri }}
+                    style={styles.thumbImage}
+                    resizeMode="cover"
+                    onError={() => handleImageError(item.uri)}
+                  />
+                ) : (
+                  <View style={styles.brokenOverlay}>
+                    <Text style={styles.brokenIcon}>!</Text>
+                  </View>
+                )}
+                {item.mediaType === "video" && !item.uploading && (
+                  <View style={styles.videoBadge}>
+                    <Text style={styles.videoBadgeText}>▶</Text>
+                  </View>
+                )}
+                {item.error && (
+                  <View style={styles.errorBadge}>
+                    <Text style={styles.errorBadgeText}>!</Text>
+                  </View>
+                )}
+              </Pressable>
+              {onRemove && !item.uploading && (
+                <Pressable
+                  onPress={() => onRemove(idx)}
+                  style={({ pressed }) => [
+                    styles.removeBtn,
+                    pressed && styles.removeBtnPressed,
+                  ]}
+                  hitSlop={8}
+                >
+                  <Text style={styles.removeBtnText}>✕</Text>
+                </Pressable>
               )}
             </View>
-            {onRemove && !item.uploading && (
-              <Pressable
-                onPress={() => onRemove(idx)}
-                style={({ pressed }) => [
-                  styles.removeBtn,
-                  pressed && styles.removeBtnPressed,
-                ]}
-                hitSlop={8}
-              >
-                <Text style={styles.removeBtnText}>✕</Text>
-              </Pressable>
-            )}
-          </View>
-        ))}
+          );
+        })}
 
         {canAdd && (
           <Pressable
@@ -124,6 +157,13 @@ export function MediaPickerBubble({
           </Pressable>
         )}
       </ScrollView>
+
+      {/* Full-screen image viewer */}
+      <ImageViewerModal
+        visible={viewerVisible}
+        uri={viewerUri}
+        onClose={() => setViewerVisible(false)}
+      />
     </View>
   );
 }
@@ -168,6 +208,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#000",
   },
+  thumbPressed: {
+    opacity: 0.7,
+  },
   thumbImage: {
     width: "100%",
     height: "100%",
@@ -180,7 +223,7 @@ const styles = StyleSheet.create({
   },
   brokenOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(60,60,60,0.8)",
     justifyContent: "center",
     alignItems: "center",
   },
