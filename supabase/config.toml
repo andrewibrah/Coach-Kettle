@@ -53,3 +53,7 @@ file_size_limit = "50MB"
   verify_jwt = false
   [functions.workout-templates]
   verify_jwt = false
+  [functions.entitlements]
+  verify_jwt = false
+  [functions.iap]
+  verify_jwt = false

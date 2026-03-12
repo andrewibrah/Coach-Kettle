@@ -8,6 +8,7 @@ import { HapticTab } from '@/components/ui/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
+import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -16,9 +17,10 @@ export default function TabLayout() {
   const { session, loading } = useAuth();
   const { isCheckingLock, needsTermsAcceptance } = useAuthLock();
   const { profileLoading, needsOnboarding } = useProfile();
+  const { isLoading: entitlementLoading, needsPaywall, needsInitialPaywall } = useEntitlement();
 
-  // Show loading while checking auth state, lock state, or profile state
-  if (loading || isCheckingLock || profileLoading) {
+  // Show loading while checking auth state, lock state, profile state, or entitlement state
+  if (loading || isCheckingLock || profileLoading || entitlementLoading) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <Image
@@ -43,6 +45,11 @@ export default function TabLayout() {
   // Session exists but needs onboarding - redirect to onboarding
   if (needsOnboarding) {
     return <Redirect href={"/onboarding" as any} />;
+  }
+
+  // Needs paywall - trial/sub expired or initial offer not yet dismissed
+  if (needsPaywall || needsInitialPaywall) {
+    return <Redirect href={"/paywall" as any} />;
   }
 
   return (

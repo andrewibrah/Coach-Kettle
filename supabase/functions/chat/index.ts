@@ -96,6 +96,42 @@ serve(async (req) => {
     const userId = data.user.id;
     console.log("[chat] User verified:", userId);
 
+    // --- Entitlement + AI usage gating ---
+    try {
+        const { data: entitlementData } = await supabaseAdmin
+            .rpc("get_entitlement", { p_user_id: userId });
+
+        const row = entitlementData?.[0] ?? entitlementData;
+        const status = row?.entitlement_status;
+        const isPro = status === "sub_active";
+
+        // If not pro, check daily AI usage limit (5/day for free users)
+        if (!isPro) {
+            if (status !== "trial_active") {
+                // Trial expired or no entitlement — hard gate
+                const { data: usageCount } = await supabaseAdmin
+                    .rpc("get_ai_usage", { p_user_id: userId });
+                const count = usageCount ?? 0;
+                if (count >= 5) {
+                    return new Response(
+                        JSON.stringify({
+                            error: "Daily AI message limit reached",
+                            code: "AI_LIMIT_REACHED",
+                            limit: 5,
+                            count,
+                        }),
+                        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+            }
+            // Increment usage counter (trial users also count toward limit for tracking)
+            await supabaseAdmin.rpc("increment_ai_usage", { p_user_id: userId });
+        }
+    } catch (gateError) {
+        // Non-blocking: if entitlement check fails, allow the request through
+        console.warn("[chat] Entitlement check failed (allowing request):", gateError);
+    }
+
     if (req.method !== "POST") {
         return new Response(
             JSON.stringify({ error: "Method not allowed" }),

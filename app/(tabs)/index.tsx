@@ -5,8 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  useWindowDimensions,
-  View
+  useWindowDimensions
 } from "react-native";
 
 import * as Haptics from "expo-haptics";
@@ -53,7 +52,47 @@ export default function HomeScreen() {
 
   const scrollRef = useRef<FlatList<LogRow> | null>(null);
 
+  // ── Post-render scroll system ──────────────────────────────────────────────
+  // Queue a scroll target BEFORE setRows, execute it AFTER React commits the
+  // new rows via useEffect. This guarantees FlatList knows about new items.
+  const pendingScrollRef = useRef<'bottom' | number | null>(null);
+
+  const scrollToBottom = useCallback(() => {
+    pendingScrollRef.current = 'bottom';
+  }, []);
+
+  const scrollToRowIndex = useCallback((index: number, _rowCount?: number) => {
+    pendingScrollRef.current = index;
+  }, []);
+
   const [rows, setRows] = useState<LogRow[]>([]);
+
+  // Execute queued scrolls AFTER React commits the new rows to the FlatList.
+  useEffect(() => {
+    const target = pendingScrollRef.current;
+    if (target === null) return;
+    pendingScrollRef.current = null;
+    // Double-rAF: first frame lets React commit, second frame lets FlatList lay out
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (target === 'bottom') {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        } else {
+          const clampedIndex = Math.max(0, Math.min(target, rows.length - 1));
+          try {
+            scrollRef.current?.scrollToIndex({
+              index: clampedIndex,
+              animated: true,
+              viewPosition: 0.6,
+            });
+          } catch {
+            scrollRef.current?.scrollToEnd({ animated: true });
+          }
+        }
+      });
+    });
+  }, [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [editingCell, setEditingCell] = useState<{ rowId: string; field: EditableField } | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [messageInput, setMessageInput] = useState<string>("");
@@ -386,7 +425,7 @@ export default function HomeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
-    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    scrollToBottom();
   };
 
   const onClearRows = () => {
@@ -424,6 +463,21 @@ export default function HomeScreen() {
     if (editingCell && (editingCell.rowId !== rowId || editingCell.field !== field)) {
       const { nextRows, changed } = applyPendingEdit(rows);
       if (changed) setRows(nextRows);
+    }
+    // Direct scroll (not deferred) — rows aren't changing, just editing focus
+    const rowIndex = rows.findIndex((r) => r.id === rowId);
+    if (rowIndex !== -1) {
+      requestAnimationFrame(() => {
+        try {
+          scrollRef.current?.scrollToIndex({
+            index: rowIndex,
+            animated: true,
+            viewPosition: 0.6,
+          });
+        } catch {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }
+      });
     }
     setEditingCell({ rowId, field });
     setEditValue(value ?? "");
@@ -564,6 +618,7 @@ export default function HomeScreen() {
       next.splice(idx + 1, 0, dupe);
       return resequenceSets(next);
     });
+    scrollToBottom();
   };
 
   const handleReorderRow = useCallback((fromIndex: number, toIndex: number) => {
@@ -753,6 +808,35 @@ export default function HomeScreen() {
     }
   };
 
+  const syncSkeletonFilledRow = useCallback((filledRow: LogRow, weight: string, reps?: string) => {
+    const repsToUse = reps || filledRow.reps;
+
+    api.logSet({
+      exercise: filledRow.exercise,
+      set: filledRow.set,
+      weightLbs: weight,
+      reps: repsToUse,
+      notes: filledRow.notes || "",
+    }).catch(err => console.error("Failed to sync skeleton fill", err));
+
+    // Client-side PR check fallback
+    const skUserId = session?.user?.id;
+    const skW = parseFloat(weight);
+    const skR = parseInt(repsToUse, 10);
+    if (skUserId && !isNaN(skW) && !isNaN(skR) && skW > 0 && skR > 0) {
+      checkForPR(skUserId, filledRow.exercise, skW, skR)
+        .then(result => {
+          if (result && result.isPR) {
+            const dedupKey = `${result.liftName}-${result.weight}-${result.reps}`;
+            if (lastCelebratedRef.current === dedupKey) return;
+            lastCelebratedRef.current = dedupKey;
+            showCelebration(result);
+          }
+        })
+        .catch(err => console.error('[PR] Client-side check failed:', err));
+    }
+  }, [session?.user?.id, showCelebration]);
+
   const sendMessage = async () => {
     const message = messageInput.trim();
     if (!message || loading) return;
@@ -792,37 +876,52 @@ export default function HomeScreen() {
       });
       setMessageInput("");
 
-      // Sync the filled row to backend for PR tracking
       const filledRow = currentRows[targetRowIndex];
       if (filledRow) {
-        api.logSet({
-          exercise: filledRow.exercise,
-          set: filledRow.set,
-          weightLbs: weight,
-          reps: reps || filledRow.reps,
-          notes: filledRow.notes || "",
-        }).catch(err => console.error("Failed to sync skeleton fill", err));
-
-        // Client-side PR check fallback
-        const skUserId = session?.user?.id;
-        const skW = parseFloat(weight);
-        const skR = parseInt(reps || filledRow.reps);
-        if (skUserId && !isNaN(skW) && !isNaN(skR) && skW > 0 && skR > 0) {
-          checkForPR(skUserId, filledRow.exercise, skW, skR)
-            .then(result => {
-              if (result && result.isPR) {
-                const dedupKey = `${result.liftName}-${result.weight}-${result.reps}`;
-                if (lastCelebratedRef.current === dedupKey) return;
-                lastCelebratedRef.current = dedupKey;
-                showCelebration(result);
-              }
-            })
-            .catch(err => console.error('[PR] Client-side check failed:', err));
-        }
+        syncSkeletonFilledRow(filledRow, weight, reps);
       }
 
       if (Platform.OS === "ios") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      const nextVisibleRow = Math.min(targetRowIndex + 1, currentRows.length - 1);
+      scrollToRowIndex(nextVisibleRow, currentRows.length);
+      return;
+    }
+
+    if (gateDecision.kind === "fill_skeleton_batch") {
+      const updates = gateDecision.updates;
+      setRows((prev) => {
+        const next = [...prev];
+        updates.forEach(({ targetRowIndex, weight, reps }) => {
+          if (!next[targetRowIndex]) return;
+          next[targetRowIndex] = {
+            ...next[targetRowIndex],
+            weightLbs: weight,
+            ...(reps ? { reps } : {}),
+          };
+        });
+        return next;
+      });
+      setMessageInput("");
+
+      updates.forEach(({ targetRowIndex, weight, reps }) => {
+        const filledRow = currentRows[targetRowIndex];
+        if (!filledRow) return;
+        syncSkeletonFilledRow(filledRow, weight, reps);
+      });
+
+      if (Platform.OS === "ios") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      const lastUpdatedIndex = updates[updates.length - 1]?.targetRowIndex ?? 0;
+      const nextUnfilledIndex = currentRows.findIndex(
+        (row, idx) => idx > lastUpdatedIndex && row.exercise && !row.weightLbs
+      );
+      if (nextUnfilledIndex !== -1) {
+        scrollToRowIndex(nextUnfilledIndex, currentRows.length);
+      } else {
+        scrollToRowIndex(lastUpdatedIndex, currentRows.length);
       }
       return;
     }
@@ -937,7 +1036,7 @@ export default function HomeScreen() {
         });
       }
 
-      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+      scrollToBottom();
       return;
     }
 
@@ -1001,7 +1100,7 @@ export default function HomeScreen() {
               ? prev.filter((r) => r.id !== ghostId).concat(newRows)
               : prev.concat(newRows)
           );
-          requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+          scrollToBottom();
         } else {
           // Empty response — remove ghost row silently
           if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));

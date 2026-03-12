@@ -97,11 +97,29 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
           text: "Delete",
           style: "destructive",
           onPress: async () => {
+            const previousTemplates = templates;
+            const previousExpandedItems = expandedItems;
+            const previousExpandedId = expandedId;
+
+            setTemplates((prev) => prev.filter((t) => t.id !== template.id));
+            setExpandedItems((prev) => {
+              const next = { ...prev };
+              delete next[template.id];
+              return next;
+            });
+            if (previousExpandedId === template.id) {
+              setExpandedId(null);
+            }
+
             try {
-              await deleteWorkoutTemplate(template.id);
-              setTemplates((prev) => prev.filter((t) => t.id !== template.id));
+              const ok = await deleteWorkoutTemplate(template.id);
+              if (!ok) throw new Error("delete_failed");
             } catch (error) {
               console.error("[RoutineModal] Failed to delete template:", error);
+              setTemplates(previousTemplates);
+              setExpandedItems(previousExpandedItems);
+              setExpandedId(previousExpandedId);
+              Alert.alert("Error", "Failed to delete routine. Please try again.");
             }
           },
         },

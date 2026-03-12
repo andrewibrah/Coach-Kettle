@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useProfile } from '@/contexts/ProfileContext';
+import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -14,6 +15,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 export default function SettingsScreen() {
     const { signOut, session, clearAllCaches } = useAuth();
     const { profile } = useProfile();
+    const { isPro, entitlement } = useEntitlement();
     const { themeMode, setThemeMode, isDark } = useTheme();
     const router = useRouter();
     const backgroundColor = useThemeColor({}, 'background');
@@ -74,6 +76,28 @@ export default function SettingsScreen() {
                             <ThemedText style={styles.emailText}>{session.user.email}</ThemedText>
                         </View>
                     )}
+                </View>
+
+                {/* Subscription Section */}
+                <View style={styles.section}>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Subscription</ThemedText>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/settings/subscription' as any)}
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="crown.fill" size={20} color={isPro ? '#FFD700' : activeColor} />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>
+                                    {isPro ? 'Coach Kettle Pro' : 'Subscription'}
+                                </ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    {isPro ? 'Manage your subscription' : entitlement.status === 'trial_active' ? `Trial: ${entitlement.trialDaysRemaining} days left` : 'Upgrade to Pro'}
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
                 </View>
 
                 {/* Profile Section */}

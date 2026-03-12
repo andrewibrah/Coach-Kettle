@@ -106,6 +106,38 @@ serve(async (req) => {
         );
     }
 
+    // --- Entitlement + AI usage gating ---
+    try {
+        const { data: entitlementData } = await supabaseAdmin
+            .rpc("get_entitlement", { p_user_id: userId });
+
+        const row = entitlementData?.[0] ?? entitlementData;
+        const status = row?.entitlement_status;
+        const isPro = status === "sub_active";
+
+        if (!isPro) {
+            if (status !== "trial_active") {
+                const { data: usageCount } = await supabaseAdmin
+                    .rpc("get_ai_usage", { p_user_id: userId });
+                const count = usageCount ?? 0;
+                if (count >= 5) {
+                    return new Response(
+                        JSON.stringify({
+                            error: "Daily AI message limit reached",
+                            code: "AI_LIMIT_REACHED",
+                            limit: 5,
+                            count,
+                        }),
+                        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+            }
+            await supabaseAdmin.rpc("increment_ai_usage", { p_user_id: userId });
+        }
+    } catch (gateError) {
+        console.warn("[coach] Entitlement check failed (allowing request):", gateError);
+    }
+
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiApiKey) {
         return new Response(

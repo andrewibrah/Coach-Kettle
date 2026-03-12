@@ -4,12 +4,15 @@ import 'react-native-reanimated';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { initConnection, endConnection } from 'react-native-iap';
 
 import { AuthLockProvider } from '@/components/AuthLockProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { Colors } from '@/constants/theme';
+import { EntitlementProvider } from '@/contexts/EntitlementContext';
 import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { PRCelebrationProvider } from '@/contexts/PRCelebrationContext';
 import { ProfileProvider } from '@/contexts/ProfileContext';
@@ -24,15 +27,17 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <ProfileProvider>
-          <OnboardingProvider>
-            <PRCelebrationProvider>
-              <AuthLockProvider>
+          <EntitlementProvider>
+            <OnboardingProvider>
+              <PRCelebrationProvider>
+                <AuthLockProvider>
               <GestureHandlerRootView style={{ flex: 1 }}>
                 <RootLayoutNav />
               </GestureHandlerRootView>
-            </AuthLockProvider>
-            </PRCelebrationProvider>
-          </OnboardingProvider>
+              </AuthLockProvider>
+              </PRCelebrationProvider>
+            </OnboardingProvider>
+          </EntitlementProvider>
         </ProfileProvider>
       </AuthProvider>
     </ThemeProvider>
@@ -41,6 +46,12 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    initConnection().catch((err) => console.warn('[IAP] init failed:', err));
+    return () => { endConnection(); };
+  }, []);
+
   return (
     <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
@@ -51,6 +62,7 @@ function RootLayoutNav() {
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="history/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="paywall" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="terms-of-service" options={{
           headerShown: true,
           title: 'Terms of Service',

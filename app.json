@@ -58,7 +58,8 @@
           "photosPermission": "Coach Kettle needs access to your photo library to attach gym photos and videos to workouts.",
           "cameraPermission": "Coach Kettle needs camera access to take gym photos for your workouts."
         }
-      ]
+      ],
+      "react-native-iap"
     ],
     "experiments": {
       "typedRoutes": true,

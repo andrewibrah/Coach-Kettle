@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     StyleSheet,
     View,
@@ -7,6 +7,9 @@ import {
     Alert,
     TextInput,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    findNodeHandle,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -70,6 +73,41 @@ export default function TemplatesScreen() {
     const [editReps, setEditReps] = useState('');
     const [editWeight, setEditWeight] = useState('');
 
+    const scrollViewRef = useRef<ScrollView | null>(null);
+    const templateDescriptionInputRef = useRef<TextInput | null>(null);
+    const addExerciseNameInputRef = useRef<TextInput | null>(null);
+    const addExerciseSetsInputRef = useRef<TextInput | null>(null);
+    const addExerciseRepsInputRef = useRef<TextInput | null>(null);
+    const addExerciseWeightInputRef = useRef<TextInput | null>(null);
+    const editSetsInputRef = useRef<TextInput | null>(null);
+    const editRepsInputRef = useRef<TextInput | null>(null);
+    const editWeightInputRef = useRef<TextInput | null>(null);
+
+    // Ref to the currently active form View — used to measure its position
+    // relative to the ScrollView and scroll to it on keyboard focus.
+    const activeFormRef = useRef<View | null>(null);
+
+    const ensureInputVisible = useCallback(() => {
+        requestAnimationFrame(() => {
+            const formNode = activeFormRef.current;
+            const svNode = scrollViewRef.current;
+            if (formNode && svNode) {
+                const svHandle = findNodeHandle(svNode);
+                if (svHandle) {
+                    formNode.measureLayout(
+                        svHandle,
+                        (_x: number, y: number) => {
+                            svNode.scrollTo({ y: Math.max(0, y - 100), animated: true });
+                        },
+                        () => svNode.scrollToEnd({ animated: true })
+                    );
+                    return;
+                }
+            }
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+        });
+    }, []);
+
     const loadTemplates = useCallback(async () => {
         if (!session?.user?.id) return;
 
@@ -114,21 +152,44 @@ export default function TemplatesScreen() {
     const handleCreateTemplate = async () => {
         if (!session?.user?.id || !newName.trim()) return;
 
+        const name = newName.trim();
+        const description = newDescription.trim() || null;
+
+        // Optimistic: show template instantly
+        const tempId = `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        const optimisticTemplate: WorkoutTemplate = {
+            id: tempId,
+            user_id: session.user.id,
+            name,
+            description,
+            display_order: templates.length + 1,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
+        setTemplates((prev) => [...prev, optimisticTemplate]);
+        setNewName('');
+        setNewDescription('');
+        setShowNewForm(false);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
         try {
             const template = await createWorkoutTemplate(
                 session.user.id,
-                newName.trim(),
-                newDescription.trim() || undefined
+                name,
+                description ?? undefined
             );
             if (template) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setTemplates((prev) => [...prev, template]);
-                setNewName('');
-                setNewDescription('');
-                setShowNewForm(false);
+                setTemplates((prev) =>
+                    prev.map((t) => (t.id === tempId ? template : t))
+                );
+            } else {
+                throw new Error('create_failed');
             }
         } catch (error) {
             console.error('[Templates] Error creating:', error);
+            setTemplates((prev) => prev.filter((t) => t.id !== tempId));
             Alert.alert('Error', 'Failed to create template');
         }
     };
@@ -143,12 +204,30 @@ export default function TemplatesScreen() {
                     text: 'Delete',
                     style: 'destructive',
                     onPress: async () => {
+                        const previousTemplates = templates;
+                        const previousExpandedItems = expandedItems;
+                        const previousExpandedId = expandedId;
+
+                        setTemplates((prev) => prev.filter((t) => t.id !== template.id));
+                        setExpandedItems((prev) => {
+                            const next = { ...prev };
+                            delete next[template.id];
+                            return next;
+                        });
+                        if (expandedId === template.id) {
+                            setExpandedId(null);
+                        }
+
                         try {
-                            await deleteWorkoutTemplate(template.id);
+                            const ok = await deleteWorkoutTemplate(template.id);
+                            if (!ok) throw new Error('delete_failed');
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            setTemplates((prev) => prev.filter((t) => t.id !== template.id));
                         } catch (error) {
                             console.error('[Templates] Error deleting:', error);
+                            setTemplates(previousTemplates);
+                            setExpandedItems(previousExpandedItems);
+                            setExpandedId(previousExpandedId);
+                            Alert.alert('Error', 'Failed to delete template');
                         }
                     },
                 },
@@ -159,28 +238,78 @@ export default function TemplatesScreen() {
     const handleAddExercise = async () => {
         if (!session?.user?.id || !addingToTemplateId || !newExerciseName.trim()) return;
 
+        const templateId = addingToTemplateId;
+        const name = newExerciseName.trim();
+        const parsedSets = newExerciseSets ? parseInt(newExerciseSets, 10) : NaN;
+        const parsedReps = newExerciseReps ? parseInt(newExerciseReps, 10) : NaN;
+        const parsedWeight = newExerciseWeight ? parseFloat(newExerciseWeight) : NaN;
+        const sets = Number.isFinite(parsedSets) ? parsedSets : null;
+        const reps = Number.isFinite(parsedReps) ? parsedReps : null;
+        const weight = Number.isFinite(parsedWeight) ? parsedWeight : null;
+        const formSnapshot = {
+            name: newExerciseName,
+            sets: newExerciseSets,
+            reps: newExerciseReps,
+            weight: newExerciseWeight,
+        };
+
+        const tempId = `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        const optimisticItem: WorkoutTemplateItem = {
+            id: tempId,
+            template_id: templateId,
+            user_id: session.user.id,
+            lift_name: name,
+            target_sets: sets,
+            target_reps: reps,
+            target_weight: weight,
+            display_order: (expandedItems[templateId]?.length || 0) + 1,
+            notes: null,
+            created_at: new Date().toISOString(),
+        };
+
+        setExpandedItems((prev) => ({
+            ...prev,
+            [templateId]: [...(prev[templateId] || []), optimisticItem],
+        }));
+        setNewExerciseName('');
+        setNewExerciseSets('');
+        setNewExerciseReps('');
+        setNewExerciseWeight('');
+        requestAnimationFrame(() => addExerciseNameInputRef.current?.focus());
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
         try {
             const item = await addTemplateItem(
                 session.user.id,
-                addingToTemplateId,
-                newExerciseName.trim(),
-                newExerciseSets ? parseInt(newExerciseSets, 10) : undefined,
-                newExerciseReps ? parseInt(newExerciseReps, 10) : undefined,
-                newExerciseWeight ? parseFloat(newExerciseWeight) : undefined,
+                templateId,
+                name,
+                sets ?? undefined,
+                reps ?? undefined,
+                weight ?? undefined,
                 undefined,
-                (expandedItems[addingToTemplateId]?.length || 0) + 1
+                optimisticItem.display_order
             );
 
             if (item) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setExpandedItems((prev) => ({
                     ...prev,
-                    [addingToTemplateId]: [...(prev[addingToTemplateId] || []), item],
+                    [templateId]: (prev[templateId] || []).map((existing) =>
+                        existing.id === tempId ? item : existing
+                    ),
                 }));
-                resetExerciseForm();
+                return;
             }
+            throw new Error('add_item_failed');
         } catch (error) {
             console.error('[Templates] Error adding exercise:', error);
+            setExpandedItems((prev) => ({
+                ...prev,
+                [templateId]: (prev[templateId] || []).filter((existing) => existing.id !== tempId),
+            }));
+            setNewExerciseName(formSnapshot.name);
+            setNewExerciseSets(formSnapshot.sets);
+            setNewExerciseReps(formSnapshot.reps);
+            setNewExerciseWeight(formSnapshot.weight);
             Alert.alert('Error', 'Failed to add exercise');
         }
     };
@@ -195,16 +324,25 @@ export default function TemplatesScreen() {
                     text: 'Delete',
                     style: 'destructive',
                     onPress: async () => {
+                        const previousTemplateItems = expandedItems[templateId] || [];
+
+                        setExpandedItems((prev) => ({
+                            ...prev,
+                            [templateId]: previousTemplateItems.filter((i) => i.id !== itemId),
+                        }));
+                        if (editingItemId === itemId) setEditingItemId(null);
+
                         try {
-                            await removeTemplateItem(itemId);
+                            const ok = await removeTemplateItem(itemId);
+                            if (!ok) throw new Error('remove_item_failed');
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            setExpandedItems((prev) => ({
-                                ...prev,
-                                [templateId]: prev[templateId].filter((i) => i.id !== itemId),
-                            }));
-                            if (editingItemId === itemId) setEditingItemId(null);
                         } catch (error) {
                             console.error('[Templates] Error removing exercise:', error);
+                            setExpandedItems((prev) => ({
+                                ...prev,
+                                [templateId]: previousTemplateItems,
+                            }));
+                            Alert.alert('Error', 'Failed to remove exercise');
                         }
                     },
                 },
@@ -222,13 +360,16 @@ export default function TemplatesScreen() {
 
     const handleSaveEdit = async (itemId: string, templateId: string) => {
         if (!editName.trim()) return;
+        const parsedSets = editSets ? parseInt(editSets, 10) : NaN;
+        const parsedReps = editReps ? parseInt(editReps, 10) : NaN;
+        const parsedWeight = editWeight ? parseFloat(editWeight) : NaN;
 
         try {
             const updated = await updateTemplateItem(itemId, {
                 lift_name: editName.trim(),
-                target_sets: editSets ? parseInt(editSets, 10) : null,
-                target_reps: editReps ? parseInt(editReps, 10) : null,
-                target_weight: editWeight ? parseFloat(editWeight) : null,
+                target_sets: Number.isFinite(parsedSets) ? parsedSets : null,
+                target_reps: Number.isFinite(parsedReps) ? parsedReps : null,
+                target_weight: Number.isFinite(parsedWeight) ? parsedWeight : null,
             });
 
             if (updated) {
@@ -285,6 +426,7 @@ export default function TemplatesScreen() {
         setNewExerciseSets('');
         setNewExerciseReps('');
         setNewExerciseWeight('');
+        activeFormRef.current = null;
     };
 
     // Get exercise count for a template (from API response or expanded items)
@@ -325,7 +467,17 @@ export default function TemplatesScreen() {
                 }
             />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <KeyboardAvoidingView
+                style={styles.flex}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 92 : 0}
+            >
+                <ScrollView
+                    ref={scrollViewRef}
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                >
                 {/* New Template Form */}
                 {showNewForm && (
                     <Animated.View
@@ -341,13 +493,25 @@ export default function TemplatesScreen() {
                             placeholder="Template name (e.g., Push Day)"
                             placeholderTextColor={isDark ? '#666' : '#999'}
                             autoFocus
+                            returnKeyType="next"
+                            blurOnSubmit={false}
+                            onFocus={ensureInputVisible}
+                            onSubmitEditing={() => templateDescriptionInputRef.current?.focus()}
                         />
                         <TextInput
+                            ref={templateDescriptionInputRef}
                             style={[styles.input, { color: textColor, backgroundColor: inputBg }]}
                             value={newDescription}
                             onChangeText={setNewDescription}
                             placeholder="Description (optional)"
                             placeholderTextColor={isDark ? '#666' : '#999'}
+                            returnKeyType="done"
+                            onFocus={ensureInputVisible}
+                            onSubmitEditing={() => {
+                                if (newName.trim()) {
+                                    handleCreateTemplate();
+                                }
+                            }}
                         />
                         <View style={styles.formButtons}>
                             <Pressable
@@ -451,7 +615,10 @@ export default function TemplatesScreen() {
                                                             <View key={item.id} style={styles.exerciseRow}>
                                                                 {editingItemId === item.id ? (
                                                                     // Edit mode
-                                                                    <View style={styles.editForm}>
+                                                                    <View
+                                                                        ref={activeFormRef}
+                                                                        style={styles.editForm}
+                                                                    >
                                                                         <TextInput
                                                                             style={[styles.exerciseInput, { color: textColor, backgroundColor: inputBg }]}
                                                                             value={editName}
@@ -459,31 +626,49 @@ export default function TemplatesScreen() {
                                                                             placeholder="Exercise name"
                                                                             placeholderTextColor={isDark ? '#666' : '#999'}
                                                                             autoFocus
+                                                                            returnKeyType="next"
+                                                                            blurOnSubmit={false}
+                                                                            onFocus={ensureInputVisible}
+                                                                            onSubmitEditing={() => editSetsInputRef.current?.focus()}
                                                                         />
                                                                         <View style={styles.exerciseInputRow}>
                                                                             <TextInput
+                                                                                ref={editSetsInputRef}
                                                                                 style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
                                                                                 value={editSets}
                                                                                 onChangeText={setEditSets}
                                                                                 placeholder="Sets"
                                                                                 placeholderTextColor={isDark ? '#666' : '#999'}
                                                                                 keyboardType="numeric"
+                                                                                returnKeyType="next"
+                                                                                blurOnSubmit={false}
+                                                                                onFocus={ensureInputVisible}
+                                                                                onSubmitEditing={() => editRepsInputRef.current?.focus()}
                                                                             />
                                                                             <TextInput
+                                                                                ref={editRepsInputRef}
                                                                                 style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
                                                                                 value={editReps}
                                                                                 onChangeText={setEditReps}
                                                                                 placeholder="Reps"
                                                                                 placeholderTextColor={isDark ? '#666' : '#999'}
                                                                                 keyboardType="numeric"
+                                                                                returnKeyType="next"
+                                                                                blurOnSubmit={false}
+                                                                                onFocus={ensureInputVisible}
+                                                                                onSubmitEditing={() => editWeightInputRef.current?.focus()}
                                                                             />
                                                                             <TextInput
+                                                                                ref={editWeightInputRef}
                                                                                 style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
                                                                                 value={editWeight}
                                                                                 onChangeText={setEditWeight}
                                                                                 placeholder="Weight"
                                                                                 placeholderTextColor={isDark ? '#666' : '#999'}
                                                                                 keyboardType="decimal-pad"
+                                                                                returnKeyType="done"
+                                                                                onFocus={ensureInputVisible}
+                                                                                onSubmitEditing={() => handleSaveEdit(item.id, template.id)}
                                                                             />
                                                                         </View>
                                                                         <View style={styles.editActions}>
@@ -577,39 +762,65 @@ export default function TemplatesScreen() {
 
                                                     {/* Add Exercise Form */}
                                                     {addingToTemplateId === template.id ? (
-                                                        <View style={styles.addExerciseForm}>
+                                                        <View
+                                                            ref={activeFormRef}
+                                                            style={styles.addExerciseForm}
+                                                        >
                                                             <TextInput
+                                                                ref={addExerciseNameInputRef}
                                                                 style={[styles.exerciseInput, { color: textColor, backgroundColor: inputBg }]}
                                                                 value={newExerciseName}
                                                                 onChangeText={setNewExerciseName}
                                                                 placeholder="Exercise name"
                                                                 placeholderTextColor={isDark ? '#666' : '#999'}
                                                                 autoFocus
+                                                                returnKeyType="next"
+                                                                blurOnSubmit={false}
+                                                                onFocus={ensureInputVisible}
+                                                                onSubmitEditing={() => addExerciseSetsInputRef.current?.focus()}
                                                             />
                                                             <View style={styles.exerciseInputRow}>
                                                                 <TextInput
+                                                                    ref={addExerciseSetsInputRef}
                                                                     style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
                                                                     value={newExerciseSets}
                                                                     onChangeText={setNewExerciseSets}
                                                                     placeholder="Sets"
                                                                     placeholderTextColor={isDark ? '#666' : '#999'}
                                                                     keyboardType="numeric"
+                                                                    returnKeyType="next"
+                                                                    blurOnSubmit={false}
+                                                                    onFocus={ensureInputVisible}
+                                                                    onSubmitEditing={() => addExerciseRepsInputRef.current?.focus()}
                                                                 />
                                                                 <TextInput
+                                                                    ref={addExerciseRepsInputRef}
                                                                     style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
                                                                     value={newExerciseReps}
                                                                     onChangeText={setNewExerciseReps}
                                                                     placeholder="Reps"
                                                                     placeholderTextColor={isDark ? '#666' : '#999'}
                                                                     keyboardType="numeric"
+                                                                    returnKeyType="next"
+                                                                    blurOnSubmit={false}
+                                                                    onFocus={ensureInputVisible}
+                                                                    onSubmitEditing={() => addExerciseWeightInputRef.current?.focus()}
                                                                 />
                                                                 <TextInput
+                                                                    ref={addExerciseWeightInputRef}
                                                                     style={[styles.smallInput, { color: textColor, backgroundColor: inputBg }]}
                                                                     value={newExerciseWeight}
                                                                     onChangeText={setNewExerciseWeight}
                                                                     placeholder="Weight"
                                                                     placeholderTextColor={isDark ? '#666' : '#999'}
                                                                     keyboardType="decimal-pad"
+                                                                    returnKeyType="done"
+                                                                    onFocus={ensureInputVisible}
+                                                                    onSubmitEditing={() => {
+                                                                        if (newExerciseName.trim()) {
+                                                                            handleAddExercise();
+                                                                        }
+                                                                    }}
                                                                 />
                                                             </View>
                                                             <View style={styles.formButtons}>
@@ -632,7 +843,10 @@ export default function TemplatesScreen() {
                                                     ) : (
                                                         <Pressable
                                                             style={[styles.addExerciseButton, { borderColor: activeColor }]}
-                                                            onPress={() => setAddingToTemplateId(template.id)}
+                                                            onPress={() => {
+                                                                setAddingToTemplateId(template.id);
+                                                                requestAnimationFrame(() => addExerciseNameInputRef.current?.focus());
+                                                            }}
                                                         >
                                                             <IconSymbol name="plus" size={16} color={activeColor} />
                                                             <ThemedText style={[styles.addExerciseText, { color: activeColor }]}>
@@ -655,13 +869,17 @@ export default function TemplatesScreen() {
                         Tip: Your templates can be loaded from the main workout screen to quickly start a routine.
                     </ThemedText>
                 </View>
-            </ScrollView>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </ThemedView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
+    },
+    flex: {
         flex: 1,
     },
     loadingContainer: {

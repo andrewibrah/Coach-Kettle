@@ -28,6 +28,12 @@ export type GateDecisionReason =
 
 type FastPattern = "single" | "multi" | "dropset" | "superset" | "cardio" | "warmup";
 
+type SkeletonFillUpdate = {
+  weight: string;
+  reps?: string;
+  targetRowIndex: number;
+};
+
 export type GateDecision =
   | {
     kind: "fast";
@@ -43,6 +49,11 @@ export type GateDecision =
     weight: string;
     reps?: string;
     targetRowIndex: number;
+  }
+  | {
+    kind: "fill_skeleton_batch";
+    reason: "fill_skeleton_row";
+    updates: SkeletonFillUpdate[];
   };
 
 export interface SkeletonRow {
@@ -142,6 +153,23 @@ const buildFastDecision = (rows: ParsedRow[], pattern?: FastPattern): GateDecisi
   rows,
   meta: pattern ? { pattern } : undefined,
 });
+
+const parseCommaSeparatedSkeletonWeights = (message: string): string[] => {
+  if (!message.includes(",")) return [];
+  const tokens = message
+    .split(/\s*,\s*/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  if (tokens.length < 2) return [];
+
+  const weights: string[] = [];
+  for (const token of tokens) {
+    const match = token.match(/^(\d+(?:\.\d+)?)(?:\s*(kg|kgs?|lb|lbs?|plates?|plate))?$/i);
+    if (!match) return [];
+    weights.push(normalizeWeightToLbs(match[1], match[2]));
+  }
+  return weights.filter(Boolean);
+};
 
 // ─── Pair parsing ─────────────────────────────────────────────────────────────
 
@@ -249,11 +277,30 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
 
   // ─── Skeleton fill (routine-aware) ─────────────────────────────────────────
   if (context.currentRows && context.currentRows.length > 0) {
-    const nextEmptyIdx = context.currentRows.findIndex(
-      (row) => row.exercise && !row.weightLbs
-    );
+    const emptyRowIndices = context.currentRows
+      .map((row, index) => (row.exercise && !row.weightLbs ? index : -1))
+      .filter((index) => index !== -1);
+
+    const nextEmptyIdx = emptyRowIndices[0] ?? -1;
 
     if (nextEmptyIdx !== -1) {
+      const commaSeparatedWeights = parseCommaSeparatedSkeletonWeights(trimmed);
+      if (commaSeparatedWeights.length > 1) {
+        const updates: SkeletonFillUpdate[] = commaSeparatedWeights
+          .slice(0, emptyRowIndices.length)
+          .map((weight, idx) => ({
+            weight,
+            targetRowIndex: emptyRowIndices[idx],
+          }));
+        if (updates.length > 0) {
+          return {
+            kind: "fill_skeleton_batch",
+            reason: "fill_skeleton_row",
+            updates,
+          };
+        }
+      }
+
       const weightOnlyMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:lbs?|kg)?$/i);
       if (weightOnlyMatch) {
         return {
@@ -515,6 +562,7 @@ type DevTestCase = {
   context?: GateContext;
   expectKind: GateDecision["kind"];
   expectRowCount?: number;
+  expectBatchCount?: number;
   expectPattern?: string;
   expectExercise?: string;
   expectWeight?: string;
@@ -570,6 +618,17 @@ function runDevStructuredGateTests() {
       message: "150 8",
       context: { currentRows: [{ id: "1", exercise: "Bench Press", weightLbs: "", reps: "10" }] },
       expectKind: "fill_skeleton",
+    },
+    {
+      message: "100, 120",
+      context: {
+        currentRows: [
+          { id: "1", exercise: "Bench Press", weightLbs: "", reps: "8" },
+          { id: "2", exercise: "Bench Press", weightLbs: "", reps: "8" },
+        ],
+      },
+      expectKind: "fill_skeleton_batch",
+      expectBatchCount: 2,
     },
     // Explicit exercise with skeleton context → fast (not skeleton fill)
     {
@@ -674,13 +733,16 @@ function runDevStructuredGateTests() {
         failures.push(`"${test.message}" pattern: expected "${test.expectPattern}" got "${res.meta?.pattern}"`);
       }
     }
+    if (res.kind === "fill_skeleton_batch" && test.expectBatchCount !== undefined) {
+      if (res.updates.length !== test.expectBatchCount) {
+        failures.push(`"${test.message}" batch count: expected ${test.expectBatchCount}, got ${res.updates.length}`);
+      }
+    }
   }
 
   if (failures.length) {
-    // eslint-disable-next-line no-console
     console.warn("[structuredGate] tests FAILED:", failures);
   } else {
-    // eslint-disable-next-line no-console
     console.log("[structuredGate] all tests passed ✓");
   }
 }

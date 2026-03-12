@@ -80,14 +80,18 @@ export default function HistoryScreen() {
 
   const handleDelete = async () => {
     if (!selectedId) return;
+    const deleteId = selectedId;
+    const previousItems = items;
+
+    setDeleteModalVisible(false);
+    setSelectedId(null);
+    setItems((prev) => prev.filter((item) => item.id !== deleteId));
+
     try {
-      await api.deleteWorkout(selectedId);
-      await load();
+      await api.deleteWorkout(deleteId);
     } catch {
+      setItems(previousItems);
       Alert.alert("Error", "Failed to delete workout. Please try again.");
-    } finally {
-      setDeleteModalVisible(false);
-      setSelectedId(null);
     }
   };
 

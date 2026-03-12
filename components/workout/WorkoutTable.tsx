@@ -186,6 +186,14 @@ export function WorkoutTable({
     [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle]
   );
 
+  const handleScrollToIndexFailed = useCallback(
+    (info: { index: number; averageItemLength: number }) => {
+      const fallbackOffset = Math.max(0, info.index * info.averageItemLength);
+      scrollRef.current?.scrollToOffset({ offset: fallbackOffset, animated: true });
+    },
+    [scrollRef]
+  );
+
   return (
     <ThemedView style={styles.tableWrap}>
       <FlatList
@@ -201,6 +209,7 @@ export function WorkoutTable({
         style={styles.tableBody}
         contentContainerStyle={styles.tableBodyContent}
         keyboardShouldPersistTaps="handled"
+        onScrollToIndexFailed={handleScrollToIndexFailed}
       />
     </ThemedView>
   );

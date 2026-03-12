@@ -1,0 +1,377 @@
+import { useAuth } from '@/components/AuthProvider';
+import { ThemedText } from '@/components/ui/themed-text';
+import { SUBSCRIPTION } from '@/constants/subscription';
+import { Colors } from '@/constants/theme';
+import { useEntitlement } from '@/contexts/EntitlementContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useIAP } from '@/lib/iap';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+
+type Plan = 'monthly' | 'annual';
+
+const FEATURES = [
+  { icon: '💬', label: 'Unlimited AI Coach Messages' },
+  { icon: '📊', label: 'Advanced Workout Analytics' },
+  { icon: '📋', label: 'Unlimited Custom Templates' },
+  { icon: '✨', label: 'Ad-Free Experience' },
+];
+
+export default function PaywallScreen() {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const router = useRouter();
+  const { needsPaywall, needsInitialPaywall, dismissPaywall, refreshEntitlement } = useEntitlement();
+  const { signOut } = useAuth();
+  const { products, purchase, restore, isProcessing, error: iapError } = useIAP({
+    onPurchaseSuccess: refreshEntitlement,
+  });
+  const [selectedPlan, setSelectedPlan] = useState<Plan>('annual');
+  const [isDismissing, setIsDismissing] = useState(false);
+
+  const monthlyProduct = products.find(p => p.productId === SUBSCRIPTION.PRODUCT_ID_MONTHLY);
+  const annualProduct = products.find(p => p.productId === SUBSCRIPTION.PRODUCT_ID_ANNUAL);
+  const monthlyPrice = monthlyProduct?.localizedPrice ?? SUBSCRIPTION.PRICE_MONTHLY;
+  const annualPrice = annualProduct?.localizedPrice ?? SUBSCRIPTION.PRICE_ANNUAL;
+
+  const isExpiredMode = needsPaywall;
+  const isInitialMode = needsInitialPaywall;
+
+  useEffect(() => {
+    if (iapError) {
+      Alert.alert('Purchase Error', iapError);
+    }
+  }, [iapError]);
+
+  const handleSubscribe = async () => {
+    const productId = selectedPlan === 'monthly'
+      ? SUBSCRIPTION.PRODUCT_ID_MONTHLY
+      : SUBSCRIPTION.PRODUCT_ID_ANNUAL;
+    await purchase(productId);
+  };
+
+  const handleSkip = async () => {
+    setIsDismissing(true);
+    try {
+      await dismissPaywall();
+    } catch (error) {
+      console.error('[Paywall] Error dismissing paywall:', error);
+    } finally {
+      setIsDismissing(false);
+      // Always navigate away — even if dismiss API fails, don't trap the user
+      router.replace('/(tabs)' as any);
+    }
+  };
+
+  const handleClose = () => {
+    // X button — same behavior as skip: dismiss paywall and navigate to tabs
+    handleSkip();
+  };
+
+  const handleRestore = async () => {
+    await restore();
+    // refreshEntitlement is called automatically by the IAP listener
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('[Paywall] Error signing out:', error);
+    }
+  };
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* X close button — always visible so user is never trapped */}
+      <Pressable
+        style={({ pressed }) => [styles.closeButton, pressed && styles.buttonPressed]}
+        onPress={handleClose}
+        hitSlop={12}
+      >
+        <Ionicons name="close" size={26} color={colors.placeholder} />
+      </Pressable>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('@/assets/images/kettlebell-logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Title */}
+        <ThemedText style={styles.title}>Coach Kettle Pro</ThemedText>
+
+        {/* Subtitle */}
+        <ThemedText style={[styles.subtitle, { color: colors.placeholder }]}>
+          {isExpiredMode
+            ? 'Your trial has ended'
+            : 'Start your fitness journey with full access'}
+        </ThemedText>
+
+        {/* Features */}
+        <View style={styles.featuresContainer}>
+          {FEATURES.map((feature) => (
+            <View
+              key={feature.label}
+              style={[styles.featureRow, { backgroundColor: colors.cardBackground }]}
+            >
+              <ThemedText style={styles.featureIcon}>{feature.icon}</ThemedText>
+              <ThemedText style={styles.featureLabel}>{feature.label}</ThemedText>
+            </View>
+          ))}
+        </View>
+
+        {/* Pricing Cards */}
+        <View style={styles.pricingContainer}>
+          {/* Monthly */}
+          <Pressable
+            style={[
+              styles.pricingCard,
+              {
+                backgroundColor: colors.cardBackground,
+                borderColor: selectedPlan === 'monthly' ? colors.tint : colors.border,
+                borderWidth: selectedPlan === 'monthly' ? 2 : 1,
+              },
+            ]}
+            onPress={() => setSelectedPlan('monthly')}
+          >
+            <ThemedText style={styles.planName}>Monthly</ThemedText>
+            <ThemedText style={[styles.planPrice, { color: colors.text }]}>{monthlyPrice}</ThemedText>
+            <ThemedText style={[styles.planPeriod, { color: colors.placeholder }]}>
+              /month
+            </ThemedText>
+          </Pressable>
+
+          {/* Annual */}
+          <Pressable
+            style={[
+              styles.pricingCard,
+              {
+                backgroundColor: colors.cardBackground,
+                borderColor: selectedPlan === 'annual' ? colors.tint : colors.border,
+                borderWidth: selectedPlan === 'annual' ? 2 : 1,
+              },
+            ]}
+            onPress={() => setSelectedPlan('annual')}
+          >
+            <View style={[styles.saveBadge, { backgroundColor: colors.tint }]}>
+              <ThemedText style={styles.saveBadgeText}>Save 40%</ThemedText>
+            </View>
+            <ThemedText style={styles.planName}>Annual</ThemedText>
+            <ThemedText style={[styles.planPrice, { color: colors.text }]}>{annualPrice}</ThemedText>
+            <ThemedText style={[styles.planPeriod, { color: colors.placeholder }]}>
+              /year
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        {/* Subscribe Button */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.subscribeButton,
+            { backgroundColor: colors.tint, opacity: (pressed || isProcessing) ? 0.85 : 1 },
+          ]}
+          onPress={handleSubscribe}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <ThemedText style={styles.subscribeButtonText}>Subscribe Now</ThemedText>
+          )}
+        </Pressable>
+
+        {/* Skip Button (initial mode only) */}
+        {isInitialMode && (
+          <Pressable
+            style={({ pressed }) => [styles.skipButton, pressed && styles.buttonPressed]}
+            onPress={handleSkip}
+            disabled={isDismissing}
+          >
+            <ThemedText style={[styles.skipButtonText, { color: colors.tint }]}>
+              {isDismissing ? 'Starting trial...' : 'Skip \u2014 Try 1 Week Free'}
+            </ThemedText>
+          </Pressable>
+        )}
+
+        {/* Restore Purchases */}
+        <Pressable
+          style={({ pressed }) => [styles.restoreButton, pressed && styles.buttonPressed]}
+          onPress={handleRestore}
+          disabled={isProcessing}
+        >
+          <ThemedText style={[styles.restoreText, { color: colors.placeholder, opacity: isProcessing ? 0.5 : 1 }]}>
+            Restore Purchases
+          </ThemedText>
+        </Pressable>
+
+        {/* Sign Out (expired mode only) */}
+        {isExpiredMode && (
+          <Pressable
+            style={({ pressed }) => [styles.signOutButton, pressed && styles.buttonPressed]}
+            onPress={handleSignOut}
+          >
+            <ThemedText style={[styles.signOutText, { color: colors.danger }]}>
+              Sign Out
+            </ThemedText>
+          </Pressable>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 58,
+    right: 18,
+    zIndex: 10,
+    padding: 4,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+  logoContainer: {
+    marginTop: 24,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 80,
+    height: 80,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 28,
+  },
+  featuresContainer: {
+    width: '100%',
+    gap: 10,
+    marginBottom: 28,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  featureIcon: {
+    fontSize: 20,
+  },
+  featureLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+  },
+  pricingContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+    marginBottom: 24,
+  },
+  pricingCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  saveBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  saveBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  planName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  planPrice: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  planPeriod: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  subscribeButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  subscribeButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  skipButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  skipButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  restoreButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  restoreText: {
+    fontSize: 14,
+  },
+  signOutButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  signOutText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+});

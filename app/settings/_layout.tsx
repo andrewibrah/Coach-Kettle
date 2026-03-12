@@ -25,6 +25,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="profile" />
       <Stack.Screen name="pr-tracking" />
       <Stack.Screen name="templates" />
+      <Stack.Screen name="subscription" />
     </Stack>
   );
 }

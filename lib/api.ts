@@ -59,7 +59,7 @@ function buildAIContextString(profile: UserProfile | null): string {
         parts.push(`Fitness focus: ${focus.other}`);
     }
 
-    const currentPrs = ctx.current_prs as Array<{ lift: string; best: { weight: number; reps: number; e1rm: number } }> | undefined;
+    const currentPrs = ctx.current_prs as { lift: string; best: { weight: number; reps: number; e1rm: number } }[] | undefined;
     if (currentPrs && currentPrs.length > 0) {
         const prStrings = currentPrs.map((pr) =>
             `${pr.lift}: ${pr.best.weight}lbs x ${pr.best.reps} (E1RM: ${pr.best.e1rm}lbs)`
@@ -257,7 +257,11 @@ JSON shape — respond with exactly this structure:
     },
 
     deleteWorkout: async (id: string) => {
-        await fetchWithAuth(`${API_BASE}/history/${id}`, { method: 'DELETE' });
+        const res = await fetchWithAuth(`${API_BASE}/history/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`Failed to delete workout: ${res.status} - ${body}`);
+        }
     },
 
     logSet: async (row: ApiWorkoutRow) => {
@@ -301,6 +305,116 @@ JSON shape — respond with exactly this structure:
             accepted_at?: string;
             current_terms_version: string;
             current_privacy_version: string;
+        };
+    },
+
+    // Entitlement methods
+    getEntitlement: async () => {
+        const res = await fetchWithAuth(`${API_BASE}/entitlements`, { method: 'GET' });
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`Failed to get entitlement: ${res.status} - ${body}`);
+        }
+        return (await res.json()) as {
+            ok: boolean;
+            data: {
+                status: string | null;
+                source: string | null;
+                expires_at: string | null;
+                trial_days_remaining: number | null;
+                subscription_id: string | null;
+                paywall_dismissed: boolean;
+            };
+        };
+    },
+
+    bootstrapEntitlement: async () => {
+        const res = await fetchWithAuth(`${API_BASE}/entitlements`, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'bootstrap' }),
+        });
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`Failed to bootstrap entitlement: ${res.status} - ${body}`);
+        }
+        return (await res.json()) as {
+            ok: boolean;
+            data: {
+                entitlement_status: string;
+                expires_at: string;
+                is_new_trial: boolean;
+                paywall_dismissed: boolean;
+            };
+        };
+    },
+
+    dismissPaywall: async () => {
+        const res = await fetchWithAuth(`${API_BASE}/entitlements`, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'dismiss_paywall' }),
+        });
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`Failed to dismiss paywall: ${res.status} - ${body}`);
+        }
+        return (await res.json()) as { ok: boolean };
+    },
+
+    checkAiUsage: async () => {
+        const res = await fetchWithAuth(`${API_BASE}/entitlements`, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'check_ai_usage' }),
+        });
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`Failed to check AI usage: ${res.status} - ${body}`);
+        }
+        return (await res.json()) as {
+            ok: boolean;
+            data: {
+                count: number;
+                limit: number;
+                is_pro: boolean;
+                remaining: number;
+            };
+        };
+    },
+
+    verifyReceipt: async (receiptData: string, productId: string) => {
+        const res = await fetchWithAuth(`${API_BASE}/iap`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'verify_receipt', receipt_data: receiptData, product_id: productId }),
+        });
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`Failed to verify receipt: ${res.status} - ${body}`);
+        }
+        return (await res.json()) as {
+            ok: boolean;
+            data: {
+                status: string;
+                expires_at: string;
+            };
+        };
+    },
+
+    restorePurchase: async (receiptData: string) => {
+        const res = await fetchWithAuth(`${API_BASE}/iap`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restore', receipt_data: receiptData }),
+        });
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`Failed to restore purchase: ${res.status} - ${body}`);
+        }
+        return (await res.json()) as {
+            ok: boolean;
+            data: {
+                status: string;
+                expires_at?: string;
+            };
         };
     },
 

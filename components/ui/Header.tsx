@@ -76,15 +76,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     titleContainer: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: -1,
-        pointerEvents: 'none',
+        marginHorizontal: 8,
     },
     title: {
         fontSize: 24,
