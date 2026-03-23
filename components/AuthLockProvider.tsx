@@ -75,8 +75,14 @@ export function AuthLockProvider({ children }: AuthLockProviderProps) {
     const lastAuthAt = await getLastAuthenticatedAt();
     const serverAcceptance = await checkServerTermsAcceptance();
 
+    // Fail-safe: if we can't verify terms acceptance, require it
+    // This prevents bypassing terms by going offline
     if (serverAcceptance) {
       setNeedsTermsAcceptance(serverAcceptance.needsAcceptance);
+    } else {
+      // Server check failed - require acceptance to be safe
+      console.warn('[AuthLockProvider] Terms check failed, requiring acceptance');
+      setNeedsTermsAcceptance(true);
     }
 
     // If never authenticated (new session), set timestamp
