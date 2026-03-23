@@ -70,10 +70,13 @@ const styles = StyleSheet.create({
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
+        width: 80,
     },
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'flex-end',
+        width: 80,
     },
     titleContainer: {
         flex: 1,

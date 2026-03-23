@@ -30,6 +30,7 @@ WebBrowser.maybeCompleteAuthSession();
 export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -86,6 +87,8 @@ export default function SignUp() {
 
   async function signUpWithEmail() {
     if (!email || !password) return Alert.alert('Error', 'Please enter email and password');
+    if (password !== confirmPassword) return Alert.alert('Error', 'Passwords do not match');
+    if (password.length < 6) return Alert.alert('Error', 'Password must be at least 6 characters');
 
     setLoading(true);
     const { error, data } = await supabase.auth.signUp({
@@ -243,6 +246,18 @@ export default function SignUp() {
                 onChangeText={setPassword}
                 value={password}
                 placeholder="Create a password"
+                placeholderTextColor={placeholderColor}
+                secureTextEntry
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Confirm Password</ThemedText>
+              <TextInput
+                style={[styles.input, { color: textColor, borderColor: inputBorderColor }]}
+                onChangeText={setConfirmPassword}
+                value={confirmPassword}
+                placeholder="Confirm your password"
                 placeholderTextColor={placeholderColor}
                 secureTextEntry
               />
