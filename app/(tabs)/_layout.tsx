@@ -1,7 +1,8 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
+import { AppLogo } from '@/components/AppLogo';
 import { useAuthLock } from '@/components/AuthLockProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { HapticTab } from '@/components/ui/haptic-tab';
@@ -23,11 +24,7 @@ export default function TabLayout() {
   if (loading || isCheckingLock || profileLoading || entitlementLoading) {
     return (
       <ThemedView style={styles.loadingContainer}>
-        <Image
-          source={require('@/assets/images/kettlebell-logo.png')}
-          style={styles.loadingLogo}
-          resizeMode="contain"
-        />
+        <AppLogo size={150} />
       </ThemedView>
     );
   }
@@ -83,9 +80,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  loadingLogo: {
-    width: 150,
-    height: 150,
   },
 });

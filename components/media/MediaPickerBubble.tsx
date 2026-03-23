@@ -4,6 +4,8 @@
  * Tap a thumbnail to view full-screen.
  */
 
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import React, { useCallback, useState } from "react";
 import {
@@ -14,7 +16,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useColorScheme,
 } from "react-native";
 import { ImageViewerModal } from "@/components/media/ImageViewerModal";
 
@@ -43,9 +44,9 @@ export function MediaPickerBubble({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const textColor = useThemeColor({}, "text");
-  const cardBg = isDark ? "#1C1C1E" : "#F3F4F6";
-  const borderColor = isDark ? "#3A3A3C" : "#D1D5DB";
-  const mutedColor = isDark ? "#9CA3AF" : "#6B7280";
+  const cardBg = isDark ? Colors.dark.cardBackground : Colors.light.cardBackground;
+  const borderColor = useThemeColor({}, "border");
+  const mutedColor = useThemeColor({}, "placeholder");
 
   const canAdd = items.length < maxItems && !disabled;
 

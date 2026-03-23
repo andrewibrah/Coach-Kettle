@@ -39,7 +39,7 @@ export function AiResponseBubble({ text, onDismiss }: Props) {
             <View style={[styles.botIcon, { backgroundColor: isDark ? "#6366F1" : "#111827" }]}>
               <IconSymbol name="sparkles" size={16} color="#FFFFFF" />
             </View>
-            <ThemedText style={styles.title}>AI Coach</ThemedText>
+            <ThemedText style={styles.title}>Coach Kettle</ThemedText>
             <View style={{ flex: 1 }} />
             <IconSymbol name="xmark" size={14} color={placeholderColor} />
           </View>

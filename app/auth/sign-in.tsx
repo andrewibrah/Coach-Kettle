@@ -7,7 +7,6 @@ import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -18,6 +17,7 @@ import {
   useColorScheme,
 } from 'react-native';
 
+import { AppLogo } from '@/components/AppLogo';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
@@ -337,11 +337,7 @@ export default function SignIn() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
 
           <View style={styles.header}>
-            <Image
-              source={require('@/assets/images/kettlebell-logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <AppLogo size={120} />
             <ThemedText type="title" style={styles.title}>Welcome Back</ThemedText>
             <ThemedText style={styles.subtitle}>Sign in to continue your progress</ThemedText>
           </View>
@@ -431,10 +427,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 48,
-  },
-  logo: {
-    width: 120,
-    height: 120,
   },
   title: {
     marginTop: 16,

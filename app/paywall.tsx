@@ -1,4 +1,5 @@
 import { useAuth } from '@/components/AuthProvider';
+import { AppLogo } from '@/components/AppLogo';
 import { ThemedText } from '@/components/ui/themed-text';
 import { SUBSCRIPTION } from '@/constants/subscription';
 import { Colors } from '@/constants/theme';
@@ -7,7 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useIAP } from '@/lib/iap';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -107,11 +108,7 @@ export default function PaywallScreen() {
       >
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <Image
-            source={require('@/assets/images/kettlebell-logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <AppLogo size={72} />
         </View>
 
         {/* Title */}
@@ -283,10 +280,6 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
     alignItems: 'center',
-  },
-  logo: {
-    width: 72,
-    height: 72,
   },
   title: {
     fontSize: 26,
