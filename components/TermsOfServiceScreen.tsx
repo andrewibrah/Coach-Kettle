@@ -1,15 +1,19 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuthLock } from '@/components/AuthLockProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
+import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '@/constants/legal';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+type DocType = 'terms' | 'privacy';
 
 export function TermsOfServiceScreen() {
     const colorScheme = useColorScheme() ?? 'light';
@@ -17,14 +21,16 @@ export function TermsOfServiceScreen() {
     const { signOut } = useAuth();
     const router = useRouter();
     const [isAccepting, setIsAccepting] = useState(false);
+    const [activeDoc, setActiveDoc] = useState<DocType>('terms');
     const insets = useSafeAreaInsets();
+    const primaryColor = useThemeColor({}, 'tint');
+    const borderColor = useThemeColor({}, 'border');
 
     const handleAccept = async () => {
         setIsAccepting(true);
         try {
             const success = await acceptTerms();
             if (success) {
-                // Terms accepted - navigate to main app
                 console.log('[TermsOfService] Terms accepted, navigating to app...');
                 router.replace('/(tabs)');
             } else {
@@ -41,7 +47,7 @@ export function TermsOfServiceScreen() {
     const handleDecline = () => {
         Alert.alert(
             'Decline Terms',
-            'You must accept the terms to use the app. Declining will sign you out.',
+            'You must accept the terms to use Coach Kettle. Declining will sign you out.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Decline and Sign Out', style: 'destructive', onPress: signOut },
@@ -49,48 +55,61 @@ export function TermsOfServiceScreen() {
         );
     };
 
+    const content = activeDoc === 'terms' ? TERMS_OF_SERVICE : PRIVACY_POLICY;
+
     return (
-        <ThemedView style={[styles.container, { paddingBottom: insets.bottom }]}>
+        <ThemedView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             <ThemedView style={styles.header}>
+                <ThemedText type="title">Terms & Privacy</ThemedText>
                 <ThemedText style={styles.subtitle}>Please review and accept to continue</ThemedText>
             </ThemedView>
 
-            <ThemedView style={styles.contentContainer}>
+            {/* Tab Switcher */}
+            <View style={[styles.tabContainer, { borderColor }]}>
+                <Pressable
+                    style={[
+                        styles.tab,
+                        activeDoc === 'terms' && { backgroundColor: primaryColor },
+                    ]}
+                    onPress={() => setActiveDoc('terms')}
+                >
+                    <ThemedText style={[
+                        styles.tabText,
+                        activeDoc === 'terms' && styles.tabTextActive,
+                    ]}>
+                        Terms of Service
+                    </ThemedText>
+                </Pressable>
+                <Pressable
+                    style={[
+                        styles.tab,
+                        activeDoc === 'privacy' && { backgroundColor: primaryColor },
+                    ]}
+                    onPress={() => setActiveDoc('privacy')}
+                >
+                    <ThemedText style={[
+                        styles.tabText,
+                        activeDoc === 'privacy' && styles.tabTextActive,
+                    ]}>
+                        Privacy Policy
+                    </ThemedText>
+                </Pressable>
+            </View>
+
+            <ThemedView style={[styles.contentContainer, { borderColor }]}>
                 <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                    <ThemedText type="defaultSemiBold">1. Acceptance of Terms</ThemedText>
-                    <ThemedText style={styles.paragraph}>
-                        By using WorkoutTracker, you agree to be bound by these terms. If you do not agree, please do not use the application.
-                    </ThemedText>
-
-                    <ThemedText type="defaultSemiBold">2. User Conduct</ThemedText>
-                    <ThemedText style={styles.paragraph}>
-                        You agree to use the app for lawful purposes only and in a way that does not infringe the rights of others.
-                    </ThemedText>
-
-                    <ThemedText type="defaultSemiBold">3. Data Privacy</ThemedText>
-                    <ThemedText style={styles.paragraph}>
-                        Your workout data is stored securely in Supabase. We do not sell your personal information to third parties.
-                    </ThemedText>
-
-                    <ThemedText type="defaultSemiBold">4. Liability</ThemedText>
-                    <ThemedText style={styles.paragraph}>
-                        WorkoutTracker is provided &quot;as is&quot;. Use at your own risk. Consult a physician before starting any exercise program.
-                    </ThemedText>
-
-                    <ThemedText type="defaultSemiBold">5. Updates to Terms</ThemedText>
-                    <ThemedText style={styles.paragraph}>
-                        We may update these terms from time to time. Your continued use of the app after such changes constitutes acceptance.
-                    </ThemedText>
-
-                    <ThemedText style={styles.paragraph}>
-                        [Placeholder for actual Terms of Service and Privacy Policy text. In a production app, this would be more comprehensive.]
-                    </ThemedText>
+                    <MarkdownText content={content} />
                 </ScrollView>
             </ThemedView>
 
             <ThemedView style={styles.footer}>
-                <TouchableOpacity
-                    style={[styles.button, styles.acceptButton, { backgroundColor: Colors[colorScheme].tint }]}
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.button,
+                        styles.acceptButton,
+                        { backgroundColor: Colors[colorScheme].tint },
+                        pressed && styles.buttonPressed,
+                    ]}
                     onPress={handleAccept}
                     disabled={isAccepting}
                 >
@@ -99,18 +118,93 @@ export function TermsOfServiceScreen() {
                     ) : (
                         <ThemedText style={styles.buttonText}>Accept and Continue</ThemedText>
                     )}
-                </TouchableOpacity>
+                </Pressable>
 
-                <TouchableOpacity
-                    style={styles.declineButton}
+                <Pressable
+                    style={({ pressed }) => [styles.declineButton, pressed && styles.buttonPressed]}
                     onPress={handleDecline}
                     disabled={isAccepting}
                 >
                     <ThemedText style={styles.declineText}>Decline</ThemedText>
-                </TouchableOpacity>
+                </Pressable>
             </ThemedView>
         </ThemedView>
     );
+}
+
+/**
+ * Simple markdown-like text renderer
+ */
+function MarkdownText({ content }: { content: string }) {
+    const lines = content.split('\n');
+
+    return (
+        <View>
+            {lines.map((line, index) => {
+                const trimmed = line.trim();
+
+                if (!trimmed) {
+                    return <View key={index} style={styles.spacer} />;
+                }
+
+                if (trimmed.startsWith('# ')) {
+                    return (
+                        <ThemedText key={index} style={styles.h1}>
+                            {trimmed.slice(2)}
+                        </ThemedText>
+                    );
+                }
+
+                if (trimmed.startsWith('## ')) {
+                    return (
+                        <ThemedText key={index} style={styles.h2}>
+                            {trimmed.slice(3)}
+                        </ThemedText>
+                    );
+                }
+
+                if (trimmed.startsWith('### ')) {
+                    return (
+                        <ThemedText key={index} style={styles.h3}>
+                            {trimmed.slice(4)}
+                        </ThemedText>
+                    );
+                }
+
+                if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+                    return (
+                        <View key={index} style={styles.bulletContainer}>
+                            <ThemedText style={styles.bullet}>•</ThemedText>
+                            <ThemedText style={styles.bulletText}>
+                                {renderInlineFormatting(trimmed.slice(2))}
+                            </ThemedText>
+                        </View>
+                    );
+                }
+
+                return (
+                    <ThemedText key={index} style={styles.paragraph}>
+                        {renderInlineFormatting(trimmed)}
+                    </ThemedText>
+                );
+            })}
+        </View>
+    );
+}
+
+function renderInlineFormatting(text: string): React.ReactNode {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
+    return parts.map((part, index) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+                <ThemedText key={index} style={styles.bold}>
+                    {part.slice(2, -2)}
+                </ThemedText>
+            );
+        }
+        return part;
+    });
 }
 
 const styles = StyleSheet.create({
@@ -119,7 +213,7 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 24,
-        paddingTop: 12,
+        paddingTop: 16,
         paddingBottom: 16,
     },
     subtitle: {
@@ -127,12 +221,31 @@ const styles = StyleSheet.create({
         opacity: 0.6,
         marginTop: 4,
     },
+    tabContainer: {
+        flexDirection: 'row',
+        marginHorizontal: 16,
+        borderRadius: 10,
+        borderWidth: 1,
+        overflow: 'hidden',
+        marginBottom: 12,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    tabText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    tabTextActive: {
+        color: '#fff',
+    },
     contentContainer: {
         flex: 1,
         marginHorizontal: 16,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(150, 150, 150, 0.2)',
         overflow: 'hidden',
     },
     scrollView: {
@@ -140,12 +253,6 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingBottom: 24,
-    },
-    paragraph: {
-        marginTop: 8,
-        marginBottom: 16,
-        lineHeight: 20,
-        opacity: 0.8,
     },
     footer: {
         padding: 24,
@@ -162,12 +269,14 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
     },
-    acceptButton: {
-    },
+    acceptButton: {},
     buttonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: '600',
+    },
+    buttonPressed: {
+        opacity: 0.7,
     },
     declineButton: {
         height: 48,
@@ -177,5 +286,49 @@ const styles = StyleSheet.create({
     declineText: {
         fontSize: 16,
         opacity: 0.6,
+    },
+    // Markdown styles
+    spacer: {
+        height: 8,
+    },
+    h1: {
+        fontSize: 24,
+        fontWeight: '700',
+        marginTop: 16,
+        marginBottom: 12,
+    },
+    h2: {
+        fontSize: 20,
+        fontWeight: '700',
+        marginTop: 20,
+        marginBottom: 8,
+    },
+    h3: {
+        fontSize: 17,
+        fontWeight: '600',
+        marginTop: 16,
+        marginBottom: 6,
+    },
+    paragraph: {
+        fontSize: 15,
+        lineHeight: 22,
+        marginBottom: 8,
+    },
+    bulletContainer: {
+        flexDirection: 'row',
+        paddingLeft: 8,
+        marginBottom: 6,
+    },
+    bullet: {
+        fontSize: 15,
+        marginRight: 8,
+    },
+    bulletText: {
+        flex: 1,
+        fontSize: 15,
+        lineHeight: 22,
+    },
+    bold: {
+        fontWeight: '700',
     },
 });

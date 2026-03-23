@@ -18,12 +18,11 @@ import {
 } from 'react-native';
 
 import { AppLogo } from '@/components/AppLogo';
-import { TermsConsent } from '@/components/TermsConsent';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { setLastAuthenticatedAt, setTermsAcceptance, syncTermsAcceptanceToServer } from '@/lib/authLock';
+import { setLastAuthenticatedAt } from '@/lib/authLock';
 import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -32,7 +31,6 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const router = useRouter();
 
   const colorScheme = useColorScheme();
@@ -72,8 +70,7 @@ export default function SignUp() {
           );
           if (sessionError) throw sessionError;
 
-          await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
-          syncTermsAcceptanceToServer().catch(console.error);
+          await setLastAuthenticatedAt();
           router.replace('/(tabs)');
         } catch (err: any) {
           Alert.alert('Authentication Error', err.message);
@@ -89,7 +86,6 @@ export default function SignUp() {
 
   async function signUpWithEmail() {
     if (!email || !password) return Alert.alert('Error', 'Please enter email and password');
-    if (!termsAccepted) return Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy to continue');
 
     setLoading(true);
     const { error, data } = await supabase.auth.signUp({
@@ -100,26 +96,16 @@ export default function SignUp() {
     setLoading(false);
     if (error) Alert.alert('Sign Up Failed', error.message);
     else {
-      // Record terms acceptance locally
-      await setTermsAcceptance();
-
       if (!data.session) {
         Alert.alert('Verification Sent', 'Please check your email to confirm your account.');
       } else {
-        // Refresh auth timestamp for TTL tracking and sync terms to server
         await setLastAuthenticatedAt();
-        syncTermsAcceptanceToServer().catch(console.error);
         router.replace('/(tabs)');
       }
     }
   }
 
   async function signUpWithAppleNative() {
-    if (!termsAccepted) {
-      Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy to continue');
-      return;
-    }
-
     setLoading(true);
     try {
       const credential = await AppleAuthentication.signInAsync({
@@ -142,8 +128,7 @@ export default function SignUp() {
 
       if (error) throw error;
 
-      await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
-      syncTermsAcceptanceToServer().catch(console.error);
+      await setLastAuthenticatedAt();
       router.replace('/(tabs)');
     } catch (err: any) {
       if (err.code === 'ERR_REQUEST_CANCELED') {
@@ -158,11 +143,6 @@ export default function SignUp() {
   }
 
   async function signInWithOAuth(provider: 'google') {
-    if (!termsAccepted) {
-      Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy to continue');
-      return;
-    }
-
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -191,8 +171,7 @@ export default function SignUp() {
             );
             if (sessionError) throw sessionError;
 
-            await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
-            syncTermsAcceptanceToServer().catch(console.error);
+            await setLastAuthenticatedAt();
             router.replace('/(tabs)');
             return;
           }
@@ -204,8 +183,7 @@ export default function SignUp() {
             });
             if (sessionError) throw sessionError;
 
-            await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
-            syncTermsAcceptanceToServer().catch(console.error);
+            await setLastAuthenticatedAt();
             router.replace('/(tabs)');
             return;
           }
@@ -219,8 +197,7 @@ export default function SignUp() {
         } else if (result.type === 'dismiss') {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            await Promise.all([setTermsAcceptance(), setLastAuthenticatedAt()]);
-            syncTermsAcceptanceToServer().catch(console.error);
+            await setLastAuthenticatedAt();
             router.replace('/(tabs)');
             return;
           }
@@ -294,12 +271,6 @@ export default function SignUp() {
               <Ionicons name="logo-google" size={24} color={textColor} />
               <ThemedText style={styles.oauthText}>Sign up with Google</ThemedText>
             </TouchableOpacity>
-
-            {/* Terms & Privacy Consent */}
-            <TermsConsent
-              accepted={termsAccepted}
-              onAcceptedChange={setTermsAccepted}
-            />
 
           </View>
 
