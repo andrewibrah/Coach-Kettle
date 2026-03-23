@@ -1,5 +1,6 @@
 import { useAuth } from '@/components/AuthProvider';
 import { AppLogo } from '@/components/AppLogo';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { SUBSCRIPTION } from '@/constants/subscription';
 import { Colors } from '@/constants/theme';
@@ -15,11 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 type Plan = 'monthly' | 'annual';
 
 const FEATURES = [
-  { icon: '💬', label: 'Unlimited AI Coach Messages' },
-  { icon: '📊', label: 'Advanced Workout Analytics' },
-  { icon: '📋', label: 'Unlimited Custom Templates' },
-  { icon: '✨', label: 'Ad-Free Experience' },
-];
+  { icon: 'bubble.left.and.bubble.right.fill', label: 'Unlimited AI Coach Messages' },
+  { icon: 'chart.bar.fill', label: 'Advanced Workout Analytics' },
+  { icon: 'doc.text.fill', label: 'Unlimited Custom Templates' },
+  { icon: 'sparkles', label: 'Ad-Free Experience' },
+] as const;
 
 export default function PaywallScreen() {
   const colorScheme = useColorScheme();
@@ -128,7 +129,7 @@ export default function PaywallScreen() {
               key={feature.label}
               style={[styles.featureRow, { backgroundColor: colors.cardBackground }]}
             >
-              <ThemedText style={styles.featureIcon}>{feature.icon}</ThemedText>
+              <IconSymbol name={feature.icon} size={20} color={colors.tint} />
               <ThemedText style={styles.featureLabel}>{feature.label}</ThemedText>
             </View>
           ))}
@@ -305,9 +306,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     gap: 12,
-  },
-  featureIcon: {
-    fontSize: 20,
   },
   featureLabel: {
     fontSize: 15,
