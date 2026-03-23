@@ -12,15 +12,14 @@ import { Platform } from 'react-native';
 import {
   initConnection,
   endConnection,
-  fetchProducts,
-  requestPurchase,
+  getSubscriptions,
+  requestSubscription,
   getAvailablePurchases,
   finishTransaction,
   purchaseUpdatedListener,
   purchaseErrorListener,
 } from 'react-native-iap';
 import type {
-  Product,
   ProductSubscription,
   Purchase,
   PurchaseError,
@@ -47,7 +46,7 @@ interface UseIAPOptions {
 }
 
 interface UseIAPReturn {
-  products: (Product | ProductSubscription)[];
+  products: ProductSubscription[];
   purchase: (productId: string) => Promise<void>;
   restore: () => Promise<boolean>;
   isProcessing: boolean;
@@ -57,7 +56,7 @@ interface UseIAPReturn {
 export function useIAP(options?: UseIAPOptions): UseIAPReturn {
   const { onPurchaseSuccess } = options ?? {};
 
-  const [products, setProducts] = useState<(Product | ProductSubscription)[]>([]);
+  const [products, setProducts] = useState<ProductSubscription[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,10 +74,7 @@ export function useIAP(options?: UseIAPOptions): UseIAPReturn {
       try {
         await initConnection();
 
-        const result = await fetchProducts({
-          skus: PRODUCT_IDS,
-          type: 'subs',
-        });
+        const result = await getSubscriptions({ skus: PRODUCT_IDS });
 
         if (!cancelled && result) {
           setProducts(result);
@@ -170,19 +166,16 @@ export function useIAP(options?: UseIAPOptions): UseIAPReturn {
 
     try {
       if (Platform.OS === 'ios') {
-        await requestPurchase({
-          request: { apple: { sku: productId } },
-          type: 'subs',
-        });
+        await requestSubscription({ sku: productId });
       } else {
-        await requestPurchase({
-          request: { google: { skus: [productId] } },
-          type: 'subs',
-        });
+        await requestSubscription({
+          sku: productId,
+          ...(Platform.OS === 'android' ? { subscriptionOffers: [{ sku: productId, offerToken: '' }] } : {}),
+        } as any);
       }
       // purchaseUpdatedListener handles the rest.
     } catch (err: any) {
-      console.error('[IAP] requestPurchase failed:', err);
+      console.error('[IAP] requestSubscription failed:', err);
       setError(err?.message ?? 'Unable to start purchase');
       setIsProcessing(false);
     }

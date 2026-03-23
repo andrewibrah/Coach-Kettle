@@ -168,12 +168,20 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
   }, [loadEntitlement]);
 
   // Derived flags
+  // Free tier: trial/sub expired but user explicitly chose to continue free
+  const isFree =
+    (entitlement.status === 'trial_expired' || entitlement.status === 'sub_expired') &&
+    entitlement.paywallDismissed;
+
   const hasAccess =
     (entitlement.status === 'trial_active' && entitlement.paywallDismissed) ||
-    entitlement.status === 'sub_active';
+    entitlement.status === 'sub_active' ||
+    isFree;
 
+  // Only block with paywall if expired AND user hasn't dismissed (i.e., chosen free tier)
   const needsPaywall =
-    entitlement.status === 'trial_expired' || entitlement.status === 'sub_expired';
+    (entitlement.status === 'trial_expired' || entitlement.status === 'sub_expired') &&
+    !entitlement.paywallDismissed;
 
   const needsInitialPaywall =
     (entitlement.status === 'trial_active' || entitlement.status === 'sub_active') &&

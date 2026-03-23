@@ -36,17 +36,26 @@ export default function PaywallScreen() {
   const annualProduct = products.find(p => p.productId === SUBSCRIPTION.PRODUCT_ID_ANNUAL);
   const monthlyPrice = monthlyProduct?.localizedPrice ?? SUBSCRIPTION.PRICE_MONTHLY;
   const annualPrice = annualProduct?.localizedPrice ?? SUBSCRIPTION.PRICE_ANNUAL;
+  const productsLoaded = products.length > 0;
 
   const isExpiredMode = needsPaywall;
   const isInitialMode = needsInitialPaywall;
 
   useEffect(() => {
     if (iapError) {
-      Alert.alert('Purchase Error', iapError);
+      // Friendlier error message for common SKU issues
+      const msg = iapError.toLowerCase().includes('sku') || iapError.toLowerCase().includes('not found')
+        ? 'Subscription is not available right now. Please try again later or contact support.'
+        : iapError;
+      Alert.alert('Subscription Unavailable', msg);
     }
   }, [iapError]);
 
   const handleSubscribe = async () => {
+    if (!productsLoaded) {
+      Alert.alert('Unavailable', 'Subscription products could not be loaded. Please check your connection and try again.');
+      return;
+    }
     const productId = selectedPlan === 'monthly'
       ? SUBSCRIPTION.PRODUCT_ID_MONTHLY
       : SUBSCRIPTION.PRODUCT_ID_ANNUAL;
@@ -61,19 +70,16 @@ export default function PaywallScreen() {
       console.error('[Paywall] Error dismissing paywall:', error);
     } finally {
       setIsDismissing(false);
-      // Always navigate away — even if dismiss API fails, don't trap the user
       router.replace('/(tabs)' as any);
     }
   };
 
   const handleClose = () => {
-    // X button — same behavior as skip: dismiss paywall and navigate to tabs
     handleSkip();
   };
 
   const handleRestore = async () => {
     await restore();
-    // refreshEntitlement is called automatically by the IAP listener
   };
 
   const handleSignOut = async () => {
@@ -114,8 +120,8 @@ export default function PaywallScreen() {
         {/* Subtitle */}
         <ThemedText style={[styles.subtitle, { color: colors.placeholder }]}>
           {isExpiredMode
-            ? 'Your trial has ended'
-            : 'Start your fitness journey with full access'}
+            ? 'Your trial has ended — upgrade or continue free'
+            : 'Unlock everything. Cancel anytime.'}
         </ThemedText>
 
         {/* Features */}
@@ -145,6 +151,8 @@ export default function PaywallScreen() {
             ]}
             onPress={() => setSelectedPlan('monthly')}
           >
+            {/* Spacer to match annual badge height */}
+            <View style={styles.badgePlaceholder} />
             <ThemedText style={styles.planName}>Monthly</ThemedText>
             <ThemedText style={[styles.planPrice, { color: colors.text }]}>{monthlyPrice}</ThemedText>
             <ThemedText style={[styles.planPeriod, { color: colors.placeholder }]}>
@@ -160,6 +168,7 @@ export default function PaywallScreen() {
                 backgroundColor: colors.cardBackground,
                 borderColor: selectedPlan === 'annual' ? colors.tint : colors.border,
                 borderWidth: selectedPlan === 'annual' ? 2 : 1,
+                paddingTop: 0,
               },
             ]}
             onPress={() => setSelectedPlan('annual')}
@@ -175,14 +184,24 @@ export default function PaywallScreen() {
           </Pressable>
         </View>
 
+        {/* Products not available notice */}
+        {!productsLoaded && (
+          <ThemedText style={[styles.productsUnavailableText, { color: colors.placeholder }]}>
+            Subscription pricing unavailable — check your connection
+          </ThemedText>
+        )}
+
         {/* Subscribe Button */}
         <Pressable
           style={({ pressed }) => [
             styles.subscribeButton,
-            { backgroundColor: colors.tint, opacity: (pressed || isProcessing) ? 0.85 : 1 },
+            {
+              backgroundColor: colors.tint,
+              opacity: (pressed || isProcessing || !productsLoaded) ? 0.6 : 1,
+            },
           ]}
           onPress={handleSubscribe}
-          disabled={isProcessing}
+          disabled={isProcessing || !productsLoaded}
         >
           {isProcessing ? (
             <ActivityIndicator color="#fff" />
@@ -204,6 +223,19 @@ export default function PaywallScreen() {
           </Pressable>
         )}
 
+        {/* Continue Free (expired mode only) */}
+        {isExpiredMode && (
+          <Pressable
+            style={({ pressed }) => [styles.skipButton, pressed && styles.buttonPressed]}
+            onPress={handleSkip}
+            disabled={isDismissing}
+          >
+            <ThemedText style={[styles.skipButtonText, { color: colors.placeholder }]}>
+              {isDismissing ? 'Loading...' : 'Continue with Free Tier'}
+            </ThemedText>
+          </Pressable>
+        )}
+
         {/* Restore Purchases */}
         <Pressable
           style={({ pressed }) => [styles.restoreButton, pressed && styles.buttonPressed]}
@@ -215,21 +247,21 @@ export default function PaywallScreen() {
           </ThemedText>
         </Pressable>
 
-        {/* Sign Out (expired mode only) */}
-        {isExpiredMode && (
-          <Pressable
-            style={({ pressed }) => [styles.signOutButton, pressed && styles.buttonPressed]}
-            onPress={handleSignOut}
-          >
-            <ThemedText style={[styles.signOutText, { color: colors.danger }]}>
-              Sign Out
-            </ThemedText>
-          </Pressable>
-        )}
+        {/* Sign Out — available in both modes */}
+        <Pressable
+          style={({ pressed }) => [styles.signOutButton, pressed && styles.buttonPressed]}
+          onPress={handleSignOut}
+        >
+          <ThemedText style={[styles.signOutText, { color: colors.danger }]}>
+            Sign Out
+          </ThemedText>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const BADGE_HEIGHT = 28;
 
 const styles = StyleSheet.create({
   container: {
@@ -249,33 +281,34 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginTop: 24,
-    marginBottom: 16,
+    marginBottom: 12,
     alignItems: 'center',
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 72,
+    height: 72,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
+    lineHeight: 20,
   },
   featuresContainer: {
     width: '100%',
-    gap: 10,
-    marginBottom: 28,
+    gap: 8,
+    marginBottom: 24,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 16,
     borderRadius: 12,
     gap: 12,
@@ -284,7 +317,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   featureLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
     flex: 1,
   },
@@ -292,24 +325,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     width: '100%',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   pricingCard: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 20,
     paddingHorizontal: 12,
+    paddingBottom: 20,
     borderRadius: 14,
-    position: 'relative',
     overflow: 'hidden',
   },
+  // Spacer in Monthly card so both cards have same content layout
+  badgePlaceholder: {
+    height: BADGE_HEIGHT,
+    marginBottom: 4,
+  },
   saveBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    left: 0,
-    paddingVertical: 4,
+    alignSelf: 'stretch',
+    paddingVertical: 6,
     alignItems: 'center',
+    marginHorizontal: -12,  // bleed to card edges
+    marginBottom: 12,
+    height: BADGE_HEIGHT,
+    justifyContent: 'center',
   },
   saveBadgeText: {
     color: '#fff',
@@ -319,9 +358,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   planName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    marginTop: 8,
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -334,6 +372,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  productsUnavailableText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
   subscribeButton: {
     width: '100%',
     paddingVertical: 16,
@@ -343,7 +387,7 @@ const styles = StyleSheet.create({
   },
   subscribeButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
   },
   skipButton: {
@@ -352,18 +396,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   skipButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
   },
   restoreButton: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
   },
   restoreText: {
     fontSize: 14,
   },
   signOutButton: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
     marginTop: 4,
   },
