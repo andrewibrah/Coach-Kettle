@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Coach Kettle — Your AI-powered workout coach. Log sets with natural language, track PRs, and get coaching insights." />
+  <title>Coach Kettle — Your AI-Powered Workout Coach</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a2e;
+      --bg-card: #16213e;
+      --accent: #4A90D9;
+      --accent-hover: #3a7bc8;
+      --text: #f0f0f0;
+      --text-muted: #a0a8c0;
+      --border: rgba(74, 144, 217, 0.2);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* NAV */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(26, 26, 46, 0.95);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--accent); }
+
+    /* HERO */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 5rem 1.5rem 4rem;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(74, 144, 217, 0.15);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.3rem 0.9rem;
+      border-radius: 999px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.2rem, 6vw, 3.4rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+    }
+
+    .hero h1 span { color: var(--accent); }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+      max-width: 520px;
+    }
+
+    /* BUTTONS */
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .btn-outline:hover { background: rgba(74, 144, 217, 0.1); }
+
+    /* APP STORE BADGE */
+    .appstore-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: #000;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 0.6rem 1.2rem;
+      text-decoration: none;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      transition: border-color 0.2s;
+    }
+
+    .appstore-badge:hover { border-color: var(--accent); }
+
+    .appstore-badge svg { flex-shrink: 0; }
+
+    .appstore-badge-inner { display: flex; flex-direction: column; line-height: 1.2; }
+    .appstore-badge-inner small { font-size: 0.7rem; opacity: 0.75; }
+    .appstore-badge-inner strong { font-size: 1rem; }
+
+    /* FEATURES */
+    .features {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+    }
+
+    .feature-icon {
+      font-size: 1.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+
+    .feature-card p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    /* DIVIDER */
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* NAV CTA SECTION */
+    .nav-cta {
+      text-align: center;
+      padding: 3rem 1.5rem 4rem;
+    }
+
+    .nav-cta h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .nav-cta p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    .nav-cta .btn-group { margin-bottom: 0; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 2rem 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    footer a:hover { color: var(--accent); }
+
+    footer .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+    }
+
+    @media (max-width: 540px) {
+      nav { padding: 0.875rem 1.25rem; }
+      .nav-links { gap: 1rem; }
+      .hero { padding: 3.5rem 1.25rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">Coach Kettle</a>
+    <ul class="nav-links">
+      <li><a href="privacy.html">Privacy</a></li>
+      <li><a href="support.html">Support</a></li>
+    </ul>
+  </nav>
+
+  <section class="hero">
+    <span class="hero-badge">iOS App</span>
+    <h1>Your <span>AI-Powered</span><br/>Workout Coach</h1>
+    <p>
+      Log sets in plain English, track personal records with confetti,
+      get AI coaching insights, and attach photos to every session — all
+      from your pocket.
+    </p>
+
+    <div class="btn-group">
+      <a href="privacy.html" class="btn btn-outline">Privacy Policy</a>
+      <a href="support.html" class="btn btn-outline">Support</a>
+    </div>
+
+    <a href="#" class="appstore-badge" aria-label="Download on the App Store">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+      </svg>
+      <span class="appstore-badge-inner">
+        <small>Download on the</small>
+        <strong>App Store</strong>
+      </span>
+    </a>
+  </section>
+
+  <hr class="section-divider" />
+
+  <section class="features">
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F4AC;</div>
+      <h3>Natural Language Logging</h3>
+      <p>Type "Bench 185 x 8" or "Squat 225 3x5" and Coach Kettle parses it instantly — no forms, no menus.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F3C6;</div>
+      <h3>PR Tracking &amp; Confetti</h3>
+      <p>Every personal record is automatically detected and celebrated so you never miss a milestone.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F916;</div>
+      <h3>AI Coaching</h3>
+      <p>Ask your coach anything — programming advice, form cues, nutrition questions — powered by AI.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F4F8;</div>
+      <h3>Gym Photos &amp; Videos</h3>
+      <p>Attach media to any workout session. Your content is stored privately and never publicly accessible.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F4C8;</div>
+      <h3>Workout History</h3>
+      <p>Browse every session, filter by body part, and see your progression over time at a glance.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x26A1;</div>
+      <h3>Fast &amp; Gym-Friendly</h3>
+      <p>Built for the gym floor — minimal taps, big text, and instant logging so you stay focused on lifting.</p>
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <section class="nav-cta">
+    <h2>Questions or feedback?</h2>
+    <p>We're here to help. Reach out anytime.</p>
+    <div class="btn-group">
+      <a href="support.html" class="btn btn-primary">Get Support</a>
+      <a href="privacy.html" class="btn btn-outline">Privacy Policy</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="support.html">Support</a>
+      <a href="mailto:andrew@coachkettle.app">Contact</a>
+    </div>
+    <p>&copy; 2026 Coach Kettle &mdash; Andrew Ibrahem. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>
