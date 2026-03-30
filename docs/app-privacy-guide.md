@@ -25,7 +25,7 @@ Before filling in privacy data you must provide a support URL and a privacy poli
 1. Go to your repository: `https://github.com/aibrah/Coach-Kettle`
 2. Click **Settings** → **Pages** (left sidebar).
 3. Under **Source**, select **Deploy from a branch**.
-4. Choose the `main` branch and `/docs` folder. Click **Save**.
+4. Choose the `0.0.0.0` branch and `/docs` folder. Click **Save**.
 5. In **Custom domain**, enter `coachkettle.com` and save.
 6. GitHub will publish your site at `https://coachkettle.com/` once DNS is configured and the Pages build completes.
 
