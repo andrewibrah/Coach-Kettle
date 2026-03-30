@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Coach Kettle Privacy Policy — how we collect, use, and protect your data." />
+  <title>Privacy Policy — Coach Kettle</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a2e;
+      --bg-card: #16213e;
+      --accent: #4A90D9;
+      --accent-hover: #3a7bc8;
+      --text: #f0f0f0;
+      --text-muted: #a0a8c0;
+      --border: rgba(74, 144, 217, 0.2);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.7;
+    }
+
+    /* NAV */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(26, 26, 46, 0.95);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--accent); }
+
+    /* PAGE HEADER */
+    .page-header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+    }
+
+    .page-header h1 {
+      font-size: clamp(1.6rem, 4vw, 2.25rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .page-header p {
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    /* CONTENT */
+    .content {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+    }
+
+    /* BACK LINK */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 2.5rem;
+      transition: opacity 0.2s;
+    }
+
+    .back-link:hover { opacity: 0.8; }
+
+    /* SECTIONS */
+    .policy-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .policy-section h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .policy-section h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 1.25rem 0 0.5rem;
+    }
+
+    .policy-section p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .policy-section p:last-child { margin-bottom: 0; }
+
+    .policy-section ul {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0 0.75rem;
+    }
+
+    .policy-section ul li {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      padding: 0.35rem 0 0.35rem 1.25rem;
+      position: relative;
+    }
+
+    .policy-section ul li::before {
+      content: "";
+      display: block;
+      width: 5px;
+      height: 5px;
+      background: var(--accent);
+      border-radius: 50%;
+      position: absolute;
+      left: 0;
+      top: 0.65rem;
+    }
+
+    .highlight-box {
+      background: rgba(74, 144, 217, 0.1);
+      border: 1px solid rgba(74, 144, 217, 0.3);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+
+    .highlight-box p {
+      color: var(--text);
+      font-size: 0.9rem;
+      margin-bottom: 0;
+    }
+
+    /* TABLE */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.75rem 0;
+      font-size: 0.88rem;
+    }
+
+    .data-table th {
+      background: rgba(74, 144, 217, 0.15);
+      color: var(--accent);
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .data-table td {
+      color: var(--text-muted);
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid rgba(74, 144, 217, 0.1);
+      vertical-align: top;
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+
+    /* CONTACT */
+    .contact-block {
+      background: rgba(74, 144, 217, 0.08);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-top: 0.75rem;
+    }
+
+    .contact-block p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.35rem; }
+    .contact-block p:last-child { margin-bottom: 0; }
+    .contact-block a { color: var(--accent); text-decoration: none; }
+    .contact-block a:hover { text-decoration: underline; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 2rem 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    footer a { color: var(--text-muted); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+
+    footer .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+    }
+
+    @media (max-width: 540px) {
+      nav { padding: 0.875rem 1.25rem; }
+      .nav-links { gap: 1rem; }
+      .policy-section { padding: 1.25rem; }
+      .data-table { font-size: 0.8rem; }
+      .data-table th, .data-table td { padding: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">Coach Kettle</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="support.html">Support</a></li>
+    </ul>
+  </nav>
+
+  <div class="page-header">
+    <h1>Privacy Policy</h1>
+    <p>Effective date: March 29, 2026</p>
+  </div>
+
+  <div class="content">
+
+    <a href="index.html" class="back-link">&#8592; Back to Home</a>
+
+    <!-- 1. INTRODUCTION -->
+    <div class="policy-section">
+      <h2>1. Introduction</h2>
+      <p>
+        Coach Kettle ("we", "us", or "our") is an iOS workout tracking application
+        developed and operated by Andrew Ibrahem. This Privacy Policy explains what
+        information we collect, how we use it, who we share it with, and what rights
+        you have regarding your personal data.
+      </p>
+      <p>
+        By using Coach Kettle (Bundle ID: <code>com.coachkettle.coachkettle</code>),
+        you agree to the practices described in this policy. If you do not agree,
+        please discontinue use of the app.
+      </p>
+      <p>
+        We are committed to compliance with applicable privacy laws including the
+        General Data Protection Regulation (GDPR), the California Consumer Privacy
+        Act (CCPA/CPRA), and the Apple App Store guidelines.
+      </p>
+    </div>
+
+    <!-- 2. DATA WE COLLECT -->
+    <div class="policy-section">
+      <h2>2. Data We Collect</h2>
+      <p>We collect only what is necessary to provide and improve the app. Below is a complete breakdown:</p>
+
+      <h3>Account Data</h3>
+      <ul>
+        <li><strong>Email address</strong> — collected via Apple Sign In during account creation. We do not collect your Apple ID password or any other Apple account credentials.</li>
+      </ul>
+
+      <h3>Fitness &amp; Health Data</h3>
+      <ul>
+        <li>Exercise names (e.g., "Bench Press", "Squat")</li>
+        <li>Sets, reps, and weights (in lbs or kg)</li>
+        <li>Body part categories (e.g., Push, Pull, Legs)</li>
+        <li>Workout session timestamps and dates</li>
+        <li>Personal records (PR) history</li>
+        <li>Workout frequency patterns</li>
+      </ul>
+      <p>
+        This data constitutes health and fitness information. It is stored securely in your private account and is never shared with advertisers, data brokers, or analytics platforms.
+      </p>
+
+      <h3>User Content</h3>
+      <ul>
+        <li>Photos and videos you choose to attach to workout sessions</li>
+      </ul>
+      <div class="highlight-box">
+        <p><strong>Important:</strong> Photos and videos are stored in a private Supabase Storage bucket. Your media is never publicly accessible, never indexed, and never shared with any third party. Only you can access your attached media through your authenticated account.</p>
+      </div>
+
+      <h3>Technical / Device Data</h3>
+      <ul>
+        <li>Supabase anonymous session tokens (used for authentication state management)</li>
+        <li>App version and OS version (collected automatically by Expo/React Native for crash reporting purposes only)</li>
+      </ul>
+
+      <h3>Data We Do NOT Collect</h3>
+      <ul>
+        <li>Precise or approximate location data</li>
+        <li>Contacts or address book data</li>
+        <li>Browsing history or cross-app tracking data</li>
+        <li>Payment or financial information</li>
+        <li>Microphone, camera, or sensor data beyond media you explicitly attach</li>
+      </ul>
+    </div>
+
+    <!-- 3. HOW WE USE YOUR DATA -->
+    <div class="policy-section">
+      <h2>3. How We Use Your Data</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Purpose</th>
+            <th>Data Used</th>
+            <th>Legal Basis (GDPR)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Authenticate your account</td>
+            <td>Email address, session token</td>
+            <td>Performance of a contract</td>
+          </tr>
+          <tr>
+            <td>Save and display your workouts</td>
+            <td>Fitness data, timestamps</td>
+            <td>Performance of a contract</td>
+          </tr>
+          <tr>
+            <td>Detect and celebrate personal records</td>
+            <td>Exercise names, weights, reps</td>
+            <td>Performance of a contract</td>
+          </tr>
+          <tr>
+            <td>Parse workout input via AI</td>
+            <td>Exercise text only (anonymized)</td>
+            <td>Legitimate interest</td>
+          </tr>
+          <tr>
+            <td>Provide AI coaching responses</td>
+            <td>Workout context text you provide</td>
+            <td>Legitimate interest / Consent</td>
+          </tr>
+          <tr>
+            <td>Store and retrieve media attachments</td>
+            <td>Photos and videos you attach</td>
+            <td>Performance of a contract</td>
+          </tr>
+          <tr>
+            <td>Improve app reliability</td>
+            <td>App version, OS version (anonymized)</td>
+            <td>Legitimate interest</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>We do not use your data for advertising, profiling, or sale to third parties under any circumstances.</p>
+    </div>
+
+    <!-- 4. DATA SHARING -->
+    <div class="policy-section">
+      <h2>4. Data Sharing &amp; Third-Party Services</h2>
+      <p>
+        We do not sell, rent, or trade your personal data. We share data only with the
+        service providers listed below, solely to operate the app, and under strict
+        data processing agreements.
+      </p>
+
+      <h3>Supabase</h3>
+      <p>
+        Supabase provides our database, authentication, file storage, and server-side
+        edge functions. Your workout data and media are stored on Supabase-managed
+        infrastructure hosted in the United States. Supabase processes data as a
+        data processor on our behalf.
+        <br/>
+        Privacy policy: <a href="https://supabase.com/privacy" style="color:var(--accent)">supabase.com/privacy</a>
+      </p>
+
+      <h3>OpenAI</h3>
+      <p>
+        We use OpenAI's API for two features: AI workout text parsing and the AI
+        coaching chat interface.
+      </p>
+      <div class="highlight-box">
+        <p>
+          <strong>What we send to OpenAI:</strong> Exercise log text you enter (e.g., "Bench 185 x 8")
+          and coaching questions you type. We never transmit your name, email address,
+          health metrics, media files, or any personally identifying information to OpenAI.
+          Inputs are sent as anonymous text strings only.
+        </p>
+      </div>
+      <p>
+        OpenAI may retain API inputs per their data usage policies.
+        <br/>
+        Privacy policy: <a href="https://openai.com/privacy" style="color:var(--accent)">openai.com/privacy</a>
+      </p>
+
+      <h3>Apple Sign In</h3>
+      <p>
+        Account creation and login use Apple's Sign In with Apple service. Apple
+        may provide us with a real or relayed email address per your Apple ID settings.
+        We do not receive your Apple ID password.
+        <br/>
+        Privacy policy: <a href="https://www.apple.com/legal/privacy/" style="color:var(--accent)">apple.com/legal/privacy</a>
+      </p>
+
+      <h3>Expo / React Native</h3>
+      <p>
+        The app is built with Expo and React Native. Expo may collect anonymized
+        crash and diagnostic data to improve framework stability. This data does not
+        include your personal workout information.
+        <br/>
+        Privacy policy: <a href="https://expo.dev/privacy" style="color:var(--accent)">expo.dev/privacy</a>
+      </p>
+
+      <h3>Legal Disclosures</h3>
+      <p>
+        We may disclose personal data if required by applicable law, court order,
+        or governmental authority, or where necessary to protect the rights,
+        property, or safety of Coach Kettle, our users, or the public.
+      </p>
+    </div>
+
+    <!-- 5. DATA STORAGE & SECURITY -->
+    <div class="policy-section">
+      <h2>5. Data Storage &amp; Security</h2>
+      <p>
+        Your data is stored in Supabase's managed infrastructure located in the
+        United States. We implement the following safeguards:
+      </p>
+      <ul>
+        <li>All data in transit is encrypted via TLS/HTTPS</li>
+        <li>Data at rest is encrypted by Supabase using AES-256</li>
+        <li>Authentication uses short-lived JWT tokens and Row-Level Security (RLS) policies so users can only access their own data</li>
+        <li>Media files are stored in a private, access-controlled Supabase Storage bucket — no public URLs exist for your media</li>
+        <li>Biometric authentication (Face ID / Touch ID) is available to lock the app after inactivity</li>
+      </ul>
+      <p>
+        No method of transmission or storage is 100% secure. In the event of a data
+        breach that affects your personal information, we will notify you as required
+        by applicable law.
+      </p>
+
+      <h3>Data Retention</h3>
+      <p>
+        We retain your data for as long as your account is active. If you delete
+        your account, all associated personal data, workout records, and media
+        attachments are permanently deleted from our systems within 30 days,
+        except where retention is required by law.
+      </p>
+    </div>
+
+    <!-- 6. YOUR RIGHTS -->
+    <div class="policy-section">
+      <h2>6. Your Rights</h2>
+      <p>Depending on your jurisdiction, you may have the following rights regarding your personal data:</p>
+
+      <h3>For All Users</h3>
+      <ul>
+        <li><strong>Access:</strong> Request a copy of the personal data we hold about you.</li>
+        <li><strong>Correction:</strong> Request correction of inaccurate data.</li>
+        <li><strong>Deletion:</strong> Request deletion of your account and all associated data ("right to be forgotten"). You can request this in-app (Settings &rarr; Account &rarr; Delete Account) or by emailing <a href="mailto:privacy@coachkettle.app" style="color:var(--accent)">privacy@coachkettle.app</a>.</li>
+        <li><strong>Portability:</strong> Request your workout data in a machine-readable format.</li>
+      </ul>
+
+      <h3>GDPR (EEA/UK Residents)</h3>
+      <ul>
+        <li><strong>Objection:</strong> Object to processing based on legitimate interests.</li>
+        <li><strong>Restriction:</strong> Request that we restrict processing of your data in certain circumstances.</li>
+        <li><strong>Withdraw Consent:</strong> Where processing is based on consent, you may withdraw it at any time.</li>
+        <li>You have the right to lodge a complaint with your local supervisory authority.</li>
+      </ul>
+
+      <h3>CCPA (California Residents)</h3>
+      <ul>
+        <li>You have the right to know what personal information we collect and how it is used.</li>
+        <li>You have the right to opt out of the sale of personal information. <strong>We do not sell personal information.</strong></li>
+        <li>You have the right to non-discrimination for exercising your privacy rights.</li>
+      </ul>
+
+      <p>To exercise any of these rights, contact us at <a href="mailto:privacy@coachkettle.app" style="color:var(--accent)">privacy@coachkettle.app</a>. We will respond within 30 days (or sooner as required by law).</p>
+    </div>
+
+    <!-- 7. CHILDREN'S PRIVACY -->
+    <div class="policy-section">
+      <h2>7. Children's Privacy</h2>
+      <p>
+        Coach Kettle is not directed at children under the age of 13 (or 16 in the
+        EEA/UK). We do not knowingly collect personal information from children. If
+        you believe a child has provided us with personal data, please contact us at
+        <a href="mailto:privacy@coachkettle.app" style="color:var(--accent)">privacy@coachkettle.app</a>
+        and we will promptly delete that information.
+      </p>
+    </div>
+
+    <!-- 8. CHANGES TO THIS POLICY -->
+    <div class="policy-section">
+      <h2>8. Changes to This Policy</h2>
+      <p>
+        We may update this Privacy Policy from time to time. When we do, we will
+        revise the effective date at the top of this page and, for material changes,
+        provide notice within the app or via email. We encourage you to review this
+        policy periodically.
+      </p>
+      <p>
+        Continued use of Coach Kettle after changes take effect constitutes acceptance
+        of the updated policy.
+      </p>
+    </div>
+
+    <!-- 9. CONTACT US -->
+    <div class="policy-section">
+      <h2>9. Contact Us</h2>
+      <p>If you have any questions, concerns, or requests regarding this Privacy Policy or your personal data, please contact us:</p>
+      <div class="contact-block">
+        <p><strong>Andrew Ibrahem</strong></p>
+        <p>Developer, Coach Kettle</p>
+        <p>General inquiries: <a href="mailto:andrew@coachkettle.app">andrew@coachkettle.app</a></p>
+        <p>Privacy requests: <a href="mailto:privacy@coachkettle.app">privacy@coachkettle.app</a></p>
+      </div>
+    </div>
+
+    <a href="index.html" class="back-link">&#8592; Back to Home</a>
+
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="index.html">Home</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="support.html">Support</a>
+    </div>
+    <p>&copy; 2026 Coach Kettle &mdash; Andrew Ibrahem. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>

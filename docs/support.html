@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Coach Kettle Support — FAQs, tips, and how to contact us." />
+  <title>Support — Coach Kettle</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a2e;
+      --bg-card: #16213e;
+      --accent: #4A90D9;
+      --accent-hover: #3a7bc8;
+      --text: #f0f0f0;
+      --text-muted: #a0a8c0;
+      --border: rgba(74, 144, 217, 0.2);
+      --success: #34d399;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.7;
+    }
+
+    /* NAV */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(26, 26, 46, 0.95);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--accent); }
+
+    /* PAGE HEADER */
+    .page-header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+    }
+
+    .page-header h1 {
+      font-size: clamp(1.6rem, 4vw, 2.25rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .page-header p {
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    /* CONTENT */
+    .content {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+    }
+
+    /* BACK LINK */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 2.5rem;
+      transition: opacity 0.2s;
+    }
+
+    .back-link:hover { opacity: 0.8; }
+
+    /* SECTION TITLE */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 2.5rem 0 1rem;
+    }
+
+    .section-title:first-of-type { margin-top: 0; }
+
+    /* FAQ */
+    .faq-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .faq-card h3 {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .faq-q-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.4rem;
+      height: 1.4rem;
+      background: rgba(74, 144, 217, 0.2);
+      color: var(--accent);
+      border-radius: 50%;
+      font-size: 0.7rem;
+      font-weight: 800;
+      margin-top: 0.1rem;
+    }
+
+    .faq-card p {
+      font-size: 0.91rem;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
+
+    .faq-card p:last-child { margin-bottom: 0; }
+
+    .faq-card ul, .faq-card ol {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0;
+    }
+
+    .faq-card ul li, .faq-card ol li {
+      font-size: 0.91rem;
+      color: var(--text-muted);
+      padding: 0.25rem 0 0.25rem 1.5rem;
+      position: relative;
+      counter-increment: faq-counter;
+    }
+
+    .faq-card ul li::before {
+      content: "";
+      display: block;
+      width: 5px;
+      height: 5px;
+      background: var(--accent);
+      border-radius: 50%;
+      position: absolute;
+      left: 0.25rem;
+      top: 0.65rem;
+    }
+
+    .faq-card ol {
+      counter-reset: faq-counter;
+    }
+
+    .faq-card ol li::before {
+      content: counter(faq-counter) ".";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.82rem;
+    }
+
+    /* CODE SNIPPET */
+    .code-example {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(74, 144, 217, 0.25);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      font-family: "SF Mono", "Fira Code", "Menlo", monospace;
+      font-size: 0.85rem;
+      color: var(--success);
+      overflow-x: auto;
+    }
+
+    /* TIPS */
+    .tips-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .tip-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .tip-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .tip-card h4 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+
+    .tip-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* CONTACT */
+    .contact-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .contact-card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .contact-card p {
+      font-size: 0.91rem;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
+
+    .contact-card p:last-child { margin-bottom: 0; }
+
+    .contact-card a { color: var(--accent); text-decoration: none; }
+    .contact-card a:hover { text-decoration: underline; }
+
+    .email-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 0.7rem 1.3rem;
+      border-radius: 10px;
+      text-decoration: none;
+      margin-top: 0.75rem;
+      transition: background 0.2s;
+    }
+
+    .email-btn:hover { background: var(--accent-hover); text-decoration: none; }
+
+    .highlight-box {
+      background: rgba(74, 144, 217, 0.1);
+      border: 1px solid rgba(74, 144, 217, 0.3);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin: 0.75rem 0;
+    }
+
+    .highlight-box p {
+      font-size: 0.9rem;
+      color: var(--text);
+      margin-bottom: 0;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 2rem 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    footer a { color: var(--text-muted); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+
+    footer .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+    }
+
+    @media (max-width: 540px) {
+      nav { padding: 0.875rem 1.25rem; }
+      .nav-links { gap: 1rem; }
+      .faq-card { padding: 1.25rem; }
+      .tips-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">Coach Kettle</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="privacy.html">Privacy</a></li>
+    </ul>
+  </nav>
+
+  <div class="page-header">
+    <h1>Support</h1>
+    <p>Answers, tips, and how to reach us</p>
+  </div>
+
+  <div class="content">
+
+    <a href="index.html" class="back-link">&#8592; Back to Home</a>
+
+    <!-- FAQ: LOGGING -->
+    <p class="section-title">Logging Workouts</p>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> How do I log a workout?</h3>
+      <p>
+        Tap the input bar at the bottom of the screen and type your set in plain English.
+        Coach Kettle's parser understands a wide range of formats:
+      </p>
+      <div class="code-example">Bench 185 x 8</div>
+      <div class="code-example">Squat 225 3x5</div>
+      <div class="code-example">185 x 8 &nbsp;&nbsp;&nbsp;(shorthand — uses your last exercise)</div>
+      <div class="code-example">185, 165, 145 x 8 &nbsp;&nbsp;&nbsp;(drop set)</div>
+      <div class="code-example">Bench 185 + Rows 135 x 8 &nbsp;&nbsp;&nbsp;(superset)</div>
+      <div class="code-example">Run 20 min &nbsp;&nbsp;&nbsp;(cardio)</div>
+      <div class="code-example">Bench 60kg x 8 &nbsp;&nbsp;&nbsp;(kg auto-converts to lbs)</div>
+      <p>
+        If the parser can't interpret your input, it automatically falls back to AI parsing
+        — so you can type naturally and the app figures it out.
+      </p>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> How do I log multiple sets at once?</h3>
+      <p>Use the multi-set format with a number before the "x":</p>
+      <div class="code-example">Bench 185 3x8 &nbsp;&nbsp;&nbsp;(logs 3 sets of 8 reps at 185 lbs)</div>
+      <p>
+        Each set is saved as a separate row in your session, making it easy to review
+        and edit individual sets.
+      </p>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> How do I attach a photo or video to a session?</h3>
+      <p>
+        While in an active workout session, tap the camera icon to attach media. You can
+        add photos or videos from your library. Media is stored privately in your account
+        and is never publicly accessible.
+      </p>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> How does the AI coach work?</h3>
+      <p>
+        Tap the coaching chat icon to open the AI coach. You can ask anything — programming
+        advice, form cues, rep ranges, recovery, nutrition, and more. The AI has context
+        about your recent workout history to give more relevant answers.
+      </p>
+      <div class="highlight-box">
+        <p>Your email and personal identifiers are never sent to the AI. Only the exercise text and questions you type are transmitted.</p>
+      </div>
+    </div>
+
+    <!-- FAQ: DATA & ACCOUNT -->
+    <p class="section-title">Data &amp; Account Management</p>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> How do I delete my account and data?</h3>
+      <p>You can request complete account and data deletion in two ways:</p>
+      <ol>
+        <li><strong>In-app:</strong> Go to Settings &rarr; Account &rarr; Delete Account. This will permanently delete your account and all associated data.</li>
+        <li><strong>By email:</strong> Send a deletion request to <a href="mailto:privacy@coachkettle.app">privacy@coachkettle.app</a> from the email address associated with your account. We will process it within 30 days.</li>
+      </ol>
+      <p>
+        Deletion removes: your account, all workout sessions, PR records, and any
+        attached photos or videos. This action is irreversible.
+      </p>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> Can I export my workout data?</h3>
+      <p>
+        Data export is on our roadmap. In the meantime, you can request a copy of your
+        data by emailing <a href="mailto:privacy@coachkettle.app">privacy@coachkettle.app</a>.
+        We will provide it in JSON or CSV format within 30 days.
+      </p>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> My session disappeared — what happened?</h3>
+      <p>
+        Coach Kettle saves data locally first (AsyncStorage) and then syncs to the cloud
+        in the background. If you lose a session:
+      </p>
+      <ul>
+        <li>Check your workout history — the session may appear after reconnecting to the internet.</li>
+        <li>If you were offline during logging, the data should still be saved locally and will sync when you reconnect.</li>
+        <li>If data appears to be missing after syncing, contact support with the approximate date and time of the session.</li>
+      </ul>
+    </div>
+
+    <!-- FAQ: PRIVACY -->
+    <p class="section-title">Privacy Questions</p>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> What data does Coach Kettle collect?</h3>
+      <p>
+        We collect your email address (via Apple Sign In), your fitness data (exercises,
+        sets, reps, weights, timestamps), and any media you choose to attach. We do not
+        collect location data, contacts, or any data unrelated to your workouts.
+      </p>
+      <p>See our full <a href="privacy.html">Privacy Policy</a> for complete details.</p>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> Is my workout data shared or sold?</h3>
+      <p>
+        No. We do not sell, rent, or share your personal data with advertisers or
+        data brokers. Your data is shared only with our infrastructure providers
+        (Supabase for storage, OpenAI for AI features) under strict data processing
+        agreements.
+      </p>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> Are my gym photos and videos private?</h3>
+      <p>
+        Yes. Photos and videos are stored in a private Supabase Storage bucket. There
+        are no public URLs for your media. Only you, authenticated with your account,
+        can access your attached media.
+      </p>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">Q</span> What does the AI see when I use it?</h3>
+      <p>
+        The AI (powered by OpenAI) only receives the exercise text you type and any
+        coaching questions you ask. Your email address, name, health metrics, and
+        media files are never sent to OpenAI.
+      </p>
+    </div>
+
+    <!-- TIPS -->
+    <p class="section-title">Tips &amp; Known Limitations</p>
+
+    <div class="tips-grid">
+      <div class="tip-card">
+        <div class="tip-icon">&#x26A1;</div>
+        <h4>Use shorthand for speed</h4>
+        <p>After naming an exercise, just type "185 x 8" for subsequent sets — the app remembers the last exercise.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">&#x1F504;</div>
+        <h4>Offline logging works</h4>
+        <p>Sets are saved locally first. If you're offline at the gym, your data is safe and will sync when you reconnect.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">&#x1F3C6;</div>
+        <h4>PRs need history</h4>
+        <p>Personal record detection requires at least one previous logged set for the same exercise. First-time exercises won't trigger a PR.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">&#x1F512;</div>
+        <h4>Session lock</h4>
+        <p>The app locks after 4 hours of inactivity. Use Face ID or Touch ID to unlock — your data is protected.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">&#x2696;</div>
+        <h4>kg auto-converts</h4>
+        <p>Append "kg" to any weight and it converts to lbs automatically. E.g., "Bench 60kg x 8".</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">&#x1F916;</div>
+        <h4>AI fallback</h4>
+        <p>If the local parser doesn't recognize your input format, it's automatically sent to AI parsing — no action needed.</p>
+      </div>
+    </div>
+
+    <div class="faq-card">
+      <h3><span class="faq-q-icon">!</span> Known Limitations</h3>
+      <ul>
+        <li>AI coaching requires an internet connection and may be slower during peak usage.</li>
+        <li>Very complex input formats (e.g., tempo notation, RPE) may require AI parsing and slightly longer response times.</li>
+        <li>Video attachments require sufficient storage space on your device and a stable connection to upload.</li>
+        <li>Workout history search is chronological; full-text search across all exercises is coming in a future update.</li>
+        <li>Apple Watch sync is not yet available.</li>
+      </ul>
+    </div>
+
+    <!-- CONTACT -->
+    <p class="section-title">Contact Support</p>
+
+    <div class="contact-card">
+      <h3>Email Us</h3>
+      <p>
+        For general questions, bug reports, or feature requests, email our support
+        address and we'll get back to you within 1–3 business days.
+      </p>
+      <p>When reporting a bug, please include:</p>
+      <ul style="list-style:none;padding:0;margin:0.5rem 0;">
+        <li style="font-size:0.91rem;color:var(--text-muted);padding:0.25rem 0 0.25rem 1.5rem;position:relative;">
+          <span style="position:absolute;left:0.25rem;top:0.55rem;width:5px;height:5px;background:var(--accent);border-radius:50%;display:block;"></span>
+          Your iOS version and app version
+        </li>
+        <li style="font-size:0.91rem;color:var(--text-muted);padding:0.25rem 0 0.25rem 1.5rem;position:relative;">
+          <span style="position:absolute;left:0.25rem;top:0.55rem;width:5px;height:5px;background:var(--accent);border-radius:50%;display:block;"></span>
+          Steps to reproduce the issue
+        </li>
+        <li style="font-size:0.91rem;color:var(--text-muted);padding:0.25rem 0 0.25rem 1.5rem;position:relative;">
+          <span style="position:absolute;left:0.25rem;top:0.55rem;width:5px;height:5px;background:var(--accent);border-radius:50%;display:block;"></span>
+          A screenshot or screen recording if applicable
+        </li>
+      </ul>
+      <a href="mailto:support@coachkettle.app" class="email-btn">
+        &#x2709; Email support@coachkettle.app
+      </a>
+    </div>
+
+    <div class="contact-card">
+      <h3>Privacy Requests</h3>
+      <p>
+        For data access, correction, deletion, or portability requests, contact our
+        privacy team. We respond to all privacy requests within 30 days.
+      </p>
+      <a href="mailto:privacy@coachkettle.app" class="email-btn">
+        &#x1F512; Email privacy@coachkettle.app
+      </a>
+    </div>
+
+    <div class="contact-card">
+      <h3>General Contact</h3>
+      <p>
+        For all other inquiries, reach the developer directly.
+      </p>
+      <a href="mailto:andrew@coachkettle.app" class="email-btn">
+        &#x2709; Email andrew@coachkettle.app
+      </a>
+    </div>
+
+    <a href="index.html" class="back-link">&#8592; Back to Home</a>
+
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="index.html">Home</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="support.html">Support</a>
+    </div>
+    <p>&copy; 2026 Coach Kettle &mdash; Andrew Ibrahem. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>
