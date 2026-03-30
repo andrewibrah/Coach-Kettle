@@ -1,26 +1,100 @@
-import { Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import AppStoreBadge from "./AppStoreBadge";
 
 export default function CTA() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add("cta-visible");
+          observer.unobserve(el);
+        }
+      },
+      { threshold: 0.2 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section className="px-6 pb-16 pt-12 text-center">
-      <h2 className="mb-2 text-2xl font-bold">Questions or feedback?</h2>
-      <p className="mb-6 text-[0.95rem] text-brand-muted">
-        We're here to help. Reach out anytime.
-      </p>
-      <div className="flex flex-wrap justify-center gap-3">
-        <Link
-          to="/support"
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-accent px-6 py-3 text-[0.95rem] font-semibold text-white no-underline transition-colors hover:bg-brand-accent-hover active:scale-[0.97]"
-        >
-          Get Support
-        </Link>
-        <Link
-          to="/privacy"
-          className="inline-flex items-center gap-2 rounded-xl border border-brand-accent bg-transparent px-6 py-3 text-[0.95rem] font-semibold text-brand-accent no-underline transition-colors hover:bg-brand-accent/10 active:scale-[0.97]"
-        >
-          Privacy Policy
-        </Link>
+    <section className="relative px-4 pb-16 pt-4 sm:px-8 lg:px-16">
+      <div
+        ref={ref}
+        className="cta-section relative mx-auto max-w-[1200px] py-24 text-center sm:py-32"
+      >
+        {/* Glow */}
+        <div
+          className="glow-orb"
+          style={{
+            width: 400,
+            height: 400,
+            top: "10%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "radial-gradient(circle, rgba(255,255,255,0.025) 0%, transparent 70%)",
+          }}
+        />
+
+        {/* Slow-spinning gradient ring behind content */}
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[300px] w-[300px] animate-spin-slow rounded-full opacity-20 sm:h-[400px] sm:w-[400px]" style={{
+          background: "conic-gradient(from 0deg, transparent, rgba(255,255,255,0.08), transparent, rgba(255,255,255,0.04), transparent)",
+          transform: "translate(-50%, -50%)",
+        }} />
+
+        {/* Divider */}
+        <div className="mx-auto mb-20 h-px max-w-[200px] bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+
+        <div className="relative">
+          <p className="cta-el mb-4 text-[0.75rem] font-light tracking-[0.25em] text-brand-muted">
+            GET STARTED
+          </p>
+          <h2 className="cta-el mb-4 text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+            Start lifting
+            <br />
+            <span className="text-brand-muted">smarter.</span>
+          </h2>
+          <p className="cta-el mx-auto mb-10 max-w-[440px] text-[0.95rem] font-light leading-[1.8] text-brand-muted">
+            Download Coach Kettle, create your account, and log your first set
+            in seconds.
+          </p>
+          <div className="cta-el">
+            <AppStoreBadge />
+          </div>
+        </div>
+
+        {/* Floating mini emojis */}
+        {[
+          { emoji: "🏋️", top: "15%", left: "10%", delay: "0s" },
+          { emoji: "💪", top: "20%", right: "12%", delay: "1s" },
+          { emoji: "🔥", bottom: "20%", left: "15%", delay: "2s" },
+          { emoji: "🎯", bottom: "25%", right: "10%", delay: "3s" },
+        ].map((item) => (
+          <span
+            key={item.emoji}
+            className="animate-float-drift pointer-events-none absolute text-lg opacity-[0.12]"
+            style={{ top: item.top, bottom: item.bottom, left: item.left, right: item.right, animationDelay: item.delay }}
+          >
+            {item.emoji}
+          </span>
+        ))}
       </div>
+
+      <style>{`
+        .cta-section .cta-el {
+          opacity: 0;
+          transform: translateY(20px);
+          transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+                      transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .cta-section.cta-visible .cta-el:nth-child(1) { opacity: 1; transform: translateY(0); transition-delay: 0ms; }
+        .cta-section.cta-visible .cta-el:nth-child(2) { opacity: 1; transform: translateY(0); transition-delay: 120ms; }
+        .cta-section.cta-visible .cta-el:nth-child(3) { opacity: 1; transform: translateY(0); transition-delay: 240ms; }
+        .cta-section.cta-visible .cta-el:nth-child(4) { opacity: 1; transform: translateY(0); transition-delay: 360ms; }
+      `}</style>
     </section>
   );
 }

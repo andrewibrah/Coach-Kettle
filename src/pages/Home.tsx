@@ -6,9 +6,7 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <hr className="mx-auto max-w-[900px] border-t border-brand-border" />
       <Features />
-      <hr className="mx-auto max-w-[900px] border-t border-brand-border" />
       <CTA />
     </>
   );
