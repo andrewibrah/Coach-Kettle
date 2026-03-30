@@ -25,17 +25,18 @@ Before filling in privacy data you must provide a support URL and a privacy poli
 1. Go to your repository: `https://github.com/aibrah/Coach-Kettle`
 2. Click **Settings** → **Pages** (left sidebar).
 3. Under **Source**, select **Deploy from a branch**.
-4. Choose the `main` branch and `/ (root)` folder. Click **Save**.
-5. GitHub will publish your site at `https://aibrah.github.io/Coach-Kettle/`.
+4. Choose the `main` branch and `/docs` folder. Click **Save**.
+5. In **Custom domain**, enter `coachkettle.com` and save.
+6. GitHub will publish your site at `https://coachkettle.com/` once DNS is configured and the Pages build completes.
 
 ### Required URLs
 
 | Field | URL |
 |---|---|
-| Support URL | `https://aibrah.github.io/Coach-Kettle/support` |
-| Privacy Policy URL | `https://aibrah.github.io/Coach-Kettle/privacy` |
+| Support URL | `https://coachkettle.com/support` |
+| Privacy Policy URL | `https://coachkettle.com/privacy` |
 
-Create a `support.html` and `privacy.html` (or `support/index.html` and `privacy/index.html`) in your repo root so the paths resolve. The privacy policy must be live and reachable by the time you submit for review.
+Keep `docs/CNAME` set to `coachkettle.com` so GitHub Pages continues to use the custom domain. The privacy policy must be live and reachable by the time you submit for review.
 
 **Where to enter these in App Store Connect:**
 - Go to **App Information** (left sidebar under your app, not the version).
@@ -231,8 +232,8 @@ Apple shows a summary of your selections. Verify it matches the table in Section
 Complete all six items before clicking **Add for Review**:
 
 - [ ] **App Privacy declaration published** in App Store Connect with all six data types declared correctly (Contact Info, Health & Fitness, Photos or Videos, User Content, Identifiers, Usage Data).
-- [ ] **Privacy Policy URL** is live and reachable at `https://aibrah.github.io/Coach-Kettle/privacy`.
-- [ ] **Support URL** is live and reachable at `https://aibrah.github.io/Coach-Kettle/support`.
+- [ ] **Privacy Policy URL** is live and reachable at `https://coachkettle.com/privacy`.
+- [ ] **Support URL** is live and reachable at `https://coachkettle.com/support`.
 - [ ] **Primary Category** set to **Health & Fitness** and **Secondary Category** set to **Productivity** in App Information.
 - [ ] **Content Rights** question answered **No** (no third-party copyrighted content).
 - [ ] **App version, build, and metadata** are complete (screenshots for required device sizes, description, keywords, what's new text).
