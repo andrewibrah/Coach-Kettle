@@ -8,7 +8,7 @@ import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useIAP } from '@/lib/iap';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,7 +28,7 @@ export default function PaywallScreen() {
   const router = useRouter();
   const { needsPaywall, needsInitialPaywall, dismissPaywall, refreshEntitlement } = useEntitlement();
   const { signOut } = useAuth();
-  const { products, purchase, restore, isProcessing, error: iapError } = useIAP({
+  const { products, restore, isProcessing } = useIAP({
     onPurchaseSuccess: refreshEntitlement,
   });
   const [selectedPlan, setSelectedPlan] = useState<Plan>('annual');
@@ -38,30 +38,12 @@ export default function PaywallScreen() {
   const annualProduct = products.find(p => p.productId === SUBSCRIPTION.PRODUCT_ID_ANNUAL);
   const monthlyPrice = monthlyProduct?.localizedPrice ?? SUBSCRIPTION.PRICE_MONTHLY;
   const annualPrice = annualProduct?.localizedPrice ?? SUBSCRIPTION.PRICE_ANNUAL;
-  const productsLoaded = products.length > 0;
 
   const isExpiredMode = needsPaywall;
   const isInitialMode = needsInitialPaywall;
 
-  useEffect(() => {
-    if (iapError) {
-      // Friendlier error message for common SKU issues
-      const msg = iapError.toLowerCase().includes('sku') || iapError.toLowerCase().includes('not found')
-        ? 'Subscription is not available right now. Please try again later or contact support.'
-        : iapError;
-      Alert.alert('Subscription Unavailable', msg);
-    }
-  }, [iapError]);
-
   const handleSubscribe = async () => {
-    if (!productsLoaded) {
-      Alert.alert('Unavailable', 'Subscription products could not be loaded. Please check your connection and try again.');
-      return;
-    }
-    const productId = selectedPlan === 'monthly'
-      ? SUBSCRIPTION.PRODUCT_ID_MONTHLY
-      : SUBSCRIPTION.PRODUCT_ID_ANNUAL;
-    await purchase(productId);
+    Alert.alert('Coming Soon', 'Subscritions coming soon...');
   };
 
   const handleSkip = async () => {
@@ -182,24 +164,17 @@ export default function PaywallScreen() {
           </Pressable>
         </View>
 
-        {/* Products not available notice */}
-        {!productsLoaded && (
-          <ThemedText style={[styles.productsUnavailableText, { color: colors.placeholder }]}>
-            Subscription pricing unavailable — check your connection
-          </ThemedText>
-        )}
-
         {/* Subscribe Button */}
         <Pressable
           style={({ pressed }) => [
             styles.subscribeButton,
             {
               backgroundColor: colors.tint,
-              opacity: (pressed || isProcessing || !productsLoaded) ? 0.6 : 1,
+              opacity: (pressed || isProcessing) ? 0.6 : 1,
             },
           ]}
           onPress={handleSubscribe}
-          disabled={isProcessing || !productsLoaded}
+          disabled={isProcessing}
         >
           {isProcessing ? (
             <ActivityIndicator color="#fff" />
