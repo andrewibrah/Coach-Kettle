@@ -51,6 +51,16 @@ export default function Navbar() {
         >
           Support
         </Link>
+        <Link
+          to="/eula"
+          className={`rounded-full px-4 py-1.5 text-[0.78rem] tracking-[0.06em] no-underline transition-all duration-300 ${
+            pathname === "/eula"
+              ? "bg-white/[0.06] text-brand-text"
+              : "text-brand-muted hover:text-brand-text"
+          }`}
+        >
+          EULA
+        </Link>
       </div>
 
       {/* Mobile fallback links */}
@@ -63,6 +73,11 @@ export default function Navbar() {
         <li>
           <Link to="/support" className={linkClass("/support")}>
             Support
+          </Link>
+        </li>
+        <li>
+          <Link to="/eula" className={linkClass("/eula")}>
+            EULA
           </Link>
         </li>
       </ul>
