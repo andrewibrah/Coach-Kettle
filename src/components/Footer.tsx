@@ -26,12 +26,6 @@ export default function Footer() {
             >
               Support
             </Link>
-            <Link
-              to="/eula"
-              className="text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
-            >
-              EULA
-            </Link>
             <a
               href="mailto:andrew@coachkettle.app"
               className="text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"

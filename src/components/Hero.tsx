@@ -1,6 +1,5 @@
 import AppStoreBadge from "./AppStoreBadge";
 import CoachLogo from "./CoachLogo";
-import { Link } from "react-router-dom";
 
 function Sparkle({ top, left, delay, size = 4 }: { top: string; left: string; delay: string; size?: number }) {
   return (
@@ -128,31 +127,8 @@ export default function Hero() {
           </p>
 
           {/* CTA buttons */}
-          <div
-            className="animate-fade-up flex flex-col items-center gap-4"
-            style={{ animationDelay: "0.55s" }}
-          >
+          <div className="animate-fade-up" style={{ animationDelay: "0.55s" }}>
             <AppStoreBadge />
-            <div className="flex flex-wrap items-center justify-center gap-3 text-[0.72rem] uppercase tracking-[0.16em] text-brand-muted">
-              <Link
-                to="/privacy"
-                className="rounded-full border border-brand-border px-4 py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
-              >
-                Privacy
-              </Link>
-              <Link
-                to="/support"
-                className="rounded-full border border-brand-border px-4 py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
-              >
-                Support
-              </Link>
-              <Link
-                to="/eula"
-                className="rounded-full border border-brand-border px-4 py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
-              >
-                EULA
-              </Link>
-            </div>
           </div>
 
           {/* Bottom scroll indicator */}
