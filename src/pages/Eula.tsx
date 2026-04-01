@@ -38,6 +38,14 @@ export default function Eula() {
           Coach Kettle uses Apple&apos;s standard licensed application end user
           license agreement for App Store distribution.
         </p>
+        <a
+          href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-flex items-center gap-2 text-[0.78rem] text-brand-muted no-underline transition-colors hover:text-brand-text"
+        >
+          View on Apple.com &rarr;
+        </a>
       </div>
 
       <div className="mx-auto max-w-[860px] px-6 pb-16 pt-12">

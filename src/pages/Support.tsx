@@ -3,7 +3,7 @@ import { useEffect } from "react";
 
 function FaqCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-4 rounded-2xl border border-brand-border bg-brand-card p-6 max-sm:p-5">
+    <div className="mb-4 rounded-xl border border-brand-border bg-brand-card p-6 max-sm:p-5">
       {children}
     </div>
   );
@@ -11,7 +11,7 @@ function FaqCard({ children }: { children: React.ReactNode }) {
 
 function QIcon({ char = "Q" }: { char?: string }) {
   return (
-    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-accent/20 text-[0.7rem] font-extrabold text-brand-accent">
+    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-bg text-[0.7rem] font-bold text-brand-muted">
       {char}
     </span>
   );
@@ -19,7 +19,7 @@ function QIcon({ char = "Q" }: { char?: string }) {
 
 function CodeExample({ children }: { children: string }) {
   return (
-    <div className="my-2 overflow-x-auto rounded-lg border border-brand-accent/25 bg-black/35 px-4 py-3 font-mono text-sm text-emerald-400">
+    <div className="my-2 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg px-4 py-3 font-mono text-sm text-brand-text">
       {children}
     </div>
   );
@@ -27,9 +27,73 @@ function CodeExample({ children }: { children: string }) {
 
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
-    <li className="relative pl-5 text-sm text-brand-muted before:absolute before:left-1 before:top-[0.55rem] before:h-[5px] before:w-[5px] before:rounded-full before:bg-brand-accent">
+    <li className="relative pl-5 text-sm text-brand-muted before:absolute before:left-1 before:top-[0.55rem] before:h-[5px] before:w-[5px] before:rounded-full before:bg-brand-muted">
       {children}
     </li>
+  );
+}
+
+/* Monochrome SVG icons for tips section */
+function TipIconBolt() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  );
+}
+function TipIconSync() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+      <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+    </svg>
+  );
+}
+function TipIconTrophy() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2" />
+      <path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2" />
+      <path d="M6 3h12v7a6 6 0 0 1-12 0V3z" />
+      <path d="M12 16v2" />
+      <path d="M8 21h8" />
+    </svg>
+  );
+}
+function TipIconLock() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+function TipIconScale() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 3l5 5-5 5" />
+      <path d="M21 8H7" />
+      <path d="M8 21l-5-5 5-5" />
+      <path d="M3 16h14" />
+    </svg>
+  );
+}
+function TipIconCpu() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+      <rect x="9" y="9" width="6" height="6" />
+      <line x1="9" y1="1" x2="9" y2="4" />
+      <line x1="15" y1="1" x2="15" y2="4" />
+      <line x1="9" y1="20" x2="9" y2="23" />
+      <line x1="15" y1="20" x2="15" y2="23" />
+      <line x1="20" y1="9" x2="23" y2="9" />
+      <line x1="20" y1="14" x2="23" y2="14" />
+      <line x1="1" y1="9" x2="4" y2="9" />
+      <line x1="1" y1="14" x2="4" y2="14" />
+    </svg>
   );
 }
 
@@ -39,7 +103,7 @@ export default function Support() {
   return (
     <>
       <div className="border-b border-brand-border bg-brand-card px-6 py-10 text-center">
-        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+        <h1 className="text-2xl font-bold uppercase tracking-[0.08em] sm:text-3xl">
           Support
         </h1>
         <p className="mt-2 text-sm text-brand-muted">
@@ -50,13 +114,13 @@ export default function Support() {
       <div className="mx-auto max-w-[780px] px-6 pb-16 pt-12">
         <Link
           to="/"
-          className="mb-10 inline-flex items-center gap-1 text-sm font-semibold text-brand-accent no-underline transition-opacity hover:opacity-80"
+          className="mb-10 inline-flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
         >
           &larr; Back to Home
         </Link>
 
         {/* LOGGING WORKOUTS */}
-        <p className="mb-4 text-xs font-bold uppercase tracking-[0.1em] text-brand-accent">
+        <p className="mb-4 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Logging Workouts
         </p>
 
@@ -117,7 +181,7 @@ export default function Support() {
             more. The AI has context about your recent workout history to give
             more relevant answers.
           </p>
-          <div className="my-3 rounded-xl border border-brand-accent/30 bg-brand-accent/10 px-5 py-4">
+          <div className="my-3 rounded-lg border border-brand-border bg-brand-bg px-5 py-4">
             <p className="text-sm text-brand-text">
               Your email and personal identifiers are never sent to the AI. Only
               the exercise text and questions you type are transmitted.
@@ -126,7 +190,7 @@ export default function Support() {
         </FaqCard>
 
         {/* DATA & ACCOUNT */}
-        <p className="mb-4 mt-10 text-xs font-bold uppercase tracking-[0.1em] text-brand-accent">
+        <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Data &amp; Account Management
         </p>
 
@@ -138,16 +202,16 @@ export default function Support() {
             You can request complete account and data deletion in two ways:
           </p>
           <ol className="mb-3 space-y-2 pl-5 text-sm text-brand-muted">
-            <li className="relative pl-5 before:absolute before:left-0 before:font-bold before:text-brand-accent before:content-['1.']">
+            <li className="relative pl-5 before:absolute before:left-0 before:font-bold before:text-brand-text before:content-['1.']">
               <strong>In-app:</strong> Go to Settings &rarr; Account &rarr;
               Delete Account. This will permanently delete your account and all
               associated data.
             </li>
-            <li className="relative pl-5 before:absolute before:left-0 before:font-bold before:text-brand-accent before:content-['2.']">
+            <li className="relative pl-5 before:absolute before:left-0 before:font-bold before:text-brand-text before:content-['2.']">
               <strong>By email:</strong> Send a deletion request to{" "}
               <a
                 href="mailto:privacy@coachkettle.app"
-                className="text-brand-accent"
+                className="text-brand-text underline decoration-brand-border underline-offset-2 hover:decoration-brand-text"
               >
                 privacy@coachkettle.app
               </a>{" "}
@@ -170,7 +234,7 @@ export default function Support() {
             copy of your data by emailing{" "}
             <a
               href="mailto:privacy@coachkettle.app"
-              className="text-brand-accent"
+              className="text-brand-text underline decoration-brand-border underline-offset-2 hover:decoration-brand-text"
             >
               privacy@coachkettle.app
             </a>
@@ -203,7 +267,7 @@ export default function Support() {
         </FaqCard>
 
         {/* PRIVACY */}
-        <p className="mb-4 mt-10 text-xs font-bold uppercase tracking-[0.1em] text-brand-accent">
+        <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Privacy Questions
         </p>
 
@@ -219,7 +283,10 @@ export default function Support() {
           </p>
           <p className="text-sm text-brand-muted">
             See our full{" "}
-            <Link to="/privacy" className="text-brand-accent">
+            <Link
+              to="/privacy"
+              className="text-brand-text underline decoration-brand-border underline-offset-2 hover:decoration-brand-text"
+            >
               Privacy Policy
             </Link>{" "}
             for complete details.
@@ -261,52 +328,52 @@ export default function Support() {
         </FaqCard>
 
         {/* TIPS */}
-        <p className="mb-4 mt-10 text-xs font-bold uppercase tracking-[0.1em] text-brand-accent">
+        <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Tips &amp; Known Limitations
         </p>
 
-        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-brand-border sm:grid-cols-2 lg:grid-cols-3">
           {[
             {
-              icon: "\u26A1",
+              icon: <TipIconBolt />,
               title: "Use shorthand for speed",
               desc: 'After naming an exercise, just type "185 x 8" for subsequent sets — the app remembers the last exercise.',
             },
             {
-              icon: "\u{1F504}",
+              icon: <TipIconSync />,
               title: "Offline logging works",
               desc: "Sets are saved locally first. If you're offline at the gym, your data is safe and will sync when you reconnect.",
             },
             {
-              icon: "\u{1F3C6}",
+              icon: <TipIconTrophy />,
               title: "PRs need history",
               desc: "Personal record detection requires at least one previous logged set for the same exercise. First-time exercises won't trigger a PR.",
             },
             {
-              icon: "\u{1F512}",
+              icon: <TipIconLock />,
               title: "Session lock",
               desc: "The app locks after 4 hours of inactivity. Use Face ID or Touch ID to unlock — your data is protected.",
             },
             {
-              icon: "\u2696",
+              icon: <TipIconScale />,
               title: "kg auto-converts",
               desc: 'Append "kg" to any weight and it converts to lbs automatically. E.g., "Bench 60kg x 8".',
             },
             {
-              icon: "\u{1F916}",
+              icon: <TipIconCpu />,
               title: "AI fallback",
               desc: "If the local parser doesn't recognize your input format, it's automatically sent to AI parsing — no action needed.",
             },
           ].map((tip) => (
             <div
               key={tip.title}
-              className="rounded-xl border border-brand-border bg-brand-card p-5"
+              className="bg-brand-card p-5"
             >
-              <div className="mb-2 text-2xl">{tip.icon}</div>
-              <h4 className="mb-1 text-sm font-bold text-brand-text">
+              <div className="mb-3 text-brand-muted">{tip.icon}</div>
+              <h4 className="mb-1 text-sm font-medium text-brand-text">
                 {tip.title}
               </h4>
-              <p className="text-[0.85rem] leading-snug text-brand-muted">
+              <p className="text-[0.82rem] leading-snug text-brand-muted">
                 {tip.desc}
               </p>
             </div>
@@ -339,15 +406,15 @@ export default function Support() {
         </FaqCard>
 
         {/* CONTACT */}
-        <p className="mb-4 mt-10 text-xs font-bold uppercase tracking-[0.1em] text-brand-accent">
+        <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Contact Support
         </p>
 
-        <div className="mb-5 rounded-2xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
-          <h3 className="mb-2 text-lg font-bold">Email Us</h3>
+        <div className="mb-5 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
+          <h3 className="mb-2 text-base font-bold">Email Us</h3>
           <p className="mb-2 text-sm text-brand-muted">
             For general questions, bug reports, or feature requests, email our
-            support address and we'll get back to you within 1–3 business days.
+            support address and we'll get back to you within 1-3 business days.
           </p>
           <p className="mb-2 text-sm text-brand-muted">
             When reporting a bug, please include:
@@ -359,14 +426,14 @@ export default function Support() {
           </ul>
           <a
             href="mailto:support@coachkettle.app"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-accent px-5 py-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-brand-accent-hover"
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-brand-text no-underline transition-all hover:bg-white/[0.08]"
           >
-            &#x2709; Email support@coachkettle.app
+            support@coachkettle.app
           </a>
         </div>
 
-        <div className="mb-5 rounded-2xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
-          <h3 className="mb-2 text-lg font-bold">Privacy Requests</h3>
+        <div className="mb-5 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
+          <h3 className="mb-2 text-base font-bold">Privacy Requests</h3>
           <p className="mb-3 text-sm text-brand-muted">
             For data access, correction, deletion, or portability requests,
             contact our privacy team. We respond to all privacy requests within
@@ -374,28 +441,28 @@ export default function Support() {
           </p>
           <a
             href="mailto:privacy@coachkettle.app"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-accent px-5 py-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-brand-accent-hover"
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-brand-text no-underline transition-all hover:bg-white/[0.08]"
           >
-            &#x1F512; Email privacy@coachkettle.app
+            privacy@coachkettle.app
           </a>
         </div>
 
-        <div className="mb-8 rounded-2xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
-          <h3 className="mb-2 text-lg font-bold">General Contact</h3>
+        <div className="mb-8 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
+          <h3 className="mb-2 text-base font-bold">General Contact</h3>
           <p className="mb-3 text-sm text-brand-muted">
             For all other inquiries, reach the developer directly.
           </p>
           <a
             href="mailto:andrew@coachkettle.app"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-accent px-5 py-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-brand-accent-hover"
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-brand-text no-underline transition-all hover:bg-white/[0.08]"
           >
-            &#x2709; Email andrew@coachkettle.app
+            andrew@coachkettle.app
           </a>
         </div>
 
         <Link
           to="/"
-          className="inline-flex items-center gap-1 text-sm font-semibold text-brand-accent no-underline transition-opacity hover:opacity-80"
+          className="inline-flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
         >
           &larr; Back to Home
         </Link>
