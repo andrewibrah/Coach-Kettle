@@ -447,7 +447,7 @@ export default function Support() {
           </a>
         </div>
 
-        <div className="mb-8 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
+        <div className="mb-5 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
           <h3 className="mb-2 text-base font-bold">General Contact</h3>
           <p className="mb-3 text-sm text-brand-muted">
             For all other inquiries, reach the developer directly.
@@ -457,6 +457,19 @@ export default function Support() {
             className="inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-brand-text no-underline transition-all hover:bg-white/[0.08]"
           >
             andrew@coachkettle.app
+          </a>
+        </div>
+
+        <div className="mb-8 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
+          <h3 className="mb-2 text-base font-bold">Co-Developer</h3>
+          <p className="mb-3 text-sm text-brand-muted">
+            For development and technical inquiries.
+          </p>
+          <a
+            href="mailto:gabe@coachkettle.com"
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-brand-text no-underline transition-all hover:bg-white/[0.08]"
+          >
+            gabe@coachkettle.com
           </a>
         </div>
 
