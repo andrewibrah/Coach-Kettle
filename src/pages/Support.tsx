@@ -407,11 +407,11 @@ export default function Support() {
 
         {/* CONTACT */}
         <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
-          Contact Support
+          Contact Us
         </p>
 
         <div className="mb-5 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
-          <h3 className="mb-2 text-base font-bold">Email Us</h3>
+          <h3 className="mb-2 text-base font-bold">Bug Reports &amp; Feature Requests</h3>
           <p className="mb-2 text-sm text-brand-muted">
             For general questions, bug reports, or feature requests, email our
             support address and we'll get back to you within 1-3 business days.
@@ -447,30 +447,38 @@ export default function Support() {
           </a>
         </div>
 
-        <div className="mb-5 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
-          <h3 className="mb-2 text-base font-bold">General Contact</h3>
-          <p className="mb-3 text-sm text-brand-muted">
-            For all other inquiries, reach the developer directly.
-          </p>
-          <a
-            href="mailto:andrew@coachkettle.app"
-            className="inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-brand-text no-underline transition-all hover:bg-white/[0.08]"
-          >
-            andrew@coachkettle.app
-          </a>
-        </div>
-
         <div className="mb-8 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
-          <h3 className="mb-2 text-base font-bold">Co-Developer</h3>
-          <p className="mb-3 text-sm text-brand-muted">
-            For development and technical inquiries.
-          </p>
-          <a
-            href="mailto:gabe@coachkettle.com"
-            className="inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-brand-text no-underline transition-all hover:bg-white/[0.08]"
-          >
-            gabe@coachkettle.com
-          </a>
+          <h3 className="mb-4 text-base font-bold">Team</h3>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-brand-border bg-brand-bg px-5 py-4">
+              <p className="text-sm text-brand-muted">
+                <strong className="text-brand-text">Andrew Ibrahem</strong>
+                {" "}&mdash; Developer
+              </p>
+              <p className="mt-1 text-sm text-brand-muted">
+                <a
+                  href="mailto:andrew@coachkettle.app"
+                  className="text-brand-text underline decoration-brand-border underline-offset-2 hover:decoration-brand-text"
+                >
+                  andrew@coachkettle.app
+                </a>
+              </p>
+            </div>
+            <div className="rounded-lg border border-brand-border bg-brand-bg px-5 py-4">
+              <p className="text-sm text-brand-muted">
+                <strong className="text-brand-text">Gabriel Gaglio</strong>
+                {" "}&mdash; Co-Developer
+              </p>
+              <p className="mt-1 text-sm text-brand-muted">
+                <a
+                  href="mailto:gabe@coachkettle.com"
+                  className="text-brand-text underline decoration-brand-border underline-offset-2 hover:decoration-brand-text"
+                >
+                  gabe@coachkettle.com
+                </a>
+              </p>
+            </div>
+          </div>
         </div>
 
         <Link
