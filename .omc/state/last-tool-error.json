@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"asc subscriptions introductory-offers list --subscription-id 6760269429 --pretty --output json 2>&1 && echo \\\"---ANNUAL---\\\" && asc subscriptions introductory-offers list --subscription-id...",
+  "error": "Exit code 2\nDESCRIPTION\n  Manage subscription groups and subscriptions.\n\nUSAGE\n  asc subscriptions <subcommand> [flags]\n\nExamples:\n  asc subscriptions groups list --app \"APP_ID\"\n  asc subscriptions list --group-id \"GROUP_ID\"\n  asc subscriptions create --group-id \"GROUP_ID\" --reference-name \"Monthly\" --product-id \"com.example.sub.monthly\"\n  asc subscriptions setup --app \"APP_ID\" --group-reference-name \"Pro\" --reference-name \"Pro Monthly\" --product-id \"com.example.pro.monthly\" --subscription-perio...",
+  "timestamp": "2026-04-06T02:24:01.257Z",
+  "retry_count": 1
+}

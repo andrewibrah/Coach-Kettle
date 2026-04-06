@@ -8,7 +8,7 @@ import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useIAP } from '@/lib/iap';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,11 +28,18 @@ export default function PaywallScreen() {
   const router = useRouter();
   const { needsPaywall, needsInitialPaywall, dismissPaywall, refreshEntitlement } = useEntitlement();
   const { signOut } = useAuth();
-  const { products, restore, isProcessing } = useIAP({
+  const { products, purchase, restore, isProcessing, error: iapError } = useIAP({
     onPurchaseSuccess: refreshEntitlement,
   });
   const [selectedPlan, setSelectedPlan] = useState<Plan>('annual');
   const [isDismissing, setIsDismissing] = useState(false);
+
+  // Surface IAP errors to the user so failures aren't silent
+  useEffect(() => {
+    if (iapError) {
+      Alert.alert('Purchase Error', iapError);
+    }
+  }, [iapError]);
 
   const monthlyProduct = products.find(p => p.productId === SUBSCRIPTION.PRODUCT_ID_MONTHLY);
   const annualProduct = products.find(p => p.productId === SUBSCRIPTION.PRODUCT_ID_ANNUAL);
@@ -43,7 +50,11 @@ export default function PaywallScreen() {
   const isInitialMode = needsInitialPaywall;
 
   const handleSubscribe = async () => {
-    Alert.alert('Coming Soon', 'Subscritions coming soon...');
+    const productId =
+      selectedPlan === 'monthly'
+        ? SUBSCRIPTION.PRODUCT_ID_MONTHLY
+        : SUBSCRIPTION.PRODUCT_ID_ANNUAL;
+    await purchase(productId);
   };
 
   const handleSkip = async () => {

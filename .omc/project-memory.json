@@ -1,0 +1,319 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775442052292,
+  "projectRoot": "/Users/me/project/Coach-Kettle",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "react",
+        "version": "19.1.0",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.1.0",
+        "category": "frontend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run start",
+    "scripts": {
+      "start": "expo start",
+      "reset-project": "node ./scripts/reset-project.js",
+      "android": "expo run:android",
+      "ios": "expo run:ios",
+      "web": "expo start --web",
+      "lint": "expo lint"
+    }
+  },
+  "conventions": {
+    "namingStyle": "camelCase",
+    "importStyle": "ES modules",
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "app",
+      "assets",
+      "components",
+      "docs",
+      "lib",
+      "scripts"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "android": {
+      "path": "android",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1775442052276,
+      "keyFiles": [
+        "build.gradle",
+        "gradle.properties",
+        "gradlew",
+        "gradlew.bat",
+        "settings.gradle"
+      ]
+    },
+    "app": {
+      "path": "app",
+      "purpose": "Application code",
+      "fileCount": 5,
+      "lastAccessed": 1775442052276,
+      "keyFiles": [
+        "_layout.tsx",
+        "chats.tsx",
+        "modal.tsx",
+        "paywall.tsx",
+        "terms-of-service.tsx"
+      ]
+    },
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 0,
+      "lastAccessed": 1775442052278,
+      "keyFiles": []
+    },
+    "components": {
+      "path": "components",
+      "purpose": "UI components",
+      "fileCount": 5,
+      "lastAccessed": 1775442052279,
+      "keyFiles": [
+        "AppLogo.tsx",
+        "AuthLockProvider.tsx",
+        "AuthProvider.tsx",
+        "TermsOfServiceScreen.tsx",
+        "ThemeProvider.tsx"
+      ]
+    },
+    "constants": {
+      "path": "constants",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1775442052285,
+      "keyFiles": [
+        "legal.ts",
+        "subscription.ts",
+        "theme.ts"
+      ]
+    },
+    "contexts": {
+      "path": "contexts",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1775442052286,
+      "keyFiles": [
+        "EntitlementContext.tsx",
+        "OnboardingContext.tsx",
+        "PRCelebrationContext.tsx",
+        "ProfileContext.tsx"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 13,
+      "lastAccessed": 1775442052287,
+      "keyFiles": [
+        "AUTHENTICATION.md",
+        "CNAME",
+        "README.md",
+        "app-privacy-guide.md",
+        "devcontainer.md"
+      ]
+    },
+    "hooks": {
+      "path": "hooks",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1775442052287,
+      "keyFiles": [
+        "use-color-scheme.ts",
+        "use-color-scheme.web.ts",
+        "use-theme-color.ts",
+        "useCellEditing.ts",
+        "useCoachLogic.ts"
+      ]
+    },
+    "ios": {
+      "path": "ios",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1775442052287,
+      "keyFiles": [
+        "Podfile",
+        "Podfile.properties.json"
+      ]
+    },
+    "lib": {
+      "path": "lib",
+      "purpose": "Library code",
+      "fileCount": 14,
+      "lastAccessed": 1775442052288,
+      "keyFiles": [
+        "api.ts",
+        "auth.ts",
+        "authLock.ts",
+        "chatStorage.ts",
+        "iap.ts"
+      ]
+    },
+    "private": {
+      "path": "private",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1775442052288,
+      "keyFiles": [
+        "AuthKey_8S8Z2HSR3J.p8"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1775442052288,
+      "keyFiles": [
+        "generate-icon.js",
+        "ipad-screenshots.js"
+      ]
+    },
+    "supabase": {
+      "path": "supabase",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1775442052288,
+      "keyFiles": [
+        "config.toml"
+      ]
+    },
+    "supabase_migration": {
+      "path": "supabase_migration",
+      "purpose": null,
+      "fileCount": 12,
+      "lastAccessed": 1775442052288,
+      "keyFiles": [
+        "00_baseline_inventory.md",
+        "00_unknowns.md",
+        "01_project_config.md",
+        "02_schema_mapping.md",
+        "04_rls_matrix.md"
+      ]
+    },
+    "types": {
+      "path": "types",
+      "purpose": "Type definitions",
+      "fileCount": 1,
+      "lastAccessed": 1775442052289,
+      "keyFiles": [
+        "workout.ts"
+      ]
+    },
+    "android/app": {
+      "path": "android/app",
+      "purpose": "Application code",
+      "fileCount": 3,
+      "lastAccessed": 1775442052291,
+      "keyFiles": [
+        "build.gradle",
+        "debug.keystore",
+        "proguard-rules.pro"
+      ]
+    },
+    "supabase/migrations": {
+      "path": "supabase/migrations",
+      "purpose": "Database migrations",
+      "fileCount": 23,
+      "lastAccessed": 1775442052292,
+      "keyFiles": [
+        "0001_initial_schema.sql",
+        "0003_rls_policies.sql",
+        "0004_rpc_functions.sql"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "app/paywall.tsx",
+      "accessCount": 10,
+      "lastAccessed": 1775442468554,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 4,
+      "lastAccessed": 1775442212506,
+      "type": "directory"
+    },
+    {
+      "path": "asc_sub_stats.md",
+      "accessCount": 2,
+      "lastAccessed": 1775442416420,
+      "type": "file"
+    },
+    {
+      "path": "lib/iap.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775442416883,
+      "type": "file"
+    },
+    {
+      "path": "constants/subscription.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775442417400,
+      "type": "file"
+    },
+    {
+      "path": "supabase/functions/iap/index.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775442248107,
+      "type": "file"
+    },
+    {
+      "path": "contexts/EntitlementContext.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775442426846,
+      "type": "file"
+    },
+    {
+      "path": "app/settings/subscription.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775442427268,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
