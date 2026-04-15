@@ -139,11 +139,11 @@ export default function SubscriptionScreen() {
             <View style={[styles.detailRow, { backgroundColor: cardBg }]}>
               <ThemedText style={styles.detailLabel}>Plan price</ThemedText>
               <ThemedText style={styles.detailValue}>
-                {entitlement.subscriptionId?.includes('annual')
+                {entitlement.appleProductId === SUBSCRIPTION.PRODUCT_ID_ANNUAL
                   ? `${SUBSCRIPTION.PRICE_ANNUAL}/year`
-                  : entitlement.subscriptionId?.includes('monthly')
+                  : entitlement.appleProductId === SUBSCRIPTION.PRODUCT_ID_MONTHLY
                     ? `${SUBSCRIPTION.PRICE_MONTHLY}/month`
-                    : `${SUBSCRIPTION.PRICE_MONTHLY}/mo or ${SUBSCRIPTION.PRICE_ANNUAL}/yr`}
+                    : '—'}
               </ThemedText>
             </View>
           </View>
