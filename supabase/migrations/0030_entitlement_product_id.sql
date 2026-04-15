@@ -1,6 +1,9 @@
 -- supabase/migrations/0030_entitlement_product_id.sql
 -- Update get_entitlement RPC to also return apple_product_id from subscriptions table.
 -- This allows the client to display the correct plan price without a UUID string-match hack.
+-- Must DROP first because PostgreSQL does not allow CREATE OR REPLACE when the return type changes.
+
+DROP FUNCTION IF EXISTS public.get_entitlement(UUID);
 
 CREATE OR REPLACE FUNCTION public.get_entitlement(p_user_id UUID)
 RETURNS TABLE(
