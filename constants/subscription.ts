@@ -8,7 +8,7 @@
 export const SUBSCRIPTION = {
   // App Store Connect Product IDs
   PRODUCT_ID_MONTHLY: 'com.coachkettle.pro.monthly',
-  PRODUCT_ID_ANNUAL: 'com.coachkettle.annual',
+  PRODUCT_ID_ANNUAL: 'com.coachkettle.pro.annual.v2',
 
   // Pricing (display only — actual pricing set in App Store Connect)
   PRICE_MONTHLY: '$1.99',
