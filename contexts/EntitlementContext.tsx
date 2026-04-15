@@ -14,6 +14,7 @@ export interface EntitlementState {
   expiresAt: string | null;
   trialDaysRemaining: number;
   subscriptionId: string | null;
+  appleProductId: string | null;
   paywallDismissed: boolean;
 }
 
@@ -40,6 +41,7 @@ const defaultEntitlement: EntitlementState = {
   expiresAt: null,
   trialDaysRemaining: 0,
   subscriptionId: null,
+  appleProductId: null,
   paywallDismissed: false,
 };
 
@@ -96,6 +98,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
               expiresAt: json2.data.expires_at ?? null,
               trialDaysRemaining: json2.data.trial_days_remaining ?? 0,
               subscriptionId: json2.data.subscription_id ?? null,
+              appleProductId: json2.data.apple_product_id ?? null,
               paywallDismissed: (json2.data.paywall_dismissed ?? false) || json2.data.status === 'sub_active',
             });
           }
@@ -106,6 +109,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
             expiresAt: json.data.expires_at ?? null,
             trialDaysRemaining: json.data.trial_days_remaining ?? 0,
             subscriptionId: json.data.subscription_id ?? null,
+            appleProductId: json.data.apple_product_id ?? null,
             paywallDismissed: (json.data.paywall_dismissed ?? false) || json.data.status === 'sub_active',
           });
         }

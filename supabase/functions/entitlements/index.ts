@@ -117,6 +117,7 @@ serve(async (req) => {
                             trial_days_remaining: 7,
                             subscription_id: null,
                             paywall_dismissed: bRow?.paywall_dismissed ?? false,
+                            apple_product_id: null,
                         },
                     }),
                     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -133,6 +134,7 @@ serve(async (req) => {
                         trial_days_remaining: row.trial_days_remaining ?? 0,
                         subscription_id: row.subscription_id ?? null,
                         paywall_dismissed: row.paywall_dismissed ?? false,
+                        apple_product_id: row.apple_product_id ?? null,
                     },
                 }),
                 { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
