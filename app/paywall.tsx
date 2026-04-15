@@ -194,6 +194,23 @@ export default function PaywallScreen() {
           )}
         </Pressable>
 
+        {/* Apple Guideline 3.1.2 — auto-renew disclosure + legal links */}
+        <ThemedText style={[styles.disclosureText, { color: colors.placeholder }]}>
+          {selectedPlan === 'annual'
+            ? `${annualPrice}/year`
+            : `${monthlyPrice}/month`}
+          {' '}· Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel anytime in your Apple ID account settings.
+        </ThemedText>
+        <View style={styles.legalLinks}>
+          <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8}>
+            <ThemedText style={[styles.legalLink, { color: colors.tint }]}>Terms of Service</ThemedText>
+          </Pressable>
+          <ThemedText style={[styles.legalSep, { color: colors.placeholder }]}> · </ThemedText>
+          <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8}>
+            <ThemedText style={[styles.legalLink, { color: colors.tint }]}>Privacy Policy</ThemedText>
+          </Pressable>
+        </View>
+
         {/* Skip Button (initial mode only) */}
         {isInitialMode && (
           <Pressable
@@ -394,5 +411,25 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.7,
+  },
+  disclosureText: {
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  legalLink: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  legalSep: {
+    fontSize: 12,
   },
 });
