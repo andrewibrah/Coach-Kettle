@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { compactVerify, importX509 } from "https://deno.land/x/jose@v5.9.3/index.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -105,6 +106,70 @@ async function verifyWithApple(receiptData: string): Promise<{ response: AppleRe
  */
 function base64UrlDecode(str: string): string {
     return atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+}
+
+// ─── Apple JWS signature verification ───────────────────────────────────────
+
+// Apple Root CA G3 SHA-256 fingerprint (lowercase hex, no colons)
+const APPLE_ROOT_CA_G3_FINGERPRINT = "63343afbd6b5b53dc2074abd75c19d573718894ab0ece2e715ebb15423279883";
+
+/**
+ * Verifies an Apple ASSN v2 JWS payload.
+ * 1. Extracts x5c certificate chain from the JWS header.
+ * 2. Verifies the root certificate is Apple Root CA G3 (by SHA-256 fingerprint).
+ * 3. Verifies the JWS signature using the leaf certificate's public key.
+ * Returns the decoded payload on success; throws on any verification failure.
+ */
+async function verifyAppleJWS(jws: string): Promise<Record<string, unknown>> {
+    const parts = jws.split(".");
+    if (parts.length !== 3) {
+        throw new Error("Invalid JWS format: expected 3 parts");
+    }
+
+    // Parse the protected header
+    let header: { x5c?: string[]; alg?: string };
+    try {
+        header = JSON.parse(base64UrlDecode(parts[0]));
+    } catch {
+        throw new Error("Failed to parse JWS header");
+    }
+
+    const { x5c, alg = "ES256" } = header;
+    if (!Array.isArray(x5c) || x5c.length < 2) {
+        throw new Error("Missing or incomplete x5c certificate chain in JWS header");
+    }
+
+    // 1. Verify root certificate fingerprint against Apple Root CA G3
+    const rootDerBytes = Uint8Array.from(atob(x5c[x5c.length - 1]), (c) => c.charCodeAt(0));
+    const rootDigest = await crypto.subtle.digest("SHA-256", rootDerBytes);
+    const rootHex = [...new Uint8Array(rootDigest)]
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+    if (rootHex !== APPLE_ROOT_CA_G3_FINGERPRINT) {
+        throw new Error(`JWS root cert fingerprint mismatch — got ${rootHex}`);
+    }
+
+    // 2. Import leaf certificate and verify JWS signature
+    const leafPem = [
+        "-----BEGIN CERTIFICATE-----",
+        x5c[0],
+        "-----END CERTIFICATE-----",
+    ].join("\n");
+
+    let publicKey: CryptoKey;
+    try {
+        publicKey = await importX509(leafPem, alg);
+    } catch (e) {
+        throw new Error(`Failed to import leaf certificate: ${e}`);
+    }
+
+    try {
+        const { payload } = await compactVerify(jws, publicKey);
+        return JSON.parse(new TextDecoder().decode(payload));
+    } catch (e) {
+        throw new Error(`JWS signature verification failed: ${e}`);
+    }
 }
 
 // ─── verify_receipt ─────────────────────────────────────────────────────────
@@ -388,46 +453,49 @@ async function handleNotification(
     }
 
     try {
-        // 1. Decode the JWS signedPayload
-        // TODO: Production — verify JWS signature using Apple's public keys
-        //       (fetch from https://appleid.apple.com/auth/keys)
-        const payloadParts = signedPayload.split(".");
-        if (payloadParts.length !== 3) {
-            console.error("[iap] Invalid JWS format: expected 3 parts, got", payloadParts.length);
+        // 1. Verify JWS signature and decode outer payload
+        let decodedPayload: Record<string, unknown>;
+        try {
+            decodedPayload = await verifyAppleJWS(signedPayload);
+        } catch (verifyErr) {
+            console.error("[iap] JWS verification failed:", verifyErr);
+            // Return 200 so Apple doesn't retry; log the rejection
+            await supabaseAdmin.from("subscription_events").insert({
+                event_type: "apple_server_notification_verification_failed",
+                raw_payload: { error: String(verifyErr) },
+                idempotency_key: `verification_failed_${Date.now()}`,
+            }).catch(() => { /* best-effort log */ });
             return respondJson({ ok: true });
         }
 
-        const decodedPayload = JSON.parse(base64UrlDecode(payloadParts[1]));
-
         // 2. Extract notification data
-        const notificationType: string = decodedPayload.notificationType;
-        const subtype: string | undefined = decodedPayload.subtype;
-        const notificationUUID: string | undefined = decodedPayload.notificationUUID;
+        const notificationType: string = decodedPayload.notificationType as string;
+        const subtype: string | undefined = decodedPayload.subtype as string | undefined;
+        const notificationUUID: string | undefined = decodedPayload.notificationUUID as string | undefined;
 
         console.log(`[iap] Notification received: type=${notificationType}, subtype=${subtype ?? "none"}, uuid=${notificationUUID ?? "unknown"}`);
 
-        // Decode the inner signedTransactionInfo JWS
-        const signedTransactionInfo: string | undefined = decodedPayload.data?.signedTransactionInfo;
+        // Decode and verify the inner signedTransactionInfo JWS
+        const signedTransactionInfo: string | undefined = (decodedPayload.data as Record<string, unknown>)?.signedTransactionInfo as string | undefined;
         if (!signedTransactionInfo) {
             console.error("[iap] No signedTransactionInfo in notification payload");
-            // Log raw event and return 200
             await logRawNotification(decodedPayload, notificationUUID);
             return respondJson({ ok: true });
         }
 
-        const txnParts = signedTransactionInfo.split(".");
-        if (txnParts.length !== 3) {
-            console.error("[iap] Invalid signedTransactionInfo JWS format");
+        let txnInfo: Record<string, unknown>;
+        try {
+            txnInfo = await verifyAppleJWS(signedTransactionInfo);
+        } catch (txnVerifyErr) {
+            console.error("[iap] Inner signedTransactionInfo verification failed:", txnVerifyErr);
             await logRawNotification(decodedPayload, notificationUUID);
             return respondJson({ ok: true });
         }
 
-        const txnInfo = JSON.parse(base64UrlDecode(txnParts[1]));
-
-        const originalTransactionId: string = txnInfo.originalTransactionId;
-        const productId: string = txnInfo.productId;
-        const expiresDate: number | undefined = txnInfo.expiresDate; // milliseconds
-        const txnEnvironment: string = txnInfo.environment?.toLowerCase() === "sandbox" ? "sandbox" : "production";
+        const originalTransactionId: string = txnInfo.originalTransactionId as string;
+        const productId: string = txnInfo.productId as string;
+        const expiresDate: number | undefined = txnInfo.expiresDate as number | undefined; // milliseconds
+        const txnEnvironment: string = (txnInfo.environment as string)?.toLowerCase() === "sandbox" ? "sandbox" : "production";
 
         console.log(`[iap] Transaction info: originalTxnId=${originalTransactionId}, product=${productId}, env=${txnEnvironment}`);
 
@@ -440,7 +508,6 @@ async function handleNotification(
 
         if (lookupError || !subRecord) {
             console.error(`[iap] No subscription found for original_transaction_id=${originalTransactionId}:`, lookupError?.message ?? "not found");
-            // Log raw event even if we can't find the user
             await logRawNotification(decodedPayload, notificationUUID);
             return respondJson({ ok: true });
         }
@@ -537,6 +604,55 @@ async function handleNotification(
                     .eq("id", subscriptionId);
 
                 console.log(`[iap] DID_CHANGE_RENEWAL_STATUS processed for user ${userId}, auto_renew=${autoRenew}`);
+                break;
+            }
+
+            case "SUBSCRIBED": {
+                // New subscription purchase or resubscription after lapse.
+                // verify_receipt already handles the initial purchase flow; this is a
+                // belt-and-suspenders update in case the client receipt call is missed.
+                const newPeriodEnd = expiresDate ? new Date(expiresDate).toISOString() : null;
+
+                await supabaseAdmin
+                    .from("subscriptions")
+                    .update({
+                        status: "active",
+                        apple_product_id: productId,
+                        ...(newPeriodEnd ? { current_period_end: newPeriodEnd } : {}),
+                    })
+                    .eq("id", subscriptionId);
+
+                await supabaseAdmin
+                    .from("user_entitlements")
+                    .update({
+                        status: "sub_active",
+                        source: "subscription",
+                        expires_at: newPeriodEnd,
+                        paywall_dismissed: true,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("user_id", userId);
+
+                console.log(`[iap] SUBSCRIBED: user ${userId} now sub_active`);
+                break;
+            }
+
+            case "GRACE_PERIOD_EXPIRED": {
+                // Billing retry period ended without successful renewal — expire the user.
+                await supabaseAdmin
+                    .from("subscriptions")
+                    .update({ status: "expired" })
+                    .eq("id", subscriptionId);
+
+                await supabaseAdmin
+                    .from("user_entitlements")
+                    .update({
+                        status: "sub_expired",
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("user_id", userId);
+
+                console.log(`[iap] GRACE_PERIOD_EXPIRED: user ${userId} now sub_expired`);
                 break;
             }
 
