@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775442052292,
+  "lastScanned": 1776274214234,
   "projectRoot": "/Users/me/project/Coach-Kettle",
   "techStack": {
     "languages": [
@@ -78,7 +78,7 @@
       "path": "android",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1775442052276,
+      "lastAccessed": 1776274214226,
       "keyFiles": [
         "build.gradle",
         "gradle.properties",
@@ -91,7 +91,7 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1775442052276,
+      "lastAccessed": 1776274214226,
       "keyFiles": [
         "_layout.tsx",
         "chats.tsx",
@@ -104,14 +104,14 @@
       "path": "assets",
       "purpose": "Static assets",
       "fileCount": 0,
-      "lastAccessed": 1775442052278,
+      "lastAccessed": 1776274214228,
       "keyFiles": []
     },
     "components": {
       "path": "components",
       "purpose": "UI components",
       "fileCount": 5,
-      "lastAccessed": 1775442052279,
+      "lastAccessed": 1776274214228,
       "keyFiles": [
         "AppLogo.tsx",
         "AuthLockProvider.tsx",
@@ -124,7 +124,7 @@
       "path": "constants",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1775442052285,
+      "lastAccessed": 1776274214229,
       "keyFiles": [
         "legal.ts",
         "subscription.ts",
@@ -135,7 +135,7 @@
       "path": "contexts",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1775442052286,
+      "lastAccessed": 1776274214230,
       "keyFiles": [
         "EntitlementContext.tsx",
         "OnboardingContext.tsx",
@@ -147,7 +147,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 13,
-      "lastAccessed": 1775442052287,
+      "lastAccessed": 1776274214230,
       "keyFiles": [
         "AUTHENTICATION.md",
         "CNAME",
@@ -160,7 +160,7 @@
       "path": "hooks",
       "purpose": null,
       "fileCount": 7,
-      "lastAccessed": 1775442052287,
+      "lastAccessed": 1776274214231,
       "keyFiles": [
         "use-color-scheme.ts",
         "use-color-scheme.web.ts",
@@ -173,7 +173,7 @@
       "path": "ios",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1775442052287,
+      "lastAccessed": 1776274214231,
       "keyFiles": [
         "Podfile",
         "Podfile.properties.json"
@@ -183,7 +183,7 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 14,
-      "lastAccessed": 1775442052288,
+      "lastAccessed": 1776274214232,
       "keyFiles": [
         "api.ts",
         "auth.ts",
@@ -196,7 +196,7 @@
       "path": "private",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1775442052288,
+      "lastAccessed": 1776274214232,
       "keyFiles": [
         "AuthKey_8S8Z2HSR3J.p8"
       ]
@@ -205,7 +205,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 2,
-      "lastAccessed": 1775442052288,
+      "lastAccessed": 1776274214232,
       "keyFiles": [
         "generate-icon.js",
         "ipad-screenshots.js"
@@ -215,7 +215,7 @@
       "path": "supabase",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1775442052288,
+      "lastAccessed": 1776274214232,
       "keyFiles": [
         "config.toml"
       ]
@@ -224,7 +224,7 @@
       "path": "supabase_migration",
       "purpose": null,
       "fileCount": 12,
-      "lastAccessed": 1775442052288,
+      "lastAccessed": 1776274214232,
       "keyFiles": [
         "00_baseline_inventory.md",
         "00_unknowns.md",
@@ -237,7 +237,7 @@
       "path": "types",
       "purpose": "Type definitions",
       "fileCount": 1,
-      "lastAccessed": 1775442052289,
+      "lastAccessed": 1776274214232,
       "keyFiles": [
         "workout.ts"
       ]
@@ -246,7 +246,7 @@
       "path": "android/app",
       "purpose": "Application code",
       "fileCount": 3,
-      "lastAccessed": 1775442052291,
+      "lastAccessed": 1776274214233,
       "keyFiles": [
         "build.gradle",
         "debug.keystore",
@@ -257,7 +257,7 @@
       "path": "supabase/migrations",
       "purpose": "Database migrations",
       "fileCount": 23,
-      "lastAccessed": 1775442052292,
+      "lastAccessed": 1776274214234,
       "keyFiles": [
         "0001_initial_schema.sql",
         "0003_rls_policies.sql",
@@ -268,8 +268,20 @@
   "hotPaths": [
     {
       "path": "app/paywall.tsx",
-      "accessCount": 10,
-      "lastAccessed": 1775442468554,
+      "accessCount": 12,
+      "lastAccessed": 1776274800400,
+      "type": "file"
+    },
+    {
+      "path": "supabase/functions/iap/index.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776274868168,
+      "type": "file"
+    },
+    {
+      "path": "contexts/EntitlementContext.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1776274918805,
       "type": "file"
     },
     {
@@ -279,9 +291,15 @@
       "type": "directory"
     },
     {
+      "path": "constants/subscription.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776276262265,
+      "type": "file"
+    },
+    {
       "path": "asc_sub_stats.md",
-      "accessCount": 2,
-      "lastAccessed": 1775442416420,
+      "accessCount": 3,
+      "lastAccessed": 1776276303554,
       "type": "file"
     },
     {
@@ -291,27 +309,21 @@
       "type": "file"
     },
     {
-      "path": "constants/subscription.ts",
+      "path": "supabase/functions/entitlements/index.ts",
       "accessCount": 2,
-      "lastAccessed": 1775442417400,
-      "type": "file"
-    },
-    {
-      "path": "supabase/functions/iap/index.ts",
-      "accessCount": 1,
-      "lastAccessed": 1775442248107,
-      "type": "file"
-    },
-    {
-      "path": "contexts/EntitlementContext.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1775442426846,
+      "lastAccessed": 1776274900159,
       "type": "file"
     },
     {
       "path": "app/settings/subscription.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1775442427268,
+      "accessCount": 2,
+      "lastAccessed": 1776274932676,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0030_entitlement_product_id.sql",
+      "accessCount": 2,
+      "lastAccessed": 1776275083065,
       "type": "file"
     }
   ],

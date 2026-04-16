@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"asc subscriptions introductory-offers list --subscription-id 6760269429 --pretty --output json 2>&1 && echo \\\"---ANNUAL---\\\" && asc subscriptions introductory-offers list --subscription-id...",
-  "error": "Exit code 2\nDESCRIPTION\n  Manage subscription groups and subscriptions.\n\nUSAGE\n  asc subscriptions <subcommand> [flags]\n\nExamples:\n  asc subscriptions groups list --app \"APP_ID\"\n  asc subscriptions list --group-id \"GROUP_ID\"\n  asc subscriptions create --group-id \"GROUP_ID\" --reference-name \"Monthly\" --product-id \"com.example.sub.monthly\"\n  asc subscriptions setup --app \"APP_ID\" --group-reference-name \"Pro\" --reference-name \"Pro Monthly\" --product-id \"com.example.pro.monthly\" --subscription-perio...",
-  "timestamp": "2026-04-06T02:24:01.257Z",
-  "retry_count": 1
+  "tool_input_preview": "{\"command\":\"asc subscriptions create --group-id 21967675 --reference-name \\\"Annual\\\" --product-id \\\"com.coachkettle.pro.annual\\\" --subscription-period ONE_YEAR 2>&1\",\"description\":\"Create annual subsc...",
+  "error": "Exit code 5\nError: subscriptions create: failed to create: The provided entity includes an attribute with a value that has already been used: This product ID has already been used",
+  "timestamp": "2026-04-15T18:03:26.580Z",
+  "retry_count": 4
 }

@@ -1,0 +1,4 @@
+{"t":0,"agent":"system","event":"skill_invoked","skill_name":"superpowers:executing-plans"}
+{"t":0,"agent":"aef6dae","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a9336dd","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a06646c","agent_type":"unknown","event":"agent_stop","success":true}
