@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776274214234,
+  "lastScanned": 1776370646915,
   "projectRoot": "/Users/me/project/Coach-Kettle",
   "techStack": {
     "languages": [
@@ -78,7 +78,7 @@
       "path": "android",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1776274214226,
+      "lastAccessed": 1776370646911,
       "keyFiles": [
         "build.gradle",
         "gradle.properties",
@@ -91,7 +91,7 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1776274214226,
+      "lastAccessed": 1776370646911,
       "keyFiles": [
         "_layout.tsx",
         "chats.tsx",
@@ -104,14 +104,14 @@
       "path": "assets",
       "purpose": "Static assets",
       "fileCount": 0,
-      "lastAccessed": 1776274214228,
+      "lastAccessed": 1776370646911,
       "keyFiles": []
     },
     "components": {
       "path": "components",
       "purpose": "UI components",
       "fileCount": 5,
-      "lastAccessed": 1776274214228,
+      "lastAccessed": 1776370646912,
       "keyFiles": [
         "AppLogo.tsx",
         "AuthLockProvider.tsx",
@@ -124,7 +124,7 @@
       "path": "constants",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1776274214229,
+      "lastAccessed": 1776370646912,
       "keyFiles": [
         "legal.ts",
         "subscription.ts",
@@ -135,7 +135,7 @@
       "path": "contexts",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1776274214230,
+      "lastAccessed": 1776370646912,
       "keyFiles": [
         "EntitlementContext.tsx",
         "OnboardingContext.tsx",
@@ -147,7 +147,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 13,
-      "lastAccessed": 1776274214230,
+      "lastAccessed": 1776370646912,
       "keyFiles": [
         "AUTHENTICATION.md",
         "CNAME",
@@ -160,7 +160,7 @@
       "path": "hooks",
       "purpose": null,
       "fileCount": 7,
-      "lastAccessed": 1776274214231,
+      "lastAccessed": 1776370646912,
       "keyFiles": [
         "use-color-scheme.ts",
         "use-color-scheme.web.ts",
@@ -173,7 +173,7 @@
       "path": "ios",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1776274214231,
+      "lastAccessed": 1776370646912,
       "keyFiles": [
         "Podfile",
         "Podfile.properties.json"
@@ -183,7 +183,7 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 14,
-      "lastAccessed": 1776274214232,
+      "lastAccessed": 1776370646913,
       "keyFiles": [
         "api.ts",
         "auth.ts",
@@ -196,7 +196,7 @@
       "path": "private",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1776274214232,
+      "lastAccessed": 1776370646913,
       "keyFiles": [
         "AuthKey_8S8Z2HSR3J.p8"
       ]
@@ -205,7 +205,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 2,
-      "lastAccessed": 1776274214232,
+      "lastAccessed": 1776370646913,
       "keyFiles": [
         "generate-icon.js",
         "ipad-screenshots.js"
@@ -215,7 +215,7 @@
       "path": "supabase",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1776274214232,
+      "lastAccessed": 1776370646913,
       "keyFiles": [
         "config.toml"
       ]
@@ -224,7 +224,7 @@
       "path": "supabase_migration",
       "purpose": null,
       "fileCount": 12,
-      "lastAccessed": 1776274214232,
+      "lastAccessed": 1776370646913,
       "keyFiles": [
         "00_baseline_inventory.md",
         "00_unknowns.md",
@@ -237,7 +237,7 @@
       "path": "types",
       "purpose": "Type definitions",
       "fileCount": 1,
-      "lastAccessed": 1776274214232,
+      "lastAccessed": 1776370646913,
       "keyFiles": [
         "workout.ts"
       ]
@@ -246,7 +246,7 @@
       "path": "android/app",
       "purpose": "Application code",
       "fileCount": 3,
-      "lastAccessed": 1776274214233,
+      "lastAccessed": 1776370646913,
       "keyFiles": [
         "build.gradle",
         "debug.keystore",
@@ -256,8 +256,8 @@
     "supabase/migrations": {
       "path": "supabase/migrations",
       "purpose": "Database migrations",
-      "fileCount": 23,
-      "lastAccessed": 1776274214234,
+      "fileCount": 24,
+      "lastAccessed": 1776370646913,
       "keyFiles": [
         "0001_initial_schema.sql",
         "0003_rls_policies.sql",
@@ -266,6 +266,12 @@
     }
   },
   "hotPaths": [
+    {
+      "path": "",
+      "accessCount": 16,
+      "lastAccessed": 1776371493471,
+      "type": "directory"
+    },
     {
       "path": "app/paywall.tsx",
       "accessCount": 12,
@@ -280,15 +286,21 @@
     },
     {
       "path": "contexts/EntitlementContext.tsx",
-      "accessCount": 5,
-      "lastAccessed": 1776274918805,
+      "accessCount": 7,
+      "lastAccessed": 1776371488139,
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 4,
-      "lastAccessed": 1775442212506,
-      "type": "directory"
+      "path": "app/auth/sign-in.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1776371721497,
+      "type": "file"
+    },
+    {
+      "path": "app/auth/sign-up.tsx",
+      "accessCount": 6,
+      "lastAccessed": 1776371722004,
+      "type": "file"
     },
     {
       "path": "constants/subscription.ts",
@@ -300,6 +312,24 @@
       "path": "asc_sub_stats.md",
       "accessCount": 3,
       "lastAccessed": 1776276303554,
+      "type": "file"
+    },
+    {
+      "path": "lib/api.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776371747086,
+      "type": "directory"
+    },
+    {
+      "path": "lib/authLock.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776371764667,
+      "type": "file"
+    },
+    {
+      "path": "components/TermsOfServiceScreen.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1776371771000,
       "type": "file"
     },
     {
@@ -325,6 +355,90 @@
       "accessCount": 2,
       "lastAccessed": 1776275083065,
       "type": "file"
+    },
+    {
+      "path": "components/AuthLockProvider.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1776371628475,
+      "type": "file"
+    },
+    {
+      "path": "app",
+      "accessCount": 1,
+      "lastAccessed": 1776306029949,
+      "type": "directory"
+    },
+    {
+      "path": "app/terms-of-service.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776306143993,
+      "type": "file"
+    },
+    {
+      "path": "components",
+      "accessCount": 1,
+      "lastAccessed": 1776306150478,
+      "type": "directory"
+    },
+    {
+      "path": "constants/legal.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776306167918,
+      "type": "file"
+    },
+    {
+      "path": "components/AuthProvider.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776371452441,
+      "type": "file"
+    },
+    {
+      "path": "lib/auth.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776371452897,
+      "type": "file"
+    },
+    {
+      "path": "app/_layout.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776371456592,
+      "type": "file"
+    },
+    {
+      "path": "app/auth/_layout.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776371470413,
+      "type": "file"
+    },
+    {
+      "path": "app/onboarding/index.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776371470893,
+      "type": "file"
+    },
+    {
+      "path": "app.json",
+      "accessCount": 1,
+      "lastAccessed": 1776371471394,
+      "type": "file"
+    },
+    {
+      "path": "app/(tabs)/_layout.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776371476451,
+      "type": "file"
+    },
+    {
+      "path": "app/(tabs)/index.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776371477763,
+      "type": "directory"
+    },
+    {
+      "path": "contexts/OnboardingContext.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776371483231,
+      "type": "directory"
     }
   ],
   "userDirectives": []

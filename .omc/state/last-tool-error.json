@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"asc subscriptions create --group-id 21967675 --reference-name \\\"Annual\\\" --product-id \\\"com.coachkettle.pro.annual\\\" --subscription-period ONE_YEAR 2>&1\",\"description\":\"Create annual subsc...",
-  "error": "Exit code 5\nError: subscriptions create: failed to create: The provided entity includes an attribute with a value that has already been used: This product ID has already been used",
-  "timestamp": "2026-04-15T18:03:26.580Z",
-  "retry_count": 4
+  "tool_input_preview": "{\"command\":\"asc subscriptions groups localizations delete --id 45bacde3-a650-4ce1-9fda-210d3690bd9a --confirm 2>&1\",\"description\":\"Delete rejected group en-US localization (separately)\"}",
+  "error": "Exit code 5\nError: subscriptions groups localizations delete: failed to delete: You cannot delete the group localization.: You must have at least once active localization in an approved subscription group",
+  "timestamp": "2026-04-16T20:38:31.526Z",
+  "retry_count": 5
 }

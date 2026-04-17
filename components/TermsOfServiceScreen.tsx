@@ -34,11 +34,31 @@ export function TermsOfServiceScreen() {
                 console.log('[TermsOfService] Terms accepted, navigating to app...');
                 router.replace('/(tabs)');
             } else {
-                Alert.alert('Error', 'Failed to save terms acceptance. Please try again.');
+                // Server sync failed after all retries. Local acceptance is recorded.
+                // Offer a clear retry path so a transient network failure (notably
+                // observed on iPad in App Review) does not strand the user here.
+                Alert.alert(
+                    'Network Error',
+                    'We could not save your acceptance to our servers. Please check your connection and try again.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Retry', onPress: () => { void handleAccept(); } },
+                    ]
+                );
             }
-        } catch (error) {
-            console.error('[TermsOfService] Accept error:', error);
-            Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+        } catch (error: any) {
+            console.error('[TermsOfService] Accept error:', {
+                message: error?.message,
+                stack: error?.stack,
+            });
+            Alert.alert(
+                'Error',
+                error?.message ? `Could not accept terms: ${error.message}` : 'An unexpected error occurred. Please try again.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Retry', onPress: () => { void handleAccept(); } },
+                ]
+            );
         } finally {
             setIsAccepting(false);
         }

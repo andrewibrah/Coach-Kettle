@@ -122,20 +122,42 @@ export async function setTermsAcceptance(): Promise<void> {
 
 /**
  * Sync terms acceptance to server (call after successful authentication)
- * This should be called after login/signup when we have a valid session
+ * This should be called after login/signup when we have a valid session.
+ *
+ * Retries with exponential backoff (300ms, 900ms, 2700ms) so a transient
+ * network blip on first sign-in (notably common on iPad in App Review)
+ * does not lock the user inside the onboarding terms gate.
  */
 export async function syncTermsAcceptanceToServer(): Promise<boolean> {
-  try {
-    // Dynamic import to avoid circular dependency
-    const { api } = await import('./api');
-    const result = await api.recordTermsAcceptance(CURRENT_TERMS_VERSION, CURRENT_TERMS_VERSION);
-    console.log('[authLock] Terms acceptance synced to server:', result);
-    return result.ok;
-  } catch (error) {
-    console.error('[authLock] Failed to sync terms acceptance to server:', error);
-    // Don't throw - local acceptance is still valid
-    return false;
+  const { api } = await import('./api');
+  const delays = [0, 300, 900, 2700];
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) {
+      await new Promise(r => setTimeout(r, delays[attempt]));
+    }
+    try {
+      const result = await api.recordTermsAcceptance(CURRENT_TERMS_VERSION, CURRENT_TERMS_VERSION);
+      if (result?.ok) {
+        if (attempt > 0) {
+          console.log(`[authLock] Terms acceptance synced on retry attempt ${attempt + 1}`);
+        } else {
+          console.log('[authLock] Terms acceptance synced to server');
+        }
+        return true;
+      }
+      lastError = new Error(`Server responded with ok=false on attempt ${attempt + 1}`);
+    } catch (error) {
+      lastError = error;
+      console.warn(`[authLock] Terms sync attempt ${attempt + 1} failed:`, error);
+    }
   }
+
+  console.error('[authLock] All terms sync attempts failed:', lastError);
+  // Local acceptance has already been written by the caller;
+  // return false so UI can prompt the user to retry.
+  return false;
 }
 
 /**

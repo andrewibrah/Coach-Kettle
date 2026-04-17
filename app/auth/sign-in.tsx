@@ -240,12 +240,22 @@ export default function SignIn() {
 
       await completeAuthAndNavigate();
     } catch (err: any) {
-      if (err.code === 'ERR_REQUEST_CANCELED') {
+      // ERR_REQUEST_CANCELED is fired when the user dismisses the SIWA sheet
+      if (err?.code === 'ERR_REQUEST_CANCELED' || err?.code === '1001') {
         console.log('[SignIn] User cancelled Apple Sign In');
-      } else {
-        console.error('[SignIn] Apple Sign In error:', err);
-        Alert.alert('Apple Sign In Failed', err.message);
+        return;
       }
+      // Verbose logging so iPad / future failures show full error context
+      console.error('[SignIn] Apple Sign In error:', {
+        code: err?.code,
+        message: err?.message,
+        domain: err?.domain,
+        userInfo: err?.userInfo,
+        stack: err?.stack,
+      });
+      const message = err?.message
+        || (err?.code ? `Apple authentication failed (code ${err.code}). Please try again.` : 'Apple authentication failed. Please try again.');
+      Alert.alert('Apple Sign In Failed', message);
     } finally {
       setLoading(false);
     }
@@ -388,10 +398,22 @@ export default function SignIn() {
               <View style={styles.line} />
             </View>
 
-            <TouchableOpacity style={[styles.oauthButton, { borderColor: oauthBorderColor }]} onPress={signInWithAppleNative}>
-              <Ionicons name="logo-apple" size={24} color={textColor} />
-              <ThemedText style={styles.oauthText}>Sign in with Apple</ThemedText>
-            </TouchableOpacity>
+            {/*
+              Use the NATIVE Apple button. expo-apple-authentication renders
+              ASAuthorizationAppleIDButton, which iPadOS uses as the popover
+              anchor for ASAuthorizationController. A plain TouchableOpacity
+              has no native UIView reference, which is the documented cause
+              of "Sign in with Apple error" on iPad (App Review 2.1(a)).
+            */}
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={isDark
+                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={8}
+              style={styles.appleButton}
+              onPress={signInWithAppleNative}
+            />
 
             <TouchableOpacity style={[styles.oauthButton, { borderColor: oauthBorderColor }]} onPress={() => signInWithOAuth('google')}>
               <Ionicons name="logo-google" size={24} color={textColor} />
@@ -499,6 +521,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
     gap: 12,
+  },
+  appleButton: {
+    height: 50,
+    width: '100%',
+    marginBottom: 12,
   },
   oauthText: {
     fontSize: 16,
