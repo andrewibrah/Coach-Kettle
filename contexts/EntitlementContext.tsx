@@ -2,7 +2,13 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { AppState, AppStateStatus } from 'react-native';
 import { useAuth } from '@/components/AuthProvider';
 import { fetchWithAuth } from '@/lib/auth';
+import {
+  configureRevenueCat,
+  getActiveCoachKettleEntitlement,
+  getRevenueCatCustomerInfo,
+} from '@/lib/iap';
 import { supabaseUrl } from '@/lib/supabase';
+import Purchases, { CustomerInfo } from 'react-native-purchases';
 
 const API_BASE = `${supabaseUrl}/functions/v1`;
 
@@ -61,6 +67,7 @@ export const useEntitlement = () => useContext(EntitlementContext);
 export function EntitlementProvider({ children }: { children: React.ReactNode }) {
   const { session, loading: authLoading } = useAuth();
   const [entitlement, setEntitlement] = useState<EntitlementState>(defaultEntitlement);
+  const [revenueCatCustomerInfo, setRevenueCatCustomerInfo] = useState<CustomerInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const lastFetchRef = useRef<number>(0);
 
@@ -88,7 +95,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
           // No entitlement exists yet — bootstrap
           await bootstrap();
           // Re-fetch after bootstrap
-          const res2 = await fetchWithAuth(`${API_BASE}/entitlements`);
+          const res2 = await fetchWithAuth(`${API_BASE}/entitlements`, { method: 'GET' });
           const json2 = await res2.json();
 
           if (json2.ok && json2.data) {
@@ -123,6 +130,64 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
     }
   }, [session?.user?.id, bootstrap]);
 
+  const loadRevenueCatCustomerInfo = useCallback(async () => {
+    if (!session?.user?.id) {
+      setRevenueCatCustomerInfo(null);
+      return null;
+    }
+
+    try {
+      const customerInfo = await getRevenueCatCustomerInfo({
+        appUserID: session.user.id,
+        email: session.user.email,
+      });
+      setRevenueCatCustomerInfo(customerInfo);
+      return customerInfo;
+    } catch (error) {
+      console.warn('[EntitlementContext] Error loading RevenueCat customer info:', error);
+      return null;
+    }
+  }, [session?.user?.id, session?.user?.email]);
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setRevenueCatCustomerInfo(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const setupRevenueCat = async () => {
+      try {
+        await configureRevenueCat({
+          appUserID: session.user.id,
+          email: session.user.email,
+        });
+
+        if (!cancelled) {
+          await loadRevenueCatCustomerInfo();
+        }
+      } catch (error) {
+        console.warn('[EntitlementContext] RevenueCat setup failed:', error);
+      }
+    };
+
+    setupRevenueCat();
+
+    const listener = (customerInfo: CustomerInfo) => {
+      if (!cancelled) {
+        setRevenueCatCustomerInfo(customerInfo);
+      }
+    };
+
+    Purchases.addCustomerInfoUpdateListener(listener);
+
+    return () => {
+      cancelled = true;
+      Purchases.removeCustomerInfoUpdateListener(listener);
+    };
+  }, [session?.user?.id, session?.user?.email, loadRevenueCatCustomerInfo]);
+
   // Load entitlement when session changes
   useEffect(() => {
     if (!authLoading) {
@@ -142,6 +207,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
         const now = Date.now();
         if (now - lastFetchRef.current >= 30_000) {
           loadEntitlement();
+          loadRevenueCatCustomerInfo();
         }
       }
     };
@@ -150,7 +216,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
     return () => {
       subscription.remove();
     };
-  }, [session?.user?.id, loadEntitlement]);
+  }, [session?.user?.id, loadEntitlement, loadRevenueCatCustomerInfo]);
 
   const dismissPaywall = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -168,35 +234,48 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
   }, [session?.user?.id, loadEntitlement]);
 
   const refreshEntitlement = useCallback(async () => {
-    await loadEntitlement();
-  }, [loadEntitlement]);
+    await Promise.all([loadEntitlement(), loadRevenueCatCustomerInfo()]);
+  }, [loadEntitlement, loadRevenueCatCustomerInfo]);
+
+  const activeRevenueCatEntitlement = getActiveCoachKettleEntitlement(revenueCatCustomerInfo);
+  const revenueCatIsPro = activeRevenueCatEntitlement?.isActive ?? false;
+  const effectiveEntitlement: EntitlementState = revenueCatIsPro
+    ? {
+        ...entitlement,
+        status: 'sub_active',
+        source: 'subscription',
+        expiresAt: activeRevenueCatEntitlement?.expirationDate ?? null,
+        appleProductId: activeRevenueCatEntitlement?.productIdentifier ?? null,
+        paywallDismissed: true,
+      }
+    : entitlement;
 
   // Derived flags
   // Free tier: trial/sub expired but user explicitly chose to continue free
   const isFree =
-    (entitlement.status === 'trial_expired' || entitlement.status === 'sub_expired') &&
-    entitlement.paywallDismissed;
+    (effectiveEntitlement.status === 'trial_expired' || effectiveEntitlement.status === 'sub_expired') &&
+    effectiveEntitlement.paywallDismissed;
 
   const hasAccess =
-    (entitlement.status === 'trial_active' && entitlement.paywallDismissed) ||
-    entitlement.status === 'sub_active' ||
+    (effectiveEntitlement.status === 'trial_active' && effectiveEntitlement.paywallDismissed) ||
+    effectiveEntitlement.status === 'sub_active' ||
     isFree;
 
   // Only block with paywall if expired AND user hasn't dismissed (i.e., chosen free tier)
   const needsPaywall =
-    (entitlement.status === 'trial_expired' || entitlement.status === 'sub_expired') &&
-    !entitlement.paywallDismissed;
+    (effectiveEntitlement.status === 'trial_expired' || effectiveEntitlement.status === 'sub_expired') &&
+    !effectiveEntitlement.paywallDismissed;
 
   const needsInitialPaywall =
-    (entitlement.status === 'trial_active' || entitlement.status === 'sub_active') &&
-    !entitlement.paywallDismissed;
+    (effectiveEntitlement.status === 'trial_active' || effectiveEntitlement.status === 'sub_active') &&
+    !effectiveEntitlement.paywallDismissed;
 
-  const isPro = entitlement.status === 'sub_active';
+  const isPro = effectiveEntitlement.status === 'sub_active';
 
   return (
     <EntitlementContext.Provider
       value={{
-        entitlement,
+        entitlement: effectiveEntitlement,
         isLoading,
         hasAccess,
         needsPaywall,

@@ -5,7 +5,6 @@ import {
   ScrollView,
   Pressable,
   Alert,
-  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +14,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useIAP } from '@/lib/iap';
+import { useAuth } from '@/components/AuthProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { SUBSCRIPTION } from '@/constants/subscription';
@@ -27,8 +27,13 @@ export default function SubscriptionScreen() {
   const textColor = useThemeColor({}, 'text');
   const activeColor = useThemeColor({}, 'tint');
 
+  const { session } = useAuth();
   const { entitlement, isPro, refreshEntitlement } = useEntitlement();
-  const { restore, isProcessing } = useIAP({ onPurchaseSuccess: refreshEntitlement });
+  const { restore, presentCustomerCenter, isProcessing } = useIAP({
+    appUserID: session?.user?.id,
+    email: session?.user?.email,
+    onPurchaseSuccess: refreshEntitlement,
+  });
 
   const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
   const sectionTitleColor = '#8E8E93';
@@ -52,8 +57,9 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const handleManageSubscription = () => {
-    Linking.openURL('https://apps.apple.com/account/subscriptions');
+  const handleManageSubscription = async () => {
+    await presentCustomerCenter();
+    await refreshEntitlement();
   };
 
   const renderStatusIndicator = () => {
@@ -139,8 +145,8 @@ export default function SubscriptionScreen() {
             <View style={[styles.detailRow, { backgroundColor: cardBg }]}>
               <ThemedText style={styles.detailLabel}>Plan price</ThemedText>
               <ThemedText style={styles.detailValue}>
-                {entitlement.appleProductId === SUBSCRIPTION.PRODUCT_ID_ANNUAL
-                  ? `${SUBSCRIPTION.PRICE_ANNUAL}/year`
+                {entitlement.appleProductId === SUBSCRIPTION.PRODUCT_ID_YEARLY
+                  ? `${SUBSCRIPTION.PRICE_YEARLY}/year`
                   : entitlement.appleProductId === SUBSCRIPTION.PRODUCT_ID_MONTHLY
                     ? `${SUBSCRIPTION.PRICE_MONTHLY}/month`
                     : '—'}

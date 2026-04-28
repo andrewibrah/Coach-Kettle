@@ -1,19 +1,27 @@
-import { useAuth } from '@/components/AuthProvider';
 import { AppLogo } from '@/components/AppLogo';
+import { useAuth } from '@/components/AuthProvider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
-import { SUBSCRIPTION } from '@/constants/subscription';
 import { Colors } from '@/constants/theme';
 import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useIAP } from '@/lib/iap';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 
-type Plan = 'monthly' | 'annual';
+const BADGE_HEIGHT = 28;
+
+type Plan = 'monthly' | 'yearly';
+type PaywallPlan = {
+  id: Plan;
+  name: string;
+  price: string;
+  period: string;
+  badge: string | null;
+};
 
 const FEATURES = [
   { icon: 'bubble.left.and.bubble.right.fill', label: 'Unlimited AI Coach Messages' },
@@ -27,34 +35,62 @@ export default function PaywallScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
   const { needsPaywall, needsInitialPaywall, dismissPaywall, refreshEntitlement } = useEntitlement();
-  const { signOut } = useAuth();
-  const { products, purchase, restore, isProcessing, error: iapError } = useIAP({
+  const { session, signOut } = useAuth();
+  const { products, purchase, restore, isLoadingProducts, isProcessing, error: iapError } = useIAP({
+    appUserID: session?.user?.id,
+    email: session?.user?.email,
     onPurchaseSuccess: refreshEntitlement,
   });
-  const [selectedPlan, setSelectedPlan] = useState<Plan>('annual');
+  const [selectedPlan, setSelectedPlan] = useState<Plan>('yearly');
   const [isDismissing, setIsDismissing] = useState(false);
 
-  // Surface IAP errors to the user so failures aren't silent
-  useEffect(() => {
-    if (iapError) {
-      Alert.alert('Purchase Error', iapError);
-    }
-  }, [iapError]);
+  const monthlyProduct = products.find(p => p.plan === 'monthly');
+  const yearlyProduct = products.find(p => p.plan === 'yearly');
+  const availablePlans: PaywallPlan[] = [];
 
-  const monthlyProduct = products.find(p => p.productId === SUBSCRIPTION.PRODUCT_ID_MONTHLY);
-  const annualProduct = products.find(p => p.productId === SUBSCRIPTION.PRODUCT_ID_ANNUAL);
-  const monthlyPrice = monthlyProduct?.localizedPrice ?? SUBSCRIPTION.PRICE_MONTHLY;
-  const annualPrice = annualProduct?.localizedPrice ?? SUBSCRIPTION.PRICE_ANNUAL;
-
+  if (monthlyProduct) {
+    availablePlans.push({
+      id: 'monthly',
+      name: 'Monthly',
+      price: monthlyProduct.localizedPrice,
+      period: '/month',
+      badge: null,
+    });
+  }
+  if (yearlyProduct) {
+    availablePlans.push({
+      id: 'yearly',
+      name: 'Yearly',
+      price: yearlyProduct.localizedPrice,
+      period: '/year',
+      badge: 'Best Value',
+    });
+  }
+  const selectedPlanConfig = availablePlans.find(plan => plan.id === selectedPlan);
+  const hasPurchasableProducts = availablePlans.length > 0;
   const isExpiredMode = needsPaywall;
   const isInitialMode = needsInitialPaywall;
 
+  useEffect(() => {
+    if (products.length === 0 || products.some(product => product.plan === selectedPlan)) return;
+
+    const fallbackProduct =
+      products.find(product => product.plan === 'yearly') ??
+      products.find(product => product.plan === 'monthly');
+
+    if (fallbackProduct) {
+      setSelectedPlan(fallbackProduct.plan);
+    }
+  }, [products, selectedPlan]);
+
   const handleSubscribe = async () => {
-    const productId =
-      selectedPlan === 'monthly'
-        ? SUBSCRIPTION.PRODUCT_ID_MONTHLY
-        : SUBSCRIPTION.PRODUCT_ID_ANNUAL;
-    await purchase(productId);
+    if (!selectedPlanConfig) return;
+
+    const unlocked = await purchase(selectedPlan);
+    if (unlocked) {
+      await refreshEntitlement();
+      router.replace('/(tabs)' as any);
+    }
   };
 
   const handleSkip = async () => {
@@ -67,10 +103,6 @@ export default function PaywallScreen() {
       setIsDismissing(false);
       router.replace('/(tabs)' as any);
     }
-  };
-
-  const handleClose = () => {
-    handleSkip();
   };
 
   const handleRestore = async () => {
@@ -87,120 +119,102 @@ export default function PaywallScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* X close button — always visible so user is never trapped */}
       <Pressable
         style={({ pressed }) => [styles.closeButton, pressed && styles.buttonPressed]}
-        onPress={handleClose}
+        onPress={handleSkip}
         hitSlop={12}
       >
         <Ionicons name="close" size={26} color={colors.placeholder} />
       </Pressable>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Logo */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.logoContainer}>
           <AppLogo size={72} />
         </View>
 
-        {/* Title */}
         <ThemedText style={styles.title}>Coach Kettle Pro</ThemedText>
 
-        {/* Subtitle */}
         <ThemedText style={[styles.subtitle, { color: colors.placeholder }]}>
-          {isExpiredMode
-            ? 'Your trial has ended — upgrade or continue free'
-            : 'Unlock everything. Cancel anytime.'}
+          {isExpiredMode ? 'Your trial has ended - upgrade or continue free' : 'Unlock everything. Cancel anytime.'}
         </ThemedText>
 
-        {/* Features */}
         <View style={styles.featuresContainer}>
           {FEATURES.map((feature) => (
-            <View
-              key={feature.label}
-              style={[styles.featureRow, { backgroundColor: colors.cardBackground }]}
-            >
+            <View key={feature.label} style={[styles.featureRow, { backgroundColor: colors.cardBackground }]}>
               <IconSymbol name={feature.icon} size={20} color={colors.tint} />
               <ThemedText style={styles.featureLabel}>{feature.label}</ThemedText>
             </View>
           ))}
         </View>
 
-        {/* Pricing Cards */}
-        <View style={styles.pricingContainer}>
-          {/* Monthly */}
-          <Pressable
-            style={[
-              styles.pricingCard,
-              {
-                backgroundColor: colors.cardBackground,
-                borderColor: selectedPlan === 'monthly' ? colors.tint : colors.border,
-                borderWidth: selectedPlan === 'monthly' ? 2 : 1,
-              },
-            ]}
-            onPress={() => setSelectedPlan('monthly')}
-          >
-            {/* Spacer to match annual badge height */}
-            <View style={styles.badgePlaceholder} />
-            <ThemedText style={styles.planName}>Monthly</ThemedText>
-            <ThemedText style={[styles.planPrice, { color: colors.text }]}>{monthlyPrice}</ThemedText>
-            <ThemedText style={[styles.planPeriod, { color: colors.placeholder }]}>
-              /month
-            </ThemedText>
-          </Pressable>
+        {hasPurchasableProducts ? (
+          <View style={styles.pricingContainer}>
+            {availablePlans.map((plan) => (
+              <Pressable
+                key={plan.id}
+                style={[
+                  styles.pricingCard,
+                  {
+                    backgroundColor: colors.cardBackground,
+                    borderColor: selectedPlan === plan.id ? colors.tint : colors.border,
+                    borderWidth: selectedPlan === plan.id ? 2 : 1,
+                    paddingTop: plan.badge ? 0 : 20,
+                  },
+                ]}
+                onPress={() => setSelectedPlan(plan.id)}
+              >
+                {plan.badge ? (
+                  <View style={[styles.saveBadge, { backgroundColor: colors.tint }]}>
+                    <ThemedText style={styles.saveBadgeText}>{plan.badge}</ThemedText>
+                  </View>
+                ) : (
+                  <View style={styles.badgePlaceholder} />
+                )}
+                <ThemedText style={styles.planName}>{plan.name}</ThemedText>
+                <ThemedText style={[styles.planPrice, { color: colors.text }]}>{plan.price}</ThemedText>
+                <ThemedText style={[styles.planPeriod, { color: colors.placeholder }]}>{plan.period}</ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <ThemedText style={[styles.productsUnavailableText, { color: colors.placeholder }]}>
+            {isLoadingProducts
+              ? 'Loading App Store prices...'
+              : 'Purchases are temporarily unavailable. Please try again later or restore purchases.'}
+          </ThemedText>
+        )}
 
-          {/* Annual */}
-          <Pressable
-            style={[
-              styles.pricingCard,
-              {
-                backgroundColor: colors.cardBackground,
-                borderColor: selectedPlan === 'annual' ? colors.tint : colors.border,
-                borderWidth: selectedPlan === 'annual' ? 2 : 1,
-                paddingTop: 0,
-              },
-            ]}
-            onPress={() => setSelectedPlan('annual')}
-          >
-            <View style={[styles.saveBadge, { backgroundColor: colors.tint }]}>
-              <ThemedText style={styles.saveBadgeText}>Save 40%</ThemedText>
-            </View>
-            <ThemedText style={styles.planName}>Annual</ThemedText>
-            <ThemedText style={[styles.planPrice, { color: colors.text }]}>{annualPrice}</ThemedText>
-            <ThemedText style={[styles.planPeriod, { color: colors.placeholder }]}>
-              /year
-            </ThemedText>
-          </Pressable>
-        </View>
+        {iapError && (
+          <ThemedText style={[styles.productsUnavailableText, { color: colors.danger }]}>{iapError}</ThemedText>
+        )}
 
-        {/* Subscribe Button */}
         <Pressable
           style={({ pressed }) => [
             styles.subscribeButton,
             {
               backgroundColor: colors.tint,
-              opacity: (pressed || isProcessing) ? 0.6 : 1,
+              opacity: pressed || isProcessing || !selectedPlanConfig ? 0.6 : 1,
             },
           ]}
           onPress={handleSubscribe}
-          disabled={isProcessing}
+          disabled={isProcessing || !selectedPlanConfig}
         >
           {isProcessing ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <ThemedText style={styles.subscribeButtonText}>Subscribe Now</ThemedText>
+            <ThemedText style={styles.subscribeButtonText}>
+              {selectedPlanConfig ? `Continue with ${selectedPlanConfig.name}` : 'Purchases Unavailable'}
+            </ThemedText>
           )}
         </Pressable>
 
-        {/* Apple Guideline 3.1.2 — auto-renew disclosure + legal links */}
         <ThemedText style={[styles.disclosureText, { color: colors.placeholder }]}>
-          {selectedPlan === 'annual'
-            ? `${annualPrice}/year`
-            : `${monthlyPrice}/month`}
-          {' '}· Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel anytime in your Apple ID account settings.
+          {selectedPlanConfig
+            ? `${selectedPlanConfig.price}${selectedPlanConfig.period}`
+            : 'Plans and prices load from the App Store'}
+          {' '}· Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current period. Manage or cancel anytime in your Apple ID account settings.
         </ThemedText>
+
         <View style={styles.legalLinks}>
           <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8}>
             <ThemedText style={[styles.legalLink, { color: colors.tint }]}>Terms of Service</ThemedText>
@@ -211,7 +225,6 @@ export default function PaywallScreen() {
           </Pressable>
         </View>
 
-        {/* Skip Button (initial mode only) */}
         {isInitialMode && (
           <Pressable
             style={({ pressed }) => [styles.skipButton, pressed && styles.buttonPressed]}
@@ -219,12 +232,11 @@ export default function PaywallScreen() {
             disabled={isDismissing}
           >
             <ThemedText style={[styles.skipButtonText, { color: colors.tint }]}>
-              {isDismissing ? 'Starting trial...' : 'Skip \u2014 Try 1 Week Free'}
+              {isDismissing ? 'Starting trial...' : 'Skip - Try 1 Week Free'}
             </ThemedText>
           </Pressable>
         )}
 
-        {/* Continue Free (expired mode only) */}
         {isExpiredMode && (
           <Pressable
             style={({ pressed }) => [styles.skipButton, pressed && styles.buttonPressed]}
@@ -237,7 +249,6 @@ export default function PaywallScreen() {
           </Pressable>
         )}
 
-        {/* Restore Purchases */}
         <Pressable
           style={({ pressed }) => [styles.restoreButton, pressed && styles.buttonPressed]}
           onPress={handleRestore}
@@ -248,21 +259,13 @@ export default function PaywallScreen() {
           </ThemedText>
         </Pressable>
 
-        {/* Sign Out — available in both modes */}
-        <Pressable
-          style={({ pressed }) => [styles.signOutButton, pressed && styles.buttonPressed]}
-          onPress={handleSignOut}
-        >
-          <ThemedText style={[styles.signOutText, { color: colors.danger }]}>
-            Sign Out
-          </ThemedText>
+        <Pressable style={({ pressed }) => [styles.signOutButton, pressed && styles.buttonPressed]} onPress={handleSignOut}>
+          <ThemedText style={[styles.signOutText, { color: colors.danger }]}>Sign Out</ThemedText>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const BADGE_HEIGHT = 28;
 
 const styles = StyleSheet.create({
   container: {
@@ -330,7 +333,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
   },
-  // Spacer in Monthly card so both cards have same content layout
   badgePlaceholder: {
     height: BADGE_HEIGHT,
     marginBottom: 4,
@@ -339,7 +341,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     paddingVertical: 6,
     alignItems: 'center',
-    marginHorizontal: -12,  // bleed to card edges
+    marginHorizontal: -12,
     marginBottom: 12,
     height: BADGE_HEIGHT,
     justifyContent: 'center',

@@ -39,6 +39,10 @@ const MAPPING = {
   'eye.slash.fill': 'visibility-off',
   'info.circle': 'info-outline',
   'doc.text.fill': 'description',
+  'bubble.left.and.bubble.right.fill': 'forum',
+  'chart.bar.fill': 'bar-chart',
+  'crown.fill': 'workspace-premium',
+  'arrow.clockwise': 'refresh',
   'minus.circle.fill': 'remove-circle',
 } as const;
 

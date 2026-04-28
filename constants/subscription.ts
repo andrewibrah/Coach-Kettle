@@ -8,13 +8,17 @@
 export const SUBSCRIPTION = {
   // App Store Connect Product IDs
   PRODUCT_ID_MONTHLY: 'com.coachkettle.pro.monthly',
+  PRODUCT_ID_YEARLY: 'com.coachkettle.pro.annual.v2',
+
+  // Backwards-compatible alias for existing screens and records.
   PRODUCT_ID_ANNUAL: 'com.coachkettle.pro.annual.v2',
 
   // Pricing (display only — actual pricing set in App Store Connect)
   PRICE_MONTHLY: '$1.99',
-  PRICE_ANNUAL: '$24.99',
-  PRICE_ANNUAL_MONTHLY_EQUIVALENT: '$2.08',
-  ANNUAL_SAVINGS_PERCENT: 40,
+  PRICE_YEARLY: '$19.99',
+
+  // Backwards-compatible alias for existing screens.
+  PRICE_ANNUAL: '$19.99',
 
   // Trial
   TRIAL_DAYS: 7,

@@ -1,12 +1,9 @@
-import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { initConnection, endConnection } from 'react-native-iap';
 
 import { AuthLockProvider } from '@/components/AuthLockProvider';
 import { AuthProvider } from '@/components/AuthProvider';
@@ -46,11 +43,6 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-
-  useEffect(() => {
-    initConnection().catch((err) => console.warn('[IAP] init failed:', err));
-    return () => { endConnection(); };
-  }, []);
 
   return (
     <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

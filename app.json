@@ -2,7 +2,7 @@
   "expo": {
     "name": "Coach Kettle",
     "slug": "CoachKettle",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "coachkettle",
@@ -58,8 +58,7 @@
           "photosPermission": "Coach Kettle needs access to your photo library to attach gym photos and videos to workouts.",
           "cameraPermission": "Coach Kettle needs camera access to take gym photos for your workouts."
         }
-      ],
-      ["react-native-iap", { "paymentProvidersAndroid": [] }]
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

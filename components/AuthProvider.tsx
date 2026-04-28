@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { logOutRevenueCat } from '@/lib/iap';
 import { clearWorkoutDraft } from '@/lib/workoutDraft';
 import { clearWorkouts } from '@/lib/workoutStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -77,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      await logOutRevenueCat();
       await supabase.auth.signOut();
       console.log('[AuthProvider] signOut completed');
     } catch (e) {
