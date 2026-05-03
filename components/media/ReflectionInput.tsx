@@ -3,7 +3,7 @@
  * Renders inside SessionReviewModal and history detail.
  */
 
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import React from "react";
 import {
   StyleSheet,

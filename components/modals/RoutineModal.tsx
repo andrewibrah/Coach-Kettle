@@ -1,5 +1,5 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import {
   deleteWorkoutTemplate,
   fetchTemplateItems,
@@ -10,7 +10,7 @@ import {
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useState } from "react";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import {
   ActivityIndicator,
   Alert,

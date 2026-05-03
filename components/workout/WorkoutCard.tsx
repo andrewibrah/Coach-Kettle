@@ -1,6 +1,6 @@
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { ThemedText } from "@/components/ui/themed-text";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { LogRow } from "@/types/workout";
 import { useCallback, useEffect, useRef } from "react";
 import { LayoutChangeEvent, StyleSheet, TextInput, View, Keyboard, Pressable } from "react-native";

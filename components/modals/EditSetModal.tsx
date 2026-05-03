@@ -1,5 +1,5 @@
 import { ThemedText } from "@/components/ui/themed-text";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { LogRow } from "@/types/workout";
 import React, { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";

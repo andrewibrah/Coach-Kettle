@@ -14,9 +14,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useIAP } from '@/lib/iap';
-import { useAuth } from '@/components/AuthProvider';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useAuth } from '@/contexts/AuthProvider';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { SUBSCRIPTION } from '@/constants/subscription';
 
 export default function SubscriptionScreen() {

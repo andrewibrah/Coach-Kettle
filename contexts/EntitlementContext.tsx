@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { useAuth } from '@/components/AuthProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import { fetchWithAuth } from '@/lib/auth';
 import {
   configureRevenueCat,

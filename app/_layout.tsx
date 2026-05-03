@@ -5,15 +5,15 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { AuthLockProvider } from '@/components/AuthLockProvider';
-import { AuthProvider } from '@/components/AuthProvider';
-import { ThemeProvider } from '@/components/ThemeProvider';
+import { AuthLockProvider } from '@/contexts/AuthLockProvider';
+import { AuthProvider } from '@/contexts/AuthProvider';
+import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { Colors } from '@/constants/theme';
 import { EntitlementProvider } from '@/contexts/EntitlementContext';
 import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { PRCelebrationProvider } from '@/contexts/PRCelebrationContext';
 import { ProfileProvider } from '@/contexts/ProfileContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 export const unstable_settings = {
   anchor: '(tabs)',

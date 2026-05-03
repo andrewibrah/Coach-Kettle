@@ -3,15 +3,15 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 
 import { AppLogo } from '@/components/AppLogo';
-import { useAuthLock } from '@/components/AuthLockProvider';
-import { useAuth } from '@/components/AuthProvider';
+import { useAuthLock } from '@/contexts/AuthLockProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import { HapticTab } from '@/components/ui/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedView } from '@/components/ui/themed-view';
 import { Colors } from '@/constants/theme';
 import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useProfile } from '@/contexts/ProfileContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();

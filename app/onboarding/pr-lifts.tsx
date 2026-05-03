@@ -1,4 +1,4 @@
-import { useAuth } from '@/components/AuthProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import {
   QuizButtonGroup,
   QuizLiftAdder,

@@ -1,8 +1,8 @@
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useAuth } from "@/components/AuthProvider";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { useAuth } from "@/contexts/AuthProvider";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { fetchChatHistory, groupChatsByDate, type ChatMessage, type ChatsByDate } from "@/lib/chatStorage";
 import { Stack, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";

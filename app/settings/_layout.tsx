@@ -1,7 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
 import React from 'react';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/components/AuthProvider';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function SettingsLayout() {
   const colorScheme = useColorScheme();

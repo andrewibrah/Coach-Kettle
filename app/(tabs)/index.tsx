@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { Directions, FlatList, Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/contexts/AuthProvider";
 import { usePRCelebration } from "@/contexts/PRCelebrationContext";
 import { supabase } from "@/lib/supabase";
 
@@ -27,7 +27,7 @@ import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
 import { Header } from "@/components/ui/Header";
 import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
 import { WorkoutTable } from "@/components/workout/WorkoutTable";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow } from "@/lib/api";
 import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";

@@ -1,10 +1,10 @@
 import { AppLogo } from '@/components/AppLogo';
-import { useAuth } from '@/components/AuthProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from '@/constants/theme';
 import { useEntitlement } from '@/contexts/EntitlementContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { useIAP } from '@/lib/iap';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';

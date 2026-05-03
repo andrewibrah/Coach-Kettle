@@ -7,7 +7,7 @@ import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { api } from "@/lib/api";
 import { type WorkoutSession } from "@/lib/workoutStorage";
 

@@ -1,8 +1,8 @@
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { ChatMessage, clearAllChatHistory, fetchChatHistory } from "@/lib/chatStorage";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";

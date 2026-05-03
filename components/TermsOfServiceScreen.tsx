@@ -4,14 +4,14 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useAuthLock } from '@/components/AuthLockProvider';
-import { useAuth } from '@/components/AuthProvider';
+import { useAuthLock } from '@/contexts/AuthLockProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '@/constants/legal';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 type DocType = 'terms' | 'privacy';
 

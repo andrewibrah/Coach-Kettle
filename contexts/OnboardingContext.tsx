@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@/components/AuthProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import { useProfile } from '@/contexts/ProfileContext';
 import {
   OnboardingDraft,

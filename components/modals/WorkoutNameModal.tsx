@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import {
     fetchTemplateItems,
     fetchWorkoutTemplates,
@@ -6,7 +6,7 @@ import {
     type WorkoutTemplateItem,
 } from "@/lib/profile";
 import { BlurView } from "expo-blur";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
