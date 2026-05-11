@@ -1,28 +1,15 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
-import { useThemeColor } from "@/hooks/useThemeColor";
-import { useWindowDimensions, View, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 
 interface VideoPlaceholderProps {
   label: string;
 }
 
 export function VideoPlaceholder({ label }: VideoPlaceholderProps) {
-  const { width } = useWindowDimensions();
-  const backgroundColor = useThemeColor({}, 'cardBackground');
-
-  const containerHeight = width * (16 / 9);
-
   return (
     <View
-      style={[
-        styles.container,
-        {
-          width,
-          height: containerHeight,
-          backgroundColor,
-        },
-      ]}
+      style={styles.container}
     >
       <View style={styles.playCircle}>
         <IconSymbol name="play.fill" size={24} color="white" />
@@ -34,11 +21,14 @@ export function VideoPlaceholder({ label }: VideoPlaceholderProps) {
 
 const styles = StyleSheet.create({
   container: {
+    height: '90%',
+    aspectRatio: 9 / 16,
+    alignSelf: "center",
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "center",
     overflow: "hidden",
+    backgroundColor: '#1c1c1e',
   },
   playCircle: {
     width: 56,

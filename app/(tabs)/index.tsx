@@ -295,7 +295,7 @@ export default function HomeScreen() {
   useEffect(() => {
     (async () => {
       const shown = await isTutorialShown();
-      if (!shown) setTutorialVisible(true);
+      if (!shown && rows.length === 0 && !workoutActive) setTutorialVisible(true);
     })();
   }, []);
 

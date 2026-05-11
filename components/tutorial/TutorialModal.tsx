@@ -12,9 +12,6 @@ import {
 } from "react-native";
 import Animated, {
   FadeIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TutorialSlide } from "./TutorialSlide";
