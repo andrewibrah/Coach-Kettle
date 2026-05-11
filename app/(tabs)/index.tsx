@@ -38,6 +38,8 @@ import { expandTemplateToRows, getLastExerciseFromRows, makeId, nextSetNumberFor
 import { type SessionReview } from "@/lib/workoutStorage";
 import { type LogRow } from "@/types/workout";
 import { clearWorkoutDraft, getWorkoutDraft, saveWorkoutDraft } from "@/lib/workoutDraft";
+import { TutorialModal } from "@/components/tutorial/TutorialModal";
+import { isTutorialShown } from "@/lib/tutorialState";
 
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
@@ -121,6 +123,9 @@ export default function HomeScreen() {
 
   // Routine modal state
   const [routineModalVisible, setRoutineModalVisible] = useState(false);
+
+  // Tutorial modal state
+  const [tutorialVisible, setTutorialVisible] = useState(false);
 
   const openMenu = () => setMenuOpen(true);
 
@@ -286,6 +291,13 @@ export default function HomeScreen() {
       channel.unsubscribe();
     };
   }, [session?.user?.id, showCelebration]);
+
+  useEffect(() => {
+    (async () => {
+      const shown = await isTutorialShown();
+      if (!shown) setTutorialVisible(true);
+    })();
+  }, []);
 
   const openCoach = () => {
     commitPendingAndGet();
@@ -1124,6 +1136,7 @@ export default function HomeScreen() {
           onMenuPress={() => setMenuOpen(true)}
           onClearPress={onClearRows}
           onRoutinePress={() => setRoutineModalVisible(true)}
+          onHelpPress={() => setTutorialVisible(true)}
         />
 
         <WorkoutTable
@@ -1205,6 +1218,11 @@ export default function HomeScreen() {
           userId={session?.user?.id || ""}
           onClose={() => setRoutineModalVisible(false)}
           onSelectTemplate={handleImportRoutine}
+        />
+
+        <TutorialModal
+          visible={tutorialVisible}
+          onDismiss={() => setTutorialVisible(false)}
         />
 
         <SessionReviewModal

@@ -44,6 +44,7 @@ const MAPPING = {
   'crown.fill': 'workspace-premium',
   'arrow.clockwise': 'refresh',
   'minus.circle.fill': 'remove-circle',
+  'play.fill': 'play-arrow',
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;

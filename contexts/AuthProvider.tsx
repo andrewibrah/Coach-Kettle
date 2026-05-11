@@ -52,6 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearWorkouts();
     await clearWorkoutDraft();
 
+    // Clear tutorial state
+    await AsyncStorage.removeItem('tutorial_shown_v1');
+
     // Clear all Supabase-related AsyncStorage keys
     const allKeys = await AsyncStorage.getAllKeys();
     const supabaseKeys = allKeys.filter(key =>
