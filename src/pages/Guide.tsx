@@ -9,15 +9,6 @@ export default function Guide() {
 
   return (
     <>
-      <div className="border-b border-brand-border bg-brand-card px-6 py-10 text-center">
-        <h1 className="text-2xl font-bold uppercase tracking-[0.08em] sm:text-3xl">
-          Get to Know Coach Kettle
-        </h1>
-        <p className="mt-2 text-sm text-brand-muted">
-          How to talk to your coach — the full plain-English vocabulary
-        </p>
-      </div>
-
       <div className="mx-auto max-w-[900px] px-6 pt-12">
         <Link
           to="/"
