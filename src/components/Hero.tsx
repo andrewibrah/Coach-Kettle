@@ -1,3 +1,17 @@
+import {
+  Activity,
+  Award,
+  Bike,
+  Dumbbell,
+  Flame,
+  Footprints,
+  Medal,
+  PersonStanding,
+  Swords,
+  Target,
+  Trophy,
+  Zap,
+} from "lucide-react";
 import AppStoreBadge from "./AppStoreBadge";
 import CoachLogo from "./CoachLogo";
 
@@ -12,6 +26,32 @@ function Sparkle({ top, left, delay, size = 4 }: { top: string; left: string; de
       fill="white"
     >
       <path d="M8 0L9.5 6.5L16 8L9.5 9.5L8 16L6.5 9.5L0 8L6.5 6.5Z" />
+    </svg>
+  );
+}
+
+/* Inline kettlebell — no Unicode emoji exists for one */
+function KettlebellIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Handle */}
+      <path
+        d="M22 16 C22 9, 42 9, 42 16 L42 22 C42 22, 38 22, 38 19 C38 14, 26 14, 26 19 C26 22, 22 22, 22 22 Z"
+        fill="currentColor"
+      />
+      {/* Bell body */}
+      <path
+        d="M16 38 C16 26, 48 26, 48 38 C48 50, 42 56, 32 56 C22 56, 16 50, 16 38 Z"
+        fill="currentColor"
+      />
+      {/* Highlight */}
+      <ellipse cx="26" cy="36" rx="3" ry="5" fill="rgba(255,255,255,0.25)" />
     </svg>
   );
 }
@@ -84,7 +124,7 @@ export default function Hero() {
             { label: "RPE 8", top: "68%", right: "10%", delay: "1.8s", size: "h-1.5 w-1.5" },
             { label: "CURLS 40×12", bottom: "45%", left: "8%", delay: "4.5s", size: "h-1.5 w-1.5" },
             { label: "RUN 20 MIN", top: "75%", left: "28%", delay: "2.5s", size: "h-1.5 w-1.5" },
-            { label: "NEW PR 🎉", top: "45%", right: "28%", delay: "3.8s", size: "h-2 w-2" },
+            { label: "NEW PR", top: "45%", right: "28%", delay: "3.8s", size: "h-2 w-2" },
           ].map((node) => (
             <div
               key={node.label}
@@ -95,6 +135,54 @@ export default function Hero() {
               <span className="whitespace-nowrap text-[0.6rem] font-light tracking-wider text-white/[0.08]">
                 {node.label}
               </span>
+            </div>
+          ))}
+
+          {/* Floating gym icons (monochrome, lucide) */}
+          {[
+            { Icon: Dumbbell, top: "6%", left: "20%", delay: "0s", size: 30 },
+            { Icon: Dumbbell, top: "9%", right: "14%", delay: "0.9s", size: 28 },
+            { Icon: PersonStanding, top: "32%", left: "3%", delay: "1.4s", size: 26 },
+            { Icon: Flame, bottom: "10%", left: "14%", delay: "2.1s", size: 26 },
+            { Icon: Trophy, bottom: "22%", right: "16%", delay: "2.6s", size: 30 },
+            { Icon: Medal, top: "52%", right: "3%", delay: "3.2s", size: 26 },
+            { Icon: Activity, top: "64%", left: "18%", delay: "1.7s", size: 22 },
+            { Icon: Footprints, bottom: "5%", right: "9%", delay: "4s", size: 26 },
+            { Icon: Swords, top: "78%", left: "32%", delay: "3.5s", size: 22 },
+            { Icon: Bike, top: "20%", left: "47%", delay: "5s", size: 24 },
+            { Icon: Zap, top: "42%", left: "10%", delay: "2.3s", size: 22 },
+            { Icon: Award, bottom: "40%", right: "6%", delay: "4.5s", size: 24 },
+            { Icon: Target, top: "55%", left: "52%", delay: "3.8s", size: 22 },
+          ].map(({ Icon, top, bottom, left, right, delay, size }, i) => (
+            <div
+              key={`gym-icon-${i}`}
+              className="animate-float-drift pointer-events-none absolute text-white/[0.16]"
+              style={{ top, bottom, left, right, animationDelay: delay }}
+            >
+              <Icon size={size} strokeWidth={1.5} />
+            </div>
+          ))}
+
+          {/* Floating kettlebells (custom SVG — no Unicode kettlebell exists) */}
+          {[
+            { top: "18%", left: "58%", delay: "1s", size: 32, anim: "animate-float-slow" },
+            { bottom: "32%", left: "42%", delay: "3.2s", size: 24, anim: "animate-float" },
+            { top: "82%", right: "40%", delay: "2.1s", size: 28, anim: "animate-float-drift" },
+            { top: "30%", left: "75%", delay: "4s", size: 22, anim: "animate-float-slow" },
+            { bottom: "8%", left: "55%", delay: "0.6s", size: 26, anim: "animate-float" },
+          ].map((kb, i) => (
+            <div
+              key={`kb-${i}`}
+              className={`${kb.anim} pointer-events-none absolute text-white/[0.12]`}
+              style={{
+                top: kb.top,
+                bottom: kb.bottom,
+                left: kb.left,
+                right: kb.right,
+                animationDelay: kb.delay,
+              }}
+            >
+              <KettlebellIcon size={kb.size} />
             </div>
           ))}
         </div>

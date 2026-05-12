@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Dumbbell, Flame, PersonStanding, Target } from "lucide-react";
 import AppStoreBadge from "./AppStoreBadge";
 
 export default function CTA() {
@@ -66,20 +67,20 @@ export default function CTA() {
           </div>
         </div>
 
-        {/* Floating mini emojis */}
+        {/* Floating mini icons (monochrome, lucide) */}
         {[
-          { emoji: "🏋️", top: "15%", left: "10%", delay: "0s" },
-          { emoji: "💪", top: "20%", right: "12%", delay: "1s" },
-          { emoji: "🔥", bottom: "20%", left: "15%", delay: "2s" },
-          { emoji: "🎯", bottom: "25%", right: "10%", delay: "3s" },
-        ].map((item) => (
-          <span
-            key={item.emoji}
-            className="animate-float-drift pointer-events-none absolute text-lg opacity-[0.12]"
-            style={{ top: item.top, bottom: item.bottom, left: item.left, right: item.right, animationDelay: item.delay }}
+          { Icon: Dumbbell, top: "15%", left: "10%", delay: "0s" },
+          { Icon: PersonStanding, top: "20%", right: "12%", delay: "1s" },
+          { Icon: Flame, bottom: "20%", left: "15%", delay: "2s" },
+          { Icon: Target, bottom: "25%", right: "10%", delay: "3s" },
+        ].map(({ Icon, top, bottom, left, right, delay }, i) => (
+          <div
+            key={`cta-icon-${i}`}
+            className="animate-float-drift pointer-events-none absolute text-white/[0.14]"
+            style={{ top, bottom, left, right, animationDelay: delay }}
           >
-            {item.emoji}
-          </span>
+            <Icon size={22} strokeWidth={1.5} />
+          </div>
         ))}
       </div>
 

@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Privacy from "./pages/Privacy";
 import Support from "./pages/Support";
 import Eula from "./pages/Eula";
+import Guide from "./pages/Guide";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/guide" element={<Guide />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/support" element={<Support />} />
           <Route path="/eula" element={<Eula />} />

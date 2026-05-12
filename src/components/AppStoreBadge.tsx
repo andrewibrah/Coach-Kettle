@@ -1,8 +1,10 @@
 export default function AppStoreBadge() {
   return (
     <a
-      href="#"
-      aria-label="Download on the App Store"
+      href="https://apps.apple.com/us/app/coach-kettle/id6759267330"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Download Coach Kettle on the App Store"
       className="shimmer-hover group inline-flex items-center gap-3 rounded-full bg-white px-7 py-4 text-black no-underline transition-all duration-300 hover:bg-white/90 hover:shadow-[0_0_40px_rgba(255,255,255,0.12)] active:scale-[0.97]"
     >
       <svg

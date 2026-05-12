@@ -32,6 +32,16 @@ export default function Navbar() {
           Home
         </Link>
         <Link
+          to="/guide"
+          className={`rounded-full px-4 py-1.5 text-[0.78rem] tracking-[0.06em] no-underline transition-all duration-300 ${
+            pathname === "/guide"
+              ? "bg-white/[0.06] text-brand-text"
+              : "text-brand-muted hover:text-brand-text"
+          }`}
+        >
+          Guide
+        </Link>
+        <Link
           to="/privacy"
           className={`rounded-full px-4 py-1.5 text-[0.78rem] tracking-[0.06em] no-underline transition-all duration-300 ${
             pathname === "/privacy"
@@ -56,6 +66,11 @@ export default function Navbar() {
       {/* Mobile fallback links */}
       <ul className="flex list-none gap-6 sm:hidden">
         <li>
+          <Link to="/guide" className={linkClass("/guide")}>
+            Guide
+          </Link>
+        </li>
+        <li>
           <Link to="/privacy" className={linkClass("/privacy")}>
             Privacy
           </Link>
@@ -69,7 +84,9 @@ export default function Navbar() {
 
       {/* Download CTA */}
       <a
-        href="#"
+        href="https://apps.apple.com/us/app/coach-kettle/id6759267330"
+        target="_blank"
+        rel="noopener noreferrer"
         className="hidden rounded-full bg-white px-5 py-2 text-[0.78rem] font-medium text-black no-underline transition-all duration-300 hover:bg-white/85 sm:inline-flex"
       >
         Download App
