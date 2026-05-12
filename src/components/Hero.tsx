@@ -15,6 +15,18 @@ import {
 import AppStoreBadge from "./AppStoreBadge";
 import CoachLogo from "./CoachLogo";
 
+/* Mobile-safe zone helper — on phones, only top 0-16% and bottom 0-16%
+   are clear of the centered hero text. Items outside those zones are hidden
+   on small screens to avoid overlapping the headline / description / CTA. */
+function isMobileSafe(pos: { top?: string; bottom?: string }): boolean {
+  const parse = (v?: string) => (v ? parseFloat(v) : NaN);
+  const t = parse(pos.top);
+  const b = parse(pos.bottom);
+  if (!Number.isNaN(t) && t <= 16) return true;
+  if (!Number.isNaN(b) && b <= 16) return true;
+  return false;
+}
+
 function Sparkle({ top, left, delay, size = 4 }: { top: string; left: string; delay: string; size?: number }) {
   return (
     <svg
@@ -94,10 +106,10 @@ export default function Hero() {
             <CoachLogo size={700} />
           </div>
 
-          {/* Concentric rings */}
-          <div className="animate-pulse-ring absolute right-[15%] top-[18%] h-48 w-48 rounded-full border border-white/[0.04]" />
-          <div className="animate-pulse-ring absolute right-[17%] top-[20%] h-36 w-36 rounded-full border border-white/[0.03]" style={{ animationDelay: "1s" }} />
-          <div className="animate-pulse-ring absolute right-[19%] top-[22%] h-24 w-24 rounded-full border border-white/[0.02]" style={{ animationDelay: "2s" }} />
+          {/* Concentric rings — hidden on mobile, overlap centered hero text */}
+          <div className="animate-pulse-ring absolute right-[15%] top-[18%] hidden h-48 w-48 rounded-full border border-white/[0.04] sm:block" />
+          <div className="animate-pulse-ring absolute right-[17%] top-[20%] hidden h-36 w-36 rounded-full border border-white/[0.03] sm:block" style={{ animationDelay: "1s" }} />
+          <div className="animate-pulse-ring absolute right-[19%] top-[22%] hidden h-24 w-24 rounded-full border border-white/[0.02] sm:block" style={{ animationDelay: "2s" }} />
 
           {/* Sparkles scattered around */}
           <Sparkle top="10%" left="12%" delay="0s" size={5} />
@@ -128,7 +140,7 @@ export default function Hero() {
           ].map((node) => (
             <div
               key={node.label}
-              className="animate-float absolute flex items-center gap-2"
+              className={`animate-float absolute flex items-center gap-2 ${isMobileSafe(node) ? "" : "max-sm:hidden"}`}
               style={{ top: node.top, bottom: node.bottom, left: node.left, right: node.right, animationDelay: node.delay }}
             >
               <div className={`${node.size} rounded-full bg-white/10`} />
@@ -156,7 +168,7 @@ export default function Hero() {
           ].map(({ Icon, top, bottom, left, right, delay, size }, i) => (
             <div
               key={`gym-icon-${i}`}
-              className="animate-float-drift pointer-events-none absolute text-white/[0.16]"
+              className={`animate-float-drift pointer-events-none absolute text-white/[0.16] ${isMobileSafe({ top, bottom }) ? "" : "max-sm:hidden"}`}
               style={{ top, bottom, left, right, animationDelay: delay }}
             >
               <Icon size={size} strokeWidth={1.5} />
@@ -173,7 +185,7 @@ export default function Hero() {
           ].map((kb, i) => (
             <div
               key={`kb-${i}`}
-              className={`${kb.anim} pointer-events-none absolute text-white/[0.12]`}
+              className={`${kb.anim} pointer-events-none absolute text-white/[0.12] ${isMobileSafe({ top: kb.top, bottom: kb.bottom }) ? "" : "max-sm:hidden"}`}
               style={{
                 top: kb.top,
                 bottom: kb.bottom,

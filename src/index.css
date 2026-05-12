@@ -4,11 +4,20 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
   @apply bg-brand-bg text-brand-text font-sans min-h-screen antialiased;
   line-height: 1.6;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  width: 100%;
+}
+
+#root {
+  overflow-x: hidden;
+  width: 100%;
 }
 
 /* ── Atmospheric glow orbs ── */

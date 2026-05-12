@@ -12,7 +12,7 @@ export default {
           accent: "#ffffff",
           "accent-hover": "#cccccc",
           text: "#f0f0f0",
-          muted: "#666666",
+          muted: "#9a9a9a",
           subtle: "#333333",
           border: "rgba(255, 255, 255, 0.06)",
         },
