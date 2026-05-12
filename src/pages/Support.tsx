@@ -17,14 +17,6 @@ function QIcon({ char = "Q" }: { char?: string }) {
   );
 }
 
-function CodeExample({ children }: { children: string }) {
-  return (
-    <div className="my-2 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg px-4 py-3 font-mono text-sm text-brand-text">
-      {children}
-    </div>
-  );
-}
-
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
     <li className="relative pl-5 text-sm text-brand-muted before:absolute before:left-1 before:top-[0.55rem] before:h-[5px] before:w-[5px] before:rounded-full before:bg-brand-muted">
@@ -34,13 +26,6 @@ function Bullet({ children }: { children: React.ReactNode }) {
 }
 
 /* Monochrome SVG icons for tips section */
-function TipIconBolt() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  );
-}
 function TipIconSync() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -51,48 +36,11 @@ function TipIconSync() {
     </svg>
   );
 }
-function TipIconTrophy() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2" />
-      <path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2" />
-      <path d="M6 3h12v7a6 6 0 0 1-12 0V3z" />
-      <path d="M12 16v2" />
-      <path d="M8 21h8" />
-    </svg>
-  );
-}
 function TipIconLock() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-function TipIconScale() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 3l5 5-5 5" />
-      <path d="M21 8H7" />
-      <path d="M8 21l-5-5 5-5" />
-      <path d="M3 16h14" />
-    </svg>
-  );
-}
-function TipIconCpu() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
-      <rect x="9" y="9" width="6" height="6" />
-      <line x1="9" y1="1" x2="9" y2="4" />
-      <line x1="15" y1="1" x2="15" y2="4" />
-      <line x1="9" y1="20" x2="9" y2="23" />
-      <line x1="15" y1="20" x2="15" y2="23" />
-      <line x1="20" y1="9" x2="23" y2="9" />
-      <line x1="20" y1="14" x2="23" y2="14" />
-      <line x1="1" y1="9" x2="4" y2="9" />
-      <line x1="1" y1="14" x2="4" y2="14" />
     </svg>
   );
 }
@@ -119,75 +67,20 @@ export default function Support() {
           &larr; Back to Home
         </Link>
 
-        {/* LOGGING WORKOUTS */}
-        <p className="mb-4 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
-          Logging Workouts
-        </p>
-
-        <FaqCard>
-          <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
-            <QIcon /> How do I log a workout?
-          </h3>
-          <p className="mb-2 text-sm text-brand-muted">
-            Tap the input bar at the bottom of the screen and type your set in
-            plain English. Coach Kettle's parser understands a wide range of
-            formats:
-          </p>
-          <CodeExample>Bench 185 x 8</CodeExample>
-          <CodeExample>Squat 225 3x5</CodeExample>
-          <CodeExample>185 x 8 &nbsp;&nbsp;&nbsp;(shorthand — uses your last exercise)</CodeExample>
-          <CodeExample>185, 165, 145 x 8 &nbsp;&nbsp;&nbsp;(drop set)</CodeExample>
-          <CodeExample>Bench 185 + Rows 135 x 8 &nbsp;&nbsp;&nbsp;(superset)</CodeExample>
-          <CodeExample>Run 20 min &nbsp;&nbsp;&nbsp;(cardio)</CodeExample>
-          <CodeExample>Bench 60kg x 8 &nbsp;&nbsp;&nbsp;(kg auto-converts to lbs)</CodeExample>
+        {/* Pointer to Guide — logging how-tos live there now */}
+        <div className="mb-10 rounded-xl border border-brand-border bg-brand-card p-6 max-sm:p-5">
           <p className="text-sm text-brand-muted">
-            If the parser can't interpret your input, it automatically falls back
-            to AI parsing — so you can type naturally and the app figures it out.
+            Looking for how to log sets, drop sets, supersets, shorthand, or
+            how to talk to Coach Kettle? See the{" "}
+            <Link
+              to="/guide"
+              className="text-brand-text underline decoration-brand-border underline-offset-2 hover:decoration-brand-text"
+            >
+              Get to Know Coach Kettle
+            </Link>{" "}
+            guide for the full walkthrough.
           </p>
-        </FaqCard>
-
-        <FaqCard>
-          <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
-            <QIcon /> How do I log multiple sets at once?
-          </h3>
-          <p className="mb-2 text-sm text-brand-muted">
-            Use the multi-set format with a number before the "x":
-          </p>
-          <CodeExample>Bench 185 3x8 &nbsp;&nbsp;&nbsp;(logs 3 sets of 8 reps at 185 lbs)</CodeExample>
-          <p className="text-sm text-brand-muted">
-            Each set is saved as a separate row in your session, making it easy
-            to review and edit individual sets.
-          </p>
-        </FaqCard>
-
-        <FaqCard>
-          <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
-            <QIcon /> How do I attach a photo or video to a session?
-          </h3>
-          <p className="text-sm text-brand-muted">
-            While in an active workout session, tap the camera icon to attach
-            media. You can add photos or videos from your library. Media is
-            stored privately in your account and is never publicly accessible.
-          </p>
-        </FaqCard>
-
-        <FaqCard>
-          <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
-            <QIcon /> How does the AI coach work?
-          </h3>
-          <p className="mb-2 text-sm text-brand-muted">
-            Tap the coaching chat icon to open the AI coach. You can ask anything
-            — programming advice, form cues, rep ranges, recovery, nutrition, and
-            more. The AI has context about your recent workout history to give
-            more relevant answers.
-          </p>
-          <div className="my-3 rounded-lg border border-brand-border bg-brand-bg px-5 py-4">
-            <p className="text-sm text-brand-text">
-              Your email and personal identifiers are never sent to the AI. Only
-              the exercise text and questions you type are transmitted.
-            </p>
-          </div>
-        </FaqCard>
+        </div>
 
         {/* DATA & ACCOUNT */}
         <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
@@ -318,7 +211,7 @@ export default function Support() {
 
         <FaqCard>
           <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
-            <QIcon /> What does the AI see when I use it?
+            <QIcon /> What does Coach Kettle's AI see when I use it?
           </h3>
           <p className="text-sm text-brand-muted">
             The AI (powered by OpenAI) only receives the exercise text you type
@@ -332,37 +225,17 @@ export default function Support() {
           Tips &amp; Known Limitations
         </p>
 
-        <div className="mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-brand-border sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-brand-border sm:grid-cols-2">
           {[
-            {
-              icon: <TipIconBolt />,
-              title: "Use shorthand for speed",
-              desc: 'After naming an exercise, just type "185 x 8" for subsequent sets — the app remembers the last exercise.',
-            },
             {
               icon: <TipIconSync />,
               title: "Offline logging works",
               desc: "Sets are saved locally first. If you're offline at the gym, your data is safe and will sync when you reconnect.",
             },
             {
-              icon: <TipIconTrophy />,
-              title: "PRs need history",
-              desc: "Personal record detection requires at least one previous logged set for the same exercise. First-time exercises won't trigger a PR.",
-            },
-            {
               icon: <TipIconLock />,
               title: "Session lock",
-              desc: "The app locks after 4 hours of inactivity. Use Face ID or Touch ID to unlock — your data is protected.",
-            },
-            {
-              icon: <TipIconScale />,
-              title: "kg auto-converts",
-              desc: 'Append "kg" to any weight and it converts to lbs automatically. E.g., "Bench 60kg x 8".',
-            },
-            {
-              icon: <TipIconCpu />,
-              title: "AI fallback",
-              desc: "If the local parser doesn't recognize your input format, it's automatically sent to AI parsing — no action needed.",
+              desc: "Coach locks after 4 hours of inactivity. Use Face ID or Touch ID to unlock — your data is protected.",
             },
           ].map((tip) => (
             <div
@@ -420,7 +293,7 @@ export default function Support() {
             When reporting a bug, please include:
           </p>
           <ul className="mb-4 space-y-2 pl-5">
-            <Bullet>Your iOS version and app version</Bullet>
+            <Bullet>Your iOS version and Coach Kettle version</Bullet>
             <Bullet>Steps to reproduce the issue</Bullet>
             <Bullet>A screenshot or screen recording if applicable</Bullet>
           </ul>

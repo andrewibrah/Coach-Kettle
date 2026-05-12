@@ -66,7 +66,7 @@ export default function Privacy() {
           </p>
           <p className="mb-3 text-sm text-brand-muted">
             By using Coach Kettle, you agree to the practices described in this
-            policy. If you do not agree, please discontinue use of the app.
+            policy. If you do not agree, please discontinue use of Coach Kettle.
           </p>
           <p className="text-sm text-brand-muted">
             We are committed to compliance with the General Data Protection
@@ -79,7 +79,7 @@ export default function Privacy() {
         <Section>
           <SectionTitle>2. Data We Collect</SectionTitle>
           <p className="mb-3 text-sm text-brand-muted">
-            We collect only what is necessary to provide and improve the app.
+            We collect only what is necessary to provide and improve Coach Kettle.
           </p>
 
           <h3 className="mb-2 mt-5 text-[0.95rem] font-bold text-brand-text">
@@ -201,7 +201,7 @@ export default function Privacy() {
           <SectionTitle>4. Third-Party Services</SectionTitle>
           <p className="mb-3 text-sm text-brand-muted">
             We do not sell or trade your personal data. Data is shared only with
-            the providers below to operate the app, under strict data processing
+            the providers below to operate Coach Kettle, under strict data processing
             agreements.
           </p>
 
@@ -353,7 +353,7 @@ export default function Privacy() {
           <SectionTitle>8. Changes to This Policy</SectionTitle>
           <p className="text-sm text-brand-muted">
             We may update this policy from time to time. For material changes,
-            we will notify you within the app or via email. Continued use after
+            we will notify you within Coach Kettle or via email. Continued use after
             changes take effect constitutes acceptance.
           </p>
         </Section>

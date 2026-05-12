@@ -29,7 +29,7 @@ const steps: Step[] = [
     number: "03",
     title: "Use shorthand for speed",
     description:
-      "After naming an exercise, just type the numbers for the next sets — the app remembers the last exercise.",
+      "After naming an exercise, just type the numbers for the next sets — Coach remembers the last exercise.",
     examples: [
       { code: "185 x 8", note: "uses your last exercise" },
     ],
@@ -46,7 +46,7 @@ const steps: Step[] = [
       { code: "Bench 60kg x 8", note: "kg auto-converts to lbs" },
     ],
     note:
-      "If the parser can't interpret your input, it automatically falls back to AI parsing — so you can type naturally and the app figures it out.",
+      "If the parser can't interpret your input, it automatically falls back to AI parsing — so you can type naturally and Coach figures it out.",
   },
   {
     number: "05",
@@ -56,9 +56,9 @@ const steps: Step[] = [
   },
   {
     number: "06",
-    title: "Ask the AI coach",
+    title: "Ask Coach Kettle",
     description:
-      "Tap the coaching chat icon to open the AI coach. Ask anything — programming advice, form cues, rep ranges, recovery, nutrition. The AI has context about your recent workout history.",
+      "Tap the coaching chat icon to open Coach Kettle. Ask anything — programming advice, form cues, rep ranges, recovery, nutrition. Coach has context about your recent workout history.",
   },
   {
     number: "07",
