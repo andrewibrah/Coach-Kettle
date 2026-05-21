@@ -58,7 +58,6 @@
           "cameraPermission": "Coach Kettle needs camera access to take gym photos for your workouts."
         }
       ],
-      "@react-native-community/datetimepicker",
       "expo-web-browser"
     ],
     "experiments": {

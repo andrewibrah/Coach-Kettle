@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Coach Kettle** — Expo/React Native workout tracker (iOS-first) with a Supabase backend. Users log sets via natural language ("Bench 185 x 8") parsed locally (regex) or via AI fallback.
+**Coach Kettle** — Expo SDK 55 / React Native 0.83.6 workout tracker (iOS-first) with a Supabase backend. Users log sets via natural language ("Bench 185 x 8") parsed locally (regex) or via AI fallback.
 
 ## Warnings
 
@@ -45,12 +45,13 @@ supabase functions serve <function-name> --env-file .env.local
 ### Provider Hierarchy (`app/_layout.tsx`)
 
 ```
-ThemeProvider → AuthProvider → ProfileProvider →
-PRCelebrationProvider → AuthLockProvider → GestureHandlerRootView →
-NavigationThemeProvider → Expo Router Stack
+ThemeProvider → AuthProvider → ProfileProvider → EntitlementProvider →
+OnboardingProvider → PRCelebrationProvider → AuthLockProvider →
+GestureHandlerRootView → NavigationThemeProvider → Expo Router Stack
 ```
 
-Order matters — auth before profile, profile before features.
+Order matters — auth before profile, entitlement before onboarding, features last.
+All providers live in `contexts/` (not `components/`).
 
 ### Core Data Flow
 
@@ -81,6 +82,7 @@ All writes go to AsyncStorage immediately; Supabase sync is background/best-effo
 | `last_authenticated_at` | Auth TTL timestamp |
 | `biometric_enabled` | Biometric preference |
 | `terms_accepted` | ToS flag |
+| `tutorial_shown_v1` | Whether tutorial carousel has been dismissed |
 
 ### Pending Edit Pattern
 
@@ -115,12 +117,16 @@ Handled by `lib/mediaUpload.ts` → Supabase Storage (private bucket, user-scope
 | Root layout / providers | `app/_layout.tsx` |
 | Input parsing | `lib/structuredGate.ts` |
 | API client | `lib/api.ts` |
-| Auth | `components/AuthProvider.tsx`, `lib/auth.ts`, `lib/authLock.ts` |
+| Auth | `contexts/AuthProvider.tsx`, `lib/auth.ts`, `lib/authLock.ts` |
+| All providers | `contexts/` (AuthProvider, AuthLockProvider, ThemeProvider, ProfileContext, EntitlementContext, OnboardingContext, PRCelebrationContext) |
 | Workout state | `hooks/useWorkoutSession.ts`, `hooks/useRowActions.ts` |
 | Local storage | `lib/workoutStorage.ts` |
 | Draft persistence | `lib/workoutDraft.ts` |
 | PR detection | `lib/prTracking.ts` |
 | Media upload | `lib/mediaUpload.ts` |
+| Tutorial | `components/tutorial/TutorialModal.tsx`, `lib/tutorialState.ts` |
+| Shared helpers | `lib/workoutRules.ts` — date utils, `makeId()`, set-number helpers |
+| IAP client | `lib/iap.ts` |
 | RevenueCat config | `constants/revenuecat.ts` |
 | Edge Functions | `supabase/functions/` |
 | DB migrations | `supabase/migrations/` |
