@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+// Use the CJS build because the current ESM build ships a non-literal dynamic
+// import for optional tracing that Hermes rejects during production bundling.
+import { createClient } from '@supabase/supabase-js/dist/index.cjs';
 import { AppState } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
