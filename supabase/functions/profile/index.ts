@@ -163,7 +163,13 @@ serve(async (req) => {
 
             if (action === "update") {
                 const { updates } = body;
-                const ALLOWED_FIELDS = ['display_name', 'focus', 'experience', 'training_days', 'ai_context', 'unit_preference'];
+                const ALLOWED_FIELDS = [
+                    'display_name', 'focus', 'experience', 'training_days', 'ai_context', 'unit_preference',
+                    'sex', 'activity_level', 'goal_type',
+                    'dietary_preferences', 'dietary_allergies', 'disliked_foods', 'preferred_cuisines',
+                    'available_equipment', 'training_days_per_week', 'session_minutes_target',
+                    'measurement_system', 'calorie_target_override', 'protein_g_per_lb'
+                ];
                 const safeUpdates = Object.fromEntries(
                     Object.entries(updates).filter(([key]) => ALLOWED_FIELDS.includes(key))
                 );
@@ -181,6 +187,9 @@ serve(async (req) => {
                         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
+
+                // Keep compact AI prompt context in sync with profile preference changes.
+                await supabase.rpc("refresh_ai_context", { p_user_id: userId });
 
                 return new Response(
                     JSON.stringify({ profile: data }),
@@ -266,7 +275,11 @@ serve(async (req) => {
                     const ALLOWED_PROFILE_FIELDS = [
                         'height_value', 'height_unit', 'dob',
                         'current_weight', 'goal_weight', 'weight_unit',
-                        'focus', 'focus_other'
+                        'focus', 'focus_other',
+                        'sex', 'activity_level', 'goal_type',
+                        'dietary_preferences', 'dietary_allergies', 'disliked_foods', 'preferred_cuisines',
+                        'available_equipment', 'training_days_per_week', 'session_minutes_target',
+                        'measurement_system', 'calorie_target_override', 'protein_g_per_lb'
                     ];
                     const safeProfileUpdates = Object.fromEntries(
                         Object.entries(profileData).filter(([key]) => ALLOWED_PROFILE_FIELDS.includes(key))
