@@ -56,6 +56,15 @@
           "cameraPermission": "Coach Kettle needs camera access to take gym photos for your workouts."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#0a7ea4",
+          "sounds": [],
+          "iosDisplayInForeground": true
+        }
+      ],
       "expo-web-browser"
     ],
     "experiments": {
