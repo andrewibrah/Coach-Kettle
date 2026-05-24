@@ -127,7 +127,7 @@ export default function CompleteScreen() {
         </Animated.View>
 
         <Animated.View entering={FadeIn.duration(400).delay(400)} style={styles.textContainer}>
-          <ThemedText style={styles.title}>You're all set!</ThemedText>
+          <ThemedText style={styles.title}>You’re all set!</ThemedText>
           <ThemedText style={[styles.message, { color: isDark ? '#999' : '#666' }]}>
             Your profile has been saved. Ready to start tracking your workouts.
           </ThemedText>
