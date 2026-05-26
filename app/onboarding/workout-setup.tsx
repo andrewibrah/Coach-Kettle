@@ -39,7 +39,7 @@ export default function WorkoutSetupScreen() {
   const [currentLift, setCurrentLift] = useState<WorkoutLift>({ name: '', sets: '3', reps: '10' });
   const [lifts, setLifts] = useState<WorkoutLift[]>([]);
   // Track saved workouts locally (will be sent in batch at complete screen)
-  const [savedWorkouts, setSavedWorkouts] = useState<Array<{ name: string; lifts: Array<{ name: string; sets: number; reps: number }> }>>(
+  const [savedWorkouts, setSavedWorkouts] = useState<{ name: string; lifts: { name: string; sets: number; reps: number }[] }[]>(
     draft.workout_templates || []
   );
   const [editingIndex, setEditingIndex] = useState<number | null>(null);

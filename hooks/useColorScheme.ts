@@ -14,6 +14,6 @@ export function useColorScheme(): 'light' | 'dark' {
     return colorScheme;
   } catch {
     // ThemeProvider not available, fall back to system
-    return systemScheme ?? 'light';
+    return systemScheme === 'dark' ? 'dark' : 'light';
   }
 }

@@ -4,7 +4,7 @@ import { makeRedirectUri } from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import { Link, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -42,7 +42,7 @@ export default function SignIn() {
   const oauthBorderColor = isDark ? Colors.dark.border : Colors.light.border;
 
   // Helper: Complete auth and navigate based on terms acceptance
-  const completeAuthAndNavigate = async () => {
+  const completeAuthAndNavigate = useCallback(async () => {
     // 1. Set TTL timestamp
     await setLastAuthenticatedAt();
 
@@ -92,7 +92,7 @@ export default function SignIn() {
       console.warn('[SignIn] Failed to check terms, proceeding to home:', e);
       router.replace('/(tabs)');
     }
-  };
+  }, [router]);
 
 
   // Create redirect URL
@@ -195,7 +195,7 @@ export default function SignIn() {
 
     const subscription = Linking.addEventListener('url', handleDeepLink);
     return () => subscription.remove();
-  }, [router]);
+  }, [router, completeAuthAndNavigate]);
 
   async function signInWithEmail() {
     if (!email || !password) return Alert.alert('Error', 'Please enter email and password');

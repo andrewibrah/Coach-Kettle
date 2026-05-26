@@ -135,14 +135,59 @@
       "keywords": ["media", "photo", "video", "upload", "reflection", "image", "storage", "signed url", "workout media"],
       "keyFiles": ["lib/mediaUpload.ts", "components/media/MediaPickerBubble.tsx", "components/media/ReflectionInput.tsx", "plugins/withImagePicker.js"],
       "relatedDocs": ["09-modals", "03-workout-flow", "05-storage"]
+    },
+    {
+      "id": "17-nutrition",
+      "title": "Nutrition System",
+      "file": "17-nutrition.md",
+      "keywords": ["nutrition", "food", "macros", "calories", "protein", "meal plan", "food log", "targets", "bmr", "tdee"],
+      "keyFiles": ["lib/nutrition.ts", "contexts/NutritionContext.tsx", "supabase/functions/food-log/index.ts", "supabase/functions/nutrition-targets/index.ts", "supabase/functions/meal-plan/index.ts", "supabase/migrations/0033_nutrition_system.sql"],
+      "relatedDocs": ["18-coaching", "10-onboarding"]
+    },
+    {
+      "id": "18-coaching",
+      "title": "Coaching & Harshness",
+      "file": "18-coaching.md",
+      "keywords": ["coach", "daily feedback", "harshness", "accountability", "streak", "grading", "behavior state"],
+      "keyFiles": ["lib/coaching.ts", "contexts/CoachingContext.tsx", "supabase/functions/daily-feedback/index.ts", "supabase/migrations/0034_coaching_system.sql"],
+      "relatedDocs": ["17-nutrition", "19-programming"]
+    },
+    {
+      "id": "19-programming",
+      "title": "Workout Programming Engine",
+      "file": "19-programming.md",
+      "keywords": ["program", "periodization", "deload", "next set", "suggest", "split", "ppl", "push pull legs"],
+      "keyFiles": ["lib/programming.ts", "contexts/ProgramContext.tsx", "supabase/functions/programming/index.ts", "supabase/functions/next-set/index.ts", "supabase/migrations/0035_programming_engine.sql", "supabase/migrations/0037_next_set_suggestion.sql"],
+      "relatedDocs": ["13-templates", "12-pr-tracking"]
+    },
+    {
+      "id": "20-progress",
+      "title": "Progress Tracking",
+      "file": "20-progress.md",
+      "keywords": ["progress", "body metrics", "weight", "measurements", "resting heart rate", "rhr", "strength progression", "photos"],
+      "keyFiles": ["lib/bodyMetrics.ts", "supabase/functions/body-metrics/index.ts", "supabase/functions/resting-hr/index.ts", "supabase/migrations/0036_progress_tracking.sql"],
+      "relatedDocs": ["12-pr-tracking", "16-media-reflection"]
+    },
+    {
+      "id": "21-notifications",
+      "title": "Notifications",
+      "file": "21-notifications.md",
+      "keywords": ["notification", "push", "expo-notifications", "rest timer", "reminder", "schedule"],
+      "keyFiles": ["lib/notifications.ts", "contexts/NotificationsProvider.tsx", "supabase/functions/notifications/index.ts", "supabase/migrations/0040_notifications.sql", "hooks/useRestTimer.ts"],
+      "relatedDocs": ["18-coaching", "02-providers"]
     }
   ],
   "areas": {
     "auth": ["01-auth", "02-providers"],
-    "workout": ["03-workout-flow", "04-parsing", "05-storage", "08-hooks"],
+    "workout": ["03-workout-flow", "04-parsing", "05-storage", "08-hooks", "19-programming"],
     "ui": ["07-components", "09-modals", "14-theming"],
     "data": ["05-storage", "06-api", "15-edge-functions"],
     "user": ["10-onboarding", "11-settings", "12-pr-tracking", "13-templates"],
-    "media": ["16-media-reflection", "09-modals", "05-storage"]
+    "media": ["16-media-reflection", "09-modals", "05-storage"],
+    "nutrition": ["17-nutrition", "18-coaching"],
+    "coaching": ["18-coaching", "21-notifications"],
+    "programming": ["19-programming", "12-pr-tracking", "13-templates"],
+    "progress": ["20-progress", "12-pr-tracking", "16-media-reflection"],
+    "notifications": ["21-notifications"]
   }
 }

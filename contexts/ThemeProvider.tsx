@@ -18,6 +18,10 @@ import { useColorScheme as useSystemColorScheme } from 'react-native';
 type ThemeMode = 'system' | 'light' | 'dark';
 type ColorScheme = 'light' | 'dark';
 
+function normalizeColorScheme(value: ReturnType<typeof useSystemColorScheme>): ColorScheme {
+  return value === 'dark' ? 'dark' : 'light';
+}
+
 interface ThemeContextType {
   themeMode: ThemeMode;
   colorScheme: ColorScheme;
@@ -60,7 +64,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // Compute the actual color scheme
   const colorScheme: ColorScheme =
     themeMode === 'system'
-      ? (systemColorScheme ?? 'light')
+      ? normalizeColorScheme(systemColorScheme)
       : themeMode;
 
   const isDark = colorScheme === 'dark';

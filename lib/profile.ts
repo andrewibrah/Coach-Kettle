@@ -21,6 +21,20 @@ export interface UserProfile {
   ai_context: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  // ----- Phase 1 expansion fields (migration 0031) -----
+  sex?: 'male' | 'female' | 'other' | null;
+  activity_level?: 'sedentary' | 'light' | 'moderate' | 'very_active' | 'athlete' | null;
+  goal_type?: 'muscle_building' | 'leaning_out' | 'weight_loss' | 'maintenance' | 'strength' | 'endurance' | null;
+  dietary_preferences?: string[];
+  dietary_allergies?: string[];
+  disliked_foods?: string[];
+  preferred_cuisines?: string[];
+  available_equipment?: string[];
+  training_days_per_week?: number | null;
+  session_minutes_target?: number | null;
+  measurement_system?: 'imperial' | 'metric' | null;
+  calorie_target_override?: number | null;
+  protein_g_per_lb?: number | null;
 }
 
 export interface PRTrackedLift {

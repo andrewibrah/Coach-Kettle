@@ -63,7 +63,6 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'tint');
-  const textColor = useThemeColor({}, 'text');
   const iconColor = useThemeColor({}, 'icon');
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -85,7 +84,6 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
   };
 
   const isLastSlide = currentIndex === SLIDES.length - 1;
-  const isFirstSlide = currentIndex === 0;
 
   const renderSlide = ({ item, index }: { item: typeof SLIDES[number]; index: number }) => {
     const placeholder = 'placeholderLabel' in item

@@ -144,6 +144,56 @@ export default function SettingsScreen() {
                     </Pressable>
                 </View>
 
+                {/* Coaching Section */}
+                <View style={styles.section}>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Coaching</ThemedText>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/form' as any)}
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="camera.fill" size={20} color={activeColor} />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>Form check</ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    Camera rep count, ROM score, and direct technique cues
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/settings/nutrition-preferences' as any)}
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="fork.knife" size={20} color={activeColor} />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>Nutrition preferences</ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    Sex, activity, goal, dietary prefs — drives macros and meal plan
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/settings/notifications' as any)}
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="bell.fill" size={20} color={activeColor} />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>Notifications</ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    Rest timer, coach reports, workout reminders
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
+                </View>
+
                 {/* Appearance Section */}
                 <View style={styles.section}>
                     <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Appearance</ThemedText>

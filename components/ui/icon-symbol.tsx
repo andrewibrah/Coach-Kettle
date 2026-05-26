@@ -22,6 +22,7 @@ const MAPPING = {
   'questionmark.circle': 'help-outline',
   'xmark.circle.fill': 'close',
   'trash': 'delete',
+  'trash.fill': 'delete',
   'sparkles': 'auto_awesome',
   'xmark': 'close',
   'plus': 'add',
@@ -45,6 +46,9 @@ const MAPPING = {
   'arrow.clockwise': 'refresh',
   'minus.circle.fill': 'remove-circle',
   'play.fill': 'play-arrow',
+  'fork.knife': 'restaurant',
+  'bell.fill': 'notifications',
+  'camera.fill': 'photo-camera',
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;

@@ -96,7 +96,7 @@ export async function requestPermissionsAndRegisterToken(): Promise<{ granted: b
 
     if (!granted) {
       const req = await N.requestPermissionsAsync({
-        ios: { allowAlert: true, allowBadge: false, allowSound: true, allowAnnouncements: true },
+        ios: { allowAlert: true, allowBadge: false, allowSound: true },
       });
       granted = req.granted ||
         req.ios?.status === N.IosAuthorizationStatus.PROVISIONAL ||

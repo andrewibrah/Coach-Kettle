@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Coach Kettle** — Expo SDK 55 / React Native 0.83.6 workout tracker (iOS-first) with a Supabase backend. Users log sets via natural language ("Bench 185 x 8") parsed locally (regex) or via AI fallback.
 
+**Phase 1 expansion (v1.0.1+):** the app now also covers nutrition logging + AI weekly meal plans, a daily honest-feedback coach with a 4-level harshness state machine, a multi-week personalized programming engine with periodization and next-set suggestions, body-metrics + photos + resting-HR progress tracking, an exercise library, and a notifications system (rest-timer, workout reminders, daily report, etc.). See `.claude/overview/17-nutrition.md`, `18-coaching.md`, `19-programming.md`, `20-progress.md`, `21-notifications.md`.
+
 ## Warnings
 
 AI coding agents optimize for fluent output, not system truth:
@@ -47,10 +49,12 @@ supabase functions serve <function-name> --env-file .env.local
 ```
 ThemeProvider → AuthProvider → ProfileProvider → EntitlementProvider →
 OnboardingProvider → PRCelebrationProvider → AuthLockProvider →
-GestureHandlerRootView → NavigationThemeProvider → Expo Router Stack
+NotificationsProvider → NutritionProvider → CoachingProvider → ProgramProvider →
+RestTimerProvider → GestureHandlerRootView → NavigationThemeProvider → Expo Router Stack
 ```
 
 Order matters — auth before profile, entitlement before onboarding, features last.
+Notifications come right after the auth-lock layer so push token bootstrap happens once the user is reachable; nutrition / coaching / program contexts come next so screens can mount them. RestTimerProvider is innermost so the chip + the workout-screen trigger share one timer instance.
 All providers live in `contexts/` (not `components/`).
 
 ### Core Data Flow
@@ -118,7 +122,7 @@ Handled by `lib/mediaUpload.ts` → Supabase Storage (private bucket, user-scope
 | Input parsing | `lib/structuredGate.ts` |
 | API client | `lib/api.ts` |
 | Auth | `contexts/AuthProvider.tsx`, `lib/auth.ts`, `lib/authLock.ts` |
-| All providers | `contexts/` (AuthProvider, AuthLockProvider, ThemeProvider, ProfileContext, EntitlementContext, OnboardingContext, PRCelebrationContext) |
+| All providers | `contexts/` (AuthProvider, AuthLockProvider, ThemeProvider, ProfileContext, EntitlementContext, OnboardingContext, PRCelebrationContext, NotificationsProvider, NutritionContext, CoachingContext, ProgramContext, RestTimerContext) |
 | Workout state | `hooks/useWorkoutSession.ts`, `hooks/useRowActions.ts` |
 | Local storage | `lib/workoutStorage.ts` |
 | Draft persistence | `lib/workoutDraft.ts` |
@@ -130,6 +134,14 @@ Handled by `lib/mediaUpload.ts` → Supabase Storage (private bucket, user-scope
 | RevenueCat config | `constants/revenuecat.ts` |
 | Edge Functions | `supabase/functions/` |
 | DB migrations | `supabase/migrations/` |
+| Nutrition | `lib/nutrition.ts`, `contexts/NutritionContext.tsx`, `app/nutrition/*` |
+| Coaching | `lib/coaching.ts`, `contexts/CoachingContext.tsx`, `app/coach/*` |
+| Programming | `lib/programming.ts`, `contexts/ProgramContext.tsx`, `app/program/*` |
+| Progress | `lib/bodyMetrics.ts`, `app/progress/*` |
+| Exercise library | `lib/exerciseLibrary.ts`, `app/exercise-library/*` |
+| Notifications | `lib/notifications.ts`, `contexts/NotificationsProvider.tsx`, `hooks/useRestTimer.ts`, `app/settings/notifications.tsx` |
+| Rest timer | `lib/restTimer.ts`, `contexts/RestTimerContext.tsx`, `hooks/useRestTimer.ts`, `components/workout/RestTimerBar.tsx` |
+| Next-set suggestion | `components/workout/NextSetSuggestion.tsx`, `lib/programming.ts:fetchNextSetSuggestion`, RPC `suggest_next_set` |
 
 ## Edge Functions
 
@@ -150,6 +162,17 @@ Handled by `lib/mediaUpload.ts` → Supabase Storage (private bucket, user-scope
 | `/iap` | In-app purchase processing |
 | `/observability` | Analytics events |
 | `/health` | Health check |
+| `/food-log` | Food log CRUD + daily totals + search |
+| `/nutrition-targets` | Get / derive (BMR→TDEE) / override |
+| `/meal-plan` | Weekly meal plan fetch / generate / recalibrate |
+| `/exercise-library` | Canonical exercise catalog (read-only) |
+| `/body-metrics` | Body metrics + body photos (private bucket) |
+| `/resting-hr` | Resting HR log + RPC-backed summary |
+| `/programming` | Multi-week program generation + week query + advance |
+| `/next-set` | Per-exercise next-set suggestion (calls `suggest_next_set` RPC) |
+| `/daily-feedback` | Daily honest feedback + harshness state machine |
+| `/default-templates` | Goal-based default workout-template seeder |
+| `/notifications` | Push token registry + per-user prefs + send helpers |
 
 All functions: Deno runtime, CORS preflight on `OPTIONS`, authenticated via JWT in `Authorization` header, scoped to `user_id`.
 
@@ -240,6 +263,15 @@ Deep-dive docs live in `.claude/overview/` (also mirrored in `docs/`):
 - User runs `supabase db push` and `supabase functions deploy` manually
 - User reloads the app manually after deploys
 - Use subagents for parallel work when appropriate
+
+## Phase 1 expansion deploy checklist (1.0.1+)
+
+1. `npm install` — picks up the new `expo-notifications` dep.
+2. `npx expo prebuild --clean` (or rebuild the dev client via EAS) — required for `expo-notifications` native module.
+3. `supabase db push` — applies migrations `0031` → `0040`.
+4. `supabase functions deploy food-log nutrition-targets meal-plan exercise-library body-metrics resting-hr programming next-set daily-feedback default-templates notifications`.
+5. (Optional) Set `OPENAI_API_KEY` env on the `meal-plan` function for AI-generated weekly plans. Falls back to a deterministic skeleton plan if absent.
+6. Reload the app — new tabs auto-populate via the providers wired into `app/_layout.tsx`.
 
 ## Vibe
 

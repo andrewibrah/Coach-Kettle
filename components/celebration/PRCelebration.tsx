@@ -64,6 +64,8 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
     }, 4000);
 
     return () => clearTimeout(timer);
+    // Run once when the celebration mounts; animation shared values are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleDismiss = () => {
@@ -191,6 +193,8 @@ function ConfettiPiece({ index }: ConfettiPieceProps) {
       index * 30 + duration * 0.7,
       withTiming(0, { duration: 300 })
     );
+    // Run once per particle; randomized start/duration are intentionally fixed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({

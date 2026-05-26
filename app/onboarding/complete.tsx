@@ -44,7 +44,7 @@ export default function CompleteScreen() {
     };
 
     saveData();
-  }, []);
+  }, [batchSaveAndComplete, checkScale]);
 
   const checkAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: checkScale.value }],

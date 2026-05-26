@@ -30,7 +30,7 @@ export default function PRValuesScreen() {
   const [reps, setReps] = useState('');
 
   // Store PR values locally as user enters them
-  const [prValues, setPrValues] = useState<Array<{ lift_name: string; weight_lbs: number; reps: number }>>(
+  const [prValues, setPrValues] = useState<{ lift_name: string; weight_lbs: number; reps: number }[]>(
     draft.pr_values || []
   );
 

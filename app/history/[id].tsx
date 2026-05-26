@@ -4,7 +4,6 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,

@@ -27,6 +27,9 @@ import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
 import { Header } from "@/components/ui/Header";
 import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
 import { WorkoutTable } from "@/components/workout/WorkoutTable";
+import { RestTimerBar } from "@/components/workout/RestTimerBar";
+import { useSharedRestTimer } from "@/contexts/RestTimerContext";
+import { isCompoundExercise } from "@/lib/restTimer";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow } from "@/lib/api";
@@ -93,7 +96,7 @@ export default function HomeScreen() {
         }
       });
     });
-  }, [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows]);  
 
   const [editingCell, setEditingCell] = useState<{ rowId: string; field: EditableField } | null>(null);
   const [editValue, setEditValue] = useState<string>("");
@@ -241,6 +244,7 @@ export default function HomeScreen() {
   const { session } = useAuth();
   const { showCelebration } = usePRCelebration();
   const lastCelebratedRef = useRef<string>('');
+  const { start: startRestTimer } = useSharedRestTimer();
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -297,7 +301,7 @@ export default function HomeScreen() {
       const shown = await isTutorialShown();
       if (!shown && rows.length === 0 && !workoutActive) setTutorialVisible(true);
     })();
-  }, []);
+  }, [rows.length, workoutActive]);
 
   const openCoach = () => {
     commitPendingAndGet();
@@ -1048,6 +1052,17 @@ export default function HomeScreen() {
         });
       }
 
+      // Start rest timer for the last logged non-cardio set
+      const lastWorking = [...parsedRows].reverse().find((r) => !r.isCardio);
+      if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
+        const reps = parseInt(lastWorking.reps, 10);
+        startRestTimer({
+          exercise: lastWorking.exercise,
+          repsLastSet: Number.isFinite(reps) ? reps : undefined,
+          isCompound: isCompoundExercise(lastWorking.exercise),
+        }).catch(err => console.warn('[restTimer] start failed', err));
+      }
+
       scrollToBottom();
       return;
     }
@@ -1112,6 +1127,16 @@ export default function HomeScreen() {
               ? prev.filter((r) => r.id !== ghostId).concat(newRows)
               : prev.concat(newRows)
           );
+          // Start rest timer for the last AI-parsed non-cardio row
+          const lastWorking = [...newRows].reverse().find((r) => !r.isCardio);
+          if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
+            const reps = parseInt(lastWorking.reps, 10);
+            startRestTimer({
+              exercise: lastWorking.exercise,
+              repsLastSet: Number.isFinite(reps) ? reps : undefined,
+              isCompound: isCompoundExercise(lastWorking.exercise),
+            }).catch(err => console.warn('[restTimer] start failed', err));
+          }
           scrollToBottom();
         } else {
           // Empty response — remove ghost row silently
@@ -1203,6 +1228,11 @@ export default function HomeScreen() {
           onNavigateSettings={() => router.push("/settings")}
           onNavigateTemplates={() => router.push("/settings/templates")}
           onOpenCoach={openCoach}
+          onNavigateNutrition={() => router.push("/nutrition" as never)}
+          onNavigateCoachReport={() => router.push("/coach" as never)}
+          onNavigateProgress={() => router.push("/progress" as never)}
+          onNavigateProgram={() => router.push("/program" as never)}
+          onNavigateExerciseLibrary={() => router.push("/exercise-library" as never)}
         />
 
         <WorkoutNameModal
@@ -1247,6 +1277,7 @@ export default function HomeScreen() {
           }}
         />
 
+        <RestTimerBar />
       </KeyboardAvoidingView>
     </GestureDetector>
   );

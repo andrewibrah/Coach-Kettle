@@ -2,6 +2,13 @@ import { supabaseUrl } from './supabase';
 import { fetchWithAuth } from './auth';
 import { fetchProfile, UserProfile } from './profile';
 
+// Domain API re-exports (Phase 1 expansion)
+export * as NutritionAPI from './nutrition';
+export * as CoachingAPI from './coaching';
+export * as ProgrammingAPI from './programming';
+export * as BodyMetricsAPI from './bodyMetrics';
+export * as ExerciseLibraryAPI from './exerciseLibrary';
+
 // Cache for user profile to avoid repeated fetches
 let cachedProfile: UserProfile | null = null;
 let profileCacheTime = 0;

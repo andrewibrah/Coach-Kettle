@@ -26,6 +26,8 @@ export default function SettingsLayout() {
       <Stack.Screen name="pr-tracking" />
       <Stack.Screen name="templates" />
       <Stack.Screen name="subscription" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="nutrition-preferences" />
     </Stack>
   );
 }

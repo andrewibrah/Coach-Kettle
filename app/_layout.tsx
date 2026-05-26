@@ -13,6 +13,11 @@ import { EntitlementProvider } from '@/contexts/EntitlementContext';
 import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { PRCelebrationProvider } from '@/contexts/PRCelebrationContext';
 import { ProfileProvider } from '@/contexts/ProfileContext';
+import { NutritionProvider } from '@/contexts/NutritionContext';
+import { CoachingProvider } from '@/contexts/CoachingContext';
+import { ProgramProvider } from '@/contexts/ProgramContext';
+import { NotificationsProvider } from '@/contexts/NotificationsProvider';
+import { RestTimerProvider } from '@/contexts/RestTimerContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 export const unstable_settings = {
@@ -28,10 +33,20 @@ export default function RootLayout() {
             <OnboardingProvider>
               <PRCelebrationProvider>
                 <AuthLockProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <RootLayoutNav />
-              </GestureHandlerRootView>
-              </AuthLockProvider>
+                  <NotificationsProvider>
+                    <NutritionProvider>
+                      <CoachingProvider>
+                        <ProgramProvider>
+                          <RestTimerProvider>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <RootLayoutNav />
+                            </GestureHandlerRootView>
+                          </RestTimerProvider>
+                        </ProgramProvider>
+                      </CoachingProvider>
+                    </NutritionProvider>
+                  </NotificationsProvider>
+                </AuthLockProvider>
               </PRCelebrationProvider>
             </OnboardingProvider>
           </EntitlementProvider>
@@ -55,6 +70,11 @@ function RootLayoutNav() {
         <Stack.Screen name="history/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="paywall" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="nutrition" options={{ headerShown: false }} />
+        <Stack.Screen name="coach" options={{ headerShown: false }} />
+        <Stack.Screen name="progress" options={{ headerShown: false }} />
+        <Stack.Screen name="program" options={{ headerShown: false }} />
+        <Stack.Screen name="exercise-library" options={{ headerShown: false }} />
         <Stack.Screen name="terms-of-service" options={{
           headerShown: true,
           title: 'Terms of Service',
