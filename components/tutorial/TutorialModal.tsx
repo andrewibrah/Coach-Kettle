@@ -14,8 +14,8 @@ import Animated, {
   FadeIn,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { GuideVideo } from "./GuideVideo";
 import { TutorialSlide } from "./TutorialSlide";
-import { VideoPlaceholder } from "./VideoPlaceholder";
 
 interface TutorialModalProps {
   visible: boolean;
@@ -33,19 +33,19 @@ const SLIDES = [
     title: "Start a Session",
     subtitle: "Pick your focus, name your workout",
     body: "Tap the routine icon or just start typing — Coach Kettle creates your session automatically.",
-    placeholderLabel: "Start a session",
+    videoSource: require("@/assets/videos/guide_start_session.mp4"),
   },
   {
     title: "Log Sets Naturally",
     subtitle: "Type it like you'd say it",
     body: '"Bench 185 x 8", "Squat 225 3x5", "Run 20 min 2 miles" — we parse it all instantly.',
-    placeholderLabel: "Log a set",
+    videoSource: require("@/assets/videos/guide_log_set.mp4"),
   },
   {
     title: "Track History & PRs",
     subtitle: "Every rep, every record",
     body: "Browse every workout in History. Hit a new PR? Expect confetti 🎉",
-    placeholderLabel: "History & PRs",
+    videoSource: require("@/assets/videos/guide_history_prs.mp4"),
   },
   {
     title: "You're Ready 💪",
@@ -70,9 +70,10 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
 
   const handleDismiss = async () => {
     await markTutorialShown();
-    onDismiss();
-    // Reset state after dismiss
+    // Reset slide index BEFORE calling onDismiss so state is clean
+    // if the parent re-opens the tutorial quickly (e.g. via the help button).
     setCurrentIndex(0);
+    onDismiss();
   };
 
   const goToNext = () => {
@@ -85,9 +86,9 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
 
   const isLastSlide = currentIndex === SLIDES.length - 1;
 
-  const renderSlide = ({ item, index }: { item: typeof SLIDES[number]; index: number }) => {
-    const placeholder = 'placeholderLabel' in item
-      ? <VideoPlaceholder label={item.placeholderLabel} />
+  const renderSlide = ({ item }: { item: typeof SLIDES[number]; index: number }) => {
+    const visual = 'videoSource' in item
+      ? <GuideVideo source={item.videoSource} />
       : undefined;
 
     return (
@@ -96,7 +97,7 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
           title={item.title}
           subtitle={item.subtitle}
           body={item.body}
-          placeholder={placeholder}
+          placeholder={visual}
           isFirst={'isFirst' in item ? item.isFirst : false}
           isLast={'isLast' in item ? item.isLast : false}
         />
@@ -127,7 +128,7 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
         {/* Slide pager */}
         <FlatList
           ref={flatListRef}
-          data={SLIDES as unknown as typeof SLIDES[number][]}
+          data={[...SLIDES]}
           keyExtractor={(_, i) => String(i)}
           horizontal
           pagingEnabled
