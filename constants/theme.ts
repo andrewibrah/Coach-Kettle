@@ -23,6 +23,8 @@ export const Colors = {
     cardBackground: '#ffffff',
     secondaryBackground: '#F9FAFB',
     danger: '#EF4444',
+    success: '#10B981',
+    warning: '#F59E0B',
   },
   dark: {
     text: '#ECEDEE',
@@ -38,6 +40,8 @@ export const Colors = {
     cardBackground: '#1F2937',
     secondaryBackground: '#1F2937',
     danger: '#EF4444',
+    success: '#10B981',
+    warning: '#F59E0B',
   },
 };
 
