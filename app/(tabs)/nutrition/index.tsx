@@ -187,7 +187,7 @@ export default function NutritionHomeScreen() {
 
           {/* Add food */}
           <Pressable
-            onPress={() => router.push('/nutrition/log' as any)}
+            onPress={() => router.push('/nutrition/log')}
             style={({ pressed }) => [
               styles.primaryBtn,
               { backgroundColor: tint, marginBottom: 12 },
@@ -199,7 +199,7 @@ export default function NutritionHomeScreen() {
 
           {/* View weekly meal plan */}
           <Pressable
-            onPress={() => router.push('/nutrition/plan' as any)}
+            onPress={() => router.push('/nutrition/plan')}
             style={({ pressed }) => [
               styles.secondaryBtn,
               { borderColor: border },
@@ -210,7 +210,7 @@ export default function NutritionHomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push('/nutrition/targets' as any)}
+            onPress={() => router.push('/nutrition/targets')}
             style={({ pressed }) => [
               styles.secondaryBtn,
               { borderColor: border, marginTop: 8 },
