@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { Directions, FlatList, Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 
@@ -43,9 +43,38 @@ import { type LogRow } from "@/types/workout";
 import { clearWorkoutDraft, getWorkoutDraft, saveWorkoutDraft } from "@/lib/workoutDraft";
 import { TutorialModal } from "@/components/tutorial/TutorialModal";
 import { isTutorialShown } from "@/lib/tutorialState";
+import { HomeDashboard } from "@/components/home/HomeDashboard";
+import { useCoaching } from "@/contexts/CoachingContext";
+import { useNutrition } from "@/contexts/NutritionContext";
+import { useProgram } from "@/contexts/ProgramContext";
 
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
+
+// ── Pure module-level helpers (no component state dependencies) ───────────────
+function buildRowsFromApi(apiRows: ApiWorkoutRow[]): LogRow[] {
+  return apiRows
+    .filter((row) => row.exercise && row.exercise.trim())
+    .map((row) => ({
+      id: `${Date.now()}-${Math.random()}`,
+      exercise: row.exercise.trim(),
+      set: Number.isFinite(row.set) ? row.set : 1,
+      weightLbs: String(row.weightLbs ?? "").trim(),
+      reps: String(row.reps ?? "").trim(),
+      notes: String(row.notes ?? "").trim(),
+      timestamp: Date.now(),
+      status: "committed" as const,
+    }));
+}
+
+const toApiRows = (sourceRows: LogRow[]): ApiWorkoutRow[] =>
+  sourceRows.map((row) => ({
+    exercise: row.exercise,
+    set: row.set,
+    weightLbs: row.weightLbs,
+    reps: row.reps,
+    notes: row.notes,
+  }));
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -102,7 +131,6 @@ export default function HomeScreen() {
   const [editValue, setEditValue] = useState<string>("");
   const [messageInput, setMessageInput] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [, setError] = useState<{ message: string; reason?: string } | null>(null);
   const [aiBubbleText, setAiBubbleText] = useState<string | null>(null);
 
   const [coachOpen, setCoachOpen] = useState(false);
@@ -145,7 +173,6 @@ export default function HomeScreen() {
     setRows([]);
     setMessageInput("");
     setLoading(false);
-    setError(null);
     setEditingCell(null);
     setEditValue("");
     clearWorkoutDraft();
@@ -164,6 +191,11 @@ export default function HomeScreen() {
     endWorkoutSession,
     buildWorkoutToSave,
   } = useWorkoutSession({ onResetForNewDay });
+
+  // ── Dashboard data (all pre-loaded by root providers — zero extra API calls) ──
+  const { program, currentWeek, loading: programLoading } = useProgram();
+  const { today: coachToday } = useCoaching();
+  const { totals: nutritionTotals, targets: nutritionTargets } = useNutrition();
 
   const showStartToast = useCallback(() => {
     setStartToastOpen(true);
@@ -303,41 +335,17 @@ export default function HomeScreen() {
     })();
   }, [rows.length, workoutActive]);
 
+  // openCoach is a plain function (commitPendingAndGet is defined below — useCallback
+  // would create a forward-reference TypeScript error)
   const openCoach = () => {
     commitPendingAndGet();
     setCoachError(null);
     setCoachOpen(true);
   };
 
-  const closeCoach = () => {
+  const closeCoach = useCallback(() => {
     setCoachOpen(false);
-  };
-
-
-
-  const buildRowsFromApi = (apiRows: ApiWorkoutRow[]): LogRow[] => {
-    return apiRows
-      .filter((row) => row.exercise && row.exercise.trim())
-      .map((row) => ({
-        id: `${Date.now()}-${Math.random()}`,
-        exercise: row.exercise.trim(),
-        set: Number.isFinite(row.set) ? row.set : 1,
-        weightLbs: String(row.weightLbs ?? "").trim(),
-        reps: String(row.reps ?? "").trim(),
-        notes: String(row.notes ?? "").trim(),
-        timestamp: Date.now(),
-        status: "committed",
-      }));
-  };
-
-  const toApiRows = (sourceRows: LogRow[]): ApiWorkoutRow[] =>
-    sourceRows.map((row) => ({
-      exercise: row.exercise,
-      set: row.set,
-      weightLbs: row.weightLbs,
-      reps: row.reps,
-      notes: row.notes,
-    }));
+  }, []);
 
   const submitCoachQuestion = async (chatHistory?: { role: string; content: string }[]) => {
     const q = coachQuestion.trim();
@@ -397,7 +405,6 @@ export default function HomeScreen() {
     startWorkoutSession(name ? [name] : []);
     setRows([]);
     setMessageInput("");
-    setError(null);
     setEditingCell(null);
     setEditValue("");
   };
@@ -412,7 +419,6 @@ export default function HomeScreen() {
     setRows(skeletonRows);
 
     setMessageInput("");
-    setError(null);
     setEditingCell(null);
     setEditValue("");
 
@@ -862,7 +868,6 @@ export default function HomeScreen() {
     }
 
     const currentRows = commitPendingAndGet();
-    setError(null);
     // Don't set loading yet, as we try fast parse synchronously
 
     // Local synchronous parse - pass currentRows for routine-aware parsing
@@ -1156,6 +1161,15 @@ export default function HomeScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={[styles.screen, { backgroundColor }]}
       >
+        {/* Green dot on tab icon while a workout is in progress */}
+        <Tabs.Screen
+          name="index"
+          options={{
+            tabBarBadge: workoutActive ? ' ' : undefined,
+            tabBarBadgeStyle: { backgroundColor: '#10B981', borderColor: 'transparent', minWidth: 10, height: 10, borderRadius: 5 },
+          }}
+        />
+
         <Header
           title={workoutActive ? title : null}
           onMenuPress={() => setMenuOpen(true)}
@@ -1164,21 +1178,36 @@ export default function HomeScreen() {
           onHelpPress={() => setTutorialVisible(true)}
         />
 
-        <WorkoutTable
-          rows={rows}
-          compact={compact}
-          scrollRef={scrollRef}
-          editingCell={editingCell}
-          editValue={editValue}
-          onBeginEditCell={beginCellEdit}
-          onChangeEditValue={setEditValue}
-          onCommitEditCell={commitCellEdit}
-          onDeleteRow={deleteRow}
-          onDuplicateRow={duplicateRow}
-          onReorderRow={handleReorderRow}
-          onIncrementSet={onIncrementSet}
-          onEditSet={handleOpenEditSet}
-        />
+        {workoutActive ? (
+          <WorkoutTable
+            rows={rows}
+            compact={compact}
+            scrollRef={scrollRef}
+            editingCell={editingCell}
+            editValue={editValue}
+            onBeginEditCell={beginCellEdit}
+            onChangeEditValue={setEditValue}
+            onCommitEditCell={commitCellEdit}
+            onDeleteRow={deleteRow}
+            onDuplicateRow={duplicateRow}
+            onReorderRow={handleReorderRow}
+            onIncrementSet={onIncrementSet}
+            onEditSet={handleOpenEditSet}
+          />
+        ) : (
+          <HomeDashboard
+            program={program}
+            currentWeek={currentWeek}
+            programLoading={programLoading}
+            coachToday={coachToday}
+            totals={nutritionTotals}
+            targets={nutritionTargets}
+            onStartWorkout={() => setNameModalVisible(true)}
+            onNavigateProgram={() => router.push('/program' as never)}
+            onNavigateCoach={() => router.push('/coach' as never)}
+            onNavigateNutrition={() => router.push('/nutrition' as never)}
+          />
+        )}
 
         <WorkoutBottomBar
           workoutActive={workoutActive}
