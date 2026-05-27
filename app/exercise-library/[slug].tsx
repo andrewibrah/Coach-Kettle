@@ -16,7 +16,6 @@ export default function ExerciseDetailScreen() {
   const cardBackground = useThemeColor({}, 'cardBackground');
   const textColor = useThemeColor({}, 'text');
   const placeholder = useThemeColor({}, 'placeholder');
-  const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
 
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -69,8 +68,6 @@ export default function ExerciseDetailScreen() {
       </ThemedView>
     );
   }
-
-  const hasDemo = !!(exercise.demo_video_url || exercise.demo_image_url);
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
@@ -141,19 +138,6 @@ export default function ExerciseDetailScreen() {
           </ThemedText>
         </View>
 
-        {hasDemo && (
-          <View
-            style={[
-              styles.card,
-              styles.demoPlaceholder,
-              { backgroundColor: cardBackground, borderColor: border },
-            ]}
-          >
-            <ThemedText style={[styles.muted, { color: placeholder }]}>
-              Demo video coming soon
-            </ThemedText>
-          </View>
-        )}
       </ScrollView>
     </ThemedView>
   );
@@ -170,10 +154,4 @@ const styles = StyleSheet.create({
   bullet: { fontSize: 14, marginRight: 8, lineHeight: 20 },
   bulletText: { fontSize: 14, flex: 1, lineHeight: 20 },
   muted: { fontSize: 13 },
-  demoPlaceholder: {
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 120,
-  },
 });

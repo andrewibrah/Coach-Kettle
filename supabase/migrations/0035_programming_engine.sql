@@ -227,7 +227,7 @@ VALUES
        {"day": 5, "body_part": "Abs", "title": "Conditioning + Core",
         "exercises": [
           {"slug":"plank","sets":4,"reps":[30,60],"rest":45},
-          {"slug":"rowing-erg","sets":1,"reps":[20,30],"rest":0}
+          {"slug":"rowing-erg","sets":1,"reps":[20,30],"rest":60}
         ]}
      ]
    }'::jsonb),

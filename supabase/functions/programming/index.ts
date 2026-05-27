@@ -153,6 +153,19 @@ async function generateProgramFromTemplate(
           const base = pr.estimated_1rm * 0.7 * intensityPct;
           target_w = Math.round(base / 5) * 5;
         }
+        // DB constraint: rest_seconds IS NULL OR BETWEEN 30 AND 600.
+        // Treat <30 (incl. 0 = "no rest") as NULL rather than crashing the whole insert.
+        const rawRest = typeof ex.rest === "number" && Number.isFinite(ex.rest) ? ex.rest : null;
+        const rest_seconds = rawRest == null
+          ? null
+          : rawRest < 30
+            ? null
+            : rawRest > 600
+              ? 600
+              : rawRest;
+        // Reps constraint: 1..60. Clamp so range-style exercises (planks/cardio) don't crash.
+        const clampReps = (n: number | undefined) =>
+          typeof n === "number" && Number.isFinite(n) ? Math.min(60, Math.max(1, Math.round(n))) : null;
         return {
           day_id: dayRow.id,
           program_id: program.id,
@@ -160,11 +173,11 @@ async function generateProgramFromTemplate(
           exercise_slug: ex.slug,
           exercise_name: name,
           target_sets: isDeload ? Math.max(1, ex.sets - 1) : ex.sets,
-          target_reps_low: ex.reps[0],
-          target_reps_high: ex.reps[1],
+          target_reps_low: clampReps(ex.reps?.[0]),
+          target_reps_high: clampReps(ex.reps?.[1]),
           target_pct_e1rm: 0.7,
           target_weight_lbs: target_w,
-          rest_seconds: ex.rest,
+          rest_seconds,
           sort_order: idx,
         };
       });
