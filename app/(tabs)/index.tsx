@@ -158,6 +158,8 @@ export default function HomeScreen() {
   // Tutorial modal state
   const [tutorialVisible, setTutorialVisible] = useState(false);
 
+  const [draftChecked, setDraftChecked] = useState(false);
+
   const openMenu = () => setMenuOpen(true);
 
   const swipeRight = Gesture.Fling()
@@ -235,6 +237,8 @@ export default function HomeScreen() {
         clearWorkoutDraft();
         console.log('[WorkoutDraft] Cleared stale draft from', draft.dateISO);
       }
+    }).finally(() => {
+      setDraftChecked(true);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -392,6 +396,9 @@ export default function HomeScreen() {
   };
 
   const onStartWorkout = () => {
+    // Guard: wait for draft restore to resolve before allowing a new session.
+    // Tapping before restore completes could orphan an in-progress draft.
+    if (!draftChecked) return;
     if (workoutActive) {
       Alert.alert("Workout already started", "End the current workout to start a new one.");
       return;
