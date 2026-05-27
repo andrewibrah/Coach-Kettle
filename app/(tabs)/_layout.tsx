@@ -31,7 +31,7 @@ export default function TabLayout() {
 
   // No session - redirect to sign in
   if (!session) {
-    return <Redirect href={"/auth/sign-in" as any} />;
+    return <Redirect href="/auth/sign-in" />;
   }
 
   // Redirect to ToS if needed (before onboarding)
@@ -41,12 +41,12 @@ export default function TabLayout() {
 
   // Session exists but needs onboarding - redirect to onboarding
   if (needsOnboarding) {
-    return <Redirect href={"/onboarding" as any} />;
+    return <Redirect href="/onboarding" />;
   }
 
   // Needs paywall - trial/sub expired or initial offer not yet dismissed
   if (needsPaywall || needsInitialPaywall) {
-    return <Redirect href={"/paywall" as any} />;
+    return <Redirect href="/paywall" />;
   }
 
   return (
@@ -55,7 +55,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarStyle: { display: 'none' },
+        tabBarStyle: { display: 'flex' },
       }}>
       <Tabs.Screen
         name="index"
@@ -65,11 +65,30 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="nutrition"
         options={{
-          title: "History",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="clock.fill" color={color} />,
+          title: 'Nutrition',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="fork.knife" color={color} />,
         }}
+      />
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'Progress',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.line.uptrend.xyaxis" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: 'More',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="line.3.horizontal" color={color} />,
+        }}
+      />
+      {/* History is accessible via the More tab — hidden from tab bar but route is preserved */}
+      <Tabs.Screen
+        name="history"
+        options={{ href: null }}
       />
     </Tabs>
   );
