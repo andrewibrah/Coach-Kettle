@@ -1213,9 +1213,9 @@ export default function HomeScreen() {
             totals={nutritionTotals}
             targets={nutritionTargets}
             onStartWorkout={() => setNameModalVisible(true)}
-            onNavigateProgram={() => router.push('/program' as never)}
-            onNavigateCoach={() => router.push('/coach' as never)}
-            onNavigateNutrition={() => router.push('/nutrition' as never)}
+            onNavigateProgram={() => router.push('/program')}
+            onNavigateCoach={() => router.push('/coach')}
+            onNavigateNutrition={() => router.push('/nutrition')}
           />
         )}
 
@@ -1267,11 +1267,11 @@ export default function HomeScreen() {
           onNavigateSettings={() => router.push("/settings")}
           onNavigateTemplates={() => router.push("/settings/templates")}
           onOpenCoach={openCoach}
-          onNavigateNutrition={() => router.push("/nutrition" as never)}
-          onNavigateCoachReport={() => router.push("/coach" as never)}
-          onNavigateProgress={() => router.push("/progress" as never)}
-          onNavigateProgram={() => router.push("/program" as never)}
-          onNavigateExerciseLibrary={() => router.push("/exercise-library" as never)}
+          onNavigateNutrition={() => router.push("/nutrition")}
+          onNavigateCoachReport={() => router.push("/coach")}
+          onNavigateProgress={() => router.push("/progress")}
+          onNavigateProgram={() => router.push("/program")}
+          onNavigateExerciseLibrary={() => router.push("/exercise-library")}
         />
 
         <WorkoutNameModal
