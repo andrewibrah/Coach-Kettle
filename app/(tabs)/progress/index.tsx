@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import {
   fetchRestingHRSummary,
   fetchBodyMetrics,
 } from '@/lib/bodyMetrics';
+import { WORKOUT_HISTORY_KEY } from '@/lib/workoutStorage';
 import type {
   BodyMetricsEntry,
   RestingHeartRateSummary,
@@ -30,22 +32,62 @@ export default function ProgressHomeScreen() {
   const [latest, setLatest] = useState<BodyMetricsEntry | null>(null);
   const [rhrSummary, setRhrSummary] = useState<RestingHeartRateSummary | null>(null);
   const [recentMetrics, setRecentMetrics] = useState<BodyMetricsEntry[]>([]);
+  const [workouts7d, setWorkouts7d] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchLatestBodyMetric().then(setLatest).catch(() => {});
-    fetchRestingHRSummary(30).then(setRhrSummary).catch(() => {});
-    fetchBodyMetrics(60).then(setRecentMetrics).catch(() => {});
+    let mounted = true;
+
+    fetchLatestBodyMetric()
+      .then((v) => { if (mounted) setLatest(v); })
+      .catch(() => {});
+
+    fetchRestingHRSummary(30)
+      .then((v) => { if (mounted) setRhrSummary(v); })
+      .catch(() => {});
+
+    fetchBodyMetrics(60)
+      .then((v) => {
+        if (!mounted) return;
+        // Sort newest-first so recentMetrics[0] is the most recent entry (BUG 5)
+        const sorted = [...v].sort((a, b) =>
+          b.measured_date.localeCompare(a.measured_date)
+        );
+        setRecentMetrics(sorted);
+      })
+      .catch(() => {});
+
+    // Count workouts in the last 7 days from local storage (W15: key constant)
+    AsyncStorage.getItem(WORKOUT_HISTORY_KEY)
+      .then((raw) => {
+        if (!mounted) return;
+        if (!raw) { setWorkouts7d(0); return; }
+        try {
+          const sessions = JSON.parse(raw);
+          const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          setWorkouts7d(
+            sessions.filter((s: { createdAt: number }) => s.createdAt >= cutoff).length
+          );
+        } catch {
+          setWorkouts7d(0);
+        }
+      })
+      .catch(() => setWorkouts7d(0));
+
+    return () => { mounted = false; };
   }, []);
 
   const navTo = useCallback((path: string) => () => router.push(path as any), [router]);
 
+  const dangerColor = useThemeColor({}, 'danger');
+  const successColor = useThemeColor({}, 'success');
+
   const rhrDelta = rhrSummary?.trend_delta_bpm ?? 0;
   const rhrArrow = rhrDelta > 0 ? '↑' : rhrDelta < 0 ? '↓' : '·';
-  const rhrColor = rhrDelta > 0 ? '#EF4444' : rhrDelta < 0 ? '#10B981' : placeholder;
+  const rhrColor = rhrDelta > 0 ? dangerColor : rhrDelta < 0 ? successColor : placeholder;
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
-      <ScreenHeader title="Progress" />
+      <ScreenHeader title="Progress" showBack={false} />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
       >
@@ -74,8 +116,10 @@ export default function ProgressHomeScreen() {
             </View>
             <View style={styles.statCol}>
               <ThemedText style={[styles.statLabel, { color: placeholder }]}>Workouts (7d)</ThemedText>
-              <ThemedText type="title" style={styles.statValue}>—</ThemedText>
-              <ThemedText style={[styles.statUnit, { color: placeholder }]}>(coming soon)</ThemedText>
+              <ThemedText type="title" style={styles.statValue}>
+                {workouts7d !== null ? workouts7d : '—'}
+              </ThemedText>
+              <ThemedText style={[styles.statUnit, { color: placeholder }]}>sessions</ThemedText>
             </View>
           </View>
         </View>
