@@ -8,7 +8,6 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { Colors } from '@/constants/theme';
 
 import { useNutrition } from '@/contexts/NutritionContext';
 import { useProfile } from '@/contexts/ProfileContext';
@@ -36,13 +35,14 @@ export default function NutritionHomeScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const dangerColor = useThemeColor({}, 'danger');
 
   const { loading, date, entries, totals, targets, refresh, deleteEntry } = useNutrition();
   const { profile } = useProfile();
   const [deriving, setDeriving] = useState(false);
 
   const isTrainingDay = useMemo(() => {
-    const dow = new Date().getUTCDay();
+    const dow = new Date().getDay(); // local day-of-week, not UTC
     const dpw = profile?.training_days_per_week ?? 0;
     const trainingDays = TRAINING_DAY_MAP[dpw] ?? [];
     return trainingDays.includes(dow);
@@ -104,7 +104,7 @@ export default function NutritionHomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
-      <ScreenHeader title="Nutrition" subtitle={date} />
+      <ScreenHeader title="Nutrition" subtitle={date} showBack={false} />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator />
@@ -175,7 +175,7 @@ export default function NutritionHomeScreen() {
                           onPress={() => handleDelete(entry.id)}
                           style={({ pressed }) => [{ padding: 8 }, pressed && { opacity: 0.7 }]}
                         >
-                          <IconSymbol name="trash.fill" size={18} color={Colors.light.danger} />
+                          <IconSymbol name="trash.fill" size={18} color={dangerColor} />
                         </Pressable>
                       </View>
                     ))}
