@@ -48,10 +48,10 @@ export type WorkoutSession = {
   media?: WorkoutMediaRecord[];
 };
 
-const KEY = "workout_history_v1";
+export const WORKOUT_HISTORY_KEY = "workout_history_v1";
 
 export async function listWorkouts(): Promise<WorkoutSession[]> {
-  const raw = await AsyncStorage.getItem(KEY);
+  const raw = await AsyncStorage.getItem(WORKOUT_HISTORY_KEY);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -65,7 +65,7 @@ export async function saveWorkout(session: WorkoutSession) {
   // 1. Local Write (Upsert)
   const existing = await listWorkouts();
   const next = [session, ...existing.filter((w) => w.id !== session.id)];
-  await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  await AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(next));
 
   // 2. Remote Sync (Best Effort)
   try {
@@ -79,9 +79,9 @@ export async function saveWorkout(session: WorkoutSession) {
 export async function deleteWorkout(id: string) {
   const existing = await listWorkouts();
   const next = existing.filter((w) => w.id !== id);
-  await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  await AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(next));
 }
 
 export async function clearWorkouts() {
-  await AsyncStorage.removeItem(KEY);
+  await AsyncStorage.removeItem(WORKOUT_HISTORY_KEY);
 }
