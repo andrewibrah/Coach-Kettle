@@ -1,8 +1,9 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useRouter } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Pressable, StyleSheet, View, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
@@ -11,14 +12,19 @@ type Props = {
     onBack?: () => void;
     rightElement?: React.ReactNode;
     style?: ViewStyle;
-    /** If true, skip adding top safe area padding (use when parent already handles it) */
+    /**
+     * When true, skips adding `insets.top` padding at the top.
+     * Only pass `true` when a parent layout (e.g. a SafeAreaView) already
+     * handles top safe area. Default is false — the header IS the safe area source.
+     */
     skipSafeArea?: boolean;
+    /** If false, hides the back button (use on tab root screens) */
+    showBack?: boolean;
 };
 
-export function ScreenHeader({ title, subtitle, onBack, rightElement, style, skipSafeArea = false }: Props) {
+export function ScreenHeader({ title, subtitle, onBack, rightElement, style, skipSafeArea = false, showBack = true }: Props) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const textColor = useThemeColor({}, "text");
     const subtitleColor = useThemeColor({}, "placeholder");
     const iconColor = useThemeColor({}, "icon");
 
@@ -38,18 +44,20 @@ export function ScreenHeader({ title, subtitle, onBack, rightElement, style, ski
         ]}>
             <View style={styles.headerTop}>
                 <View style={styles.headerLeft}>
-                    <Pressable
-                        onPress={handleBack}
-                        style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
-                    >
-                        <IconSymbol name="chevron.left" size={24} color={iconColor} />
-                    </Pressable>
+                    {showBack ? (
+                        <Pressable
+                            onPress={handleBack}
+                            style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
+                        >
+                            <IconSymbol name="chevron.left" size={24} color={iconColor} />
+                        </Pressable>
+                    ) : null}
                     <View>
-                        <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+                        <ThemedText style={styles.title}>{title}</ThemedText>
                         {subtitle && (
-                            <Text style={[styles.subtitle, { color: subtitleColor }]}>
+                            <ThemedText style={[styles.subtitle, { color: subtitleColor }]}>
                                 {subtitle}
-                            </Text>
+                            </ThemedText>
                         )}
                     </View>
                 </View>
