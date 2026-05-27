@@ -1013,16 +1013,19 @@ export default function HomeScreen() {
         ];
       };
 
+      const prevLength = next.length; // snapshot before loop
       parsedRows.forEach((row) => addOrFillRow(row));
       setRows(next);
       setMessageInput("");
       setLoading(false);
 
-      // Sync log to backend
-      parsedRows.forEach(row => {
+      // Sync log to backend using actual set numbers from newly-added rows
+      // (fill-path rows are handled separately by syncSkeletonFilledRow)
+      const addedRows = next.slice(prevLength);
+      addedRows.forEach(row => {
         api.logSet({
           exercise: row.exercise,
-          set: 1, // approximate
+          set: row.set,           // real set number from nextSetNumberForExercise
           weightLbs: row.weightLbs,
           reps: row.reps,
           notes: row.notes,
@@ -1039,7 +1042,7 @@ export default function HomeScreen() {
       // Client-side PR check fallback (skip cardio entries)
       const prUserId = session?.user?.id;
       if (prUserId) {
-        parsedRows.forEach(row => {
+        addedRows.forEach(row => {
           if (row.isCardio) return; // Cardio doesn't have PRs
           const w = parseFloat(row.weightLbs);
           const r = parseInt(row.reps);
