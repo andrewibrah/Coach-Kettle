@@ -175,6 +175,14 @@
       "keywords": ["notification", "push", "expo-notifications", "rest timer", "reminder", "schedule"],
       "keyFiles": ["lib/notifications.ts", "contexts/NotificationsProvider.tsx", "supabase/functions/notifications/index.ts", "supabase/migrations/0040_notifications.sql", "hooks/useRestTimer.ts"],
       "relatedDocs": ["18-coaching", "02-providers"]
+    },
+    {
+      "id": "22-repo-audit",
+      "title": "Repo Audit",
+      "file": "22-repo-audit.md",
+      "keywords": ["audit", "strategy", "security", "product", "navigation", "maintenance", "findings"],
+      "keyFiles": ["app/_layout.tsx", "app/(tabs)/_layout.tsx", "app/settings/index.tsx", "supabase/functions/daily-feedback/index.ts", "supabase/functions/food-log/index.ts", "supabase/functions/resting-hr/index.ts", "supabase/functions/next-set/index.ts", "supabase/functions/default-templates/index.ts"],
+      "relatedDocs": ["00-architecture", "06-api", "15-edge-functions"]
     }
   ],
   "areas": {
@@ -188,6 +196,7 @@
     "coaching": ["18-coaching", "21-notifications"],
     "programming": ["19-programming", "12-pr-tracking", "13-templates"],
     "progress": ["20-progress", "12-pr-tracking", "16-media-reflection"],
-    "notifications": ["21-notifications"]
+    "notifications": ["21-notifications"],
+    "audit": ["22-repo-audit", "00-architecture", "06-api", "15-edge-functions"]
   }
 }

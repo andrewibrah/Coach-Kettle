@@ -13,6 +13,7 @@ const corsHeaders = {
 };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 async function verifyAuth(req: Request): Promise<string> {
@@ -21,7 +22,7 @@ async function verifyAuth(req: Request): Promise<string> {
   const token = authHeader.replace("Bearer ", "");
   // The RPC uses auth.uid(); we need an authenticated client (not service-role)
   // for the RPC's auth.uid() check to pass.
-  const userClient = createClient(supabaseUrl, supabaseServiceKey, {
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -68,7 +69,7 @@ serve(async (req) => {
   if (!exercise) return jsonRes({ error: "exercise required" }, 400);
 
   // Call the RPC with a user-scoped client so auth.uid() matches.
-  const userClient = createClient(supabaseUrl, supabaseServiceKey, {
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });

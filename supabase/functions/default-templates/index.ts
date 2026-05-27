@@ -13,6 +13,7 @@ const corsHeaders = {
 };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 function jsonRes(body: unknown, status = 200): Response {
@@ -45,7 +46,7 @@ serve(async (req) => {
     : "muscle_building";
 
   // RPC uses auth.uid() — must call via user-scoped client
-  const userClient = createClient(supabaseUrl, supabaseServiceKey, {
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
