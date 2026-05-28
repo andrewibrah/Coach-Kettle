@@ -66,7 +66,15 @@
         }
       ],
       "expo-web-browser",
-      "expo-video"
+      "expo-video",
+      [
+        "@sentry/react-native",
+        {
+          "organization": "coach-kettle",
+          "project": "apple-ios",
+          "url": "https://sentry.io/"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
