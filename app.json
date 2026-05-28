@@ -68,7 +68,7 @@
       "expo-web-browser",
       "expo-video",
       [
-        "@sentry/react-native",
+        "@sentry/react-native/expo",
         {
           "organization": "coach-kettle",
           "project": "apple-ios",
