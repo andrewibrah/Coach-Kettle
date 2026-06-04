@@ -18,6 +18,7 @@ export default function StrengthProgressionScreen() {
   const text = useThemeColor({}, 'text');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const [exercise, setExercise] = useState('');
   const [points, setPoints] = useState<StrengthProgressionPoint[]>([]);
@@ -70,7 +71,7 @@ export default function StrengthProgressionScreen() {
               (loading || !exercise.trim()) && { opacity: 0.5 },
             ]}
           >
-            <ThemedText type="defaultSemiBold" style={styles.loadBtnText}>
+            <ThemedText type="defaultSemiBold" style={[styles.loadBtnText, { color: onTint }]}>
               {loading ? 'Loading…' : 'Load'}
             </ThemedText>
           </Pressable>

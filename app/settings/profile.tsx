@@ -34,6 +34,7 @@ export default function ProfileSettingsScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const activeColor = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const { profile, profileLoading, updateProfile, refreshProfile } = useProfile();
 
@@ -193,7 +194,7 @@ export default function ProfileSettingsScreen() {
                   ]}
                   onPress={() => setHeightUnit('in')}
                 >
-                  <ThemedText style={[styles.unitText, heightUnit === 'in' && styles.unitTextActive]}>
+                  <ThemedText style={[styles.unitText, heightUnit === 'in' && [styles.unitTextActive, { color: onTint }]]}>
                     in
                   </ThemedText>
                 </Pressable>
@@ -204,7 +205,7 @@ export default function ProfileSettingsScreen() {
                   ]}
                   onPress={() => setHeightUnit('cm')}
                 >
-                  <ThemedText style={[styles.unitText, heightUnit === 'cm' && styles.unitTextActive]}>
+                  <ThemedText style={[styles.unitText, heightUnit === 'cm' && [styles.unitTextActive, { color: onTint }]]}>
                     cm
                   </ThemedText>
                 </Pressable>
@@ -267,7 +268,7 @@ export default function ProfileSettingsScreen() {
                   ]}
                   onPress={() => setWeightUnit('lb')}
                 >
-                  <ThemedText style={[styles.unitText, weightUnit === 'lb' && styles.unitTextActive]}>
+                  <ThemedText style={[styles.unitText, weightUnit === 'lb' && [styles.unitTextActive, { color: onTint }]]}>
                     lb
                   </ThemedText>
                 </Pressable>
@@ -278,7 +279,7 @@ export default function ProfileSettingsScreen() {
                   ]}
                   onPress={() => setWeightUnit('kg')}
                 >
-                  <ThemedText style={[styles.unitText, weightUnit === 'kg' && styles.unitTextActive]}>
+                  <ThemedText style={[styles.unitText, weightUnit === 'kg' && [styles.unitTextActive, { color: onTint }]]}>
                     kg
                   </ThemedText>
                 </Pressable>

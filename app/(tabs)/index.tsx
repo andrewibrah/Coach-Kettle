@@ -1184,7 +1184,6 @@ export default function HomeScreen() {
           onMenuPress={() => setMenuOpen(true)}
           onClearPress={onClearRows}
           onRoutinePress={() => setRoutineModalVisible(true)}
-          onHelpPress={() => setTutorialVisible(true)}
         />
 
         {workoutActive ? (
@@ -1271,6 +1270,7 @@ export default function HomeScreen() {
           onNavigateProgress={() => router.push("/progress")}
           onNavigateProgram={() => router.push("/program")}
           onNavigateExerciseLibrary={() => router.push("/exercise-library")}
+          onOpenHelp={() => setTutorialVisible(true)}
         />
 
         <WorkoutNameModal

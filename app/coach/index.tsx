@@ -36,6 +36,7 @@ export default function CoachScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const { loading, today, regenerateToday } = useCoaching();
   const [regenerating, setRegenerating] = useState(false);
@@ -78,9 +79,9 @@ export default function CoachScreen() {
                 ]}
               >
                 {regenerating ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={onTint} />
                 ) : (
-                  <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Generate</ThemedText>
+                  <ThemedText style={{ color: onTint, fontWeight: '700' }}>Generate</ThemedText>
                 )}
               </Pressable>
             </View>
@@ -148,7 +149,7 @@ export default function CoachScreen() {
                     </ThemedText>
                   </View>
                   <View style={[styles.pill, { borderColor: border, backgroundColor: tint }]}>
-                    <ThemedText style={{ fontSize: 12, color: '#fff', fontWeight: '700' }}>
+                    <ThemedText style={{ fontSize: 12, color: onTint, fontWeight: '700' }}>
                       harshness {today.harshness_level}
                     </ThemedText>
                   </View>
@@ -166,9 +167,9 @@ export default function CoachScreen() {
                   ]}
                 >
                   {regenerating ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={onTint} />
                   ) : (
-                    <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Regenerate</ThemedText>
+                    <ThemedText style={{ color: onTint, fontWeight: '700' }}>Regenerate</ThemedText>
                   )}
                 </Pressable>
                 <Pressable

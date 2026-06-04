@@ -16,6 +16,7 @@ export default function NutritionTargetsScreen() {
   const cardBackground = useThemeColor({}, 'cardBackground');
   const placeholder = useThemeColor({}, 'placeholder');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const { targets, refresh } = useNutrition();
   const [deriving, setDeriving] = useState(false);
@@ -58,9 +59,9 @@ export default function NutritionTargetsScreen() {
               ]}
             >
               {deriving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={onTint} />
               ) : (
-                <ThemedText style={{ color: '#fff', fontWeight: '700' }}>
+                <ThemedText style={{ color: onTint, fontWeight: '700' }}>
                   Derive from profile
                 </ThemedText>
               )}
@@ -101,9 +102,9 @@ export default function NutritionTargetsScreen() {
               ]}
             >
               {deriving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={onTint} />
               ) : (
-                <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Recalibrate now</ThemedText>
+                <ThemedText style={{ color: onTint, fontWeight: '700' }}>Recalibrate now</ThemedText>
               )}
             </Pressable>
           </>

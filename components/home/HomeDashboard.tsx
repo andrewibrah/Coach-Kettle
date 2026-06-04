@@ -43,6 +43,7 @@ export function HomeDashboard({
   onNavigateNutrition,
 }: HomeDashboardProps) {
   const tintColor = useThemeColor({}, 'tint');
+  const onTintColor = useThemeColor({}, 'tintForeground');
   const cardBackground = useThemeColor({}, 'cardBackground');
   const placeholder = useThemeColor({}, 'placeholder');
   const textColor = useThemeColor({}, 'text');
@@ -114,7 +115,7 @@ export function HomeDashboard({
               </ThemedText>
             </View>
             <View style={[styles.startBtn, { backgroundColor: tintColor }]}>
-              <ThemedText style={styles.startBtnText}>Start</ThemedText>
+              <ThemedText style={[styles.startBtnText, { color: onTintColor }]}>Start</ThemedText>
             </View>
           </View>
         </Pressable>

@@ -36,6 +36,7 @@ export default function SignIn() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const primaryColor = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const textColor = useThemeColor({}, 'text');
   const inputBorderColor = isDark ? Colors.dark.icon : Colors.light.icon;
   const placeholderColor = isDark ? Colors.dark.placeholder : Colors.light.placeholder;
@@ -389,7 +390,7 @@ export default function SignIn() {
               onPress={signInWithEmail}
               disabled={loading}
             >
-              <ThemedText style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</ThemedText>
+              <ThemedText style={[styles.buttonText, { color: onTint }]}>{loading ? 'Signing in...' : 'Sign In'}</ThemedText>
             </TouchableOpacity>
 
             <View style={styles.divider}>

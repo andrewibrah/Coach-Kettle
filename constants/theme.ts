@@ -7,6 +7,8 @@ import { Platform } from 'react-native';
 
 const tintColorLight = '#0a7ea4';
 const tintColorDark = '#fff';
+// Neutral accent for dark mode — replaces the blue tint so dark UI stays monochrome.
+const accentDark = '#E5E7EB';
 
 export const Colors = {
   light: {
@@ -16,6 +18,8 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    // Text/icon color to place on top of a `tint`-filled surface (buttons).
+    tintForeground: '#ffffff',
     border: '#D6D6D6',
     inputBackground: '#F3F4F6',
     placeholder: '#6B7280',
@@ -29,10 +33,12 @@ export const Colors = {
   dark: {
     text: '#ECEDEE',
     background: '#151718',
-    tint: tintColorLight,
+    tint: accentDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    // Dark mode accent is light, so on-tint text must be dark for contrast.
+    tintForeground: '#151718',
     border: '#374151',
     inputBackground: '#374151',
     placeholder: '#9CA3AF',

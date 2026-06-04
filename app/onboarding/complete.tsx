@@ -105,7 +105,7 @@ export default function CompleteScreen() {
             onPress={handleRetry}
             activeOpacity={0.8}
           >
-            <ThemedText style={styles.buttonText}>Try Again</ThemedText>
+            <ThemedText style={[styles.buttonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       </ThemedView>
@@ -123,7 +123,7 @@ export default function CompleteScreen() {
             checkAnimatedStyle,
           ]}
         >
-          <IconSymbol name="checkmark" size={32} color="#fff" />
+          <IconSymbol name="checkmark" size={32} color={Colors[colorScheme ?? 'light'].tintForeground} />
         </Animated.View>
 
         <Animated.View entering={FadeIn.duration(400).delay(400)} style={styles.textContainer}>
@@ -139,7 +139,7 @@ export default function CompleteScreen() {
             onPress={handleContinue}
             activeOpacity={0.8}
           >
-            <ThemedText style={styles.buttonText}>Continue</ThemedText>
+            <ThemedText style={[styles.buttonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Continue</ThemedText>
           </TouchableOpacity>
         </Animated.View>
       </View>

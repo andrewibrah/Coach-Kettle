@@ -63,7 +63,7 @@ export default function OnboardingWelcome() {
           onPress={handleGetStarted}
           activeOpacity={0.8}
         >
-          <ThemedText style={styles.buttonText}>Get Started</ThemedText>
+          <ThemedText style={[styles.buttonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Get Started</ThemedText>
         </TouchableOpacity>
 
         <TouchableOpacity

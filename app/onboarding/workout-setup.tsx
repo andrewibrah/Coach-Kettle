@@ -151,7 +151,7 @@ export default function WorkoutSetupScreen() {
               style={[styles.choiceButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
               onPress={handleYes}
             >
-              <ThemedText style={styles.choiceButtonText}>Yes, let&apos;s set them up</ThemedText>
+              <ThemedText style={[styles.choiceButtonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Yes, let&apos;s set them up</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -219,7 +219,7 @@ export default function WorkoutSetupScreen() {
             <QuizQuestion question={`Add lifts to "${workoutName}"`} subtitle="Build your workout one exercise at a time" />
             {lifts.length > 0 && (
               <View style={[styles.countBadge, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}>
-                <ThemedText style={styles.countBadgeText}>{lifts.length}</ThemedText>
+                <ThemedText style={[styles.countBadgeText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>{lifts.length}</ThemedText>
               </View>
             )}
           </View>
@@ -269,7 +269,7 @@ export default function WorkoutSetupScreen() {
                 onPress={handleAddLift}
                 disabled={!currentLift.name.trim()}
               >
-                <IconSymbol name={editingIndex !== null ? "checkmark" : "plus"} size={20} color="#fff" />
+                <IconSymbol name={editingIndex !== null ? "checkmark" : "plus"} size={20} color={Colors[colorScheme ?? 'light'].tintForeground} />
               </TouchableOpacity>
             </View>
           </View>
@@ -359,7 +359,7 @@ export default function WorkoutSetupScreen() {
             style={[styles.choiceButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
             onPress={handleAddAnother}
           >
-            <ThemedText style={styles.choiceButtonText}>Add another workout</ThemedText>
+            <ThemedText style={[styles.choiceButtonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Add another workout</ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity

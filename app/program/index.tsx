@@ -34,6 +34,7 @@ export default function ProgramHomeScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const cardBackground = useThemeColor({}, 'cardBackground');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const textColor = useThemeColor({}, 'text');
   const placeholder = useThemeColor({}, 'placeholder');
   const danger = useThemeColor({}, 'danger');
@@ -83,7 +84,7 @@ export default function ProgramHomeScreen() {
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <ThemedText style={styles.primaryBtnText}>Create Program</ThemedText>
+              <ThemedText style={[styles.primaryBtnText, { color: onTint }]}>Create Program</ThemedText>
             </Pressable>
           </View>
         ) : (
@@ -113,7 +114,7 @@ export default function ProgramHomeScreen() {
                   pressed && { opacity: 0.7 },
                 ]}
               >
-                <ThemedText style={styles.primaryBtnText}>View this week</ThemedText>
+                <ThemedText style={[styles.primaryBtnText, { color: onTint }]}>View this week</ThemedText>
               </Pressable>
               <Pressable
                 onPress={() => advance()}

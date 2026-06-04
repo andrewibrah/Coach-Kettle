@@ -34,6 +34,7 @@ export default function BodyPhotosScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const { session } = useAuth();
   const userId = session?.user?.id ?? '';
@@ -133,7 +134,7 @@ export default function BodyPhotosScreen() {
                 >
                   <ThemedText
                     type="defaultSemiBold"
-                    style={[styles.poseBtnText, active && { color: '#fff' }]}
+                    style={[styles.poseBtnText, active && { color: onTint }]}
                   >
                     {p[0].toUpperCase() + p.slice(1)}
                   </ThemedText>
@@ -151,7 +152,7 @@ export default function BodyPhotosScreen() {
               uploading && { opacity: 0.5 },
             ]}
           >
-            <ThemedText type="defaultSemiBold" style={styles.addBtnText}>
+            <ThemedText type="defaultSemiBold" style={[styles.addBtnText, { color: onTint }]}>
               {uploading ? 'Uploading…' : 'Add photo'}
             </ThemedText>
           </Pressable>

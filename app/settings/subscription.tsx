@@ -26,6 +26,7 @@ export default function SubscriptionScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const activeColor = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const { session } = useAuth();
   const { entitlement, isPro, refreshEntitlement } = useEntitlement();
@@ -164,8 +165,8 @@ export default function SubscriptionScreen() {
               style={({ pressed }) => [styles.upgradeButton, { backgroundColor: activeColor }, pressed && styles.buttonPressed]}
               onPress={() => router.push('/paywall' as any)}
             >
-              <IconSymbol name="crown.fill" size={20} color="#fff" />
-              <ThemedText style={styles.upgradeText}>Upgrade to Pro</ThemedText>
+              <IconSymbol name="crown.fill" size={20} color={onTint} />
+              <ThemedText style={[styles.upgradeText, { color: onTint }]}>Upgrade to Pro</ThemedText>
             </Pressable>
           )}
 

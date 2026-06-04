@@ -18,6 +18,7 @@ type Props = {
     onNavigateProgress?: () => void;
     onNavigateProgram?: () => void;
     onNavigateExerciseLibrary?: () => void;
+    onOpenHelp?: () => void;
 };
 
 export function MenuModal({
@@ -33,6 +34,7 @@ export function MenuModal({
     onNavigateProgress,
     onNavigateProgram,
     onNavigateExerciseLibrary,
+    onOpenHelp,
 }: Props) {
 
     const colorScheme = useColorScheme();
@@ -59,15 +61,16 @@ export function MenuModal({
                 <Pressable style={styles.container} onPress={onClose}>
                     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
                         <View style={styles.content}>
-                            {item("History", () => { onClose(); onNavigateHistory(); })}
                             {item("Ask Coach", () => { onClose(); onOpenCoach(); })}
+                            {item("Chats", () => { onClose(); onNavigateChats(); })}
+                            {item("History", () => { onClose(); onNavigateHistory(); })}
                             {onNavigateCoachReport && item("Daily Report", () => { onClose(); onNavigateCoachReport!(); })}
                             {onNavigateNutrition && item("Nutrition", () => { onClose(); onNavigateNutrition!(); })}
                             {onNavigateProgram && item("Program", () => { onClose(); onNavigateProgram!(); })}
                             {onNavigateProgress && item("Progress", () => { onClose(); onNavigateProgress!(); })}
-                            {onNavigateExerciseLibrary && item("Exercise Library", () => { onClose(); onNavigateExerciseLibrary!(); })}
-                            {item("Chats", () => { onClose(); onNavigateChats(); })}
+                            {onNavigateExerciseLibrary && item("Library", () => { onClose(); onNavigateExerciseLibrary!(); })}
                             {item("Templates", () => { onClose(); onNavigateTemplates(); })}
+                            {onOpenHelp && item("Help", () => { onClose(); onOpenHelp!(); })}
                             {item("Settings", () => { onClose(); onNavigateSettings(); })}
                         </View>
                     </ScrollView>

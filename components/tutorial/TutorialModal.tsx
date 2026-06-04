@@ -44,11 +44,11 @@ const SLIDES = [
   {
     title: "Track History & PRs",
     subtitle: "Every rep, every record",
-    body: "Browse every workout in History. Hit a new PR? Expect confetti 🎉",
+    body: "Browse every workout in History. Hit a new PR? Expect confetti.",
     videoSource: require("@/assets/videos/guide_history_prs.mp4"),
   },
   {
-    title: "You're Ready 💪",
+    title: "You're Ready",
     subtitle: "Hit the gym. We've got you.",
     body: "Tap ? any time to revisit this guide.",
     isLast: true,
@@ -63,6 +63,7 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'tint');
+  const onTintColor = useThemeColor({}, 'tintForeground');
   const iconColor = useThemeColor({}, 'icon');
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -181,7 +182,7 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
               ]}
               onPress={handleDismiss}
             >
-              <ThemedText style={styles.getStartedText}>Get Started →</ThemedText>
+              <ThemedText style={[styles.getStartedText, { color: onTintColor }]}>Get Started →</ThemedText>
             </Pressable>
           )}
         </View>

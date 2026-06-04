@@ -33,6 +33,7 @@ export default function RestingHrScreen() {
   const text = useThemeColor({}, 'text');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const [summary, setSummary] = useState<RestingHeartRateSummary | null>(null);
   const [entries, setEntries] = useState<RestingHeartRateEntry[]>([]);
@@ -141,7 +142,7 @@ export default function RestingHrScreen() {
               (saving || !bpm.trim()) && { opacity: 0.5 },
             ]}
           >
-            <ThemedText type="defaultSemiBold" style={styles.logBtnText}>
+            <ThemedText type="defaultSemiBold" style={[styles.logBtnText, { color: onTint }]}>
               {saving ? 'Saving…' : 'Log today'}
             </ThemedText>
           </Pressable>

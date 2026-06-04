@@ -26,6 +26,7 @@ export default function ForgotPassword() {
   const router = useRouter();
 
   const primaryColor = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const textColor = useThemeColor({}, 'text');
 
   async function handleResetPassword() {
@@ -60,7 +61,7 @@ export default function ForgotPassword() {
             style={[styles.button, { backgroundColor: primaryColor }]}
             onPress={() => router.replace('/auth/sign-in')}
           >
-            <ThemedText style={styles.buttonText}>Back to Sign In</ThemedText>
+            <ThemedText style={[styles.buttonText, { color: onTint }]}>Back to Sign In</ThemedText>
           </TouchableOpacity>
         </View>
       </ThemedView>
@@ -104,7 +105,7 @@ export default function ForgotPassword() {
               onPress={handleResetPassword}
               disabled={loading}
             >
-              <ThemedText style={styles.buttonText}>
+              <ThemedText style={[styles.buttonText, { color: onTint }]}>
                 {loading ? 'Sending...' : 'Send Reset Link'}
               </ThemedText>
             </TouchableOpacity>

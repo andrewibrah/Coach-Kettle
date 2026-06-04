@@ -4,6 +4,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
+import { TutorialModal } from '@/components/tutorial/TutorialModal';
 import { Colors } from '@/constants/theme';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useEntitlement } from '@/contexts/EntitlementContext';
@@ -22,6 +23,7 @@ export default function SettingsScreen() {
     const textColor = useThemeColor({}, 'text');
     const activeColor = useThemeColor({}, 'tint');
     const [isClearing, setIsClearing] = useState(false);
+    const [tutorialVisible, setTutorialVisible] = useState(false);
 
     // Dynamic colors for dark mode
     const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
@@ -223,6 +225,26 @@ export default function SettingsScreen() {
                     </Pressable>
                 </View>
 
+                {/* Help Section */}
+                <View style={styles.section}>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Help</ThemedText>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => setTutorialVisible(true)}
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="questionmark.circle" size={20} color={activeColor} />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>How to use Coach Kettle</ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    Replay the walkthrough of logging, history, and coaching
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
+                </View>
+
                 {/* Data Section */}
                 <View style={styles.section}>
                     <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Data</ThemedText>
@@ -248,6 +270,11 @@ export default function SettingsScreen() {
                     </Pressable>
                 </View>
             </ScrollView>
+
+            <TutorialModal
+                visible={tutorialVisible}
+                onDismiss={() => setTutorialVisible(false)}
+            />
         </ThemedView>
     );
 }

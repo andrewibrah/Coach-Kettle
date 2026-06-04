@@ -18,6 +18,7 @@ export default function FormAnalysisScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const [exercise, setExercise] = useState('Back Squat');
   const [expectedReps, setExpectedReps] = useState('8');
@@ -103,7 +104,7 @@ export default function FormAnalysisScreen() {
             disabled={loading}
             style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint }, pressed && { opacity: 0.7 }, loading && { opacity: 0.6 }]}
           >
-            {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.primaryText}>Record form check</ThemedText>}
+            {loading ? <ActivityIndicator color={onTint} /> : <ThemedText style={[styles.primaryText, { color: onTint }]}>Record form check</ThemedText>}
           </Pressable>
         </View>
 

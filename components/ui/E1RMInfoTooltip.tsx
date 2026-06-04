@@ -14,6 +14,7 @@ export function E1RMInfoTooltip({ style }: E1RMInfoTooltipProps) {
   const [visible, setVisible] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const tint = Colors[colorScheme].tint;
+  const onTint = Colors[colorScheme].tintForeground;
 
   return (
     <>
@@ -51,7 +52,7 @@ export function E1RMInfoTooltip({ style }: E1RMInfoTooltipProps) {
               onPress={() => setVisible(false)}
               style={[styles.button, { backgroundColor: tint }]}
             >
-              <ThemedText style={styles.buttonText}>Got it</ThemedText>
+              <ThemedText style={[styles.buttonText, { color: onTint }]}>Got it</ThemedText>
             </Pressable>
           </View>
         </BlurView>

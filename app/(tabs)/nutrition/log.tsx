@@ -24,6 +24,7 @@ export default function LogFoodScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const inputBg = useThemeColor({}, 'inputBackground');
 
   const { logFood } = useNutrition();
@@ -151,7 +152,7 @@ export default function LogFoodScreen() {
           >
             <ThemedText
               style={{
-                color: active ? '#fff' : textColor,
+                color: active ? onTint : textColor,
                 fontWeight: '600',
                 textTransform: 'capitalize',
                 fontSize: 13,
@@ -248,9 +249,9 @@ export default function LogFoodScreen() {
               ]}
             >
               {submitting ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={onTint} />
               ) : (
-                <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Log</ThemedText>
+                <ThemedText style={{ color: onTint, fontWeight: '700' }}>Log</ThemedText>
               )}
             </Pressable>
           </View>
@@ -327,9 +328,9 @@ export default function LogFoodScreen() {
             ]}
           >
             {quickSubmitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={onTint} />
             ) : (
-              <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Log</ThemedText>
+              <ThemedText style={{ color: onTint, fontWeight: '700' }}>Log</ThemedText>
             )}
           </Pressable>
         </View>

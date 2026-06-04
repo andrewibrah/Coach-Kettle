@@ -49,6 +49,7 @@ export default function NutritionPreferencesScreen() {
   const bg = useThemeColor({}, 'background');
   const cardBg = useThemeColor({}, 'cardBackground');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const subtle = useThemeColor({}, 'placeholder');
 
   const [sex, setSex] = useState(profile?.sex ?? 'male');
@@ -127,7 +128,7 @@ export default function NutritionPreferencesScreen() {
         { backgroundColor: active ? tint : cardBg, opacity: pressed ? 0.7 : 1 },
       ]}
     >
-      <ThemedText style={{ color: active ? '#fff' : undefined, fontWeight: '600' }}>{label}</ThemedText>
+      <ThemedText style={{ color: active ? onTint : undefined, fontWeight: '600' }}>{label}</ThemedText>
     </Pressable>
   );
 
@@ -214,7 +215,7 @@ export default function NutritionPreferencesScreen() {
           disabled={saving}
           style={({ pressed }) => [styles.saveBtn, { backgroundColor: tint }, pressed && { opacity: 0.8 }]}
         >
-          <ThemedText style={{ color: '#fff', fontWeight: '700' }}>{saving ? 'Saving…' : 'Save preferences'}</ThemedText>
+          <ThemedText style={{ color: onTint, fontWeight: '700' }}>{saving ? 'Saving…' : 'Save preferences'}</ThemedText>
         </Pressable>
       </ScrollView>
     </ThemedView>

@@ -69,7 +69,7 @@ export function QuizLiftAdder({
           onPress={handleAdd}
           disabled={!value.trim()}
         >
-          <IconSymbol name="plus" size={20} color="#fff" />
+          <IconSymbol name="plus" size={20} color={Colors[colorScheme ?? 'light'].tintForeground} />
         </TouchableOpacity>
       </View>
 

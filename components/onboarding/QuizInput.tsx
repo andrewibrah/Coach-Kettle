@@ -114,7 +114,7 @@ export function QuizUnitPicker({ options, selected, onSelect }: QuizUnitPickerPr
           <ThemedText
             style={[
               styles.pickerText,
-              selected === option.value && styles.pickerTextSelected,
+              selected === option.value && [styles.pickerTextSelected, { color: Colors[colorScheme ?? 'light'].tintForeground }],
             ]}
           >
             {option.label}

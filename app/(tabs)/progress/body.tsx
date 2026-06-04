@@ -56,6 +56,7 @@ export default function BodyMetricsScreen() {
   const text = useThemeColor({}, 'text');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const [entries, setEntries] = useState<BodyMetricsEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -187,7 +188,7 @@ export default function BodyMetricsScreen() {
               saving && { opacity: 0.5 },
             ]}
           >
-            <ThemedText type="defaultSemiBold" style={styles.saveBtnText}>
+            <ThemedText type="defaultSemiBold" style={[styles.saveBtnText, { color: onTint }]}>
               {saving ? 'Saving…' : 'Save'}
             </ThemedText>
           </Pressable>

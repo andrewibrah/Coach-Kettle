@@ -10,10 +10,9 @@ type HeaderProps = {
     onMenuPress: () => void;
     onClearPress: () => void;
     onRoutinePress?: () => void;
-    onHelpPress?: () => void;
 };
 
-export function Header({ title, onMenuPress, onClearPress, onRoutinePress, onHelpPress }: HeaderProps) {
+export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: HeaderProps) {
     const insets = useSafeAreaInsets();
     const iconColor = useThemeColor({}, 'icon');
     const textColor = useThemeColor({}, 'text');
@@ -45,14 +44,6 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress, onHel
                             <MaterialCommunityIcons name="clipboard-list-outline" size={24} color={iconColor} />
                         </Pressable>
                     )}
-                    {onHelpPress && (
-                        <Pressable
-                            onPress={onHelpPress}
-                            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
-                        >
-                            <IconSymbol name="questionmark.circle" size={22} color={iconColor} />
-                        </Pressable>
-                    )}
                     <Pressable
                         onPress={onClearPress}
                         style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
@@ -79,13 +70,14 @@ const styles = StyleSheet.create({
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        width: 80,
+        justifyContent: 'flex-start',
+        width: 88,
     },
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'flex-end',
-        width: 120,
+        width: 88,
     },
     titleContainer: {
         flex: 1,

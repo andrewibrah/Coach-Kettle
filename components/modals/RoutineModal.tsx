@@ -39,6 +39,7 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
   const subtextColor = useThemeColor({}, "placeholder");
   const borderColor = useThemeColor({}, "border");
   const accentColor = useThemeColor({}, "tint");
+  const onTint = useThemeColor({}, "tintForeground");
 
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +180,7 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
                 onPress={() => handleSelect(template)}
                 style={[styles.actionButton, { backgroundColor: accentColor }]}
               >
-                <IconSymbol name="plus" size={16} color="#fff" />
+                <IconSymbol name="plus" size={16} color={onTint} />
               </Pressable>
               <Pressable
                 onPress={() => handleDelete(template)}

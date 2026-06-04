@@ -82,9 +82,9 @@ export function QuizContinueButton({
         activeOpacity={0.8}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={Colors[colorScheme ?? 'light'].tintForeground} />
         ) : (
-          <ThemedText style={styles.continueText}>{label}</ThemedText>
+          <ThemedText style={[styles.continueText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>{label}</ThemedText>
         )}
       </TouchableOpacity>
     </Animated.View>

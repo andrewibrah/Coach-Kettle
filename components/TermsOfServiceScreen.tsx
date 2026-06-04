@@ -23,6 +23,7 @@ export function TermsOfServiceScreen() {
     const [activeDoc, setActiveDoc] = useState<DocType>('terms');
     const insets = useSafeAreaInsets();
     const primaryColor = useThemeColor({}, 'tint');
+    const onTint = useThemeColor({}, 'tintForeground');
     const borderColor = useThemeColor({}, 'border');
 
     const handleAccept = async () => {
@@ -94,7 +95,7 @@ export function TermsOfServiceScreen() {
                 >
                     <ThemedText style={[
                         styles.tabText,
-                        activeDoc === 'terms' && styles.tabTextActive,
+                        activeDoc === 'terms' && [styles.tabTextActive, { color: onTint }],
                     ]}>
                         Terms of Service
                     </ThemedText>
@@ -108,7 +109,7 @@ export function TermsOfServiceScreen() {
                 >
                     <ThemedText style={[
                         styles.tabText,
-                        activeDoc === 'privacy' && styles.tabTextActive,
+                        activeDoc === 'privacy' && [styles.tabTextActive, { color: onTint }],
                     ]}>
                         Privacy Policy
                     </ThemedText>
@@ -133,9 +134,9 @@ export function TermsOfServiceScreen() {
                     disabled={isAccepting}
                 >
                     {isAccepting ? (
-                        <ActivityIndicator color="#fff" />
+                        <ActivityIndicator color={onTint} />
                     ) : (
-                        <ThemedText style={styles.buttonText}>Accept and Continue</ThemedText>
+                        <ThemedText style={[styles.buttonText, { color: onTint }]}>Accept and Continue</ThemedText>
                     )}
                 </Pressable>
 

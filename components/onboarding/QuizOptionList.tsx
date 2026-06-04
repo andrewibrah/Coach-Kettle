@@ -148,7 +148,7 @@ function OptionCard({ option, isSelected, onPress, delay, colorScheme }: OptionC
           ]}
         >
           {isSelected && (
-            <IconSymbol name="checkmark" size={14} color="#fff" />
+            <IconSymbol name="checkmark" size={14} color={Colors[colorScheme ?? 'light'].tintForeground} />
           )}
         </View>
       </TouchableOpacity>

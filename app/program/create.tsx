@@ -44,6 +44,7 @@ export default function CreateProgramScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
   const tint = Colors[scheme === 'dark' ? 'dark' : 'light'].tint;
+  const onTint = Colors[scheme === 'dark' ? 'dark' : 'light'].tintForeground;
 
   const { create } = useProgram();
 
@@ -94,7 +95,7 @@ export default function CreateProgramScreen() {
       ]}
     >
       <ThemedText
-        style={[styles.pillText, { color: selected ? '#fff' : textColor }]}
+        style={[styles.pillText, { color: selected ? onTint : textColor }]}
       >
         {label}
       </ThemedText>
@@ -205,7 +206,7 @@ export default function CreateProgramScreen() {
             (pressed || submitting) && { opacity: 0.7 },
           ]}
         >
-          <ThemedText style={styles.primaryBtnText}>
+          <ThemedText style={[styles.primaryBtnText, { color: onTint }]}>
             {submitting ? 'Generating…' : 'Generate Program'}
           </ThemedText>
         </Pressable>

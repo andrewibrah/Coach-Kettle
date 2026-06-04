@@ -22,6 +22,7 @@ export default function ExerciseLibraryScreen() {
   const border = useThemeColor({}, 'border');
   const inputBackground = useThemeColor({}, 'inputBackground');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const [query, setQuery] = useState<string>('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -115,7 +116,7 @@ export default function ExerciseLibraryScreen() {
                   ]}
                 >
                   <ThemedText
-                    style={[styles.pillText, { color: selected ? '#fff' : textColor }]}
+                    style={[styles.pillText, { color: selected ? onTint : textColor }]}
                   >
                     {bp}
                   </ThemedText>

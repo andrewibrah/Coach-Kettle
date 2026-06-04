@@ -40,6 +40,7 @@ export default function PRTrackingScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const activeColor = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const { session } = useAuth();
 
@@ -397,7 +398,7 @@ export default function PRTrackingScreen() {
                     }}
                     disabled={!newLiftName.trim()}
                   >
-                    <ThemedText style={styles.confirmButtonText}>Continue</ThemedText>
+                    <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Continue</ThemedText>
                   </Pressable>
                 </View>
               </>
@@ -452,7 +453,7 @@ export default function PRTrackingScreen() {
                     style={[styles.confirmButton, { backgroundColor: activeColor }]}
                     onPress={handleAddWithPR}
                   >
-                    <ThemedText style={styles.confirmButtonText}>Add Lift</ThemedText>
+                    <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Add Lift</ThemedText>
                   </Pressable>
                 </View>
               </>
@@ -529,7 +530,7 @@ export default function PRTrackingScreen() {
                             style={[styles.confirmButton, { backgroundColor: activeColor }]}
                             onPress={() => handleSaveEdit(lift)}
                           >
-                            <ThemedText style={styles.confirmButtonText}>Save</ThemedText>
+                            <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Save</ThemedText>
                           </Pressable>
                         </View>
                       </View>

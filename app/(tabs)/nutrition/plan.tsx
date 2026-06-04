@@ -22,6 +22,7 @@ export default function MealPlanScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const { mealPlan, refresh } = useNutrition();
   const [generating, setGenerating] = useState(false);
@@ -117,9 +118,9 @@ export default function MealPlanScreen() {
               ]}
             >
               {generating ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={onTint} />
               ) : (
-                <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Generate plan</ThemedText>
+                <ThemedText style={{ color: onTint, fontWeight: '700' }}>Generate plan</ThemedText>
               )}
             </Pressable>
             <ThemedText style={{ fontSize: 12, color: placeholder, marginTop: 10 }}>
@@ -142,7 +143,7 @@ export default function MealPlanScreen() {
                       pressed && { opacity: 0.7 },
                     ]}
                   >
-                    <ThemedText style={{ color: active ? '#fff' : textColor, fontWeight: '600', fontSize: 13 }}>
+                    <ThemedText style={{ color: active ? onTint : textColor, fontWeight: '600', fontSize: 13 }}>
                       {label}
                     </ThemedText>
                   </Pressable>

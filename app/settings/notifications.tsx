@@ -33,6 +33,7 @@ export default function NotificationsSettingsScreen() {
   const bg = useThemeColor({}, 'background');
   const cardBg = useThemeColor({}, 'cardBackground');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const subtle = useThemeColor({}, 'placeholder');
 
   const [busy, setBusy] = useState(false);
@@ -90,7 +91,7 @@ export default function NotificationsSettingsScreen() {
               style={({ pressed }) => [styles.btn, { backgroundColor: tint }, pressed && { opacity: 0.7 }]}
               disabled={busy}
             >
-              <ThemedText style={[styles.btnText, { color: '#fff' }]}>
+              <ThemedText style={[styles.btnText, { color: onTint }]}>
                 {busy ? 'Working…' : 'Enable notifications'}
               </ThemedText>
             </Pressable>

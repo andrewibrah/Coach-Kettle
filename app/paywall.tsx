@@ -165,7 +165,7 @@ export default function PaywallScreen() {
               >
                 {plan.badge ? (
                   <View style={[styles.saveBadge, { backgroundColor: colors.tint }]}>
-                    <ThemedText style={styles.saveBadgeText}>{plan.badge}</ThemedText>
+                    <ThemedText style={[styles.saveBadgeText, { color: colors.tintForeground }]}>{plan.badge}</ThemedText>
                   </View>
                 ) : (
                   <View style={styles.badgePlaceholder} />
@@ -200,9 +200,9 @@ export default function PaywallScreen() {
           disabled={isProcessing || !selectedPlanConfig}
         >
           {isProcessing ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.tintForeground} />
           ) : (
-            <ThemedText style={styles.subscribeButtonText}>
+            <ThemedText style={[styles.subscribeButtonText, { color: colors.tintForeground }]}>
               {selectedPlanConfig ? `Continue with ${selectedPlanConfig.name}` : 'Purchases Unavailable'}
             </ThemedText>
           )}

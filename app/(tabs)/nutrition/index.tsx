@@ -35,6 +35,7 @@ export default function NutritionHomeScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const dangerColor = useThemeColor({}, 'danger');
 
   const { loading, date, entries, totals, targets, refresh, deleteEntry } = useNutrition();
@@ -124,9 +125,9 @@ export default function NutritionHomeScreen() {
                 ]}
               >
                 {deriving ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={onTint} />
                 ) : (
-                  <ThemedText style={{ color: '#fff', fontWeight: '700' }}>
+                  <ThemedText style={{ color: onTint, fontWeight: '700' }}>
                     Set up your nutrition targets
                   </ThemedText>
                 )}
@@ -194,7 +195,7 @@ export default function NutritionHomeScreen() {
               pressed && { opacity: 0.7 },
             ]}
           >
-            <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Add food</ThemedText>
+            <ThemedText style={{ color: onTint, fontWeight: '700' }}>Add food</ThemedText>
           </Pressable>
 
           {/* View weekly meal plan */}

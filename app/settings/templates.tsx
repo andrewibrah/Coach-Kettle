@@ -41,6 +41,7 @@ export default function TemplatesScreen() {
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const activeColor = useThemeColor({}, 'tint');
+    const onTint = useThemeColor({}, 'tintForeground');
 
     const { session } = useAuth();
 
@@ -533,7 +534,7 @@ export default function TemplatesScreen() {
                                 onPress={handleCreateTemplate}
                                 disabled={!newName.trim()}
                             >
-                                <ThemedText style={styles.confirmButtonText}>Create</ThemedText>
+                                <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Create</ThemedText>
                             </Pressable>
                         </View>
                     </Animated.View>
@@ -694,7 +695,7 @@ export default function TemplatesScreen() {
                                                                                     onPress={() => handleSaveEdit(item.id, template.id)}
                                                                                     disabled={!editName.trim()}
                                                                                 >
-                                                                                    <ThemedText style={styles.confirmButtonText}>Save</ThemedText>
+                                                                                    <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Save</ThemedText>
                                                                                 </Pressable>
                                                                             </View>
                                                                         </View>
@@ -836,7 +837,7 @@ export default function TemplatesScreen() {
                                                                     onPress={handleAddExercise}
                                                                     disabled={!newExerciseName.trim()}
                                                                 >
-                                                                    <ThemedText style={styles.confirmButtonText}>Add</ThemedText>
+                                                                    <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Add</ThemedText>
                                                                 </Pressable>
                                                             </View>
                                                         </View>
