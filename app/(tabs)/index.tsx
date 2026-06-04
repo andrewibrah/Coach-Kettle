@@ -1173,7 +1173,6 @@ export default function HomeScreen() {
       >
         {/* Green dot on tab icon while a workout is in progress */}
         <Tabs.Screen
-          name="index"
           options={{
             tabBarBadge: workoutActive ? ' ' : undefined,
             tabBarBadgeStyle: { backgroundColor: '#10B981', borderColor: 'transparent', minWidth: 10, height: 10, borderRadius: 5 },
