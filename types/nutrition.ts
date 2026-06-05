@@ -154,3 +154,16 @@ export interface PlannedMeal {
   sort_order: number;
   created_at: string;
 }
+
+export interface RecentFood {
+  food_name: string;
+  food_id: string | null;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  saturated_fat_g: number;
+  servings: number;
+  meal_slot: MealSlot;
+}

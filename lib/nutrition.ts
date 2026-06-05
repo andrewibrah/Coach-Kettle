@@ -12,6 +12,7 @@ import type {
   MealPlan,
   PlannedMeal,
   MealSlot,
+  RecentFood,
 } from '@/types/nutrition';
 
 const API = `${supabaseUrl}/functions/v1`;
@@ -113,4 +114,8 @@ export async function generateMealPlan(): Promise<{ plan: MealPlan; meals_insert
 
 export async function recalibrateMealPlan(): Promise<{ plan: MealPlan; meals_inserted: number }> {
   return post(`${API}/meal-plan`, { action: 'recalibrate' });
+}
+
+export async function fetchRecentFoods(): Promise<{ foods: RecentFood[] }> {
+  return get(`${API}/food-log?action=recent`);
 }

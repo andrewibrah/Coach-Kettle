@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,19 +12,10 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useNutrition } from '@/contexts/NutritionContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { deriveNutritionTargets } from '@/lib/nutrition';
+import { isTrainingDay as checkTrainingDay } from '@/lib/trainingSchedule';
 import type { MealSlot, FoodLogEntry } from '@/types/nutrition';
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
-
-const TRAINING_DAY_MAP: Record<number, number[]> = {
-  1: [3],
-  2: [1, 4],
-  3: [1, 3, 5],
-  4: [1, 2, 4, 5],
-  5: [1, 2, 3, 4, 5],
-  6: [1, 2, 3, 4, 5, 6],
-  7: [0, 1, 2, 3, 4, 5, 6],
-};
 
 export default function NutritionHomeScreen() {
   const router = useRouter();
@@ -37,16 +28,16 @@ export default function NutritionHomeScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const dangerColor = useThemeColor({}, 'danger');
+  const successColor = useThemeColor({}, 'success');
+  const warningColor = useThemeColor({}, 'warning');
 
-  const { loading, date, entries, totals, targets, refresh, deleteEntry } = useNutrition();
+  const { loading, date, entries, totals, targets, grade, refresh, deleteEntry } = useNutrition();
   const { profile } = useProfile();
   const [deriving, setDeriving] = useState(false);
 
   const isTrainingDay = useMemo(() => {
-    const dow = new Date().getDay(); // local day-of-week, not UTC
-    const dpw = profile?.training_days_per_week ?? 0;
-    const trainingDays = TRAINING_DAY_MAP[dpw] ?? [];
-    return trainingDays.includes(dow);
+    const dow = new Date().getDay();
+    return checkTrainingDay(dow, profile?.training_days_per_week);
   }, [profile?.training_days_per_week]);
 
   const calTarget = isTrainingDay ? targets?.training_calories : targets?.rest_calories;
@@ -71,7 +62,8 @@ export default function NutritionHomeScreen() {
       await deriveNutritionTargets();
       await refresh();
     } catch (e) {
-      console.warn('[nutrition] derive failed', e);
+      const msg = e instanceof Error ? e.message : 'Failed to derive targets';
+      Alert.alert('Setup needed', msg);
     } finally {
       setDeriving(false);
     }
@@ -88,6 +80,7 @@ export default function NutritionHomeScreen() {
   const renderBar = (label: string, actual: number, target: number | undefined, suffix: string) => {
     const t = target ?? 0;
     const pct = t > 0 ? Math.min(100, (actual / t) * 100) : 0;
+    const barColor = grade === 'green' ? successColor : grade === 'yellow' ? warningColor : grade === 'red' ? dangerColor : tint;
     return (
       <View style={{ marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -97,7 +90,7 @@ export default function NutritionHomeScreen() {
           </ThemedText>
         </View>
         <View style={{ height: 8, borderRadius: 4, backgroundColor: border, overflow: 'hidden' }}>
-          <View style={{ width: `${pct}%`, height: '100%', backgroundColor: tint }} />
+          <View style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor }} />
         </View>
       </View>
     );

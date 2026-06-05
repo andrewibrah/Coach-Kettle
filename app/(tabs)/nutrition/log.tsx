@@ -7,11 +7,10 @@ import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { Colors } from '@/constants/theme';
 
 import { useNutrition } from '@/contexts/NutritionContext';
 import { searchFoods } from '@/lib/nutrition';
-import type { FoodItem, MealSlot } from '@/types/nutrition';
+import type { FoodItem, MealSlot, RecentFood } from '@/types/nutrition';
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -26,8 +25,9 @@ export default function LogFoodScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const inputBg = useThemeColor({}, 'inputBackground');
+  const dangerColor = useThemeColor({}, 'danger');
 
-  const { logFood } = useNutrition();
+  const { logFood, recentFoods } = useNutrition();
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoodItem[]>([]);
@@ -43,12 +43,14 @@ export default function LogFoodScreen() {
   const [quickProt, setQuickProt] = useState('');
   const [quickCarb, setQuickCarb] = useState('');
   const [quickFat, setQuickFat] = useState('');
+  const [quickFiber, setQuickFiber] = useState('');
+  const [quickSatFat, setQuickSatFat] = useState('');
   const [quickMealSlot, setQuickMealSlot] = useState<MealSlot>('breakfast');
   const [quickError, setQuickError] = useState<string | null>(null);
   const [quickSubmitting, setQuickSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!query.trim()) {
+    if (!query.trim() || query.trim().length < 2) {
       setResults([]);
       return;
     }
@@ -73,9 +75,8 @@ export default function LogFoodScreen() {
     };
   }, [query]);
 
-  const today = new Date().toISOString().slice(0, 10);
-
   const handleLogSelected = async () => {
+    const today = new Date().toISOString().slice(0, 10);
     if (!selected || submitting) return;
     const s = parseFloat(servings) || 1;
     setSubmitting(true);
@@ -102,6 +103,7 @@ export default function LogFoodScreen() {
   };
 
   const handleQuickLog = async () => {
+    const today = new Date().toISOString().slice(0, 10);
     setQuickError(null);
     const cal = parseFloat(quickCal);
     const prot = parseFloat(quickProt);
@@ -124,8 +126,8 @@ export default function LogFoodScreen() {
         protein_g: prot,
         carbs_g: carb,
         fat_g: fat,
-        fiber_g: 0,
-        saturated_fat_g: 0,
+        fiber_g: parseFloat(quickFiber) || 0,
+        saturated_fat_g: parseFloat(quickSatFat) || 0,
       });
       router.back();
     } catch (e) {
@@ -175,6 +177,60 @@ export default function LogFoodScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Recently logged */}
+        {recentFoods.length > 0 && query.trim().length === 0 && (
+          <View style={[styles.card, { backgroundColor: cardBackground, paddingBottom: 8 }]}>
+            <ThemedText style={{ fontWeight: '700', marginBottom: 8 }}>Recently logged</ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {recentFoods.map((food: RecentFood, idx: number) => (
+                  <Pressable
+                    key={`${food.food_id ?? food.food_name}-${idx}`}
+                    onPress={() => {
+                      setSelected({
+                        id: food.food_id ?? '',
+                        user_id: null,
+                        is_global: false,
+                        name: food.food_name,
+                        brand: null,
+                        serving_size_g: 0,
+                        serving_label: null,
+                        calories: food.calories,
+                        protein_g: food.protein_g,
+                        carbs_g: food.carbs_g,
+                        fat_g: food.fat_g,
+                        fiber_g: food.fiber_g,
+                        saturated_fat_g: food.saturated_fat_g,
+                        sugar_g: 0,
+                        sodium_mg: 0,
+                        tags: [],
+                        created_at: '',
+                        updated_at: '',
+                      });
+                      setServings(String(food.servings));
+                      setMealSlot(food.meal_slot);
+                      setResults([]);
+                      setQuery('');
+                    }}
+                    style={({ pressed }) => [
+                      styles.recentPill,
+                      { backgroundColor: cardBackground, borderColor: border },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <ThemedText style={{ fontWeight: '600', fontSize: 13 }} numberOfLines={1}>
+                      {food.food_name}
+                    </ThemedText>
+                    <ThemedText style={{ color: placeholder, fontSize: 11 }}>
+                      {Math.round(food.calories)} cal
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
         {/* Search */}
         <View style={[styles.card, { backgroundColor: cardBackground }]}>
           <ThemedText type="subtitle" style={{ marginBottom: 10 }}>Search foods</ThemedText>
@@ -199,7 +255,7 @@ export default function LogFoodScreen() {
               {results.map((item) => (
                 <Pressable
                   key={item.id}
-                  onPress={() => setSelected(item)}
+                  onPress={() => { setSelected(item); setResults([]); setQuery(''); }}
                   style={({ pressed }) => [
                     styles.resultRow,
                     { borderColor: border },
@@ -213,6 +269,11 @@ export default function LogFoodScreen() {
                 </Pressable>
               ))}
             </View>
+          )}
+          {!searching && results.length === 0 && query.trim().length >= 2 && (
+            <ThemedText style={{ color: placeholder, marginTop: 8, fontSize: 13 }}>
+              No foods found. Try Quick Log below or create a custom food.
+            </ThemedText>
           )}
         </View>
 
@@ -312,10 +373,28 @@ export default function LogFoodScreen() {
               style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border, marginBottom: 8 }]}
             />
           </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              value={quickFiber}
+              onChangeText={setQuickFiber}
+              placeholder="Fiber g (opt)"
+              placeholderTextColor={placeholder}
+              keyboardType="decimal-pad"
+              style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border, marginBottom: 8 }]}
+            />
+            <TextInput
+              value={quickSatFat}
+              onChangeText={setQuickSatFat}
+              placeholder="Sat fat g (opt)"
+              placeholderTextColor={placeholder}
+              keyboardType="decimal-pad"
+              style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border, marginBottom: 8 }]}
+            />
+          </View>
           <ThemedText style={{ fontWeight: '600', marginTop: 4 }}>Meal</ThemedText>
           {renderSlotPicker(quickMealSlot, setQuickMealSlot)}
           {quickError && (
-            <ThemedText style={{ color: Colors.light.danger, marginBottom: 8, fontSize: 13 }}>
+            <ThemedText style={{ color: dangerColor, marginBottom: 8, fontSize: 13 }}>
               {quickError}
             </ThemedText>
           )}
@@ -379,5 +458,13 @@ const styles = StyleSheet.create({
   separatorLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
+  },
+  recentPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 90,
+    maxWidth: 140,
   },
 });

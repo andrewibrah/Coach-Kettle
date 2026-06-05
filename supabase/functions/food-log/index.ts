@@ -130,7 +130,66 @@ serve(async (req) => {
           .order("is_global", { ascending: false })
           .limit(30);
         if (error) throw error;
-        return jsonRes({ foods: data ?? [] });
+
+        // Fuzzy fallback: if ilike returns < 3 results, also try trigram similarity
+        let foods = data ?? [];
+        if (foods.length < 3) {
+          try {
+            const { data: fuzzyData } = await userClient.rpc("search_foods_fuzzy", {
+              p_q: safe,
+              p_user_id: userId,
+            });
+            if (fuzzyData && Array.isArray(fuzzyData)) {
+              // Merge, deduplicating by id
+              const existingIds = new Set(foods.map((f: { id: string }) => f.id));
+              for (const item of fuzzyData) {
+                if (!existingIds.has(item.id)) {
+                  foods.push(item);
+                  existingIds.add(item.id);
+                }
+              }
+            }
+          } catch {
+            // fuzzy search not available yet (before migration runs) — ignore
+          }
+        }
+        return jsonRes({ foods });
+      }
+
+      if (action === "recent") {
+        // Return last 10 distinct foods logged by this user (by most recently consumed)
+        const { data, error } = await admin
+          .from("food_logs")
+          .select("food_name, food_id, calories, protein_g, carbs_g, fat_g, fiber_g, saturated_fat_g, servings, meal_slot, consumed_at")
+          .eq("user_id", userId)
+          .order("consumed_at", { ascending: false })
+          .limit(100);
+        if (error) throw error;
+
+        // Deduplicate by food_name, keeping most recent
+        const seen = new Set<string>();
+        const unique: typeof data = [];
+        for (const row of (data ?? [])) {
+          if (!seen.has(row.food_name)) {
+            seen.add(row.food_name);
+            unique.push(row);
+            if (unique.length >= 10) break;
+          }
+        }
+
+        const recentFoods = unique.map((r) => ({
+          food_name: r.food_name,
+          food_id: r.food_id,
+          calories: Number(r.calories ?? 0),
+          protein_g: Number(r.protein_g ?? 0),
+          carbs_g: Number(r.carbs_g ?? 0),
+          fat_g: Number(r.fat_g ?? 0),
+          fiber_g: Number(r.fiber_g ?? 0),
+          saturated_fat_g: Number(r.saturated_fat_g ?? 0),
+          servings: Number(r.servings ?? 1),
+          meal_slot: r.meal_slot,
+        }));
+        return jsonRes({ foods: recentFoods });
       }
 
       return jsonRes({ error: "unknown action" }, 400);

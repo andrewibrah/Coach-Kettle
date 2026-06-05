@@ -27,7 +27,7 @@ export default function MealPlanScreen() {
   const { mealPlan, refresh } = useNutrition();
   const [generating, setGenerating] = useState(false);
   const [recal, setRecal] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<number>(new Date().getUTCDay());
+  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
 
   const mealsByDay = useMemo(() => {
     const out: Record<number, PlannedMeal[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
