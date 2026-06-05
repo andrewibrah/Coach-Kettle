@@ -1,0 +1,54 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo*)",
+      "Bash(npm run*)",
+      "Bash(npm install*)",
+      "Bash(node -e:*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git checkout*)",
+      "Bash(git fetch*)",
+      "Bash(git pull*)",
+      "Bash(supabase db push*)",
+      "Bash(supabase functions*)",
+      "Bash(supabase migration*)",
+      "Bash(npx gitnexus*)",
+      "Bash(npx eslint*)",
+      "Bash(npx tsc*)",
+      "Read(**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/prevent-force-push-main.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-edit-lint.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/warn-direct-db.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,45 +1,27 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project
 
-## Project Overview
-
-**Coach Kettle** — Expo SDK 55 / React Native 0.83.6 workout tracker (iOS-first) with a Supabase backend. Users log sets via natural language ("Bench 185 x 8") parsed locally (regex) or via AI fallback.
-
-**Phase 1 expansion (v1.0.1+):** the app now also covers nutrition logging + AI weekly meal plans, a daily honest-feedback coach with a 4-level harshness state machine, a multi-week personalized programming engine with periodization and next-set suggestions, body-metrics + photos + resting-HR progress tracking, an exercise library, and a notifications system (rest-timer, workout reminders, daily report, etc.). See `.claude/overview/17-nutrition.md`, `18-coaching.md`, `19-programming.md`, `20-progress.md`, `21-notifications.md`.
+**Coach Kettle** — Expo SDK 55 / React Native 0.83.6 workout tracker (iOS-first), Supabase backend. Users log sets via natural language ("Bench 185 x 8") parsed locally (regex) or AI fallback. Phase 1 (v1.0.1+) adds: nutrition + meal plans, daily coach with harshness state machine, multi-week programming engine, body metrics + progress, exercise library, notifications.
 
 ## Warnings
 
 AI coding agents optimize for fluent output, not system truth:
-1. AI will confidently fabricate logic, APIs, and edge-case behavior—verify all output.
+1. AI will confidently fabricate logic, APIs, and edge-case behavior — verify all output.
 2. Generated code often silently fails under real load, concurrency, or malformed input.
-3. Security assumptions are naïve by default—assume missing auth, validation, and threat modeling.
-4. AI optimizes for plausibility, not correctness—"looks right" is a red flag.
+3. Security assumptions are naïve by default — assume missing auth, validation, and threat modeling.
+4. AI optimizes for plausibility, not correctness — "looks right" is a red flag.
 5. Subtle bugs hide in glue code, state transitions, and error handling.
 
 ## Commands
 
 ```bash
-# Start dev server
-npx expo start
-
-# Run on iOS simulator
-npx expo run:ios
-
-# Lint
-npx expo lint
-
-# Deploy a single Edge Function (user runs manually)
-supabase functions deploy <function-name>
-
-# Deploy all Edge Functions
-supabase functions deploy
-
-# Apply DB migrations (user runs manually)
-supabase db push
-
-# Serve a function locally for testing
-supabase functions serve <function-name> --env-file .env.local
+npx expo start                                          # Dev server
+npx expo run:ios                                        # iOS simulator
+npx expo lint                                           # Lint
+supabase db push                                        # Apply migrations (user runs manually)
+supabase functions deploy <name>                        # Deploy function (user runs manually)
+supabase functions serve <name> --env-file .env.local   # Local function testing
 ```
 
 ## Architecture
@@ -53,188 +35,64 @@ NotificationsProvider → NutritionProvider → CoachingProvider → ProgramProv
 RestTimerProvider → GestureHandlerRootView → NavigationThemeProvider → Expo Router Stack
 ```
 
-Order matters — auth before profile, entitlement before onboarding, features last.
-Notifications come right after the auth-lock layer so push token bootstrap happens once the user is reachable; nutrition / coaching / program contexts come next so screens can mount them. RestTimerProvider is innermost so the chip + the workout-screen trigger share one timer instance.
-All providers live in `contexts/` (not `components/`).
+Order matters: auth before profile, entitlement before onboarding, features last. RestTimerProvider is innermost so chip + workout-screen trigger share one instance. All providers live in `contexts/`.
 
 ### Core Data Flow
 
 ```
 User Input → structuredGate.ts → regex match? → LogRow[]
-                               → no match? → /chat API → LogRow[]
-                                      ↓
-                              AsyncStorage (immediate) + Supabase (background)
+                               → no match?   → /chat API → LogRow[]
+                                     ↓
+                          AsyncStorage (immediate) + Supabase (background)
 ```
 
-**Structured Gate decisions** (`lib/structuredGate.ts`):
-- `fast` — regex matched, rows returned directly
-- `ai` — send to `/chat` Edge Function
-- `end_workout` — trigger end-workout flow
-- `fill_skeleton` — fill a template placeholder row
+All writes hit AsyncStorage immediately; Supabase sync is background/best-effort. Sign-out calls `clearAllCaches()` in `AuthProvider`.
 
-### Storage (Local-First)
+### Why These Decisions
 
-All writes go to AsyncStorage immediately; Supabase sync is background/best-effort. On sign-out, `clearAllCaches()` in `AuthProvider` wipes all keys.
+- **Local-first storage** — data survives network failures; gym environments have weak signal
+- **Edge Functions for all mutations** — no direct DB access from client; enforces auth boundary
+- **4-hour session TTL** — biometric convenience + security; change via `AUTH_TTL_MS` in `lib/authLock.ts`
+- **Structured gate pattern** — regex first (fast path), AI fallback only for complex queries
 
-**Key AsyncStorage keys:**
-| Key | Purpose |
-|-----|---------|
-| `workout_history_v1` | Saved workouts |
-| `chat_history_v1` | Chat messages |
-| `workout_draft_v1` | In-progress draft (same-day restore on relaunch) |
-| `onboarding_draft_v1` | Onboarding answer backup |
-| `last_authenticated_at` | Auth TTL timestamp |
-| `biometric_enabled` | Biometric preference |
-| `terms_accepted` | ToS flag |
-| `tutorial_shown_v1` | Whether tutorial carousel has been dismissed |
+## Domain Rules (not obvious from code)
 
-### Pending Edit Pattern
+### Coaching / Harshness State Machine
 
-Inline cell editing is "pending" until committed. Call `commitPendingAndGet()` before any mutation that reads rows to prevent race conditions.
+Levels: `0=supportive` → `1=firm` → `2=direct` → `3=accountability`.
+
+- **Bad day** = `nutrition_color === 'red'` OR (scheduled training day AND no workout logged)
+- **Good day** = `nutrition_color === 'green'` AND (workout completed OR not a training day)
+- Bad days increment level; good streaks decrement by 1/day (floor 0)
+- Narrative must cite specific gaps — "Great job!" is forbidden; every line must cite a specific hit or miss
+
+### Programming Engine
+
+Linear periodization (default): intensity +4%/week, deload every 4th week at 70% intensity / 60% volume. Target weights seeded at 70% e1RM from PRs × intensity_pct. Block/undulating are placeholder stubs.
+
+`suggest_next_set` RPC heuristics: 12+ reps + clean drop-off → +5/10 lb, drop rep target ~3; 10+ reps clean → +2.5/5 lb; any set ≤ 4 reps → back off 5/10 lb; otherwise hold.
 
 ### PR Detection
 
-Logged sets → `checkForPR()` → E1RM (Epley) → compare to PR → insert to `pr_history` → Supabase Realtime → `PRCelebrationProvider` → confetti overlay.
+Logged sets → `checkForPR()` → E1RM (Epley) → compare PR → insert `pr_history` → Supabase Realtime → `PRCelebrationProvider` → confetti.
 
-### Session Lock
+## Edge Function Pattern
 
-4-hour TTL in `lib/authLock.ts`. After idle timeout → `LockScreen` → biometric unlock (Face ID / Touch ID). Change TTL: edit `AUTH_TTL_MS` in `lib/authLock.ts`.
+All functions: Deno runtime, CORS preflight on `OPTIONS`, JWT auth.
 
-### Subscription / IAP
-
-Uses **RevenueCat SDK** (`react-native-purchases`). Config in `constants/revenuecat.ts`:
-- Entitlement: `"Coach Kettle Pro"`
-- iOS API key: `REVENUECAT.API_KEY`
-- Plans: `yearly`, `monthly`
-
-Entitlement checks go through the `/entitlements` Edge Function or the `entitlements` Edge Function; never check subscription state directly from RevenueCat on the server.
-
-### Media Upload
-
-Handled by `lib/mediaUpload.ts` → Supabase Storage (private bucket, user-scoped paths `{userId}/{workoutId}/{uuid}.{ext}`). All access via 1-hour signed URLs. Max 10 files per workout, 50 MB each. Types: JPEG, PNG, HEIC, WebP, MP4, MOV.
-
-## Key Files
-
-| Area | Files |
-|------|-------|
-| Main screen | `app/(tabs)/index.tsx` |
-| Root layout / providers | `app/_layout.tsx` |
-| Input parsing | `lib/structuredGate.ts` |
-| API client | `lib/api.ts` |
-| Auth | `contexts/AuthProvider.tsx`, `lib/auth.ts`, `lib/authLock.ts` |
-| All providers | `contexts/` (AuthProvider, AuthLockProvider, ThemeProvider, ProfileContext, EntitlementContext, OnboardingContext, PRCelebrationContext, NotificationsProvider, NutritionContext, CoachingContext, ProgramContext, RestTimerContext) |
-| Workout state | `hooks/useWorkoutSession.ts`, `hooks/useRowActions.ts` |
-| Local storage | `lib/workoutStorage.ts` |
-| Draft persistence | `lib/workoutDraft.ts` |
-| PR detection | `lib/prTracking.ts` |
-| Media upload | `lib/mediaUpload.ts` |
-| Tutorial | `components/tutorial/TutorialModal.tsx`, `lib/tutorialState.ts` |
-| Shared helpers | `lib/workoutRules.ts` — date utils, `makeId()`, set-number helpers |
-| IAP client | `lib/iap.ts` |
-| RevenueCat config | `constants/revenuecat.ts` |
-| Edge Functions | `supabase/functions/` |
-| DB migrations | `supabase/migrations/` |
-| Nutrition | `lib/nutrition.ts`, `contexts/NutritionContext.tsx`, `app/nutrition/*` |
-| Coaching | `lib/coaching.ts`, `contexts/CoachingContext.tsx`, `app/coach/*` |
-| Programming | `lib/programming.ts`, `contexts/ProgramContext.tsx`, `app/program/*` |
-| Progress | `lib/bodyMetrics.ts`, `app/progress/*` |
-| Exercise library | `lib/exerciseLibrary.ts`, `app/exercise-library/*` |
-| Notifications | `lib/notifications.ts`, `contexts/NotificationsProvider.tsx`, `hooks/useRestTimer.ts`, `app/settings/notifications.tsx` |
-| Rest timer | `lib/restTimer.ts`, `contexts/RestTimerContext.tsx`, `hooks/useRestTimer.ts`, `components/workout/RestTimerBar.tsx` |
-| Next-set suggestion | `components/workout/NextSetSuggestion.tsx`, `lib/programming.ts:fetchNextSetSuggestion`, RPC `suggest_next_set` |
-
-## Edge Functions
-
-| Endpoint | Purpose |
-|----------|---------|
-| `/chat` | Parse workout + AI fallback |
-| `/coach` | Streaming AI Q&A |
-| `/parse` | Fast workout parsing |
-| `/history` | Workout CRUD (POST also inserts `workout_log` rows → triggers PR detection) |
-| `/log-set` | Log individual set |
-| `/profile` | User profile CRUD |
-| `/pr-tracking` | PR tracked lifts |
-| `/workout-templates` | Templates CRUD |
-| `/terms-acceptance` | ToS status |
-| `/chat-history` | Chat messages |
-| `/chats` | Chat sessions |
-| `/entitlements` | Subscription entitlement checks |
-| `/iap` | In-app purchase processing |
-| `/observability` | Analytics events |
-| `/health` | Health check |
-| `/food-log` | Food log CRUD + daily totals + search |
-| `/nutrition-targets` | Get / derive (BMR→TDEE) / override |
-| `/meal-plan` | Weekly meal plan fetch / generate / recalibrate |
-| `/exercise-library` | Canonical exercise catalog (read-only) |
-| `/body-metrics` | Body metrics + body photos (private bucket) |
-| `/resting-hr` | Resting HR log + RPC-backed summary |
-| `/programming` | Multi-week program generation + week query + advance |
-| `/next-set` | Per-exercise next-set suggestion (calls `suggest_next_set` RPC) |
-| `/daily-feedback` | Daily honest feedback + harshness state machine |
-| `/default-templates` | Goal-based default workout-template seeder |
-| `/notifications` | Push token registry + per-user prefs + send helpers |
-
-All functions: Deno runtime, CORS preflight on `OPTIONS`, authenticated via JWT in `Authorization` header, scoped to `user_id`.
-
-**Adding a new function:**
-1. `mkdir supabase/functions/my-function && touch supabase/functions/my-function/index.ts`
-2. Follow the standard template in `.claude/overview/15-edge-functions.md`
-3. Add a corresponding `lib/api.ts` export
-4. User deploys: `supabase functions deploy my-function`
-
-## Key Types
+**CRITICAL:** User-scoped calls use `SUPABASE_ANON_KEY` + bearer token. Service-role is only for true admin operations. Never use service-role where user auth context is expected — it silently bypasses RLS.
 
 ```typescript
-// types/workout.ts
-type LogRow = {
-  id: string;
-  exercise: string;
-  set: number;
-  weightLbs: string;
-  reps: string;
-  notes: string;
-  timestamp: number;
-  status?: 'syncing' | 'committed';
-  // Cardio fields
-  isCardio?: boolean;
-  durationMins?: number;
-  distance?: number;
-  distanceUnit?: 'miles' | 'km' | 'meters';
-  heartRate?: number;
-  calories?: number;
-  level?: number;
-}
-
-// lib/workoutStorage.ts
-interface WorkoutSession {
-  id: string;
-  dateISO: string;       // "2024-01-15"
-  title: string;
-  part: BodyPart;
-  rows: WorkoutRow[];
-  createdAt: number;
-  review?: SessionReview;     // AI rating 1-10 + strengths/weakness
-  reflection?: string;        // User notes (max 2000 chars)
-  media?: WorkoutMediaRecord[];
-}
-
-type BodyPart = "Push" | "Pull" | "Legs" | "Chest" | "Back" | ...
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+  { global: { headers: { Authorization: authHeader } } }
+);
 ```
 
-## Parsing Patterns
+ENV vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`
 
-| Input | Result |
-|-------|--------|
-| `Bench 185 x 8` | Single set |
-| `Bench 185 3x8` | Multi-set (3 rows) |
-| `185 x 8` | Shorthand — uses last exercise |
-| `185, 165, 145 x 8` | Drop set (3 rows) |
-| `Bench 185 + Rows 135 x 8` | Superset (2 rows) |
-| `Run 30 min 3 miles` | Cardio with duration + distance |
-| `Bench 60kg x 8` | Auto kg→lbs conversion |
-| `Warmup bench 95 x 10` | Warmup note |
-
-Cardio metric parsing is order-independent.
+Adding a new function: `mkdir supabase/functions/<name> && touch supabase/functions/<name>/index.ts`, follow the pattern above, add export to `lib/api.ts`, user deploys.
 
 ## Rules
 
@@ -242,80 +100,41 @@ Cardio metric parsing is order-independent.
 - `useThemeColor()` for all colors — no hardcoded hex values
 - Mutations via Edge Functions only — never direct Supabase DB access from client
 - Call `commitPendingAndGet()` before any mutation that reads rows (inline editing guard)
-- When adding a new AsyncStorage key, also add it to `clearAllCaches()` in `AuthProvider`
-
-## Docs
-
-Deep-dive docs live in `.claude/overview/` (also mirrored in `docs/`):
-- `00-architecture.md` — System diagram + data flows
-- `01-auth.md` — Auth flow, TTL, biometrics
-- `02-providers.md` — Provider hierarchy details
-- `03-workout-flow.md` — Workout lifecycle
-- `04-parsing.md` — structuredGate internals
-- `05-storage.md` — Storage keys + sync strategy
-- `06-api.md` — API layer patterns
-- `15-edge-functions.md` — Edge Function template + patterns
-- `16-media-reflection.md` — Media upload + reflection system
-
-## Workflow Notes
-
-- Prepare all code changes, migrations, and Edge Function code
-- User runs `supabase db push` and `supabase functions deploy` manually
-- User reloads the app manually after deploys
-- Use subagents for parallel work when appropriate
-
-## Phase 1 expansion deploy checklist (1.0.1+)
-
-1. `npm install` — picks up the new `expo-notifications` dep.
-2. `npx expo prebuild --clean` (or rebuild the dev client via EAS) — required for `expo-notifications` native module.
-3. `supabase db push` — applies migrations `0031` → `0040`.
-4. `supabase functions deploy food-log nutrition-targets meal-plan exercise-library body-metrics resting-hr programming next-set daily-feedback default-templates notifications`.
-5. (Optional) Set `OPENAI_API_KEY` env on the `meal-plan` function for AI-generated weekly plans. Falls back to a deterministic skeleton plan if absent.
-6. Reload the app — new tabs auto-populate via the providers wired into `app/_layout.tsx`.
+- When adding a new AsyncStorage key, add it to `clearAllCaches()` in `AuthProvider`
 
 ## GitNexus — Code Intelligence (MANDATORY)
 
-This project is indexed by GitNexus as **WorkoutTracker** (4513 symbols, 7617 relationships, 224 execution flows). The MCP server is registered and live — use it for **every** code task.
+Repo indexed as **WorkoutTracker**. Use MCP tools for every code task.
 
-### Always Do
+**Always do:**
+- Run `impact({target: "symbolName", direction: "upstream"})` before editing any symbol — report blast radius
+- Run `detect_changes()` before committing
+- Warn user on HIGH or CRITICAL risk before proceeding
+- Use `query({query: "concept"})` to explore unfamiliar code — not grep
+- Use `context({name: "symbolName"})` for callers, callees, and process participation
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, call `impact({target: "symbolName", direction: "upstream"})` and report the blast radius to the user.
-- **MUST run `detect_changes()` before committing** to verify changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding.
-- When exploring unfamiliar code, use `query({query: "concept"})` to find execution flows instead of grepping.
-- When you need full context on a symbol (callers, callees, process participation), use `context({name: "symbolName"})`.
-
-### Never Do
-
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings.
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit without running `detect_changes()`.
-
-### Tools Reference
+**Never do:**
+- Edit a symbol without running impact first
+- Ignore HIGH/CRITICAL warnings
+- Rename with find-and-replace — use `rename` (understands the call graph)
+- Commit without `detect_changes()`
 
 | Tool | Use for |
 |------|---------|
-| `list_repos` | Confirm WorkoutTracker is indexed |
 | `query` | Find execution flows by concept |
-| `context` | 360° view of a symbol (callers, callees, processes) |
+| `context` | 360° view of a symbol |
 | `impact` | Blast radius before editing |
 | `detect_changes` | Pre-commit scope check |
 | `rename` | Safe multi-file rename |
-| `cypher` | Raw graph queries |
 
-### Skills
+> Index stale? Run `npx gitnexus analyze` first.
 
-Skill files in `.claude/skills/gitnexus/` cover: exploring, impact-analysis, debugging, refactoring, CLI, and guide.
+## Workflow
 
-| Task | Skill |
-|------|-------|
-| Understand architecture / "How does X work?" | `gitnexus-exploring` |
-| Blast radius / "What breaks if I change X?" | `gitnexus-impact-analysis` |
-| Trace bugs / "Why is X failing?" | `gitnexus-debugging` |
-| Rename / extract / refactor | `gitnexus-refactoring` |
-
-> If any tool warns the index is stale, run `npx gitnexus analyze` first.
+- Prepare all code changes, migrations, and edge function code
+- User runs `supabase db push` and `supabase functions deploy` manually
+- User reloads app manually after deploys
+- Use subagents for parallel work when appropriate
 
 ## Vibe
 
