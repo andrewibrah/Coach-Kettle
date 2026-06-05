@@ -90,9 +90,8 @@ function scoreNear(actual: number, target: number, tolerance: number): number {
 function scoreOver(actual: number, target: number, floorPct: number): number {
   if (target <= 0) return 50;
   const ratio = actual / target;
-  if (ratio >= 1) return 100;
-  if (ratio >= floorPct) return 60 + (ratio - floorPct) * 100;
-  return Math.max(0, ratio * 60);
+  if (ratio < floorPct) return Math.max(0, (ratio / floorPct) * 60);
+  return Math.min(100, 60 + ((ratio - floorPct) / (1 - floorPct)) * 40);
 }
 
 function buildNarrative(args: {
@@ -190,7 +189,7 @@ async function getNutritionTotals(userClient: ReturnType<typeof createClient>, u
   };
 }
 
-type BehaviorEventKind = 'good_day' | 'bad_day' | 'plan_recalibrated';
+type BehaviorEventKind = 'good_day' | 'bad_day' | 'plan_recalibrated' | 'neutral_day';
 
 function deriveStateFromEvents(events: { event_date: string; kind: BehaviorEventKind }[]) {
   let level = 0;
@@ -214,7 +213,10 @@ function deriveStateFromEvents(events: { event_date: string; kind: BehaviorEvent
       badStreak = 0;
       lastGoodDay = ev.event_date;
       level = Math.max(0, level - 1);
+    } else if (ev.kind === "neutral_day") {
+      // neutral day: no streak change, no level change
     } else {
+      // plan_recalibrated: reset both streaks (legacy behavior)
       goodStreak = 0;
       badStreak = 0;
     }
@@ -230,7 +232,7 @@ async function updateBehaviorState(
   isBad: boolean,
   payload: Record<string, unknown>
 ) {
-  const kind: BehaviorEventKind = isGood ? "good_day" : isBad ? "bad_day" : "plan_recalibrated";
+  const kind: BehaviorEventKind = isGood ? "good_day" : isBad ? "bad_day" : "neutral_day";
 
   const { error: eventError } = await admin
     .from("behavior_events")
@@ -258,7 +260,7 @@ async function updateBehaviorState(
 
   const { level, goodStreak, badStreak, lastGoodDay, lastBadDay, lastEvaluatedDate } = deriveStateFromEvents(
     ((events ?? []) as { event_date: string; kind: BehaviorEventKind }[])
-      .filter((ev) => ev.kind === "good_day" || ev.kind === "bad_day" || ev.kind === "plan_recalibrated")
+      .filter((ev) => ["good_day", "bad_day", "plan_recalibrated", "neutral_day"].includes(ev.kind))
   );
 
   const row = {
@@ -289,12 +291,27 @@ async function generateFeedback(userClient: ReturnType<typeof createClient>, use
 
   // Determine if this was a workout day (loose: use profile.training_days_per_week)
   const dpw = Number(profile?.training_days_per_week ?? 0);
-  const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
-  const TRAINING_DAY_MAP: Record<number, number[]> = {
+
+  // Derive local DOW using user's timezone from notification_preferences
+  const { data: notifPrefs } = await admin
+    .from("notification_preferences")
+    .select("timezone")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const timezone = notifPrefs?.timezone ?? "America/New_York";
+  const localDow = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    timeZone: timezone,
+  }).format(new Date(`${date}T12:00:00Z`));
+  const DOW_MAP: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dow = DOW_MAP[localDow] ?? new Date(`${date}T12:00:00Z`).getUTCDay();
+
+  const TRAINING_DAY_MAP_LOCAL: Record<number, number[]> = {
     1: [3], 2: [1, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6],
   };
-  const wasWorkoutDay = (TRAINING_DAY_MAP[dpw] ?? []).includes(dow);
-  const isTrainingDay = workoutDone || wasWorkoutDay;
+  const wasWorkoutDay = (TRAINING_DAY_MAP_LOCAL[dpw] ?? []).includes(dow);
+  // Schedule-based only — spontaneous training on a rest day doesn't change calorie targets
+  const isTrainingDay = wasWorkoutDay;
 
   let nutritionColor: 'green'|'yellow'|'red'|null = null;
   let nutritionScore: number|null = null;
