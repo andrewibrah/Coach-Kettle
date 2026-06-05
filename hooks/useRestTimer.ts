@@ -59,6 +59,9 @@ function fireWebNotification(body: string): void {
 
 export function useRestTimer() {
   const [state, setState] = useState<RestTimerState>({ kind: 'idle' });
+  // Forces a re-render on each tick so derived values (remainingSec, progress)
+  // recompute even when `tick()` returns the same state reference.
+  const [, setNowTick] = useState(0);
   const { prefs } = useNotifications();
   const notifIdRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -93,12 +96,17 @@ export function useRestTimer() {
     }
   }, [state]);
 
-  // ── Tick every second while running ────────────────────────────────────────
+  // ── Tick at 4Hz while running ──────────────────────────────────────────────
+  // We bump `nowTick` every 250ms so the displayed remaining time and progress
+  // ring redraw smoothly. `tick(state)` returns the SAME reference while still
+  // running, so without an explicit re-render trigger the countdown appears
+  // frozen until expiry.
   useEffect(() => {
     if (state.kind === 'running') {
       intervalRef.current = setInterval(() => {
         setState((s) => tick(s));
-      }, 1000);
+        setNowTick((n) => (n + 1) % 1_000_000);
+      }, 250);
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
       };
