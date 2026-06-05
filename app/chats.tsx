@@ -1,4 +1,5 @@
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { accentColor } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthProvider";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
@@ -59,7 +60,7 @@ export default function ChatsScreen() {
 
     return (
       <View style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
-        <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble, !isUser && { backgroundColor: botBubbleBg }]}>
+        <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble, isUser ? { backgroundColor: accentColor(isDark, 'fill') } : { backgroundColor: botBubbleBg }]}>
           {!isUser && (
             <Text style={styles.sourceLabel}>{sourceLabel}</Text>
           )}
@@ -105,7 +106,7 @@ export default function ChatsScreen() {
             Sign in to view chat history
           </Text>
           <Pressable
-            style={styles.signInButton}
+            style={[styles.signInButton, { backgroundColor: accentColor(isDark, 'fill') }]}
             onPress={() => router.push('/auth/sign-in')}
           >
             <Text style={styles.signInButtonText}>Sign In</Text>

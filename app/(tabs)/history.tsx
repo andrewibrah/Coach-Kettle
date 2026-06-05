@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
-import { Colors } from "@/constants/theme";
+import { Colors, accentColor } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { api } from "@/lib/api";
 import { type WorkoutSession } from "@/lib/workoutStorage";
@@ -126,7 +126,7 @@ export default function HistoryScreen() {
 
   const getRatingColor = (rating: number) => {
     if (rating >= 8) return "#10B981";
-    if (rating >= 6) return "#3B82F6";
+    if (rating >= 6) return accentColor(isDark);
     if (rating >= 4) return "#F59E0B";
     return "#EF4444";
   };

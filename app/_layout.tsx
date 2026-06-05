@@ -18,6 +18,7 @@ import { CoachingProvider } from '@/contexts/CoachingContext';
 import { ProgramProvider } from '@/contexts/ProgramContext';
 import { NotificationsProvider } from '@/contexts/NotificationsProvider';
 import { RestTimerProvider } from '@/contexts/RestTimerContext';
+import { RestTimerToast } from '@/components/workout/RestTimerToast';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 Sentry.init({
@@ -46,6 +47,7 @@ function RootLayout() {
                           <RestTimerProvider>
                             <GestureHandlerRootView style={{ flex: 1 }}>
                               <RootLayoutNav />
+                              <RestTimerToast />
                             </GestureHandlerRootView>
                           </RestTimerProvider>
                         </ProgramProvider>
@@ -64,11 +66,32 @@ function RootLayout() {
 
 export default Sentry.wrap(RootLayout);
 
+// Build the navigation theme from our own design tokens so the navigator's
+// surfaces (screen background, header card, borders) match the app exactly.
+// Without this, react-navigation's stock backgrounds differ slightly from our
+// tokens, which shows as a brief color mismatch when navigating / theme switching.
+function navThemeFor(scheme: 'light' | 'dark') {
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const c = Colors[scheme];
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: c.tint,
+      background: c.background,
+      card: c.headerBackground,
+      text: c.text,
+      border: c.border,
+    },
+  };
+}
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const navTheme = navThemeFor(colorScheme === 'dark' ? 'dark' : 'light');
 
   return (
-    <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <NavigationThemeProvider value={navTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />

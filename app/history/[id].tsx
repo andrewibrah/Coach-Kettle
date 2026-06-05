@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { accentColor } from "@/constants/theme";
 import {
   ActivityIndicator,
   Alert,
@@ -52,7 +53,7 @@ function ReviewCard({
 }) {
   const getRatingColor = (rating: number) => {
     if (rating >= 8) return "#10B981";
-    if (rating >= 6) return "#3B82F6";
+    if (rating >= 6) return accentColor(isDark);
     if (rating >= 4) return "#F59E0B";
     return "#EF4444";
   };
@@ -90,16 +91,16 @@ function ReviewCard({
       </View>
 
       <View style={styles.reviewSection}>
-        <Text style={[styles.reviewSectionTitle, { color: "#3B82F6" }]}>📝 Next Session</Text>
+        <Text style={[styles.reviewSectionTitle, { color: accentColor(isDark) }]}>📝 Next Session</Text>
         <Text style={[styles.reviewText, { color: textColor, fontStyle: 'italic' }]}>{review.nextSessionNote}</Text>
       </View>
     </View>
   );
 }
 
-function getRatingColor(rating: number) {
+function getRatingColor(rating: number, isDark: boolean) {
   if (rating >= 8) return "#10B981";
-  if (rating >= 6) return "#3B82F6";
+  if (rating >= 6) return accentColor(isDark);
   if (rating >= 4) return "#F59E0B";
   return "#EF4444";
 }
@@ -315,16 +316,16 @@ export default function WorkoutDetail() {
                 styles.reviewToggleBtn,
                 {
                   backgroundColor: showReview
-                    ? getRatingColor(workout.review!.rating) + '20'
+                    ? getRatingColor(workout.review!.rating, isDark) + '20'
                     : isDark ? '#1C1C1E' : '#F3F4F6',
                   borderColor: showReview
-                    ? getRatingColor(workout.review!.rating)
+                    ? getRatingColor(workout.review!.rating, isDark)
                     : isDark ? '#374151' : '#D1D5DB',
                 },
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Text style={[styles.reviewToggleRating, { color: getRatingColor(workout.review!.rating) }]}>
+              <Text style={[styles.reviewToggleRating, { color: getRatingColor(workout.review!.rating, isDark) }]}>
                 {workout.review!.rating}/10
               </Text>
               <Text style={[styles.reviewToggleLabel, { color: secondaryTextColor }]}>
@@ -401,7 +402,7 @@ export default function WorkoutDetail() {
                 onPress={() => setReflectionEditing(true)}
                 style={({ pressed }) => [styles.reflectionEditBtn, pressed && { opacity: 0.6 }]}
               >
-                <Text style={[styles.reflectionEditText, { color: isDark ? '#60A5FA' : '#3B82F6' }]}>
+                <Text style={[styles.reflectionEditText, { color: accentColor(isDark) }]}>
                   {reflection ? 'Edit' : 'Add'}
                 </Text>
               </Pressable>

@@ -1,5 +1,7 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { accentColor } from "@/constants/theme";
 import { LogRow } from "@/types/workout";
 import React, { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -22,6 +24,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
     const placeholderColor = useThemeColor({}, 'placeholder');
     const borderColor = useThemeColor({}, 'border');
     const inputBg = useThemeColor({}, 'inputBackground');
+    const isDark = useColorScheme() === 'dark';
 
     useEffect(() => {
         if (visible && row) {
@@ -60,7 +63,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                         <View style={styles.header}>
                             <ThemedText type="subtitle">Edit Set</ThemedText>
                             <Pressable onPress={handleSave} hitSlop={10}>
-                                <ThemedText style={styles.doneButton}>Done</ThemedText>
+                                <ThemedText style={[styles.doneButton, { color: accentColor(isDark) }]}>Done</ThemedText>
                             </Pressable>
                         </View>
 

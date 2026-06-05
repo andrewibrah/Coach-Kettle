@@ -17,10 +17,26 @@ export function makeId(): string {
 
 export function getLastExerciseFromRows(rows: LogRow[]): string | undefined {
   for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (rows[i]?.isRest) continue; // rest markers aren't exercises
     const ex = rows[i]?.exercise?.trim();
     if (ex) return ex;
   }
   return undefined;
+}
+
+/** Build a rest-timer marker row to insert between sets. */
+export function makeRestRow(durationSec: number): LogRow {
+  return {
+    id: makeId(),
+    exercise: "Rest",
+    set: 0,
+    weightLbs: "",
+    reps: "",
+    notes: `Rest timer started: ${durationSec} seconds`,
+    timestamp: Date.now(),
+    status: "committed",
+    isRest: true,
+  };
 }
 
 export function nextSetNumberForExercise(rows: LogRow[], exercise: string): number {
@@ -45,6 +61,7 @@ export function normalizeExercise(value: string): string {
 export function resequenceSets(list: LogRow[]): LogRow[] {
   const counters: Record<string, number> = {};
   return list.map((row) => {
+    if (row.isRest) return row; // rest markers keep set 0 and don't count
     const norm = normalizeExercise(row.exercise);
     const nextSet = (counters[norm] || 0) + 1;
     counters[norm] = nextSet;

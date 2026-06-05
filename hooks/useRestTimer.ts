@@ -1,8 +1,15 @@
 // useRestTimer — wraps lib/restTimer state machine, ticks every second,
 // integrates with the local-notification rest_timer reminder, and exposes a
 // simple API to start/pause/resume/cancel/skip.
+//
+// Persistence: the live state is mirrored to AsyncStorage (start/end timestamps
+// + duration + status) so a running timer survives a tab switch, refresh, or
+// relaunch. Remaining time is always derived from `endsAt`, never from a counter,
+// so it stays accurate regardless of how long the app was backgrounded.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   RestTimerState,
   IntensityHints,
@@ -22,13 +29,71 @@ interface StartArgs extends IntensityHints {
   nextSetHint?: string;
 }
 
+interface StartOpts {
+  /** Also append a "Rest timer started" marker into the active workout log. */
+  logRestEntry?: boolean;
+}
+
+type RestEntrySink = (info: { durationSec: number }) => void;
+
+const STORAGE_KEY = 'rest_timer_v1';
+
+// ── Web browser notification helpers (no-op on native) ───────────────────────
+function webNotificationsAvailable(): boolean {
+  return Platform.OS === 'web' && typeof window !== 'undefined' && 'Notification' in window;
+}
+
+function maybeRequestWebPermission(): void {
+  if (!webNotificationsAvailable()) return;
+  try {
+    if (Notification.permission === 'default') Notification.requestPermission().catch(() => undefined);
+  } catch { /* ignore */ }
+}
+
+function fireWebNotification(body: string): void {
+  if (!webNotificationsAvailable()) return;
+  try {
+    if (Notification.permission === 'granted') new Notification('Rest complete', { body });
+  } catch { /* ignore */ }
+}
+
 export function useRestTimer() {
   const [state, setState] = useState<RestTimerState>({ kind: 'idle' });
   const { prefs } = useNotifications();
   const notifIdRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hydratedRef = useRef(false);
+  const prevKindRef = useRef<RestTimerState['kind']>('idle');
+  const restEntrySinkRef = useRef<RestEntrySink | null>(null);
 
-  // Tick every second while running
+  // ── Hydrate persisted state once on mount ──────────────────────────────────
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const saved = JSON.parse(raw) as RestTimerState;
+            // Derive freshness from timestamps: a running timer may already be done.
+            setState(saved.kind === 'running' ? tick(saved) : saved);
+          } catch { /* ignore corrupt payload */ }
+        }
+      })
+      .finally(() => {
+        hydratedRef.current = true;
+      });
+  }, []);
+
+  // ── Persist on every change (after hydration) ──────────────────────────────
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (state.kind === 'idle' || state.kind === 'done') {
+      AsyncStorage.removeItem(STORAGE_KEY).catch(() => undefined);
+    } else {
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => undefined);
+    }
+  }, [state]);
+
+  // ── Tick every second while running ────────────────────────────────────────
   useEffect(() => {
     if (state.kind === 'running') {
       intervalRef.current = setInterval(() => {
@@ -44,6 +109,16 @@ export function useRestTimer() {
     }
   }, [state.kind]);
 
+  // ── Fire completion side-effects only on a genuine running → done transition.
+  // (Hydrating a timer that finished while the app was closed must NOT re-notify.)
+  useEffect(() => {
+    if (prevKindRef.current === 'running' && state.kind === 'done') {
+      const body = state.exercise ? `${state.exercise} — next set.` : 'Time for your next set.';
+      fireWebNotification(body);
+    }
+    prevKindRef.current = state.kind;
+  }, [state.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const cancelScheduledNotif = useCallback(async () => {
     const id = notifIdRef.current;
     if (id) {
@@ -52,9 +127,18 @@ export function useRestTimer() {
     }
   }, []);
 
-  const start = useCallback(async (args: StartArgs, durationSecOverride?: number) => {
+  const registerRestEntrySink = useCallback((sink: RestEntrySink) => {
+    restEntrySinkRef.current = sink;
+    return () => {
+      if (restEntrySinkRef.current === sink) restEntrySinkRef.current = null;
+    };
+  }, []);
+
+  const start = useCallback(async (args: StartArgs, durationSecOverride?: number, opts?: StartOpts) => {
     const seconds = durationSecOverride ?? suggestRestSeconds(args);
     setState(startTimer(seconds, { setNumber: args.setNumber, exercise: args.exercise }));
+    maybeRequestWebPermission();
+    if (opts?.logRestEntry) restEntrySinkRef.current?.({ durationSec: seconds });
     await cancelScheduledNotif();
     if (prefs?.rest_timer_enabled && prefs?.permission_granted) {
       const id = await fireRestTimerNotification(seconds, args.exercise, args.nextSetHint);
@@ -107,5 +191,6 @@ export function useRestTimer() {
     resume,
     cancel,
     skip,
+    registerRestEntrySink,
   };
 }

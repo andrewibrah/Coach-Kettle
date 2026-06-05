@@ -5,10 +5,26 @@ import { FlatList, Swipeable } from "react-native-gesture-handler";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { WorkoutCard } from "@/components/workout/WorkoutCard";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import type { LogRow } from "@/types/workout";
 import Animated, { useSharedValue, useAnimatedStyle } from "react-native-reanimated";
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
+
+/** Slim divider row marking a rest timer between sets. */
+const RestEntryRow = ({ row, onDelete }: { row: LogRow; onDelete: (id: string) => void }) => {
+  const border = useThemeColor({}, 'border');
+  const placeholder = useThemeColor({}, 'placeholder');
+  return (
+    <Pressable onLongPress={() => onDelete(row.id)} style={styles.restRow}>
+      <View style={[styles.restLine, { backgroundColor: border }]} />
+      <ThemedText style={[styles.restText, { color: placeholder }]}>
+        ⏱  {row.notes || 'Rest timer'}
+      </ThemedText>
+      <View style={[styles.restLine, { backgroundColor: border }]} />
+    </Pressable>
+  );
+};
 
 /** Cell wrapper that elevates the actively-dragged item above all siblings. */
 const CellWrapper = ({ children, index, activeDragIndex, style, onLayout }: {
@@ -133,6 +149,9 @@ export function WorkoutTable({
 
   const renderItem = useCallback(
     ({ item, index }: { item: LogRow; index: number }) => {
+      if (item.isRest) {
+        return <RestEntryRow row={item} onDelete={onDeleteRow} />;
+      }
       const isSyncing = item.status === "syncing";
 
       const renderRightActions = () => {
@@ -267,5 +286,21 @@ const styles = StyleSheet.create({
   },
   syncingWrap: {
     opacity: 0.5,
+  },
+  restRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  restLine: {
+    flex: 1,
+    height: 1,
+    opacity: 0.6,
+  },
+  restText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

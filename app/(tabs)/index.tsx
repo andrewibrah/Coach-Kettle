@@ -5,7 +5,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  useWindowDimensions
+  useWindowDimensions,
+  View
 } from "react-native";
 
 import * as Haptics from "expo-haptics";
@@ -37,7 +38,7 @@ import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { type WorkoutTemplate, type WorkoutTemplateItem } from "@/lib/profile";
 import { checkForPR } from "@/lib/prTracking";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
-import { expandTemplateToRows, getLastExerciseFromRows, makeId, nextSetNumberForExercise, normalizeExercise, resequenceSets, todayISO } from "@/lib/workoutRules";
+import { expandTemplateToRows, getLastExerciseFromRows, makeId, makeRestRow, nextSetNumberForExercise, normalizeExercise, resequenceSets, todayISO } from "@/lib/workoutRules";
 import { type SessionReview } from "@/lib/workoutStorage";
 import { type LogRow } from "@/types/workout";
 import { clearWorkoutDraft, getWorkoutDraft, saveWorkoutDraft } from "@/lib/workoutDraft";
@@ -280,7 +281,17 @@ export default function HomeScreen() {
   const { session } = useAuth();
   const { showCelebration } = usePRCelebration();
   const lastCelebratedRef = useRef<string>('');
-  const { start: startRestTimer } = useSharedRestTimer();
+  const { start: startRestTimer, registerRestEntrySink } = useSharedRestTimer();
+
+  // When a rest timer is started (e.g. from the Timer tab), drop a clear marker
+  // into the active workout log between sets — appended, never overwriting input.
+  useEffect(() => {
+    return registerRestEntrySink(({ durationSec }) => {
+      if (!workoutActive) return;
+      setRows((prev) => [...prev, makeRestRow(durationSec)]);
+      scrollToBottom();
+    });
+  }, [registerRestEntrySink, workoutActive, scrollToBottom]);
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -699,7 +710,8 @@ export default function HomeScreen() {
       Alert.alert("No active workout", "Start a workout first.");
       return;
     }
-    if (!committedRows.length) {
+    const loggedSets = committedRows.filter((r) => !r.isRest);
+    if (!loggedSets.length) {
       Alert.alert(
         "End empty session?",
         "No sets logged. Nothing will be saved to history.",
@@ -748,7 +760,7 @@ export default function HomeScreen() {
 
   // Handle end workout with auto-save and AI review generation
   const handleEndWorkoutWithReview = async (currentRows: LogRow[]) => {
-    const committedRows = currentRows.filter(r => r.status === "committed");
+    const committedRows = currentRows.filter(r => r.status === "committed" && !r.isRest);
     if (committedRows.length === 0) {
       Alert.alert("No sets logged", "Log some sets before ending your workout.");
       return;
@@ -1186,36 +1198,40 @@ export default function HomeScreen() {
           onRoutinePress={() => setRoutineModalVisible(true)}
         />
 
-        {workoutActive ? (
-          <WorkoutTable
-            rows={rows}
-            compact={compact}
-            scrollRef={scrollRef}
-            editingCell={editingCell}
-            editValue={editValue}
-            onBeginEditCell={beginCellEdit}
-            onChangeEditValue={setEditValue}
-            onCommitEditCell={commitCellEdit}
-            onDeleteRow={deleteRow}
-            onDuplicateRow={duplicateRow}
-            onReorderRow={handleReorderRow}
-            onIncrementSet={onIncrementSet}
-            onEditSet={handleOpenEditSet}
-          />
-        ) : (
-          <HomeDashboard
-            program={program}
-            currentWeek={currentWeek}
-            programLoading={programLoading}
-            coachToday={coachToday}
-            totals={nutritionTotals}
-            targets={nutritionTargets}
-            onStartWorkout={() => setNameModalVisible(true)}
-            onNavigateProgram={() => router.push('/program')}
-            onNavigateCoach={() => router.push('/coach')}
-            onNavigateNutrition={() => router.push('/nutrition')}
-          />
-        )}
+        {/* Content fills all space above the input bar, so the input + Start/Send
+            buttons stay anchored directly above the footer on every screen size. */}
+        <View style={styles.contentArea}>
+          {workoutActive ? (
+            <WorkoutTable
+              rows={rows}
+              compact={compact}
+              scrollRef={scrollRef}
+              editingCell={editingCell}
+              editValue={editValue}
+              onBeginEditCell={beginCellEdit}
+              onChangeEditValue={setEditValue}
+              onCommitEditCell={commitCellEdit}
+              onDeleteRow={deleteRow}
+              onDuplicateRow={duplicateRow}
+              onReorderRow={handleReorderRow}
+              onIncrementSet={onIncrementSet}
+              onEditSet={handleOpenEditSet}
+            />
+          ) : (
+            <HomeDashboard
+              program={program}
+              currentWeek={currentWeek}
+              programLoading={programLoading}
+              coachToday={coachToday}
+              totals={nutritionTotals}
+              targets={nutritionTargets}
+              onStartWorkout={() => setNameModalVisible(true)}
+              onNavigateProgram={() => router.push('/program')}
+              onNavigateCoach={() => router.push('/coach')}
+              onNavigateNutrition={() => router.push('/nutrition')}
+            />
+          )}
+        </View>
 
         <WorkoutBottomBar
           workoutActive={workoutActive}
@@ -1323,6 +1339,9 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: {
+    flex: 1,
+  },
+  contentArea: {
     flex: 1,
   },
 });

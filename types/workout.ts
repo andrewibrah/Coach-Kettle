@@ -19,6 +19,9 @@ export type LogRow = {
   notes: string;
   timestamp: number;
   status?: 'syncing' | 'committed';
+  // Rest-timer marker row. Inserted between sets when a rest timer is started.
+  // Not a real set: excluded from sync, save, PR checks, and set re-sequencing.
+  isRest?: boolean;
   // Cardio-specific fields (optional)
   isCardio?: boolean;
   durationMins?: number;

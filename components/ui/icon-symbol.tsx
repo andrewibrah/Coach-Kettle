@@ -49,6 +49,7 @@ const MAPPING = {
   'fork.knife': 'restaurant',
   'bell.fill': 'notifications',
   'camera.fill': 'photo-camera',
+  'timer': 'timer',
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;

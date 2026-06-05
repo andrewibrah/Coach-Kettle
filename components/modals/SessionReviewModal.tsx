@@ -4,6 +4,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { accentColor as themeAccent } from "@/constants/theme";
 import { getSignedUrl, pickMedia, uploadAndRecordMedia } from "@/lib/mediaUpload";
 import { SessionReview } from "@/lib/workoutStorage";
 import React, { useCallback, useState } from "react";
@@ -61,7 +62,7 @@ export function SessionReviewModal({
 
   const getRatingColor = (rating: number) => {
     if (rating >= 8) return "#10B981"; // Green
-    if (rating >= 6) return "#3B82F6"; // Blue
+    if (rating >= 6) return themeAccent(isDark); // Blue (neutral gray in dark mode)
     if (rating >= 4) return "#F59E0B"; // Orange
     return "#EF4444"; // Red
   };
@@ -238,7 +239,7 @@ export function SessionReviewModal({
               {/* Next Session Note */}
               <View style={[styles.section, { backgroundColor: cardBg }]}>
                 <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionIcon, { color: "#3B82F6" }]}>
+                  <Text style={[styles.sectionIcon, { color: themeAccent(isDark) }]}>
                     📝
                   </Text>
                   <ThemedText style={styles.sectionTitle}>

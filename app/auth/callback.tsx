@@ -1,5 +1,7 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
+import { accentColor } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { checkServerTermsAcceptance, setLastAuthenticatedAt } from '@/lib/authLock';
 import { supabase } from '@/lib/supabase';
 import * as Linking from 'expo-linking';
@@ -9,6 +11,7 @@ import { ActivityIndicator } from 'react-native';
 
 export default function AuthCallback() {
   const router = useRouter();
+  const isDark = useColorScheme() === 'dark';
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('Verifying...');
 
@@ -128,7 +131,7 @@ export default function AuthCallback() {
           {error}
         </ThemedText>
         <ThemedText
-          style={{ color: '#3B82F6' }}
+          style={{ color: accentColor(isDark) }}
           onPress={() => router.replace('/auth/sign-in')}
         >
           Back to Sign In

@@ -51,6 +51,18 @@ export const Colors = {
   },
 };
 
+/**
+ * Accent color resolver. Several screens historically hard-coded a light-blue
+ * accent (`#3B82F6`). In dark mode the app stays monochrome, so blue accents
+ * resolve to neutral gray instead. Light mode keeps the original blue.
+ * `kind: 'text'` is for links/icons/labels; `kind: 'fill'` is for filled
+ * button/bubble backgrounds (needs more contrast against white text).
+ */
+export function accentColor(isDark: boolean, kind: 'text' | 'fill' = 'text'): string {
+  if (!isDark) return '#3B82F6';
+  return kind === 'fill' ? '#4B5563' : '#D1D5DB';
+}
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */
