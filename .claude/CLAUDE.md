@@ -127,6 +127,14 @@ Repo indexed as **WorkoutTracker**. Use MCP tools for every code task.
 | `detect_changes` | Pre-commit scope check |
 | `rename` | Safe multi-file rename |
 
+| Task | Skill (read before acting) |
+|------|----------------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+
 > Index stale? Run `npx gitnexus analyze` first.
 
 ## Workflow
