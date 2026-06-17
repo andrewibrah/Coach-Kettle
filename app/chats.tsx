@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function ChatsScreen() {
   const [chatGroups, setChatGroups] = useState<ChatsByDate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -33,12 +34,14 @@ export default function ChatsScreen() {
       return;
     }
 
+    setLoadError(false);
     try {
       const messages = await fetchChatHistory();
       const grouped = groupChatsByDate(messages);
       setChatGroups(grouped);
     } catch (e) {
       console.error("Failed to load chats", e);
+      setLoadError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -127,6 +130,15 @@ export default function ChatsScreen() {
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={iconColor} />
+        </View>
+      ) : loadError ? (
+        <View style={styles.center}>
+          <Text style={[styles.emptyText, { color: placeholder }]}>
+            Failed to load chat history
+          </Text>
+          <Text style={[styles.emptyHint, { color: placeholder }]}>
+            Pull down to retry
+          </Text>
         </View>
       ) : chatGroups.length === 0 ? (
         <View style={styles.center}>
