@@ -87,6 +87,8 @@ export default function ProgramHomeScreen() {
                 { backgroundColor: tint },
                 pressed && { opacity: 0.7 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Create program"
             >
               <ThemedText style={[styles.primaryBtnText, { color: onTint }]}>Create Program</ThemedText>
             </Pressable>
@@ -117,6 +119,8 @@ export default function ProgramHomeScreen() {
                   { backgroundColor: tint },
                   pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="View this week's program"
               >
                 <ThemedText style={[styles.primaryBtnText, { color: onTint }]}>View this week</ThemedText>
               </Pressable>
@@ -127,6 +131,8 @@ export default function ProgramHomeScreen() {
                   { borderColor: tint },
                   pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Advance to next week"
               >
                 <ThemedText style={[styles.secondaryBtnText, { color: tint }]}>
                   Advance to next week
@@ -139,6 +145,8 @@ export default function ProgramHomeScreen() {
                   { borderColor: danger },
                   pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Archive program"
               >
                 <ThemedText style={[styles.secondaryBtnText, { color: danger }]}>
                   Archive program
