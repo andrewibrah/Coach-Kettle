@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  addBtnText: { color: '#fff', fontSize: 16 },
+  addBtnText: { fontSize: 16 },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

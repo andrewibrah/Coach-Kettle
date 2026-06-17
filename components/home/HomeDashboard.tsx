@@ -232,7 +232,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   startBtnText: {
-    color: '#fff',
     fontWeight: '700',
     fontSize: 14,
   },

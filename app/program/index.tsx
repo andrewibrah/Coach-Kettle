@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
   },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  primaryBtnText: { fontWeight: '700', fontSize: 15 },
   secondaryBtn: {
     borderRadius: 12,
     paddingVertical: 12,

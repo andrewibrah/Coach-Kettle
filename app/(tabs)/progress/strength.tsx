@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  loadBtnText: { color: '#fff', fontSize: 16 },
+  loadBtnText: { fontSize: 16 },
   pointDate: { fontSize: 16, marginBottom: 8 },
   pointRow: {
     flexDirection: 'row',

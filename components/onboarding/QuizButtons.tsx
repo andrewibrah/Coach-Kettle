@@ -144,7 +144,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   continueText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

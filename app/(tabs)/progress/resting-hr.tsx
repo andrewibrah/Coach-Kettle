@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  logBtnText: { color: '#fff', fontSize: 16 },
+  logBtnText: { fontSize: 16 },
   entryCard: {
     flexDirection: 'row',
     alignItems: 'center',

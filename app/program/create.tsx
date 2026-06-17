@@ -248,6 +248,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
   },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  primaryBtnText: { fontWeight: '700', fontSize: 16 },
   hint: { marginTop: 10, fontSize: 12 },
 });

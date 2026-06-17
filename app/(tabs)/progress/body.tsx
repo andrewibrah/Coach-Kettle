@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  saveBtnText: { color: '#fff', fontSize: 16 },
+  saveBtnText: { fontSize: 16 },
   entryDate: { fontSize: 16, marginBottom: 8 },
   entryRows: { gap: 4 },
   entryRow: { flexDirection: 'row', justifyContent: 'space-between' },
