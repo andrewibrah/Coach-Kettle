@@ -1,4 +1,3 @@
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { Dispatch, SetStateAction } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,10 +36,11 @@ export function WorkoutBottomBar({
   startToastOpen,
   showStartToast,
 }: Props) {
-  const colorScheme = useColorScheme();
   const textColor = useThemeColor({}, 'text');
   const bgColor = useThemeColor({}, 'background');
-  const isDark = colorScheme === 'dark';
+  const placeholder = useThemeColor({}, 'placeholder');
+  const inputBg = useThemeColor({}, 'inputBackground');
+  const borderColor = useThemeColor({}, 'border');
 
   const disabledSend = !workoutActive || loading || !messageInput.trim();
 
@@ -88,11 +88,11 @@ export function WorkoutBottomBar({
           value={messageInput}
           onChangeText={setMessageInput}
           placeholder={workoutActive ? "Exercise  lbs  reps" : "Start a workout to log sets"}
-          placeholderTextColor={isDark ? "#888" : "#999"}
+          placeholderTextColor={placeholder}
           style={[
             styles.input,
             styles.messageInput,
-            { color: textColor, backgroundColor: isDark ? '#1c1c1e' : '#fff', borderColor: isDark ? '#3a3a3c' : '#D6D6D6' }
+            { color: textColor, backgroundColor: inputBg, borderColor: borderColor }
           ]}
           returnKeyType="send"
           onSubmitEditing={handleSend}
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#D6D6D6",
+    borderColor: 'transparent',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 12,

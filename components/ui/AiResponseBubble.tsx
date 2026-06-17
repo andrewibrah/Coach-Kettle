@@ -1,4 +1,3 @@
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
@@ -14,12 +13,10 @@ type Props = {
 };
 
 export function AiResponseBubble({ text, onDismiss }: Props) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const backgroundColor = useThemeColor({}, 'background');
-
   const borderColor = useThemeColor({}, 'border');
   const placeholderColor = useThemeColor({}, 'placeholder');
+  const tint = useThemeColor({}, 'tint');
 
   useEffect(() => {
     if (Platform.OS === "ios") {
@@ -36,7 +33,7 @@ export function AiResponseBubble({ text, onDismiss }: Props) {
       <Pressable onPress={onDismiss} style={styles.touchableContainer}>
         <ThemedView style={[styles.bubble, { backgroundColor, borderColor }]}>
           <View style={styles.header}>
-            <View style={[styles.botIcon, { backgroundColor: isDark ? "#6366F1" : "#111827" }]}>
+            <View style={[styles.botIcon, { backgroundColor: tint }]}>
               <IconSymbol name="sparkles" size={16} color="#FFFFFF" />
             </View>
             <ThemedText style={styles.title}>Coach Kettle</ThemedText>

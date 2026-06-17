@@ -1,4 +1,3 @@
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { LogRow } from "@/types/workout";
@@ -58,19 +57,14 @@ export function WorkoutCard({
     const inputRef = useRef<TextInput>(null);
     const cardBg = useThemeColor({}, 'cardBackground');
     const borderColor = useThemeColor({}, 'border');
-
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === 'dark';
-
-    // Dynamic colors
-    const inputTextColor = isDark ? '#FFFFFF' : '#000000';
-    const inputBg = isDark ? '#374151' : '#FFFFFF';
-    const inputPlaceholderColor = isDark ? '#9CA3AF' : '#6B7280';
-    const labelColor = isDark ? '#9CA3AF' : '#6B7280';
-    const dividerColor = isDark ? '#374151' : '#D1D5DB';
-    const noteColor = isDark ? '#9CA3AF' : '#4B5563';
-    const setLabelColor = isDark ? '#9CA3AF' : '#6B7280';
-    const setLabelBg = isDark ? 'rgba(156, 163, 175, 0.15)' : 'rgba(107, 114, 128, 0.1)';
+    const inputTextColor = useThemeColor({}, 'text');
+    const inputBg = useThemeColor({}, 'inputBackground');
+    const inputPlaceholderColor = useThemeColor({}, 'placeholder');
+    const labelColor = useThemeColor({}, 'placeholder');
+    const dividerColor = useThemeColor({}, 'border');
+    const noteColor = useThemeColor({}, 'placeholder');
+    const setLabelColor = useThemeColor({}, 'placeholder');
+    const setLabelBg = useThemeColor({}, 'secondaryBackground');
 
     useEffect(() => {
         if (editingField && inputRef.current) {

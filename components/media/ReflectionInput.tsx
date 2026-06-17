@@ -10,7 +10,6 @@ import {
   Text,
   TextInput,
   View,
-  useColorScheme,
 } from "react-native";
 
 type Props = {
@@ -26,14 +25,12 @@ export function ReflectionInput({
   editable = true,
   placeholder = "How did the session feel? Any notes for next time...",
 }: Props) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const textColor = useThemeColor({}, "text");
-  const placeholderColor = isDark ? "#6B7280" : "#9CA3AF";
-  const cardBg = isDark ? "#1C1C1E" : "#F3F4F6";
-  const inputBg = isDark ? "#2C2C2E" : "#FFFFFF";
-  const borderColor = isDark ? "#3A3A3C" : "#E5E7EB";
-  const mutedColor = isDark ? "#9CA3AF" : "#6B7280";
+  const placeholderColor = useThemeColor({}, "placeholder");
+  const cardBg = useThemeColor({}, "secondaryBackground");
+  const inputBg = useThemeColor({}, "inputBackground");
+  const borderColor = useThemeColor({}, "border");
+  const mutedColor = useThemeColor({}, "placeholder");
 
   return (
     <View style={[styles.container, { backgroundColor: cardBg }]}>
