@@ -93,6 +93,9 @@ export default function CreateProgramScreen() {
         },
         pressed && { opacity: 0.7 },
       ]}
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
     >
       <ThemedText
         style={[styles.pillText, { color: selected ? onTint : textColor }]}
@@ -121,6 +124,8 @@ export default function CreateProgramScreen() {
           { borderColor: border },
           pressed && { opacity: 0.7 },
         ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Decrease, currently ${value}`}
       >
         <ThemedText style={[styles.stepBtnText, { color: textColor }]}>−</ThemedText>
       </Pressable>
@@ -132,6 +137,8 @@ export default function CreateProgramScreen() {
           { borderColor: border },
           pressed && { opacity: 0.7 },
         ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Increase, currently ${value}`}
       >
         <ThemedText style={[styles.stepBtnText, { color: textColor }]}>+</ThemedText>
       </Pressable>
@@ -206,6 +213,8 @@ export default function CreateProgramScreen() {
             { backgroundColor: tint },
             (pressed || submitting) && { opacity: 0.7 },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="Generate program"
         >
           <ThemedText style={[styles.primaryBtnText, { color: onTint }]}>
             {submitting ? 'Generating…' : 'Generate Program'}
