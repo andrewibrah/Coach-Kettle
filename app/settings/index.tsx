@@ -5,7 +5,6 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { TutorialModal } from '@/components/tutorial/TutorialModal';
-import { Colors } from '@/constants/theme';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -26,7 +25,7 @@ export default function SettingsScreen() {
     const [tutorialVisible, setTutorialVisible] = useState(false);
 
     // Dynamic colors for dark mode
-    const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
+    const cardBg = useThemeColor({}, 'cardBackground');
     const sectionTitleColor = isDark ? '#8E8E93' : '#8E8E93';
     const cacheBg = isDark ? '#3d2d00' : '#FFF8E6';
     const logoutBg = isDark ? '#3d1515' : '#FFF1F0';

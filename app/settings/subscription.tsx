@@ -11,22 +11,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
 import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useIAP } from '@/lib/iap';
 import { useAuth } from '@/contexts/AuthProvider';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { SUBSCRIPTION } from '@/constants/subscription';
 
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const activeColor = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
+  const cardBg = useThemeColor({}, 'cardBackground');
 
   const { session } = useAuth();
   const { entitlement, isPro, refreshEntitlement } = useEntitlement();
@@ -35,8 +32,6 @@ export default function SubscriptionScreen() {
     email: session?.user?.email,
     onPurchaseSuccess: refreshEntitlement,
   });
-
-  const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
   const sectionTitleColor = '#8E8E93';
 
   const formatDate = (iso: string | null): string => {

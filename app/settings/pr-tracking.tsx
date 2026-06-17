@@ -19,7 +19,6 @@ import { E1RMInfoTooltip } from '@/components/ui/E1RMInfoTooltip';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { Colors } from '@/constants/theme';
 import {
   PRTrackedLift,
   PRLift,
@@ -44,7 +43,7 @@ export default function PRTrackingScreen() {
 
   const { session } = useAuth();
 
-  const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
+  const cardBg = useThemeColor({}, 'cardBackground');
   const sectionTitleColor = '#8E8E93';
 
   const [trackedLifts, setTrackedLifts] = useState<PRTrackedLift[]>([]);

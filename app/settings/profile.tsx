@@ -18,7 +18,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { Colors } from '@/constants/theme';
 
 const FOCUS_OPTIONS = [
   { label: 'Strength', value: 'strength' },
@@ -43,7 +42,7 @@ export default function ProfileSettingsScreen() {
     refreshProfile();
   }, [refreshProfile]);
 
-  const cardBg = isDark ? Colors.dark.cardBackground : '#F2F2F7';
+  const cardBg = useThemeColor({}, 'cardBackground');
   const sectionTitleColor = '#8E8E93';
 
   // Form state

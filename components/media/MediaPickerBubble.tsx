@@ -4,8 +4,6 @@
  * Tap a thumbnail to view full-screen.
  */
 
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import React, { useCallback, useState } from "react";
 import {
@@ -41,10 +39,8 @@ export function MediaPickerBubble({
   disabled = false,
   maxItems = 10,
 }: Props) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const textColor = useThemeColor({}, "text");
-  const cardBg = isDark ? Colors.dark.cardBackground : Colors.light.cardBackground;
+  const cardBg = useThemeColor({}, "cardBackground");
   const borderColor = useThemeColor({}, "border");
   const mutedColor = useThemeColor({}, "placeholder");
 
