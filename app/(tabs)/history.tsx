@@ -1,13 +1,12 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
-import { Alert, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
-import { Colors, accentColor } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { api } from "@/lib/api";
 import { type WorkoutSession } from "@/lib/workoutStorage";
 
@@ -46,21 +45,23 @@ export default function HistoryScreen() {
   const [items, setItems] = useState<WorkoutSession[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const firstFocusRef = useRef(true);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const backgroundColor = isDark ? Colors.dark.background : Colors.light.background;
-  const textColor = isDark ? Colors.dark.text : Colors.light.text;
-  const cardBg = isDark ? Colors.dark.cardBackground : Colors.light.cardBackground;
-  const borderColor = isDark ? Colors.dark.border : Colors.light.border;
-  const secondaryTextColor = isDark ? Colors.dark.placeholder : Colors.light.placeholder;
-  const chevronColor = isDark ? Colors.dark.icon : Colors.light.icon;
+  const backgroundColor = useThemeColor({}, 'background');
+  const textColor = useThemeColor({}, 'text');
+  const cardBg = useThemeColor({}, 'cardBackground');
+  const borderColor = useThemeColor({}, 'border');
+  const secondaryTextColor = useThemeColor({}, 'placeholder');
+  const chevronColor = useThemeColor({}, 'icon');
+  const tintColor = useThemeColor({}, 'tint');
+  const dangerColor = useThemeColor({}, 'danger');
 
-  const load = async () => {
+  const load = async (isInitial = false) => {
     try {
       setLoadError(false);
       const data = await api.getHistory();
@@ -69,12 +70,19 @@ export default function HistoryScreen() {
       setItems(sorted);
     } catch {
       setLoadError(true);
+    } finally {
+      if (isInitial) setInitialLoading(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      if (firstFocusRef.current) {
+        firstFocusRef.current = false;
+        load(true);
+      } else {
+        load();
+      }
     }, [])
   );
 
@@ -126,7 +134,7 @@ export default function HistoryScreen() {
 
   const getRatingColor = (rating: number) => {
     if (rating >= 8) return "#10B981";
-    if (rating >= 6) return accentColor(isDark);
+    if (rating >= 6) return tintColor;
     if (rating >= 4) return "#F59E0B";
     return "#EF4444";
   };
@@ -182,6 +190,17 @@ export default function HistoryScreen() {
     );
   };
 
+  if (initialLoading) {
+    return (
+      <ThemedView style={[styles.screen, { paddingTop: insets.top + 12, backgroundColor }]}>
+        <ScreenHeader title="History" subtitle="" skipSafeArea />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator />
+        </View>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={[styles.screen, { paddingTop: insets.top + 12, backgroundColor }]}>
       <ScreenHeader
@@ -191,7 +210,7 @@ export default function HistoryScreen() {
       />
 
       {loadError && (
-        <Text style={[styles.errorBanner, { color: textColor }]}>
+        <Text style={[styles.errorBanner, { color: dangerColor }]}>
           Failed to load workouts. Pull to refresh.
         </Text>
       )}
@@ -336,6 +355,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     paddingVertical: 12,
-    opacity: 0.7,
+    opacity: 0.9,
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
