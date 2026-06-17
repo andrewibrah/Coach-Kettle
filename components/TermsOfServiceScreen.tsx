@@ -28,7 +28,6 @@ export function TermsOfServiceScreen() {
         try {
             const success = await acceptTerms();
             if (success) {
-                console.log('[TermsOfService] Terms accepted, navigating to app...');
                 router.replace('/(tabs)');
             } else {
                 // Server sync failed after all retries. Local acceptance is recorded.

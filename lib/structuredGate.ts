@@ -743,7 +743,7 @@ function runDevStructuredGateTests() {
   if (failures.length) {
     console.warn("[structuredGate] tests FAILED:", failures);
   } else {
-    console.log("[structuredGate] all tests passed ✓");
+    if (__DEV__) console.info("[structuredGate] all tests passed ✓");
   }
 }
 

@@ -72,7 +72,7 @@ export async function saveWorkout(session: WorkoutSession) {
     await api.saveWorkout(session);
   } catch (e) {
     // Fail silently if Supabase is unreachable
-    console.log("[saveWorkout] Supabase sync failed, saved locally only.", e);
+    console.warn("[saveWorkout] Supabase sync failed, saved locally only.", e);
   }
 }
 

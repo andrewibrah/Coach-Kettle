@@ -109,7 +109,6 @@ export async function uploadMediaToStorage(
         throw new Error(`File appears empty or corrupt (${arrayBuffer.byteLength} bytes)`);
     }
 
-    console.log(`[mediaUpload] Uploading ${storagePath} | ${contentType} | ${arrayBuffer.byteLength} bytes`);
 
     // Upload ArrayBuffer (supabase-js accepts ArrayBuffer directly)
     const { error } = await supabase.storage
@@ -176,7 +175,6 @@ export async function uploadAndRecordMedia(
  */
 export async function getSignedUrl(storagePath: string): Promise<string | null> {
     try {
-        console.log('[mediaUpload] Requesting signed URL for:', storagePath);
         const { data, error } = await supabase.storage
             .from(BUCKET)
             .createSignedUrl(storagePath, SIGNED_URL_TTL);
@@ -188,7 +186,6 @@ export async function getSignedUrl(storagePath: string): Promise<string | null> 
 
         const url = data?.signedUrl ?? null;
         if (url) {
-            console.log('[mediaUpload] Signed URL OK for:', storagePath, '→', url.substring(0, 80) + '...');
         } else {
             console.warn('[mediaUpload] getSignedUrl returned null data for:', storagePath);
         }
@@ -214,7 +211,6 @@ export async function getMediaSignedUrls(
     const result: Record<string, string> = {};
 
     try {
-        console.log('[mediaUpload] Batch createSignedUrls for', storagePaths.length, 'paths:', storagePaths);
         const { data, error } = await supabase.storage
             .from(BUCKET)
             .createSignedUrls(storagePaths, SIGNED_URL_TTL);

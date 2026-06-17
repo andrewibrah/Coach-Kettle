@@ -93,7 +93,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       try {
         // Ensure profile exists before updating
         if (!profile) {
-          console.log('[ProfileContext] No profile found, creating one first...');
           const newProfile = await ensureProfile(session.user.id);
           if (!newProfile) {
             console.error('[ProfileContext] Failed to create profile');

@@ -48,21 +48,14 @@ export default function SignIn() {
 
     // 2. Wait for session to be fully established
     // The Supabase SDK needs time to persist the session to AsyncStorage
-    console.log('[SignIn] Waiting for session to be established...');
-
     let sessionConfirmed = false;
     for (let i = 0; i < 10; i++) {
       await new Promise(resolve => setTimeout(resolve, 300));
       const { data: { session }, error } = await supabase.auth.getSession();
       if (session && !error) {
-        console.log('[SignIn] Session confirmed:', {
-          userId: session.user?.id,
-          expiresAt: session.expires_at
-        });
         sessionConfirmed = true;
         break;
       }
-      console.log('[SignIn] Session not ready yet, attempt', i + 1);
     }
 
     if (!sessionConfirmed) {
@@ -79,11 +72,9 @@ export default function SignIn() {
       // Fail-safe: If status is null (check failed) or explicitly needs acceptance, redirect to ToS
       if (!termsStatus || termsStatus.needsAcceptance) {
         if (!termsStatus) console.warn('[SignIn] Terms check failed or returned null, defaulting to strict acceptance');
-        else console.log('[SignIn] Redirecting to Terms of Service');
 
         router.replace('/terms-of-service');
       } else {
-        console.log('[SignIn] Redirecting to Home');
         router.replace('/(tabs)');
       }
     } catch (e) {
@@ -93,8 +84,6 @@ export default function SignIn() {
       router.replace('/(tabs)');
     }
   }, [router]);
-
-
   // Create redirect URL
   // In Expo Go: uses exp:// scheme (dynamic URL)
   // In dev/prod builds: uses coachkettle:// scheme (stable)
@@ -104,19 +93,6 @@ export default function SignIn() {
     // For Expo Go development, this will still return exp:// URL
     // The scheme is only used in standalone builds
   });
-
-  // Log redirect URL in dev for debugging and Supabase configuration
-  useEffect(() => {
-    if (__DEV__) {
-      console.log('[SignIn] ========================================');
-      console.log('[SignIn] OAuth redirect URL:', redirectTo);
-      console.log('[SignIn] Add this URL (or wildcard pattern) to Supabase Dashboard:');
-      console.log('[SignIn] Authentication → URL Configuration → Redirect URLs');
-      console.log('[SignIn] For Expo Go, add: exp://*.exp.direct/--/auth/callback');
-      console.log('[SignIn] For prod builds, add: coachkettle://auth/callback');
-      console.log('[SignIn] ========================================');
-    }
-  }, [redirectTo]);
 
   // Listen for deep link events as fallback for OAuth callback
   useEffect(() => {
@@ -229,7 +205,7 @@ export default function SignIn() {
         throw new Error('No identity token received from Apple');
       }
 
-      console.log('[SignIn] Apple credential received, signing in with Supabase...');
+  
 
       const { error } = await supabase.auth.signInWithIdToken({
         provider: 'apple',
@@ -242,7 +218,7 @@ export default function SignIn() {
     } catch (err: any) {
       // ERR_REQUEST_CANCELED is fired when the user dismisses the SIWA sheet
       if (err?.code === 'ERR_REQUEST_CANCELED' || err?.code === '1001') {
-        console.log('[SignIn] User cancelled Apple Sign In');
+    
         return;
       }
       // Verbose logging so iPad / future failures show full error context
@@ -275,7 +251,7 @@ export default function SignIn() {
       if (error) throw error;
 
       if (data?.url) {
-        console.log('[SignIn] Opening OAuth URL:', data.url);
+    
 
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,

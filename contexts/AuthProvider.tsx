@@ -46,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Clear all local caches (workout history, Supabase auth tokens)
   const clearAllCaches = async () => {
-    console.log('[AuthProvider] Clearing all local caches...');
 
     // Clear workout history cache + any in-progress draft
     await clearWorkouts();
@@ -69,14 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (supabaseKeys.length > 0) {
       await AsyncStorage.multiRemove(supabaseKeys);
-      console.log('[AuthProvider] Cleared Supabase keys:', supabaseKeys);
     }
 
-    console.log('[AuthProvider] All caches cleared');
   };
 
   const signOut = async () => {
-    console.log('[AuthProvider] signOut called');
     try {
       // Try to clear caches but don't let it block signOut
       await clearAllCaches();
@@ -87,7 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await logOutRevenueCat();
       await supabase.auth.signOut();
-      console.log('[AuthProvider] signOut completed');
     } catch (e) {
       console.error('[AuthProvider] signOut error:', e);
       // Force clear session state even if Supabase signOut fails

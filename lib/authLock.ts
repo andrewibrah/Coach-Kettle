@@ -141,9 +141,7 @@ export async function syncTermsAcceptanceToServer(): Promise<boolean> {
       const result = await api.recordTermsAcceptance(CURRENT_TERMS_VERSION, CURRENT_TERMS_VERSION);
       if (result?.ok) {
         if (attempt > 0) {
-          console.log(`[authLock] Terms acceptance synced on retry attempt ${attempt + 1}`);
         } else {
-          console.log('[authLock] Terms acceptance synced to server');
         }
         return true;
       }

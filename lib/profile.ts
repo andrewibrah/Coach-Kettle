@@ -174,7 +174,6 @@ export async function ensureProfile(userId: string): Promise<UserProfile | null>
   let profile = await fetchProfile(userId);
 
   if (!profile) {
-    console.log('[Profile] Creating profile for user:', userId);
     await createProfile(userId);
     profile = await fetchProfile(userId);
   }
@@ -187,7 +186,6 @@ export async function updateProfile(
   userId: string,
   updates: Partial<Omit<UserProfile, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'ai_context'>>
 ): Promise<UserProfile | null> {
-  console.log('[Profile] Updating profile for user:', userId, 'with updates:', updates);
 
   try {
     const response = await fetchWithAuth(`${API_BASE}/profile`, {
@@ -201,7 +199,6 @@ export async function updateProfile(
     }
 
     const data = await response.json();
-    console.log('[Profile] Profile updated successfully:', data.profile);
 
     if (data.profile) {
       await cacheProfile(data.profile);
@@ -266,7 +263,6 @@ export async function batchSaveOnboarding(
   userId: string,
   data: BatchOnboardingData
 ): Promise<{ ok: boolean; warnings?: string[]; error?: string }> {
-  console.log('[Profile] Batch saving onboarding data for user:', userId);
 
   try {
     const response = await fetchWithAuth(`${API_BASE}/profile`, {
@@ -292,7 +288,6 @@ export async function batchSaveOnboarding(
       return { ok: true, warnings: result.warnings };
     }
 
-    console.log('[Profile] Batch onboarding completed successfully');
     return { ok: true };
   } catch (error) {
     console.error('[Profile] Error in batch onboarding:', error);
