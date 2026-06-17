@@ -112,8 +112,8 @@ function RootLayoutNav() {
           presentation: 'modal',
           headerBackTitle: "",
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background },
-          headerTintColor: colorScheme === 'dark' ? Colors.dark.text : Colors.light.text,
+          headerStyle: { backgroundColor: navTheme.colors.background },
+          headerTintColor: navTheme.colors.text,
         }} />
       </Stack>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
