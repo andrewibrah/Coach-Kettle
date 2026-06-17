@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Text,
   useWindowDimensions,
   View
 } from "react-native";
@@ -172,6 +173,8 @@ export default function HomeScreen() {
 
   const [startToastOpen, setStartToastOpen] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [draftRestoredToast, setDraftRestoredToast] = useState(false);
+  const draftToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onResetForNewDay = useCallback((_nextDate: string) => {
     setRows([]);
@@ -213,6 +216,7 @@ export default function HomeScreen() {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (draftToastTimerRef.current) clearTimeout(draftToastTimerRef.current);
     };
   }, []);
 
@@ -234,6 +238,11 @@ export default function HomeScreen() {
           draft.dateISO
         );
         console.log('[WorkoutDraft] Restored draft with', draft.rows.length, 'rows');
+        setDraftRestoredToast(true);
+        draftToastTimerRef.current = setTimeout(() => {
+          setDraftRestoredToast(false);
+          draftToastTimerRef.current = null;
+        }, 3000);
       } else {
         // Stale draft from a different day — clear it silently
         clearWorkoutDraft();
@@ -1248,6 +1257,14 @@ export default function HomeScreen() {
           showStartToast={showStartToast}
         />
 
+        {draftRestoredToast && (
+          <View style={styles.draftRestoredToast} pointerEvents="none">
+            <View style={[styles.draftRestoredBadge, { backgroundColor: successColor }]}>
+              <Text style={styles.draftRestoredText}>Session resumed</Text>
+            </View>
+          </View>
+        )}
+
         {aiBubbleText && (
           <AiResponseBubble
             text={aiBubbleText}
@@ -1343,5 +1360,28 @@ const styles = StyleSheet.create({
   },
   contentArea: {
     flex: 1,
+  },
+  draftRestoredToast: {
+    position: 'absolute',
+    top: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  draftRestoredBadge: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  draftRestoredText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
