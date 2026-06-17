@@ -17,7 +17,7 @@ export default function SettingsLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: {
-          backgroundColor: colorScheme === 'dark' ? '#000' : '#fff',
+          backgroundColor: colorScheme === 'dark' ? '#151718' : '#ffffff',
         },
       }}
     >

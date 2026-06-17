@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
@@ -44,7 +44,7 @@ export default function MealPlanScreen() {
       await generateMealPlan();
       await refresh();
     } catch (e) {
-      console.warn('[plan] generate failed', e);
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to generate meal plan. Try again.');
     } finally {
       setGenerating(false);
     }
@@ -57,7 +57,7 @@ export default function MealPlanScreen() {
       await recalibrateMealPlan();
       await refresh();
     } catch (e) {
-      console.warn('[plan] recalibrate failed', e);
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to recalibrate. Try again.');
     } finally {
       setRecal(false);
     }
