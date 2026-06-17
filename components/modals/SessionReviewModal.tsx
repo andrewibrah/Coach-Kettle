@@ -4,7 +4,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { accentColor as themeAccent } from "@/constants/theme";
 import { getSignedUrl, pickMedia, uploadAndRecordMedia } from "@/lib/mediaUpload";
 import { SessionReview } from "@/lib/workoutStorage";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -17,7 +16,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useColorScheme,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -43,8 +41,6 @@ export function SessionReviewModal({
   onSaveReflection,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const backgroundColor = useThemeColor({}, "background");
   const textColor = useThemeColor({}, "text");
   const iconColor = useThemeColor({}, "icon");
@@ -53,6 +49,7 @@ export function SessionReviewModal({
   const doneButtonBg = useThemeColor({}, "text");
   const doneButtonTextColor = useThemeColor({}, "background");
   const accentColor = useThemeColor({}, "success");
+  const tint = useThemeColor({}, "tint");
   const warningColor = useThemeColor({}, "warning");
   const dangerThemeColor = useThemeColor({}, "danger");
 
@@ -73,7 +70,7 @@ export function SessionReviewModal({
 
   const getRatingColor = (rating: number) => {
     if (rating >= 8) return accentColor;
-    if (rating >= 6) return themeAccent(isDark);
+    if (rating >= 6) return tint;
     if (rating >= 4) return warningColor;
     return dangerThemeColor;
   };
@@ -250,7 +247,7 @@ export function SessionReviewModal({
               {/* Next Session Note */}
               <View style={[styles.section, { backgroundColor: cardBg }]}>
                 <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionIcon, { color: themeAccent(isDark) }]}>
+                  <Text style={[styles.sectionIcon, { color: tint }]}>
                     📝
                   </Text>
                   <ThemedText style={styles.sectionTitle}>
