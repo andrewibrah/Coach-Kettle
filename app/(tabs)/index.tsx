@@ -1170,7 +1170,8 @@ export default function HomeScreen() {
           // Empty response — remove ghost row silently
           if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));
         }
-      } catch {
+      } catch (e) {
+        console.warn('[workout] sendMessage failed', e);
         if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));
       } finally {
         setLoading(false);

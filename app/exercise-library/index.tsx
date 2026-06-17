@@ -36,7 +36,8 @@ export default function ExerciseLibraryScreen() {
       try {
         const list = await fetchExerciseLibrary();
         if (!cancelled) setExercises(list);
-      } catch {
+      } catch (e) {
+        console.warn('[exercise-library] load failed', e);
         if (!cancelled) setExercises([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -52,8 +53,8 @@ export default function ExerciseLibraryScreen() {
       try {
         const list = await fetchExerciseLibrary();
         setExercises(list);
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.warn('[exercise-library] reset failed', e);
       }
       return;
     }
@@ -61,7 +62,8 @@ export default function ExerciseLibraryScreen() {
     try {
       const results = await searchExercises(query);
       setExercises(results);
-    } catch {
+    } catch (e) {
+      console.warn('[exercise-library] search failed', e);
       setExercises([]);
     } finally {
       setLoading(false);

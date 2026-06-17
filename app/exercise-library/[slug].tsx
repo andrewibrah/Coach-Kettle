@@ -34,7 +34,8 @@ export default function ExerciseDetailScreen() {
       try {
         const ex = await getExerciseBySlug(String(slug));
         if (!cancelled) setExercise(ex);
-      } catch {
+      } catch (e) {
+        console.warn('[exercise-library/slug] load failed', e);
         if (!cancelled) setExercise(null);
       } finally {
         if (!cancelled) setLoading(false);

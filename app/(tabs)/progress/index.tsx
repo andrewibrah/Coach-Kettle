@@ -67,11 +67,12 @@ export default function ProgressHomeScreen() {
           setWorkouts7d(
             sessions.filter((s: { createdAt: number }) => s.createdAt >= cutoff).length
           );
-        } catch {
+        } catch (e) {
+          console.warn('[progress] workouts7d parse failed', e);
           setWorkouts7d(0);
         }
       })
-      .catch(() => setWorkouts7d(0));
+      .catch((e) => { console.warn('[progress] workouts7d load failed', e); setWorkouts7d(0); });
 
     return () => { mounted = false; };
   }, []);

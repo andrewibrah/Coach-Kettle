@@ -70,7 +70,8 @@ export default function HistoryScreen() {
       // newest first
       const sorted = [...data].sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
       setItems(sorted);
-    } catch {
+    } catch (e) {
+      console.warn('[history] load failed', e);
       setLoadError(true);
     } finally {
       if (isInitial) setInitialLoading(false);
@@ -99,7 +100,8 @@ export default function HistoryScreen() {
 
     try {
       await api.deleteWorkout(deleteId);
-    } catch {
+    } catch (e) {
+      console.warn('[history] delete failed', e);
       setItems(previousItems);
       Alert.alert("Error", "Failed to delete workout. Please try again.");
     }

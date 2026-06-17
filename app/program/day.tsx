@@ -50,7 +50,8 @@ export default function ProgramDayScreen() {
           const s = await fetchNextSetSuggestion(ex.exercise_name);
           if (cancelled) return;
           setSuggestions((prev) => ({ ...prev, [ex.id]: s }));
-        } catch {
+        } catch (e) {
+          console.warn('[program/day] suggestion failed for', ex.id, e);
           if (cancelled) return;
           setSuggestions((prev) => ({ ...prev, [ex.id]: null }));
         }

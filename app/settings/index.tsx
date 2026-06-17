@@ -26,7 +26,7 @@ export default function SettingsScreen() {
 
     // Dynamic colors for dark mode
     const cardBg = useThemeColor({}, 'cardBackground');
-    const sectionTitleColor = isDark ? '#8E8E93' : '#8E8E93';
+    const sectionTitleColor = '#8E8E93'; // iOS system gray — same in both themes
     const cacheBg = isDark ? '#3d2d00' : '#FFF8E6';
     const logoutBg = isDark ? '#3d1515' : '#FFF1F0';
 
