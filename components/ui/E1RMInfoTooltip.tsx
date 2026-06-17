@@ -1,10 +1,10 @@
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
 
 interface E1RMInfoTooltipProps {
   style?: any;
@@ -13,8 +13,9 @@ interface E1RMInfoTooltipProps {
 export function E1RMInfoTooltip({ style }: E1RMInfoTooltipProps) {
   const [visible, setVisible] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
-  const tint = Colors[colorScheme].tint;
-  const onTint = Colors[colorScheme].tintForeground;
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
+  const cardBackground = useThemeColor({}, 'cardBackground');
 
   return (
     <>
@@ -35,7 +36,7 @@ export function E1RMInfoTooltip({ style }: E1RMInfoTooltipProps) {
         >
           <Pressable style={styles.overlay} onPress={() => setVisible(false)} />
 
-          <View style={[styles.content, { backgroundColor: Colors[colorScheme].cardBackground }]}>
+          <View style={[styles.content, { backgroundColor: cardBackground }]}>
             <ThemedText type="subtitle" style={styles.title}>
               About E1RM
             </ThemedText>

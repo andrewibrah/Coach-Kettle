@@ -3,8 +3,7 @@ import { StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-nat
 import Animated, { FadeInUp, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/ui/themed-text';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 interface QuizSkipButtonProps {
   onPress: () => void;
@@ -46,7 +45,8 @@ export function QuizContinueButton({
   loading,
   label = 'Continue',
 }: QuizContinueButtonProps) {
-  const colorScheme = useColorScheme();
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -72,7 +72,7 @@ export function QuizContinueButton({
       <TouchableOpacity
         style={[
           styles.continueButton,
-          { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+          { backgroundColor: tint },
           (disabled || loading) && styles.disabledButton,
         ]}
         onPress={handlePress}
@@ -82,9 +82,9 @@ export function QuizContinueButton({
         activeOpacity={0.8}
       >
         {loading ? (
-          <ActivityIndicator color={Colors[colorScheme ?? 'light'].tintForeground} />
+          <ActivityIndicator color={onTint} />
         ) : (
-          <ThemedText style={[styles.continueText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>{label}</ThemedText>
+          <ThemedText style={[styles.continueText, { color: onTint }]}>{label}</ThemedText>
         )}
       </TouchableOpacity>
     </Animated.View>

@@ -1,9 +1,8 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
-import { Colors } from '@/constants/theme';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -13,7 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function OnboardingWelcome() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const { profile } = useProfile();
   const { draft, skipOnboarding } = useOnboarding();
   const [skipping, setSkipping] = useState(false);
@@ -59,11 +59,11 @@ export default function OnboardingWelcome() {
         </View>
 
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+          style={[styles.button, { backgroundColor: tint }]}
           onPress={handleGetStarted}
           activeOpacity={0.8}
         >
-          <ThemedText style={[styles.buttonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Get Started</ThemedText>
+          <ThemedText style={[styles.buttonText, { color: onTint }]}>Get Started</ThemedText>
         </TouchableOpacity>
 
         <TouchableOpacity

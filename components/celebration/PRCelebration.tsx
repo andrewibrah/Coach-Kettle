@@ -13,7 +13,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/ui/themed-text';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { BlurView } from 'expo-blur';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -33,6 +33,9 @@ interface PRCelebrationProps {
 
 export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
   const colorScheme = useColorScheme();
+  const tint = useThemeColor({}, 'tint');
+  const cardBg = useThemeColor({}, 'cardBackground');
+  const secondaryBg = useThemeColor({}, 'secondaryBackground');
 
   const overlayOpacity = useSharedValue(0);
   const cardScale = useSharedValue(0.5);
@@ -114,10 +117,10 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
           ))}
         </Animated.View>
 
-        <Animated.View style={[styles.card, cardAnimatedStyle, { backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#fff' }]}>
+        <Animated.View style={[styles.card, cardAnimatedStyle, { backgroundColor: cardBg }]}>
           <Animated.View style={titleAnimatedStyle}>
             <ThemedText style={styles.trophy}>🏆</ThemedText>
-            <ThemedText style={[styles.title, { color: Colors[colorScheme ?? 'light'].tint }]}>
+            <ThemedText style={[styles.title, { color: tint }]}>
               NEW PR!
             </ThemedText>
           </Animated.View>
@@ -136,9 +139,9 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
             </View>
           </View>
 
-          <View style={[styles.e1rmContainer, { backgroundColor: colorScheme === 'dark' ? '#2c2c2e' : '#f5f5f5' }]}>
+          <View style={[styles.e1rmContainer, { backgroundColor: secondaryBg }]}>
             <ThemedText style={styles.e1rmLabel}>Estimated 1RM</ThemedText>
-            <ThemedText style={[styles.e1rmValue, { color: Colors[colorScheme ?? 'light'].tint }]}>
+            <ThemedText style={[styles.e1rmValue, { color: tint }]}>
               {data.newE1rm.toFixed(0)} lbs
             </ThemedText>
             {improvement && (

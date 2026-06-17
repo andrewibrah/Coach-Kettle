@@ -8,14 +8,11 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '@/constants/legal';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 type DocType = 'terms' | 'privacy';
 
 export function TermsOfServiceScreen() {
-    const colorScheme = useColorScheme() ?? 'light';
     const { acceptTerms } = useAuthLock();
     const { signOut } = useAuth();
     const router = useRouter();
@@ -127,7 +124,7 @@ export function TermsOfServiceScreen() {
                     style={({ pressed }) => [
                         styles.button,
                         styles.acceptButton,
-                        { backgroundColor: Colors[colorScheme].tint },
+                        { backgroundColor: primaryColor },
                         pressed && styles.buttonPressed,
                     ]}
                     onPress={handleAccept}
