@@ -1,14 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
 import { generateMealPlan, recalibrateMealPlan } from '@/lib/nutrition';
+import { fireMealPlanReady } from '@/lib/notifications';
 import type { MealSlot, PlannedMeal } from '@/types/nutrition';
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -25,6 +28,7 @@ export default function MealPlanScreen() {
   const onTint = useThemeColor({}, 'tintForeground');
 
   const { mealPlan, refresh } = useNutrition();
+  const { toast, showToast, hideToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [recal, setRecal] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
@@ -43,8 +47,10 @@ export default function MealPlanScreen() {
     try {
       await generateMealPlan();
       await refresh();
+      fireMealPlanReady().catch(() => undefined);
+      showToast('Meal plan ready', 'success');
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to generate meal plan. Try again.');
+      showToast(e instanceof Error ? e.message : 'Failed to generate meal plan. Try again.', 'error');
     } finally {
       setGenerating(false);
     }
@@ -56,8 +62,9 @@ export default function MealPlanScreen() {
     try {
       await recalibrateMealPlan();
       await refresh();
+      showToast('Meal plan updated', 'success');
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to recalibrate. Try again.');
+      showToast(e instanceof Error ? e.message : 'Failed to recalibrate. Try again.', 'error');
     } finally {
       setRecal(false);
     }
@@ -101,6 +108,7 @@ export default function MealPlanScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader
         title="This Week's Plan"
         subtitle={mealPlan.plan?.week_start_date ?? 'Not generated yet'}

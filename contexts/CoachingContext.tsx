@@ -9,7 +9,10 @@ import {
   generateFeedbackForDate,
   fetchBehaviorState,
 } from '@/lib/coaching';
+import { fireStreakMilestone } from '@/lib/notifications';
 import type { DailyFeedback, BehaviorState } from '@/types/coaching';
+
+const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100];
 
 interface CoachingContextValue {
   loading: boolean;
@@ -45,6 +48,16 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
 
   const isMounted = useRef(true);
   useEffect(() => () => { isMounted.current = false; }, []);
+
+  // Fire a local notification when streak crosses a milestone for the first time today
+  const lastStreakNotifRef = useRef<number>(0);
+  useEffect(() => {
+    const streak = today?.streak_days ?? 0;
+    if (streak > 0 && STREAK_MILESTONES.includes(streak) && lastStreakNotifRef.current !== streak) {
+      lastStreakNotifRef.current = streak;
+      fireStreakMilestone(streak).catch(() => undefined);
+    }
+  }, [today?.streak_days]);
 
   const refresh = useCallback(async () => {
     if (!userId) {

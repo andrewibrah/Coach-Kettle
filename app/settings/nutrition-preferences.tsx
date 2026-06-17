@@ -4,12 +4,14 @@
 // migration 0031). Re-derives nutrition targets when key inputs change.
 
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/contexts/ProfileContext';
@@ -51,6 +53,8 @@ export default function NutritionPreferencesScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const subtle = useThemeColor({}, 'placeholder');
+
+  const { toast, showToast, hideToast } = useToast();
 
   const [sex, setSex] = useState(profile?.sex ?? 'male');
   const [activity, setActivity] = useState(profile?.activity_level ?? 'moderate');
@@ -97,9 +101,9 @@ export default function NutritionPreferencesScreen() {
       if (!ok) throw new Error('save failed');
       // Re-derive targets (best-effort, ignore failure)
       await deriveNutritionTargets().catch(() => undefined);
-      Alert.alert('Saved', 'Preferences updated and nutrition targets re-derived.');
+      showToast('Preferences saved', 'success');
     } catch (e) {
-      Alert.alert('Save failed', (e as Error).message);
+      showToast((e as Error).message || 'Save failed. Please try again.', 'error');
     } finally {
       setSaving(false);
     }
@@ -113,9 +117,9 @@ export default function NutritionPreferencesScreen() {
     try {
       const r = await seedDefaultTemplates(tgoal);
       const n = r.templates?.length ?? 0;
-      Alert.alert(n > 0 ? 'Templates created' : 'No change', n > 0 ? `Added ${n} starter templates.` : 'You already have templates — nothing was changed.');
+      showToast(n > 0 ? `Added ${n} starter templates` : 'You already have templates', n > 0 ? 'success' : 'info');
     } catch (e) {
-      Alert.alert('Could not seed templates', (e as Error).message);
+      showToast((e as Error).message || 'Could not seed templates', 'error');
     }
   };
 
@@ -143,6 +147,7 @@ export default function NutritionPreferencesScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: bg }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Nutrition preferences" />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
 

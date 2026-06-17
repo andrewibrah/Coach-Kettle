@@ -4,7 +4,6 @@ import {
   View,
   ScrollView,
   Pressable,
-  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +14,8 @@ import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useIAP } from '@/lib/iap';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { Toast } from '@/components/ui/Toast';
+import { useToast } from '@/hooks/useToast';
 import { SUBSCRIPTION } from '@/constants/subscription';
 
 export default function SubscriptionScreen() {
@@ -35,6 +36,7 @@ export default function SubscriptionScreen() {
     onPurchaseSuccess: refreshEntitlement,
   });
   const sectionTitleColor = '#8E8E93';
+  const { toast, showToast, hideToast } = useToast();
 
   const formatDate = (iso: string | null): string => {
     if (!iso) return 'N/A';
@@ -49,9 +51,9 @@ export default function SubscriptionScreen() {
   const handleRestore = async () => {
     const success = await restore();
     if (success) {
-      Alert.alert('Restore Complete', 'Your purchases have been restored.');
+      showToast('Purchases restored', 'success');
     } else {
-      Alert.alert('Restore Failed', 'Unable to restore purchases. Please try again.');
+      showToast('Unable to restore purchases. Please try again.', 'error');
     }
   };
 
@@ -112,6 +114,7 @@ export default function SubscriptionScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + 20, backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}

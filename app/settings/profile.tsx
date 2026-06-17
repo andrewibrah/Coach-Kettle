@@ -8,6 +8,8 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { Toast } from '@/components/ui/Toast';
+import { useToast } from '@/hooks/useToast';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -36,6 +38,7 @@ export default function ProfileSettingsScreen() {
   const onTint = useThemeColor({}, 'tintForeground');
 
   const { profile, profileLoading, updateProfile, refreshProfile } = useProfile();
+  const { toast, showToast, hideToast } = useToast();
 
   // Refresh profile when screen mounts to ensure we have latest data
   useEffect(() => {
@@ -107,13 +110,13 @@ export default function ProfileSettingsScreen() {
 
       if (success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Saved', 'Your profile has been updated.');
+        showToast('Profile saved', 'success');
       } else {
-        Alert.alert('Error', 'Failed to save profile. Please try again.');
+        showToast('Failed to save profile. Please try again.', 'error');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
+      showToast('Failed to save profile. Please try again.', 'error');
     } finally {
       setSaving(false);
     }
@@ -161,6 +164,7 @@ export default function ProfileSettingsScreen() {
         </View>
       )}
 
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Physical Stats */}
         <View style={styles.section}>

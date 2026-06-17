@@ -38,6 +38,7 @@ import { api, type ApiWorkoutRow } from "@/lib/api";
 import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { type WorkoutTemplate, type WorkoutTemplateItem } from "@/lib/profile";
 import { checkForPR } from "@/lib/prTracking";
+import { firePRCelebration } from "@/lib/notifications";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
 import { expandTemplateToRows, getLastExerciseFromRows, makeId, makeRestRow, nextSetNumberForExercise, normalizeExercise, resequenceSets, todayISO } from "@/lib/workoutRules";
 import { type SessionReview } from "@/lib/workoutStorage";
@@ -882,6 +883,7 @@ export default function HomeScreen() {
             if (lastCelebratedRef.current === dedupKey) return;
             lastCelebratedRef.current = dedupKey;
             showCelebration(result);
+            firePRCelebration(result.liftName, result.weight, result.reps).catch(() => undefined);
           }
         })
         .catch(err => console.error('[PR] Client-side check failed:', err));
@@ -1081,6 +1083,7 @@ export default function HomeScreen() {
                 if (lastCelebratedRef.current === dedupKey) return;
                 lastCelebratedRef.current = dedupKey;
                 showCelebration(result);
+                firePRCelebration(result.liftName, result.weight, result.reps).catch(() => undefined);
               }
             })
             .catch(err => console.error('[PR] Client-side check failed:', err));
