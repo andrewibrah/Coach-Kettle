@@ -1,8 +1,10 @@
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
+import { Toast } from "@/components/ui/Toast";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useToast } from "@/hooks/useToast";
 import { ChatMessage, clearAllChatHistory, fetchChatHistory } from "@/lib/chatStorage";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
@@ -50,6 +52,7 @@ export function CoachModal({
   const borderColor = useThemeColor({}, 'border');
   const iconColor = useThemeColor({}, 'icon');
   const inputBackground = useThemeColor({}, 'inputBackground');
+  const { toast, showToast, hideToast } = useToast();
   const placeholderColor = useThemeColor({}, 'placeholder');
   const chatBackground = useThemeColor({}, 'secondaryBackground');
 
@@ -148,7 +151,7 @@ export function CoachModal({
               await clearAllChatHistory();
               setHistory([]);
             } catch {
-              Alert.alert("Error", "Failed to clear chat history.");
+              showToast("Failed to clear chat history.", "error");
             }
           }
         }
@@ -200,6 +203,7 @@ export function CoachModal({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <ThemedView style={{ flex: 1, backgroundColor }}>
+        {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
           <ScreenHeader
             title="Coach"

@@ -3,13 +3,14 @@ import { ReflectionInput } from "@/components/media/ReflectionInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
+import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useToast } from "@/hooks/useToast";
 import { getSignedUrl, pickMedia, uploadAndRecordMedia } from "@/lib/mediaUpload";
 import { SessionReview } from "@/lib/workoutStorage";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -50,6 +51,7 @@ export function SessionReviewModal({
   const doneButtonTextColor = useThemeColor({}, "background");
   const accentColor = useThemeColor({}, "success");
   const tint = useThemeColor({}, "tint");
+  const { toast, showToast, hideToast } = useToast();
   const warningColor = useThemeColor({}, "warning");
   const dangerThemeColor = useThemeColor({}, "danger");
 
@@ -142,7 +144,7 @@ export function SessionReviewModal({
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not access photos";
-      Alert.alert("Media Error", msg);
+      showToast(msg, "error");
     }
   }, [mediaItems.length, workoutId, userId]);
 
@@ -174,6 +176,7 @@ export function SessionReviewModal({
           { backgroundColor, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 20 },
         ]}
       >
+        {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
         {/* Header */}
         <View style={styles.header}>
           <Pressable

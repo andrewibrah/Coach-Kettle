@@ -1,5 +1,7 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useToast } from "@/hooks/useToast";
 import {
   deleteWorkoutTemplate,
   fetchTemplateItems,
@@ -43,6 +45,7 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
   const secondaryBg = useThemeColor({}, "secondaryBackground");
   const inputBg = useThemeColor({}, "inputBackground");
 
+  const { toast, showToast, hideToast } = useToast();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -122,7 +125,7 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
               setTemplates(previousTemplates);
               setExpandedItems(previousExpandedItems);
               setExpandedId(previousExpandedId);
-              Alert.alert("Error", "Failed to delete routine. Please try again.");
+              showToast("Failed to delete routine. Please try again.", "error");
             }
           },
         },
@@ -239,6 +242,7 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
       onRequestClose={onClose}
     >
       <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill}>
+        {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
         <View style={styles.container}>
           <View style={[styles.card, { backgroundColor: cardBg }]}>
             <View style={styles.header}>
