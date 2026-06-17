@@ -21,7 +21,7 @@ Each cron job / scheduled agent picks up the **next `[ ]` feature below**, execu
 
 - [x] **F1** — Log Food: silent failure hardening *(done 2026-06-17)*
 - [x] **F2** — Nutrition Home: error banner + retry *(done 2026-06-17)*
-- [ ] **F3** — Coaching Context: error resilience (mirrors Nutrition pattern)
+- [x] **F3** — Coaching Context: error resilience *(done 2026-06-17)*
 - [ ] **F4** — History Screen: theming + loading hardening
 - [ ] **F5** — Session Review: save-path UX gap + reflection state reset
 - [ ] **F6** — Rest Timer: commit WIP + notification resilience
