@@ -35,11 +35,11 @@ export function DeleteWorkoutModal({ visible, onClose, onConfirm }: Props) {
                         </Text>
 
                         <View style={styles.buttonRow}>
-                            <Pressable onPress={onClose} style={[styles.cancelButton, { backgroundColor: buttonBg }]}>
+                            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel" style={[styles.cancelButton, { backgroundColor: buttonBg }]}>
                                 <Text style={[styles.cancelText, { color: textColor }]}>Cancel</Text>
                             </Pressable>
 
-                            <Pressable onPress={onConfirm} style={[styles.deleteButton, { backgroundColor: danger }]}>
+                            <Pressable onPress={onConfirm} accessibilityRole="button" accessibilityLabel="Confirm delete" style={[styles.deleteButton, { backgroundColor: danger }]}>
                                 <Text style={styles.deleteText}>Delete</Text>
                             </Pressable>
                         </View>

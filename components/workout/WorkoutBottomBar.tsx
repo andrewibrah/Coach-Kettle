@@ -103,6 +103,8 @@ export function WorkoutBottomBar({
       <View style={styles.bottomButtons}>
         <Pressable
           onPress={workoutActive ? handleEndWorkout : handleStartWorkout}
+          accessibilityRole="button"
+          accessibilityLabel={workoutActive ? "End workout" : "Start workout"}
           style={({ pressed }) => [
             styles.pillButton,
             { backgroundColor: textColor, borderColor: textColor },
@@ -117,6 +119,9 @@ export function WorkoutBottomBar({
 
         <Pressable
           onPress={handleSend}
+          accessibilityRole="button"
+          accessibilityLabel="Send set"
+          accessibilityState={{ disabled: disabledSend }}
           style={({ pressed }) => [
             styles.pillButton,
             { backgroundColor: textColor, borderColor: textColor },
