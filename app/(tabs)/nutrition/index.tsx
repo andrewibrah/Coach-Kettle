@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,7 +7,9 @@ import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
 import { useProfile } from '@/contexts/ProfileContext';
@@ -34,6 +36,7 @@ export default function NutritionHomeScreen() {
   const { loading, error, date, entries, totals, targets, grade, refresh, deleteEntry } = useNutrition();
   const { profile } = useProfile();
   const [deriving, setDeriving] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
 
   const isTrainingDay = useMemo(() => {
     const dow = new Date().getDay();
@@ -63,7 +66,7 @@ export default function NutritionHomeScreen() {
       await refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to derive targets';
-      Alert.alert('Setup needed', msg);
+      showToast(msg, 'error');
     } finally {
       setDeriving(false);
     }
@@ -98,6 +101,7 @@ export default function NutritionHomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Nutrition" subtitle={date} showBack={false} />
       {loading ? (
         <View style={styles.center}>

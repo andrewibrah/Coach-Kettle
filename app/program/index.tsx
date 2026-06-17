@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import { useProgram } from '@/contexts/ProgramContext';
 import { archiveProgram } from '@/lib/programming';
 
@@ -40,6 +42,7 @@ export default function ProgramHomeScreen() {
   const danger = useThemeColor({}, 'danger');
 
   const { loading, program, advance, refresh } = useProgram();
+  const { toast, showToast, hideToast } = useToast();
 
   const handleArchive = () => {
     if (!program) return;
@@ -56,7 +59,7 @@ export default function ProgramHomeScreen() {
               await archiveProgram(program.id);
               await refresh();
             } catch (e) {
-              Alert.alert('Error', e instanceof Error ? e.message : 'Failed to archive');
+              showToast(e instanceof Error ? e.message : 'Failed to archive', 'error');
             }
           },
         },
@@ -66,6 +69,7 @@ export default function ProgramHomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Program" />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
         {loading ? (

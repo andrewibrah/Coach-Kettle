@@ -2,7 +2,6 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +14,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthProvider";
 import { MediaPickerBubble, type MediaThumb } from "@/components/media/MediaPickerBubble";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useToast } from "@/hooks/useToast";
 import { api } from "@/lib/api";
 import {
   deleteMedia,
@@ -114,6 +115,7 @@ function groupByExercise(rows: WorkoutRow[]): ExerciseGroup[] {
 
 export default function WorkoutDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { toast, showToast, hideToast } = useToast();
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
   const [showReview, setShowReview] = useState(false);
   const router = useRouter();
@@ -169,12 +171,8 @@ export default function WorkoutDetail() {
 
             const resolvedCount = Object.keys(urls).length;
             if (resolvedCount === 0 && allPaths.length > 0) {
-              // Surface the error visually so we can debug
               console.warn("[WorkoutDetail] All signed URLs failed. Paths:", allPaths);
-              Alert.alert(
-                "Media Load Issue",
-                `Could not generate signed URLs for ${allPaths.length} media file(s).\n\nPath: ${allPaths[0]}\n\nThis usually means the storage bucket or RLS policies need to be set up. Run:\n  supabase db push`,
-              );
+              showToast('Could not load media. Check storage configuration.', 'error');
             }
 
             const thumbs = found.media.map((m: WorkoutMediaRecord) => ({
@@ -208,7 +206,7 @@ export default function WorkoutDetail() {
       setReflectionEditing(false);
     } catch (err) {
       console.error("[WorkoutDetail] Failed to save reflection:", err);
-      Alert.alert("Error", "Could not save reflection. Please try again.");
+      showToast('Could not save reflection. Please try again.', 'error');
     } finally {
       setReflectionSaving(false);
     }
@@ -269,7 +267,7 @@ export default function WorkoutDetail() {
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not access photos";
-      Alert.alert("Media Error", msg);
+      showToast(msg, 'error');
     }
   }, [mediaThumbs.length, userId, id]);
 
@@ -308,6 +306,7 @@ export default function WorkoutDetail() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12, backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.header}>

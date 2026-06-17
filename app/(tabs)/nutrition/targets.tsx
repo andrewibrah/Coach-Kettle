@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
 import { deriveNutritionTargets, overrideNutritionTargets } from '@/lib/nutrition';
@@ -22,6 +24,7 @@ export default function NutritionTargetsScreen() {
   const inputBg = useThemeColor({}, 'inputBackground');
 
   const { targets, refresh } = useNutrition();
+  const { toast, showToast, hideToast } = useToast();
   const [deriving, setDeriving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [trainCal, setTrainCal] = useState('');
@@ -42,7 +45,7 @@ export default function NutritionTargetsScreen() {
       await refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to derive targets';
-      Alert.alert('Setup needed', msg);
+      showToast(msg, 'error');
     } finally {
       setDeriving(false);
     }
@@ -79,7 +82,7 @@ export default function NutritionTargetsScreen() {
       setEditMode(false);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to save';
-      Alert.alert('Error', msg);
+      showToast(msg, 'error');
     } finally {
       setSaving(false);
     }
@@ -96,6 +99,7 @@ export default function NutritionTargetsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Nutrition Targets" />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
         {!targets ? (
