@@ -69,7 +69,7 @@ export default function CoachScreen() {
           {error && (
             <View style={[styles.errorBanner, { backgroundColor: dangerColor }]}>
               <ThemedText style={styles.errorText}>{error}</ThemedText>
-              <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}>
+              <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Retry">
                 <ThemedText style={styles.retryBtnText}>Retry</ThemedText>
               </Pressable>
             </View>
@@ -87,6 +87,8 @@ export default function CoachScreen() {
                   { backgroundColor: tint, marginTop: 12 },
                   pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Generate coach report"
               >
                 {regenerating ? (
                   <ActivityIndicator color={onTint} />
@@ -175,6 +177,8 @@ export default function CoachScreen() {
                     { backgroundColor: tint, flex: 1 },
                     pressed && { opacity: 0.7 },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Regenerate coach report"
                 >
                   {regenerating ? (
                     <ActivityIndicator color={onTint} />
@@ -189,6 +193,8 @@ export default function CoachScreen() {
                     { borderColor: border, flex: 1 },
                     pressed && { opacity: 0.7 },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="View past 7 days"
                 >
                   <ThemedText style={{ color: textColor, fontWeight: '600' }}>Past 7 days</ThemedText>
                 </Pressable>
