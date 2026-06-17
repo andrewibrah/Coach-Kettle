@@ -193,6 +193,8 @@ export default function BodyMetricsScreen() {
               pressed && { opacity: 0.7 },
               saving && { opacity: 0.5 },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Save body measurements"
           >
             <ThemedText type="defaultSemiBold" style={[styles.saveBtnText, { color: onTint }]}>
               {saving ? 'Saving…' : 'Save'}
@@ -217,6 +219,8 @@ export default function BodyMetricsScreen() {
                   { backgroundColor: cardBackground },
                   pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Measurements from ${e.measured_date} — long press to delete`}
               >
                 <ThemedText type="defaultSemiBold" style={styles.entryDate}>
                   {e.measured_date}

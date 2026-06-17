@@ -112,6 +112,8 @@ export default function NutritionTargetsScreen() {
                 { backgroundColor: tint },
                 pressed && { opacity: 0.7 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Derive nutrition targets from profile"
             >
               {deriving ? (
                 <ActivityIndicator color={onTint} />
@@ -176,12 +178,16 @@ export default function NutritionTargetsScreen() {
                   <Pressable
                     onPress={handleSaveOverride}
                     style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint, flex: 1 }, pressed && { opacity: 0.7 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Save nutrition targets"
                   >
                     {saving ? <ActivityIndicator color={onTint} /> : <ThemedText style={{ color: onTint, fontWeight: '700' }}>Save</ThemedText>}
                   </Pressable>
                   <Pressable
                     onPress={() => setEditMode(false)}
                     style={({ pressed }) => [styles.primaryBtn, { borderWidth: 1, borderColor: border, flex: 1 }, pressed && { opacity: 0.7 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel editing"
                   >
                     <ThemedText style={{ fontWeight: '600' }}>Cancel</ThemedText>
                   </Pressable>
@@ -191,6 +197,8 @@ export default function NutritionTargetsScreen() {
               <Pressable
                 onPress={handleOpenEdit}
                 style={({ pressed }) => [styles.secondaryBtn, { borderColor: border, marginBottom: 12 }, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Edit targets manually"
               >
                 <ThemedText style={{ fontWeight: '600' }}>Edit manually</ThemedText>
               </Pressable>
@@ -202,6 +210,8 @@ export default function NutritionTargetsScreen() {
                 { backgroundColor: tint },
                 pressed && { opacity: 0.7 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Re-derive targets from profile"
             >
               {deriving ? (
                 <ActivityIndicator color={onTint} />
