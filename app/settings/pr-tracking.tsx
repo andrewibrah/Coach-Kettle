@@ -16,8 +16,10 @@ import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { E1RMInfoTooltip } from '@/components/ui/E1RMInfoTooltip';
+import { Toast } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import {
   PRTrackedLift,
   PRLift,
@@ -47,6 +49,7 @@ export default function PRTrackingScreen() {
   const successColor = useThemeColor({}, 'success');
   const dangerColor = useThemeColor({}, 'danger');
 
+  const { toast, showToast, hideToast } = useToast();
   const [trackedLifts, setTrackedLifts] = useState<PRTrackedLift[]>([]);
   const [prLifts, setPRLifts] = useState<PRLift[]>([]);
   const [selectedLiftHistory, setSelectedLiftHistory] = useState<PRHistory[] | null>(null);
@@ -119,7 +122,7 @@ export default function PRTrackingScreen() {
       }
     } catch (error) {
       console.error('Error adding lift:', error);
-      Alert.alert('Error', 'Failed to add lift. Please try again.');
+      showToast('Failed to add lift. Please try again.', 'error');
     }
   };
 
@@ -209,7 +212,7 @@ export default function PRTrackingScreen() {
           await loadData();
         } catch (error) {
           console.error('Error setting PR:', error);
-          Alert.alert('Error', 'Failed to set PR value');
+          showToast('Failed to set PR value', 'error');
         }
       }
     }
@@ -231,7 +234,7 @@ export default function PRTrackingScreen() {
     const reps = parseInt(editReps, 10);
 
     if (!session?.user?.id || weight <= 0 || reps <= 0) {
-      Alert.alert('Invalid Input', 'Please enter valid weight and reps');
+      showToast('Please enter valid weight and reps', 'error');
       return;
     }
 
@@ -247,7 +250,7 @@ export default function PRTrackingScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Error updating PR:', error);
-      Alert.alert('Error', 'Failed to update PR');
+      showToast('Failed to update PR', 'error');
     } finally {
       setLoading(false);
     }
@@ -338,6 +341,7 @@ export default function PRTrackingScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + 20, backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}

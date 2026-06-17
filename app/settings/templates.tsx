@@ -17,8 +17,10 @@ import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import {
     WorkoutTemplate,
     WorkoutTemplateItem,
@@ -53,6 +55,7 @@ export default function TemplatesScreen() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [loadingItems, setLoadingItems] = useState<string | null>(null);
 
+    const { toast, showToast, hideToast } = useToast();
     // New template form
     const [showNewForm, setShowNewForm] = useState(false);
     const [newName, setNewName] = useState('');
@@ -189,7 +192,7 @@ export default function TemplatesScreen() {
         } catch (error) {
             console.error('[Templates] Error creating:', error);
             setTemplates((prev) => prev.filter((t) => t.id !== tempId));
-            Alert.alert('Error', 'Failed to create template');
+            showToast('Failed to create template', 'error');
         }
     };
 
@@ -226,7 +229,7 @@ export default function TemplatesScreen() {
                             setTemplates(previousTemplates);
                             setExpandedItems(previousExpandedItems);
                             setExpandedId(previousExpandedId);
-                            Alert.alert('Error', 'Failed to delete template');
+                            showToast('Failed to delete template', 'error');
                         }
                     },
                 },
@@ -309,7 +312,7 @@ export default function TemplatesScreen() {
             setNewExerciseSets(formSnapshot.sets);
             setNewExerciseReps(formSnapshot.reps);
             setNewExerciseWeight(formSnapshot.weight);
-            Alert.alert('Error', 'Failed to add exercise');
+            showToast('Failed to add exercise', 'error');
         }
     };
 
@@ -341,7 +344,7 @@ export default function TemplatesScreen() {
                                 ...prev,
                                 [templateId]: previousTemplateItems,
                             }));
-                            Alert.alert('Error', 'Failed to remove exercise');
+                            showToast('Failed to remove exercise', 'error');
                         }
                     },
                 },
@@ -383,7 +386,7 @@ export default function TemplatesScreen() {
             setEditingItemId(null);
         } catch (error) {
             console.error('[Templates] Error updating exercise:', error);
-            Alert.alert('Error', 'Failed to update exercise');
+            showToast('Failed to update exercise', 'error');
         }
     };
 
@@ -454,6 +457,7 @@ export default function TemplatesScreen() {
 
     return (
         <ThemedView style={[styles.container, { backgroundColor }]}>
+            {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
             <ScreenHeader
                 title="Templates"
                 rightElement={
