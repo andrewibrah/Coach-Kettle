@@ -45,6 +45,8 @@ export function MenuModal({
         <Pressable
             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
             onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={label}
         >
             <Text style={[styles.buttonText, { color: textColor }]}>{label}</Text>
         </Pressable>
@@ -58,7 +60,7 @@ export function MenuModal({
             onRequestClose={onClose}
         >
             <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill}>
-                <Pressable style={styles.container} onPress={onClose}>
+                <Pressable style={styles.container} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu">
                     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
                         <View style={styles.content}>
                             {item("Ask Coach", () => { onClose(); onOpenCoach(); })}

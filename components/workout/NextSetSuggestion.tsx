@@ -84,6 +84,8 @@ export function NextSetSuggestionPill({ exercise, onUseWeight, compact = true }:
         <Pressable
           onPress={() => onUseWeight(weight)}
           style={({ pressed }) => [styles.useBtn, pressed && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Use suggested weight ${Math.round(weight)} lbs`}
         >
           <ThemedText style={[styles.useText, { color: tint }]}>Use</ThemedText>
         </Pressable>

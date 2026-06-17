@@ -60,7 +60,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                     <Pressable style={[styles.modalContent, { backgroundColor }]} onPress={(e) => e.stopPropagation()}>
                         <View style={styles.header}>
                             <ThemedText type="subtitle">Edit Set</ThemedText>
-                            <Pressable onPress={handleSave} hitSlop={10}>
+                            <Pressable onPress={handleSave} hitSlop={10} accessibilityRole="button" accessibilityLabel="Done">
                                 <ThemedText style={[styles.doneButton, { color: tint }]}>Done</ThemedText>
                             </Pressable>
                         </View>
