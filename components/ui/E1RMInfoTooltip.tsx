@@ -19,7 +19,7 @@ export function E1RMInfoTooltip({ style }: E1RMInfoTooltipProps) {
 
   return (
     <>
-      <Pressable onPress={() => setVisible(true)} style={style}>
+      <Pressable onPress={() => setVisible(true)} style={style} accessibilityRole="button" accessibilityLabel="About E1RM estimate">
         <IconSymbol name="info.circle" size={18} color={tint} />
       </Pressable>
 
@@ -34,7 +34,7 @@ export function E1RMInfoTooltip({ style }: E1RMInfoTooltipProps) {
           tint={colorScheme === 'dark' ? 'dark' : 'light'}
           style={styles.blurContainer}
         >
-          <Pressable style={styles.overlay} onPress={() => setVisible(false)} />
+          <Pressable style={styles.overlay} onPress={() => setVisible(false)} accessibilityRole="button" accessibilityLabel="Close" />
 
           <View style={[styles.content, { backgroundColor: cardBackground }]}>
             <ThemedText type="subtitle" style={styles.title}>
@@ -52,6 +52,8 @@ export function E1RMInfoTooltip({ style }: E1RMInfoTooltipProps) {
             <Pressable
               onPress={() => setVisible(false)}
               style={[styles.button, { backgroundColor: tint }]}
+              accessibilityRole="button"
+              accessibilityLabel="Got it"
             >
               <ThemedText style={[styles.buttonText, { color: onTint }]}>Got it</ThemedText>
             </Pressable>

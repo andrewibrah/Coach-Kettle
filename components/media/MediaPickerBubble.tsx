@@ -95,6 +95,8 @@ export function MediaPickerBubble({
                   { borderColor },
                   pressed && !item.uploading && styles.thumbPressed,
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={item.uploading ? 'Uploading media' : `View ${item.mediaType}`}
               >
                 {item.uploading ? (
                   <View style={styles.uploadingOverlay}>
@@ -131,6 +133,8 @@ export function MediaPickerBubble({
                     pressed && { backgroundColor: dangerColor },
                   ]}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove media"
                 >
                   <Text style={styles.removeBtnText}>✕</Text>
                 </Pressable>
@@ -147,6 +151,8 @@ export function MediaPickerBubble({
               { borderColor },
               pressed && styles.addBtnPressed,
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Add media"
           >
             <Text style={[styles.addBtnIcon, { color: mutedColor }]}>+</Text>
             <Text style={[styles.addBtnLabel, { color: mutedColor }]}>

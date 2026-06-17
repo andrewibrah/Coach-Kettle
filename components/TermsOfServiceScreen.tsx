@@ -88,6 +88,9 @@ export function TermsOfServiceScreen() {
                         activeDoc === 'terms' && { backgroundColor: primaryColor },
                     ]}
                     onPress={() => setActiveDoc('terms')}
+                    accessibilityRole="tab"
+                    accessibilityLabel="Terms of Service"
+                    accessibilityState={{ selected: activeDoc === 'terms' }}
                 >
                     <ThemedText style={[
                         styles.tabText,
@@ -102,6 +105,9 @@ export function TermsOfServiceScreen() {
                         activeDoc === 'privacy' && { backgroundColor: primaryColor },
                     ]}
                     onPress={() => setActiveDoc('privacy')}
+                    accessibilityRole="tab"
+                    accessibilityLabel="Privacy Policy"
+                    accessibilityState={{ selected: activeDoc === 'privacy' }}
                 >
                     <ThemedText style={[
                         styles.tabText,
@@ -128,6 +134,9 @@ export function TermsOfServiceScreen() {
                     ]}
                     onPress={handleAccept}
                     disabled={isAccepting}
+                    accessibilityRole="button"
+                    accessibilityLabel={isAccepting ? 'Accepting...' : 'Accept and continue'}
+                    accessibilityState={{ disabled: isAccepting }}
                 >
                     {isAccepting ? (
                         <ActivityIndicator color={onTint} />
@@ -140,6 +149,8 @@ export function TermsOfServiceScreen() {
                     style={({ pressed }) => [styles.declineButton, pressed && styles.buttonPressed]}
                     onPress={handleDecline}
                     disabled={isAccepting}
+                    accessibilityRole="button"
+                    accessibilityLabel="Decline"
                 >
                     <ThemedText style={styles.declineText}>Decline</ThemedText>
                 </Pressable>
