@@ -7,7 +7,7 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 import { accentColor as themeAccent } from "@/constants/theme";
 import { getSignedUrl, pickMedia, uploadAndRecordMedia } from "@/lib/mediaUpload";
 import { SessionReview } from "@/lib/workoutStorage";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -59,6 +59,16 @@ export function SessionReviewModal({
   const [reflection, setReflection] = useState("");
   const [mediaItems, setMediaItems] = useState<MediaThumb[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Reset internal state when modal closes so next session starts clean.
+  const prevVisible = useRef(visible);
+  useEffect(() => {
+    if (prevVisible.current && !visible) {
+      setReflection('');
+      setMediaItems([]);
+    }
+    prevVisible.current = visible;
+  }, [visible]);
 
   const getRatingColor = (rating: number) => {
     if (rating >= 8) return "#10B981"; // Green
@@ -285,7 +295,7 @@ export function SessionReviewModal({
           ) : (
             <View style={styles.errorContainer}>
               <ThemedText style={styles.errorText}>
-                Could not generate review. Your workout has been saved.
+                Workout saved. The AI review couldn't be generated — tap Close to continue.
               </ThemedText>
 
               {/* Still show media + reflection even without AI review */}
