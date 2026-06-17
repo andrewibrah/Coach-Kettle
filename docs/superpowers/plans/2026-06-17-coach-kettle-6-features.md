@@ -22,9 +22,9 @@ Each cron job / scheduled agent picks up the **next `[ ]` feature below**, execu
 - [x] **F1** — Log Food: silent failure hardening *(done 2026-06-17)*
 - [x] **F2** — Nutrition Home: error banner + retry *(done 2026-06-17)*
 - [x] **F3** — Coaching Context: error resilience *(done 2026-06-17)*
-- [ ] **F4** — History Screen: theming + loading hardening
-- [ ] **F5** — Session Review: save-path UX gap + reflection state reset
-- [ ] **F6** — Rest Timer: commit WIP + notification resilience
+- [x] **F4** — History Screen: theming + loading hardening *(done 2026-06-17)*
+- [x] **F5** — Session Review: save-path UX gap + reflection state reset *(done 2026-06-17)*
+- [x] **F6** — Rest Timer: commit WIP + notification resilience *(done 2026-06-17 — already wired)*
 
 ## Global Constraints
 
