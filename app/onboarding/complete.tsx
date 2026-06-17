@@ -1,9 +1,9 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
-import { Colors } from '@/constants/theme';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -21,6 +21,8 @@ export default function CompleteScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'onTint');
   const { batchSaveAndComplete } = useOnboarding();
 
   const [saving, setSaving] = useState(true);
@@ -77,7 +79,7 @@ export default function CompleteScreen() {
     return (
       <ThemedView style={styles.container}>
         <View style={[styles.centered, { paddingBottom: insets.bottom }]}>
-          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+          <ActivityIndicator size="large" color={tint} />
           <ThemedText style={[styles.loadingText, { color: isDark ? '#999' : '#666' }]}>
             Saving your profile...
           </ThemedText>
@@ -101,11 +103,11 @@ export default function CompleteScreen() {
           </ThemedText>
 
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+            style={[styles.button, { backgroundColor: tint }]}
             onPress={handleRetry}
             activeOpacity={0.8}
           >
-            <ThemedText style={[styles.buttonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Try Again</ThemedText>
+            <ThemedText style={[styles.buttonText, { color: onTint }]}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       </ThemedView>
@@ -119,11 +121,11 @@ export default function CompleteScreen() {
         <Animated.View
           style={[
             styles.iconCircle,
-            { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+            { backgroundColor: tint },
             checkAnimatedStyle,
           ]}
         >
-          <IconSymbol name="checkmark" size={32} color={Colors[colorScheme ?? 'light'].tintForeground} />
+          <IconSymbol name="checkmark" size={32} color={onTint} />
         </Animated.View>
 
         <Animated.View entering={FadeIn.duration(400).delay(400)} style={styles.textContainer}>
@@ -135,11 +137,11 @@ export default function CompleteScreen() {
 
         <Animated.View entering={FadeIn.duration(400).delay(600)} style={styles.buttonWrapper}>
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+            style={[styles.button, { backgroundColor: tint }]}
             onPress={handleContinue}
             activeOpacity={0.8}
           >
-            <ThemedText style={[styles.buttonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Continue</ThemedText>
+            <ThemedText style={[styles.buttonText, { color: onTint }]}>Continue</ThemedText>
           </TouchableOpacity>
         </Animated.View>
       </View>
