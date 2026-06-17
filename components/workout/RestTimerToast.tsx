@@ -5,7 +5,7 @@
 
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
+import { useRouter, usePathname, type Href } from 'expo-router';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -15,6 +15,7 @@ import { useSharedRestTimer } from '@/contexts/RestTimerContext';
 import { formatTime } from '@/lib/restTimer';
 
 const AUTO_DISMISS_MS = 6000;
+const TIMER_ROUTE = '/timer' as Href;
 
 export function RestTimerToast() {
   const { state, remainingSec, pause, resume, skip, cancel } = useSharedRestTimer();
@@ -55,7 +56,7 @@ export function RestTimerToast() {
   }, [state.kind]);
 
   // Hide the overlay entirely while the user is already on the Timer tab.
-  const onTimerScreen = pathname?.startsWith('/timer');
+  const onTimerScreen = pathname?.endsWith('/timer');
   if (onTimerScreen) return null;
 
   // ── Idle: nothing to show ─────────────────────────────────────────────────
@@ -69,7 +70,7 @@ export function RestTimerToast() {
     return (
       <View pointerEvents="box-none" style={[styles.wrap, { top: topInset + 8 }]}>
         <Pressable
-          onPress={() => router.push('/timer')}
+          onPress={() => router.push(TIMER_ROUTE)}
           style={[styles.chip, { backgroundColor: cardBg, borderColor }]}
         >
           <View style={[styles.chipBar, { backgroundColor: borderColor }]}>
@@ -131,7 +132,7 @@ export function RestTimerToast() {
       <Pressable
         onPress={() => {
           setDoneVisible(false);
-          router.push('/timer');
+          router.push(TIMER_ROUTE);
         }}
         style={[styles.card, { backgroundColor: cardBg, borderColor }]}
       >

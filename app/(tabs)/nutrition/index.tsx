@@ -31,7 +31,7 @@ export default function NutritionHomeScreen() {
   const successColor = useThemeColor({}, 'success');
   const warningColor = useThemeColor({}, 'warning');
 
-  const { loading, date, entries, totals, targets, grade, refresh, deleteEntry } = useNutrition();
+  const { loading, error, date, entries, totals, targets, grade, refresh, deleteEntry } = useNutrition();
   const { profile } = useProfile();
   const [deriving, setDeriving] = useState(false);
 
@@ -105,6 +105,14 @@ export default function NutritionHomeScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
+          {error && (
+            <View style={[styles.errorBanner, { backgroundColor: dangerColor }]}>
+              <ThemedText style={styles.errorBannerText}>{error}</ThemedText>
+              <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}>
+                <ThemedText style={styles.retryBtnText}>Retry</ThemedText>
+              </Pressable>
+            </View>
+          )}
           {/* Today's totals */}
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
             <ThemedText type="subtitle" style={{ marginBottom: 12 }}>Today&apos;s totals</ThemedText>
@@ -248,5 +256,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  errorBanner: {
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  errorBannerText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  retryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  retryBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

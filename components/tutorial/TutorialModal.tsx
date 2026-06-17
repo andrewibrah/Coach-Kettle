@@ -93,7 +93,7 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
       : undefined;
 
     return (
-      <Animated.View entering={FadeIn.duration(300)} style={{ width }}>
+      <Animated.View entering={FadeIn.duration(300)} style={{ width, height: '100%' }}>
         <TutorialSlide
           title={item.title}
           subtitle={item.subtitle}

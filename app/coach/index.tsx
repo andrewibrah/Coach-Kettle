@@ -38,7 +38,9 @@ export default function CoachScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
 
-  const { loading, today, regenerateToday } = useCoaching();
+  const dangerColor = useThemeColor({}, 'danger');
+
+  const { loading, error, today, refresh, regenerateToday } = useCoaching();
   const [regenerating, setRegenerating] = useState(false);
 
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -64,6 +66,14 @@ export default function CoachScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
+          {error && (
+            <View style={[styles.errorBanner, { backgroundColor: dangerColor }]}>
+              <ThemedText style={styles.errorText}>{error}</ThemedText>
+              <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}>
+                <ThemedText style={styles.retryBtnText}>Retry</ThemedText>
+              </Pressable>
+            </View>
+          )}
           {!today ? (
             <View style={[styles.card, { backgroundColor: cardBackground }]}>
               <ThemedText type="subtitle" style={{ marginBottom: 6 }}>No data yet</ThemedText>
@@ -230,5 +240,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+  },
+  errorBanner: {
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  errorText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  retryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  retryBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

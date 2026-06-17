@@ -19,13 +19,11 @@ export function TutorialSlide({
   body,
   placeholder,
 }: TutorialSlideProps) {
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const tintColor = useThemeColor({}, 'tint');
 
   const hasMedia = !!placeholder;
-  // Focused media region anchored to the lower part of the screen.
-  const mediaHeight = height * 0.48;
 
   return (
     <View style={[styles.slide, { width }]}>
@@ -44,7 +42,7 @@ export function TutorialSlide({
       </View>
 
       {hasMedia && (
-        <View style={[styles.mediaArea, { height: mediaHeight }]}>
+        <View style={styles.mediaArea}>
           {placeholder}
         </View>
       )}
@@ -65,10 +63,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   mediaArea: {
+    flex: 1,
     width: "100%",
     alignItems: "center",
-    justifyContent: "flex-end",
-    paddingBottom: 8,
+    justifyContent: "center",
+    paddingVertical: 16,
   },
   title: {
     fontSize: 24,

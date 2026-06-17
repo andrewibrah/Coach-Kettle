@@ -65,6 +65,7 @@ function computeGrade(
 
 interface NutritionContextValue {
   loading: boolean;
+  error: string | null;
   date: string;                       // YYYY-MM-DD
   entries: FoodLogEntry[];
   totals: DailyTotals | null;
@@ -80,6 +81,7 @@ interface NutritionContextValue {
 
 const NutritionContext = createContext<NutritionContextValue>({
   loading: true,
+  error: null,
   date: new Date().toISOString().slice(0, 10),
   entries: [],
   totals: null,
@@ -105,6 +107,7 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   const userId = session?.user?.id ?? null;
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [date, setDate] = useState<string>(todayIso());
   const [entries, setEntries] = useState<FoodLogEntry[]>([]);
   const [totals, setTotals] = useState<DailyTotals | null>(null);
@@ -121,6 +124,7 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     if (!userId) {
       if (isMounted.current) {
+        setError(null);
         setEntries([]); setTotals(null); setTargets(null); setMealPlan({ plan: null, meals: [] }); setRecentFoods([]);
         setLoading(false);
       }
@@ -129,6 +133,7 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
     const currentDate = todayIso();
     if (isMounted.current) {
       setLoading(true);
+      setError(null);
       setDate(currentDate);
     }
     try {
@@ -142,12 +147,42 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
       if (dayRes.status === 'fulfilled') {
         setEntries(dayRes.value.entries ?? []);
         setTotals(dayRes.value.totals ?? null);
+      } else {
+        setEntries([]);
+        setTotals(null);
       }
-      if (tgtRes.status === 'fulfilled') setTargets(tgtRes.value.targets);
-      if (planRes.status === 'fulfilled') setMealPlan({ plan: planRes.value.plan, meals: planRes.value.meals });
-      if (recentRes.status === 'fulfilled') setRecentFoods(recentRes.value.foods ?? []);
+      if (tgtRes.status === 'fulfilled') {
+        setTargets(tgtRes.value.targets);
+      } else {
+        setTargets(null);
+      }
+      if (planRes.status === 'fulfilled') {
+        setMealPlan({ plan: planRes.value.plan, meals: planRes.value.meals });
+      } else {
+        setMealPlan({ plan: null, meals: [] });
+      }
+      if (recentRes.status === 'fulfilled') {
+        setRecentFoods(recentRes.value.foods ?? []);
+      } else {
+        setRecentFoods([]);
+      }
+
+      const failures = [dayRes, tgtRes, planRes, recentRes].filter((res) => res.status === 'rejected');
+      if (failures.length > 0) {
+        setError(failures.length === 1
+          ? 'Some nutrition data could not be refreshed. Pull to retry or try again in a moment.'
+          : 'Nutrition data loaded partially. Pull to retry or try again in a moment.');
+      }
     } catch (e) {
       console.warn('[NutritionContext] refresh error', e);
+      if (isMounted.current) {
+        setEntries([]);
+        setTotals(null);
+        setTargets(null);
+        setMealPlan({ plan: null, meals: [] });
+        setRecentFoods([]);
+        setError('Nutrition data could not be loaded. Please try again.');
+      }
     } finally {
       if (isMounted.current) setLoading(false);
     }
@@ -193,8 +228,8 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<NutritionContextValue>(() => ({
-    loading, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods,
-  }), [loading, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods]);
+    loading, error, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods,
+  }), [loading, error, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods]);
 
   return <NutritionContext.Provider value={value}>{children}</NutritionContext.Provider>;
 }

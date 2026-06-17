@@ -36,6 +36,7 @@ export default function LogFoodScreen() {
   const [servings, setServings] = useState('1');
   const [mealSlot, setMealSlot] = useState<MealSlot>('breakfast');
   const [submitting, setSubmitting] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
 
   // Quick log fields
   const [quickName, setQuickName] = useState('');
@@ -80,6 +81,7 @@ export default function LogFoodScreen() {
     if (!selected || submitting) return;
     const s = parseFloat(servings) || 1;
     setSubmitting(true);
+    setLogError(null);
     try {
       await logFood({
         date: today,
@@ -97,6 +99,7 @@ export default function LogFoodScreen() {
       router.back();
     } catch (e) {
       console.warn('[nutrition] log failed', e);
+      setLogError('Failed to log food. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -211,6 +214,7 @@ export default function LogFoodScreen() {
                       setMealSlot(food.meal_slot);
                       setResults([]);
                       setQuery('');
+                      setLogError(null);
                     }}
                     style={({ pressed }) => [
                       styles.recentPill,
@@ -255,7 +259,7 @@ export default function LogFoodScreen() {
               {results.map((item) => (
                 <Pressable
                   key={item.id}
-                  onPress={() => { setSelected(item); setResults([]); setQuery(''); }}
+                  onPress={() => { setSelected(item); setResults([]); setQuery(''); setLogError(null); }}
                   style={({ pressed }) => [
                     styles.resultRow,
                     { borderColor: border },
@@ -315,6 +319,11 @@ export default function LogFoodScreen() {
                 <ThemedText style={{ color: onTint, fontWeight: '700' }}>Log</ThemedText>
               )}
             </Pressable>
+            {logError && (
+              <ThemedText style={{ color: dangerColor, fontSize: 13, marginTop: 8, textAlign: 'center' }}>
+                {logError}
+              </ThemedText>
+            )}
           </View>
         )}
 

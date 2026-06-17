@@ -13,6 +13,7 @@ import type { DailyFeedback, BehaviorState } from '@/types/coaching';
 
 interface CoachingContextValue {
   loading: boolean;
+  error: string | null;
   today: DailyFeedback | null;
   recent: DailyFeedback[];
   state: BehaviorState | null;
@@ -22,6 +23,7 @@ interface CoachingContextValue {
 
 const CoachingContext = createContext<CoachingContextValue>({
   loading: true,
+  error: null,
   today: null,
   recent: [],
   state: null,
@@ -36,6 +38,7 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
   const userId = session?.user?.id ?? null;
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [today, setToday] = useState<DailyFeedback | null>(null);
   const [recent, setRecent] = useState<DailyFeedback[]>([]);
   const [state, setState] = useState<BehaviorState | null>(null);
@@ -45,10 +48,10 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!userId) {
-      if (isMounted.current) { setToday(null); setRecent([]); setState(null); setLoading(false); }
+      if (isMounted.current) { setError(null); setToday(null); setRecent([]); setState(null); setLoading(false); }
       return;
     }
-    if (isMounted.current) setLoading(true);
+    if (isMounted.current) { setLoading(true); setError(null); }
     try {
       const [t, r, s] = await Promise.allSettled([
         fetchTodayFeedback(),
@@ -59,8 +62,16 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
       if (t.status === 'fulfilled') setToday(t.value);
       if (r.status === 'fulfilled') setRecent(r.value);
       if (s.status === 'fulfilled') setState(s.value);
+      const failures = [t, r, s].filter(res => res.status === 'rejected');
+      if (failures.length > 0) {
+        setError('Coach data could not be fully loaded. Pull to retry.');
+      }
     } catch (e) {
       console.warn('[CoachingContext] refresh error', e);
+      if (isMounted.current) {
+        setToday(null); setRecent([]); setState(null);
+        setError('Coach data could not be loaded. Please try again.');
+      }
     } finally {
       if (isMounted.current) setLoading(false);
     }
@@ -79,8 +90,8 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
   }, [userId]);
 
   const value = useMemo<CoachingContextValue>(() => ({
-    loading, today, recent, state, refresh, regenerateToday,
-  }), [loading, today, recent, state, refresh, regenerateToday]);
+    loading, error, today, recent, state, refresh, regenerateToday,
+  }), [loading, error, today, recent, state, refresh, regenerateToday]);
 
   return <CoachingContext.Provider value={value}>{children}</CoachingContext.Provider>;
 }
