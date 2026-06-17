@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useThemeColor } from "@/hooks/useThemeColor";
 
 type Props = {
   visible: boolean;
@@ -27,6 +28,8 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 export function ImageViewerModal({ visible, uri, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const dangerColor = useThemeColor({}, "danger");
+  const placeholderColor = useThemeColor({}, "placeholder");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -64,9 +67,9 @@ export function ImageViewerModal({ visible, uri, onClose }: Props) {
         {/* Error message */}
         {error && (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorIcon}>!</Text>
+            <Text style={[styles.errorIcon, { color: dangerColor }]}>!</Text>
             <Text style={styles.errorText}>Failed to load image</Text>
-            <Text style={styles.errorSubtext}>
+            <Text style={[styles.errorSubtext, { color: placeholderColor }]}>
               The signed URL may have expired.{"\n"}Try closing and reopening this workout.
             </Text>
           </View>
@@ -121,7 +124,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   errorIcon: {
-    color: "#EF4444",
     fontSize: 40,
     fontWeight: "700",
   },
@@ -131,7 +133,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   errorSubtext: {
-    color: "#9CA3AF",
     fontSize: 14,
     textAlign: "center",
     lineHeight: 20,

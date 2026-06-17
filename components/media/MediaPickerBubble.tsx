@@ -111,7 +111,7 @@ export function MediaPickerBubble({
                   />
                 ) : (
                   <View style={styles.brokenOverlay}>
-                    <Text style={styles.brokenIcon}>!</Text>
+                    <Text style={[styles.brokenIcon, { color: mutedColor }]}>!</Text>
                   </View>
                 )}
                 {item.mediaType === "video" && !item.uploading && (
@@ -232,7 +232,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   brokenIcon: {
-    color: "#9CA3AF",
     fontSize: 20,
     fontWeight: "700",
   },
