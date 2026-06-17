@@ -35,7 +35,7 @@ export default function SubscriptionScreen() {
     email: session?.user?.email,
     onPurchaseSuccess: refreshEntitlement,
   });
-  const sectionTitleColor = '#8E8E93';
+  const sectionTitleColor = useThemeColor({}, 'placeholder');
   const { toast, showToast, hideToast } = useToast();
 
   const formatDate = (iso: string | null): string => {
@@ -313,7 +313,6 @@ const styles = StyleSheet.create({
   upgradeText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#fff',
   },
   actionRow: {
     flexDirection: 'row',

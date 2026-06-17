@@ -89,6 +89,7 @@ export default function HomeScreen() {
   const compact = width < 380;
   const backgroundColor = useThemeColor({}, 'background');
   const successColor = useThemeColor({}, 'success');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const scrollRef = useRef<FlatList<LogRow> | null>(null);
 
@@ -1264,7 +1265,7 @@ export default function HomeScreen() {
         {draftRestoredToast && (
           <View style={styles.draftRestoredToast} pointerEvents="none">
             <View style={[styles.draftRestoredBadge, { backgroundColor: successColor }]}>
-              <Text style={styles.draftRestoredText}>Session resumed</Text>
+              <Text style={[styles.draftRestoredText, { color: onTint }]}>Session resumed</Text>
             </View>
           </View>
         )}
@@ -1384,7 +1385,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   draftRestoredText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },

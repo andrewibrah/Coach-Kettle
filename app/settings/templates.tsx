@@ -691,7 +691,7 @@ export default function TemplatesScreen() {
                                                                                 accessibilityRole="button"
                                                                                 accessibilityLabel={`Delete ${item.lift_name}`}
                                                                             >
-                                                                                <ThemedText style={styles.editActionText}>Delete</ThemedText>
+                                                                                <ThemedText style={[styles.editActionText, { color: onTint }]}>Delete</ThemedText>
                                                                             </Pressable>
                                                                             <View style={styles.editActionsRight}>
                                                                                 <Pressable
@@ -968,7 +968,6 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     confirmButtonText: {
-        color: '#fff',
         fontWeight: '600',
     },
     disabledButton: {
@@ -1086,7 +1085,6 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     editActionText: {
-        color: '#fff',
         fontSize: 13,
         fontWeight: '600',
     },

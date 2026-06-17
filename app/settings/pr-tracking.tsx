@@ -732,7 +732,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   confirmButtonText: {
-    color: '#fff',
     fontWeight: '600',
   },
   emptyCard: {

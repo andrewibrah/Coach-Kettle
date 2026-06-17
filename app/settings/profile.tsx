@@ -499,9 +499,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  unitTextActive: {
-    color: '#fff',
-  },
+  unitTextActive: {},
   focusOption: {
     flexDirection: 'row',
     alignItems: 'center',

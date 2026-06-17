@@ -376,7 +376,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveBadgeText: {
-    color: '#fff',
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -411,7 +410,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   subscribeButtonText: {
-    color: '#fff',
     fontSize: 17,
     fontWeight: '700',
   },
