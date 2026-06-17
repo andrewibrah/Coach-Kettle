@@ -8,7 +8,7 @@ import {
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -20,7 +20,7 @@ const CURRENT_STEP = 7;
 
 export default function PRValuesScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
+  const secondaryBg = useThemeColor({}, 'secondaryBackground');
   const { draft, updateDraft } = useOnboarding();
 
   // Get tracked lifts from draft
@@ -161,7 +161,7 @@ export default function PRValuesScreen() {
           <View
             style={[
               styles.e1rmPreview,
-              { backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5' },
+              { backgroundColor: secondaryBg },
             ]}
           >
             <ThemedText style={styles.e1rmLabel}>Estimated 1RM</ThemedText>

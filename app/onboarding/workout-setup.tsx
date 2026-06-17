@@ -8,9 +8,8 @@ import {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
-import { Colors } from '@/constants/theme';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -31,7 +30,12 @@ interface WorkoutLift {
 
 export default function WorkoutSetupScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'onTint');
+  const secondaryBg = useThemeColor({}, 'secondaryBackground');
+  const inputBg = useThemeColor({}, 'inputBackground');
+  const textColor = useThemeColor({}, 'text');
+  const placeholder = useThemeColor({}, 'placeholder');
   const { draft, updateDraft } = useOnboarding();
 
   const [step, setStep] = useState<Step>('initial');
@@ -148,16 +152,16 @@ export default function WorkoutSetupScreen() {
 
           <View style={styles.choiceButtons}>
             <TouchableOpacity
-              style={[styles.choiceButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+              style={[styles.choiceButton, { backgroundColor: tint }]}
               onPress={handleYes}
             >
-              <ThemedText style={[styles.choiceButtonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Yes, let&apos;s set them up</ThemedText>
+              <ThemedText style={[styles.choiceButtonText, { color: onTint }]}>Yes, let&apos;s set them up</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.choiceButton,
-                { backgroundColor: colorScheme === 'dark' ? '#333' : '#e0e0e0' },
+                { backgroundColor: inputBg },
               ]}
               onPress={handleNo}
             >
@@ -218,8 +222,8 @@ export default function WorkoutSetupScreen() {
           <View style={styles.questionWithBadge}>
             <QuizQuestion question={`Add lifts to "${workoutName}"`} subtitle="Build your workout one exercise at a time" />
             {lifts.length > 0 && (
-              <View style={[styles.countBadge, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}>
-                <ThemedText style={[styles.countBadgeText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>{lifts.length}</ThemedText>
+              <View style={[styles.countBadge, { backgroundColor: tint }]}>
+                <ThemedText style={[styles.countBadgeText, { color: onTint }]}>{lifts.length}</ThemedText>
               </View>
             )}
           </View>
@@ -253,23 +257,23 @@ export default function WorkoutSetupScreen() {
                 <TouchableOpacity
                   style={[
                     styles.addLiftButton,
-                    { backgroundColor: colorScheme === 'dark' ? '#444' : '#ccc' },
+                    { backgroundColor: inputBg },
                   ]}
                   onPress={handleCancelEdit}
                 >
-                  <IconSymbol name="xmark" size={20} color={colorScheme === 'dark' ? '#fff' : '#333'} />
+                  <IconSymbol name="xmark" size={20} color={textColor} />
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity
                 style={[
                   styles.addLiftButton,
-                  { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+                  { backgroundColor: tint },
                   !currentLift.name.trim() && styles.addLiftButtonDisabled,
                 ]}
                 onPress={handleAddLift}
                 disabled={!currentLift.name.trim()}
               >
-                <IconSymbol name={editingIndex !== null ? "checkmark" : "plus"} size={20} color={Colors[colorScheme ?? 'light'].tintForeground} />
+                <IconSymbol name={editingIndex !== null ? "checkmark" : "plus"} size={20} color={onTint} />
               </TouchableOpacity>
             </View>
           </View>
@@ -292,8 +296,8 @@ export default function WorkoutSetupScreen() {
                     onPress={() => handleEditLift(index)}
                     style={[
                       styles.liftItem,
-                      { backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5' },
-                      editingIndex === index && { borderColor: Colors[colorScheme ?? 'light'].tint, borderWidth: 2 },
+                      { backgroundColor: secondaryBg },
+                      editingIndex === index && { borderColor: tint, borderWidth: 2 },
                     ]}
                   >
                     <View style={styles.liftInfo}>
@@ -316,7 +320,7 @@ export default function WorkoutSetupScreen() {
                       <IconSymbol
                         name="xmark.circle.fill"
                         size={22}
-                        color={colorScheme === 'dark' ? '#666' : '#999'}
+                        color={placeholder}
                       />
                     </TouchableOpacity>
                   </TouchableOpacity>
@@ -345,10 +349,10 @@ export default function WorkoutSetupScreen() {
               key={`${workout.name}-${index}`}
               style={[
                 styles.savedItem,
-                { backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5' },
+                { backgroundColor: secondaryBg },
               ]}
             >
-              <IconSymbol name="checkmark.circle.fill" size={20} color={Colors[colorScheme ?? 'light'].tint} />
+              <IconSymbol name="checkmark.circle.fill" size={20} color={tint} />
               <ThemedText style={styles.savedName}>{workout.name}</ThemedText>
             </View>
           ))}
@@ -356,16 +360,16 @@ export default function WorkoutSetupScreen() {
 
         <View style={styles.choiceButtons}>
           <TouchableOpacity
-            style={[styles.choiceButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+            style={[styles.choiceButton, { backgroundColor: tint }]}
             onPress={handleAddAnother}
           >
-            <ThemedText style={[styles.choiceButtonText, { color: Colors[colorScheme ?? 'light'].tintForeground }]}>Add another workout</ThemedText>
+            <ThemedText style={[styles.choiceButtonText, { color: onTint }]}>Add another workout</ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
               styles.choiceButton,
-              { backgroundColor: colorScheme === 'dark' ? '#333' : '#e0e0e0' },
+              { backgroundColor: inputBg },
             ]}
             onPress={finishOnboarding}
           >
@@ -394,7 +398,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   choiceButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -491,7 +494,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   countBadgeText: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '700',
   },

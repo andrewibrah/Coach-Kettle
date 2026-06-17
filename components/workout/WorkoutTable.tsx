@@ -79,6 +79,9 @@ export function WorkoutTable({
   onIncrementSet,
   onEditSet,
 }: Props) {
+  const successColor = useThemeColor({}, 'success');
+  const dangerColor = useThemeColor({}, 'danger');
+
   const openRowMenu = useCallback(
     (rowId: string) => {
       const actions: { text: string; onPress?: () => void; style?: "default" | "cancel" | "destructive" }[] = [
@@ -160,13 +163,13 @@ export function WorkoutTable({
           <View style={styles.swipeActions}>
             <Pressable
               onPress={() => onDuplicateRow(item.id)}
-              style={({ pressed }) => [styles.swipeButton, styles.swipeDuplicate, pressed && styles.swipePressed]}
+              style={({ pressed }) => [styles.swipeButton, { backgroundColor: successColor }, pressed && styles.swipePressed]}
             >
               <ThemedText style={styles.swipeText}>Duplicate</ThemedText>
             </Pressable>
             <Pressable
               onPress={() => onDeleteRow(item.id)}
-              style={({ pressed }) => [styles.swipeButton, styles.swipeDelete, pressed && styles.swipePressed]}
+              style={({ pressed }) => [styles.swipeButton, { backgroundColor: dangerColor }, pressed && styles.swipePressed]}
             >
               <ThemedText style={styles.swipeText}>Delete</ThemedText>
             </Pressable>
@@ -202,7 +205,7 @@ export function WorkoutTable({
         </Swipeable>
       );
     },
-    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle]
+    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle, successColor, dangerColor]
   );
 
   const handleScrollToIndexFailed = useCallback(
@@ -269,12 +272,6 @@ const styles = StyleSheet.create({
     minWidth: 80,
     borderRadius: 16,
     marginLeft: 8,
-  },
-  swipeDuplicate: {
-    backgroundColor: "#16A34A",
-  },
-  swipeDelete: {
-    backgroundColor: "#DC2626",
   },
   swipeText: {
     color: "#FFFFFF",

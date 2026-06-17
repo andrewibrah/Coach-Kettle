@@ -1,7 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useColorScheme } from "@/hooks/useColorScheme";
-import { accentColor } from "@/constants/theme";
 import {
   ActivityIndicator,
   Alert,
@@ -38,24 +36,20 @@ type ExerciseGroup = {
   sets: { row: WorkoutRow; setNum: number }[];
 };
 
-function ReviewCard({
-  review,
-  isDark,
-  cardColor,
-  textColor,
-  secondaryTextColor,
-}: {
-  review: SessionReview;
-  isDark: boolean;
-  cardColor: string;
-  textColor: string;
-  secondaryTextColor: string;
-}) {
+function ReviewCard({ review }: { review: SessionReview }) {
+  const cardColor = useThemeColor({}, 'cardBackground');
+  const textColor = useThemeColor({}, 'text');
+  const secondaryTextColor = useThemeColor({}, 'placeholder');
+  const successColor = useThemeColor({}, 'success');
+  const warningColor = useThemeColor({}, 'warning');
+  const dangerColor = useThemeColor({}, 'danger');
+  const tintColor = useThemeColor({}, 'tint');
+
   const getRatingColor = (rating: number) => {
-    if (rating >= 8) return "#10B981";
-    if (rating >= 6) return accentColor(isDark);
-    if (rating >= 4) return "#F59E0B";
-    return "#EF4444";
+    if (rating >= 8) return successColor;
+    if (rating >= 6) return tintColor;
+    if (rating >= 4) return warningColor;
+    return dangerColor;
   };
 
   const getRatingEmoji = (rating: number) => {
@@ -79,30 +73,30 @@ function ReviewCard({
       </View>
 
       <View style={styles.reviewSection}>
-        <Text style={[styles.reviewSectionTitle, { color: "#10B981" }]}>✓ Strengths</Text>
+        <Text style={[styles.reviewSectionTitle, { color: successColor }]}>✓ Strengths</Text>
         {review.strengths.map((s, i) => (
           <Text key={i} style={[styles.reviewBullet, { color: textColor }]}>• {s}</Text>
         ))}
       </View>
 
       <View style={styles.reviewSection}>
-        <Text style={[styles.reviewSectionTitle, { color: "#F59E0B" }]}>↑ Improve</Text>
+        <Text style={[styles.reviewSectionTitle, { color: warningColor }]}>↑ Improve</Text>
         <Text style={[styles.reviewText, { color: textColor }]}>{review.weakness}</Text>
       </View>
 
       <View style={styles.reviewSection}>
-        <Text style={[styles.reviewSectionTitle, { color: accentColor(isDark) }]}>📝 Next Session</Text>
+        <Text style={[styles.reviewSectionTitle, { color: tintColor }]}>📝 Next Session</Text>
         <Text style={[styles.reviewText, { color: textColor, fontStyle: 'italic' }]}>{review.nextSessionNote}</Text>
       </View>
     </View>
   );
 }
 
-function getRatingColor(rating: number, isDark: boolean) {
-  if (rating >= 8) return "#10B981";
-  if (rating >= 6) return accentColor(isDark);
-  if (rating >= 4) return "#F59E0B";
-  return "#EF4444";
+function getRatingColor(rating: number, successColor: string, tintColor: string, warningColor: string, dangerColor: string) {
+  if (rating >= 8) return successColor;
+  if (rating >= 6) return tintColor;
+  if (rating >= 4) return warningColor;
+  return dangerColor;
 }
 
 function groupByExercise(rows: WorkoutRow[]): ExerciseGroup[] {
@@ -131,22 +125,22 @@ export default function WorkoutDetail() {
   const isMounted = useRef(true);
   useEffect(() => () => { isMounted.current = false; }, []);
 
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
-  const cardColor = isDark ? '#1C1C1E' : '#F9FAFB';
-  const secondaryTextColor = isDark ? '#9CA3AF' : '#6B7280';
-
-  // Dynamic colors for dark mode
-  const setIndicatorBg = isDark ? '#374151' : '#E5E7EB';
-  const setIndicatorText = isDark ? '#9CA3AF' : '#6B7280';
-  const noteTextColor = isDark ? '#9CA3AF' : '#4B5563';
-  const backBtnPressedBg = isDark ? '#374151' : '#E5E7EB';
-  const statSepColor = isDark ? '#4B5563' : '#D1D5DB';
-  const mutedTextColor = isDark ? '#9CA3AF' : '#6B7280';
-  const inputBg = isDark ? '#2C2C2E' : '#FFFFFF';
-  const borderColor = isDark ? '#3A3A3C' : '#E5E7EB';
+  const cardColor = useThemeColor({}, 'cardBackground');
+  const secondaryTextColor = useThemeColor({}, 'placeholder');
+  const setIndicatorBg = useThemeColor({}, 'secondaryBackground');
+  const setIndicatorText = useThemeColor({}, 'placeholder');
+  const noteTextColor = useThemeColor({}, 'placeholder');
+  const backBtnPressedBg = useThemeColor({}, 'secondaryBackground');
+  const statSepColor = useThemeColor({}, 'border');
+  const mutedTextColor = useThemeColor({}, 'placeholder');
+  const inputBg = useThemeColor({}, 'inputBackground');
+  const borderColor = useThemeColor({}, 'border');
+  const successColor = useThemeColor({}, 'success');
+  const warningColor = useThemeColor({}, 'warning');
+  const dangerColor = useThemeColor({}, 'danger');
+  const tintColor = useThemeColor({}, 'tint');
 
   // Reflection state
   const [reflection, setReflection] = useState("");
@@ -331,16 +325,16 @@ export default function WorkoutDetail() {
                 styles.reviewToggleBtn,
                 {
                   backgroundColor: showReview
-                    ? getRatingColor(workout.review!.rating, isDark) + '20'
-                    : isDark ? '#1C1C1E' : '#F3F4F6',
+                    ? getRatingColor(workout.review!.rating, successColor, tintColor, warningColor, dangerColor) + '20'
+                    : cardColor,
                   borderColor: showReview
-                    ? getRatingColor(workout.review!.rating, isDark)
-                    : isDark ? '#374151' : '#D1D5DB',
+                    ? getRatingColor(workout.review!.rating, successColor, tintColor, warningColor, dangerColor)
+                    : borderColor,
                 },
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Text style={[styles.reviewToggleRating, { color: getRatingColor(workout.review!.rating, isDark) }]}>
+              <Text style={[styles.reviewToggleRating, { color: getRatingColor(workout.review!.rating, successColor, tintColor, warningColor, dangerColor) }]}>
                 {workout.review!.rating}/10
               </Text>
               <Text style={[styles.reviewToggleLabel, { color: secondaryTextColor }]}>
@@ -355,7 +349,7 @@ export default function WorkoutDetail() {
 
         {/* Session Review Card — toggled by header button */}
         {workout.review && showReview && (
-          <ReviewCard review={workout.review} isDark={isDark} cardColor={cardColor} textColor={textColor} secondaryTextColor={secondaryTextColor} />
+          <ReviewCard review={workout.review} />
         )}
 
         {groups.length === 0 ? (
@@ -417,7 +411,7 @@ export default function WorkoutDetail() {
                 onPress={() => setReflectionEditing(true)}
                 style={({ pressed }) => [styles.reflectionEditBtn, pressed && { opacity: 0.6 }]}
               >
-                <Text style={[styles.reflectionEditText, { color: accentColor(isDark) }]}>
+                <Text style={[styles.reflectionEditText, { color: tintColor }]}>
                   {reflection ? 'Edit' : 'Add'}
                 </Text>
               </Pressable>
@@ -457,14 +451,14 @@ export default function WorkoutDetail() {
                   style={({ pressed }) => [
                     styles.reflectionActionBtn,
                     styles.reflectionSaveBtn,
-                    { backgroundColor: isDark ? '#FFFFFF' : '#111827' },
+                    { backgroundColor: textColor },
                     pressed && { opacity: 0.8 },
                   ]}
                 >
                   {reflectionSaving ? (
-                    <ActivityIndicator size="small" color={isDark ? '#111827' : '#FFFFFF'} />
+                    <ActivityIndicator size="small" color={backgroundColor} />
                   ) : (
-                    <Text style={[styles.reflectionSaveText, { color: isDark ? '#111827' : '#FFFFFF' }]}>
+                    <Text style={[styles.reflectionSaveText, { color: backgroundColor }]}>
                       Save
                     </Text>
                   )}

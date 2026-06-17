@@ -247,5 +247,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
   },
-  deleteBtnText: { color: '#EF4444', fontSize: 14, fontWeight: '600' },
+  deleteBtnText: { fontSize: 14, fontWeight: '600' },
 });

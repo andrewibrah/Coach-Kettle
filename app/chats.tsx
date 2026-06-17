@@ -1,5 +1,3 @@
-import { useColorScheme } from "@/hooks/useColorScheme";
-import { accentColor } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthProvider";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
@@ -20,13 +18,10 @@ export default function ChatsScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const iconColor = useThemeColor({}, 'text');
   const placeholder = useThemeColor({}, 'placeholder');
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
+  const botBubbleBg = useThemeColor({}, 'secondaryBackground');
   const { session } = useAuth();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  // Theme-aware colors for AI response bubbles
-  const botBubbleBg = isDark ? '#1F2937' : '#E5E7EB';
-  const botTextColor = isDark ? '#F3F4F6' : '#1F2937';
 
   const loadChats = useCallback(async () => {
     if (!session) {
@@ -63,14 +58,14 @@ export default function ChatsScreen() {
 
     return (
       <View style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
-        <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble, isUser ? { backgroundColor: accentColor(isDark, 'fill') } : { backgroundColor: botBubbleBg }]}>
+        <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble, { backgroundColor: isUser ? tint : botBubbleBg }]}>
           {!isUser && (
-            <Text style={styles.sourceLabel}>{sourceLabel}</Text>
+            <Text style={[styles.sourceLabel, { color: placeholder }]}>{sourceLabel}</Text>
           )}
-          <Text style={[styles.messageText, isUser ? styles.userText : { color: botTextColor }]}>
+          <Text style={[styles.messageText, { color: isUser ? onTint : iconColor }]}>
             {item.content}
           </Text>
-          <Text style={[styles.timeText, isUser ? styles.userTime : styles.botTime]}>
+          <Text style={[styles.timeText, { color: isUser ? onTint : placeholder }]}>
             {item.created_at
               ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : ''
@@ -84,7 +79,7 @@ export default function ChatsScreen() {
   const renderSectionHeader = ({ section }: { section: ChatsByDate }) => (
     <View style={styles.sectionHeader}>
       <View style={styles.datePill}>
-        <Text style={styles.dateText}>{section.displayDate}</Text>
+        <Text style={[styles.dateText, { color: placeholder }]}>{section.displayDate}</Text>
       </View>
     </View>
   );
@@ -109,10 +104,10 @@ export default function ChatsScreen() {
             Sign in to view chat history
           </Text>
           <Pressable
-            style={[styles.signInButton, { backgroundColor: accentColor(isDark, 'fill') }]}
+            style={[styles.signInButton, { backgroundColor: tint }]}
             onPress={() => router.push('/auth/sign-in')}
           >
-            <Text style={styles.signInButtonText}>Sign In</Text>
+            <Text style={[styles.signInButtonText, { color: onTint }]}>Sign In</Text>
           </Pressable>
         </View>
       </ThemedView>
@@ -198,13 +193,11 @@ const styles = StyleSheet.create({
   },
   signInButton: {
     marginTop: 20,
-    backgroundColor: '#3B82F6',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
   },
   signInButtonText: {
-    color: '#FFF',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -224,7 +217,6 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#9CA3AF',
   },
   messageRow: {
     width: '100%',
@@ -243,7 +235,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   userBubble: {
-    backgroundColor: '#3B82F6',
     borderBottomRightRadius: 4,
   },
   botBubble: {
@@ -252,7 +243,6 @@ const styles = StyleSheet.create({
   },
   sourceLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
     marginBottom: 4,
     fontWeight: '500',
   },
@@ -260,22 +250,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
-  userText: {
-    color: '#FFFFFF',
-  },
-  botText: {
-    // color set dynamically via botTextColor (isDark ternary)
-  },
   timeText: {
     fontSize: 10,
     marginTop: 4,
     opacity: 0.7,
     alignSelf: 'flex-end',
-  },
-  userTime: {
-    color: '#E0E7FF',
-  },
-  botTime: {
-    color: '#9CA3AF',
   },
 });
