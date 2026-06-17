@@ -16,7 +16,7 @@ const RestEntryRow = ({ row, onDelete }: { row: LogRow; onDelete: (id: string) =
   const border = useThemeColor({}, 'border');
   const placeholder = useThemeColor({}, 'placeholder');
   return (
-    <Pressable onLongPress={() => onDelete(row.id)} style={styles.restRow}>
+    <Pressable onLongPress={() => onDelete(row.id)} style={styles.restRow} accessibilityRole="button" accessibilityLabel="Rest timer row" accessibilityHint="Long press to delete">
       <View style={[styles.restLine, { backgroundColor: border }]} />
       <ThemedText style={[styles.restText, { color: placeholder }]}>
         ⏱  {row.notes || 'Rest timer'}
@@ -164,12 +164,16 @@ export function WorkoutTable({
             <Pressable
               onPress={() => onDuplicateRow(item.id)}
               style={({ pressed }) => [styles.swipeButton, { backgroundColor: successColor }, pressed && styles.swipePressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Duplicate set"
             >
               <ThemedText style={styles.swipeText}>Duplicate</ThemedText>
             </Pressable>
             <Pressable
               onPress={() => onDeleteRow(item.id)}
               style={({ pressed }) => [styles.swipeButton, { backgroundColor: dangerColor }, pressed && styles.swipePressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Delete set"
             >
               <ThemedText style={styles.swipeText}>Delete</ThemedText>
             </Pressable>
