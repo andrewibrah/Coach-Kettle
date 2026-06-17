@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import { useProgram } from '@/contexts/ProgramContext';
 import type { GoalType, SplitType, Periodization } from '@/types/programming';
 
@@ -44,6 +46,7 @@ export default function CreateProgramScreen() {
   const onTint = useThemeColor({}, 'tintForeground');
 
   const { create } = useProgram();
+  const { toast, showToast, hideToast } = useToast();
 
   const [goal, setGoal] = useState<GoalType>('muscle_building');
   const [split, setSplit] = useState<SplitType>('ppl_3day');
@@ -65,7 +68,7 @@ export default function CreateProgramScreen() {
       });
       router.replace('/program');
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to create program');
+      showToast(e instanceof Error ? e.message : 'Failed to create program', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -137,6 +140,7 @@ export default function CreateProgramScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Create Program" />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
         <View style={[styles.card, { backgroundColor: cardBackground }]}>

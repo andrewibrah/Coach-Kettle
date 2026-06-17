@@ -1,11 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 
 import { fetchStrengthProgression } from '@/lib/bodyMetrics';
 import type { StrengthProgressionPoint } from '@/types/body';
@@ -20,6 +22,7 @@ export default function StrengthProgressionScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
 
+  const { toast, showToast, hideToast } = useToast();
   const [exercise, setExercise] = useState('');
   const [points, setPoints] = useState<StrengthProgressionPoint[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +38,7 @@ export default function StrengthProgressionScreen() {
     } catch (e: any) {
       setPoints([]);
       setHasLoaded(true);
-      Alert.alert('Could not load', e?.message ?? 'Failed to load progression data.');
+      showToast(e?.message ?? 'Failed to load progression data.', 'error');
     } finally {
       setLoading(false);
     }
@@ -43,6 +46,7 @@ export default function StrengthProgressionScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Strength progression" />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
