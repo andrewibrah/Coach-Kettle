@@ -141,6 +141,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '700', marginBottom: 6, marginTop: 10 },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
   primaryBtn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
-  primaryText: { color: '#fff', fontWeight: '700' },
+  primaryText: { fontWeight: '700' },
   resultRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 10, flexDirection: 'row' },
 });
