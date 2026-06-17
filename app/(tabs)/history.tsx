@@ -164,6 +164,8 @@ export default function HistoryScreen() {
           { backgroundColor: cardBg, borderColor },
           pressed && styles.cardPressed,
         ]}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.part?.trim() || 'Workout'} — long press to delete`}
       >
         <View style={styles.cardRow}>
           <View style={styles.cardMain}>

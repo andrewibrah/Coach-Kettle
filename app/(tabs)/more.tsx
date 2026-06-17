@@ -33,6 +33,8 @@ function NavItem({ icon, label, description, onPress, cardBackground, iconColor,
         { backgroundColor: cardBackground },
         pressed && { opacity: 0.7 },
       ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <View style={styles.navLeft}>
         <IconSymbol name={icon as any} size={22} color={iconColor} />
