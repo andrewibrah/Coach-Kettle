@@ -45,6 +45,8 @@ import { type SessionReview } from "@/lib/workoutStorage";
 import { type LogRow } from "@/types/workout";
 import { clearWorkoutDraft, getWorkoutDraft, saveWorkoutDraft } from "@/lib/workoutDraft";
 import { TutorialModal } from "@/components/tutorial/TutorialModal";
+import { Toast } from "@/components/ui/Toast";
+import { useToast } from "@/hooks/useToast";
 import { isTutorialShown } from "@/lib/tutorialState";
 import { HomeDashboard } from "@/components/home/HomeDashboard";
 import { useCoaching } from "@/contexts/CoachingContext";
@@ -172,6 +174,7 @@ export default function HomeScreen() {
       runOnJS(openMenu)();
     });
 
+  const { toast: inlineToast, showToast, hideToast } = useToast();
   const [startToastOpen, setStartToastOpen] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [draftRestoredToast, setDraftRestoredToast] = useState(false);
@@ -422,7 +425,7 @@ export default function HomeScreen() {
     // Tapping before restore completes could orphan an in-progress draft.
     if (!draftChecked) return;
     if (workoutActive) {
-      Alert.alert("Workout already started", "End the current workout to start a new one.");
+      showToast('End the current workout before starting a new one.', 'info');
       return;
     }
     setNameModalVisible(true);
@@ -718,7 +721,7 @@ export default function HomeScreen() {
     const committedRows = commitPendingAndGet();
 
     if (!workoutActive) {
-      Alert.alert("No active workout", "Start a workout first.");
+      showToast('Start a workout first.', 'info');
       return;
     }
     const loggedSets = committedRows.filter((r) => !r.isRest);
@@ -773,7 +776,7 @@ export default function HomeScreen() {
   const handleEndWorkoutWithReview = async (currentRows: LogRow[]) => {
     const committedRows = currentRows.filter(r => r.status === "committed" && !r.isRest);
     if (committedRows.length === 0) {
-      Alert.alert("No sets logged", "Log some sets before ending your workout.");
+      showToast('Log some sets before ending your workout.', 'info');
       return;
     }
 
@@ -851,11 +854,7 @@ export default function HomeScreen() {
       } catch (saveError) {
         console.error("[handleEndWorkoutWithReview] Save also failed:", saveError);
         setReviewModalVisible(false);
-        Alert.alert(
-          "Save Failed",
-          "Could not save your workout. Please try again.",
-          [{ text: "OK" }]
-        );
+        showToast('Could not save your workout. Please try again.', 'error');
       }
     }
   };
@@ -894,7 +893,7 @@ export default function HomeScreen() {
     const message = messageInput.trim();
     if (!message || loading) return;
     if (!workoutActive) {
-      Alert.alert("Start workout", "Start a workout before logging sets.");
+      showToast('Start a workout before logging sets.', 'info');
       return;
     }
 
@@ -1110,7 +1109,7 @@ export default function HomeScreen() {
       setMessageInput("");
 
       if (currentRows.length === 0) {
-        Alert.alert("No sets logged", "Log some sets before ending your workout.");
+        showToast('Log some sets before ending your workout.', 'info');
         return;
       }
 
@@ -1259,6 +1258,8 @@ export default function HomeScreen() {
           startToastOpen={startToastOpen}
           showStartToast={showStartToast}
         />
+
+        {inlineToast && <Toast message={inlineToast.message} type={inlineToast.type} onDismiss={hideToast} />}
 
         {draftRestoredToast && (
           <View style={styles.draftRestoredToast} pointerEvents="none">
