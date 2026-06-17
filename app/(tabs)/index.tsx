@@ -84,6 +84,7 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const compact = width < 380;
   const backgroundColor = useThemeColor({}, 'background');
+  const successColor = useThemeColor({}, 'success');
 
   const scrollRef = useRef<FlatList<LogRow> | null>(null);
 
@@ -1187,7 +1188,7 @@ export default function HomeScreen() {
         <Tabs.Screen
           options={{
             tabBarBadge: workoutActive ? ' ' : undefined,
-            tabBarBadgeStyle: { backgroundColor: '#10B981', borderColor: 'transparent', minWidth: 10, height: 10, borderRadius: 5 },
+            tabBarBadgeStyle: { backgroundColor: successColor, borderColor: 'transparent', minWidth: 10, height: 10, borderRadius: 5 },
           }}
         />
 

@@ -1,7 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
-import { accentColor } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { checkServerTermsAcceptance, setLastAuthenticatedAt } from '@/lib/authLock';
 import { supabase } from '@/lib/supabase';
 import * as Linking from 'expo-linking';
@@ -11,7 +10,8 @@ import { ActivityIndicator } from 'react-native';
 
 export default function AuthCallback() {
   const router = useRouter();
-  const isDark = useColorScheme() === 'dark';
+  const dangerColor = useThemeColor({}, 'danger');
+  const tint = useThemeColor({}, 'tint');
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('Verifying...');
 
@@ -127,11 +127,11 @@ export default function AuthCallback() {
   if (error) {
     return (
       <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-        <ThemedText style={{ color: '#EF4444', marginBottom: 16, textAlign: 'center' }}>
+        <ThemedText style={{ color: dangerColor, marginBottom: 16, textAlign: 'center' }}>
           {error}
         </ThemedText>
         <ThemedText
-          style={{ color: accentColor(isDark) }}
+          style={{ color: tint }}
           onPress={() => router.replace('/auth/sign-in')}
         >
           Back to Sign In

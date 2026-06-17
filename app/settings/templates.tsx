@@ -18,7 +18,6 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { useAuth } from '@/contexts/AuthProvider';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import {
     WorkoutTemplate,
@@ -35,8 +34,6 @@ import {
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 export default function TemplatesScreen() {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === 'dark';
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const activeColor = useThemeColor({}, 'tint');
@@ -45,8 +42,9 @@ export default function TemplatesScreen() {
     const { session } = useAuth();
 
     const cardBg = useThemeColor({}, 'cardBackground');
-    const sectionTitleColor = '#8E8E93';
-    const inputBg = isDark ? '#2c2c2e' : '#fff';
+    const inputBg = useThemeColor({}, 'inputBackground');
+    const placeholder = useThemeColor({}, 'placeholder');
+    const sectionTitleColor = '#8E8E93'; // iOS system gray, same in both themes
 
     const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
     const [expandedItems, setExpandedItems] = useState<Record<string, WorkoutTemplateItem[]>>({});
@@ -491,7 +489,7 @@ export default function TemplatesScreen() {
                             value={newName}
                             onChangeText={setNewName}
                             placeholder="Template name (e.g., Push Day)"
-                            placeholderTextColor={isDark ? '#666' : '#999'}
+                            placeholderTextColor={placeholder}
                             autoFocus
                             returnKeyType="next"
                             blurOnSubmit={false}
@@ -504,7 +502,7 @@ export default function TemplatesScreen() {
                             value={newDescription}
                             onChangeText={setNewDescription}
                             placeholder="Description (optional)"
-                            placeholderTextColor={isDark ? '#666' : '#999'}
+                            placeholderTextColor={placeholder}
                             returnKeyType="done"
                             onFocus={ensureInputVisible}
                             onSubmitEditing={() => {
@@ -624,7 +622,7 @@ export default function TemplatesScreen() {
                                                                             value={editName}
                                                                             onChangeText={setEditName}
                                                                             placeholder="Exercise name"
-                                                                            placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                            placeholderTextColor={placeholder}
                                                                             autoFocus
                                                                             returnKeyType="next"
                                                                             blurOnSubmit={false}
@@ -638,7 +636,7 @@ export default function TemplatesScreen() {
                                                                                 value={editSets}
                                                                                 onChangeText={setEditSets}
                                                                                 placeholder="Sets"
-                                                                                placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                                placeholderTextColor={placeholder}
                                                                                 keyboardType="numeric"
                                                                                 returnKeyType="next"
                                                                                 blurOnSubmit={false}
@@ -651,7 +649,7 @@ export default function TemplatesScreen() {
                                                                                 value={editReps}
                                                                                 onChangeText={setEditReps}
                                                                                 placeholder="Reps"
-                                                                                placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                                placeholderTextColor={placeholder}
                                                                                 keyboardType="numeric"
                                                                                 returnKeyType="next"
                                                                                 blurOnSubmit={false}
@@ -664,7 +662,7 @@ export default function TemplatesScreen() {
                                                                                 value={editWeight}
                                                                                 onChangeText={setEditWeight}
                                                                                 placeholder="Weight"
-                                                                                placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                                placeholderTextColor={placeholder}
                                                                                 keyboardType="decimal-pad"
                                                                                 returnKeyType="done"
                                                                                 onFocus={ensureInputVisible}
@@ -772,7 +770,7 @@ export default function TemplatesScreen() {
                                                                 value={newExerciseName}
                                                                 onChangeText={setNewExerciseName}
                                                                 placeholder="Exercise name"
-                                                                placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                placeholderTextColor={placeholder}
                                                                 autoFocus
                                                                 returnKeyType="next"
                                                                 blurOnSubmit={false}
@@ -786,7 +784,7 @@ export default function TemplatesScreen() {
                                                                     value={newExerciseSets}
                                                                     onChangeText={setNewExerciseSets}
                                                                     placeholder="Sets"
-                                                                    placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                    placeholderTextColor={placeholder}
                                                                     keyboardType="numeric"
                                                                     returnKeyType="next"
                                                                     blurOnSubmit={false}
@@ -799,7 +797,7 @@ export default function TemplatesScreen() {
                                                                     value={newExerciseReps}
                                                                     onChangeText={setNewExerciseReps}
                                                                     placeholder="Reps"
-                                                                    placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                    placeholderTextColor={placeholder}
                                                                     keyboardType="numeric"
                                                                     returnKeyType="next"
                                                                     blurOnSubmit={false}
@@ -812,7 +810,7 @@ export default function TemplatesScreen() {
                                                                     value={newExerciseWeight}
                                                                     onChangeText={setNewExerciseWeight}
                                                                     placeholder="Weight"
-                                                                    placeholderTextColor={isDark ? '#666' : '#999'}
+                                                                    placeholderTextColor={placeholder}
                                                                     keyboardType="decimal-pad"
                                                                     returnKeyType="done"
                                                                     onFocus={ensureInputVisible}
