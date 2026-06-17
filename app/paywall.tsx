@@ -130,6 +130,8 @@ export default function PaywallScreen() {
         style={({ pressed }) => [styles.closeButton, pressed && styles.buttonPressed]}
         onPress={handleSkip}
         hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
       >
         <Ionicons name="close" size={26} color={colors.placeholder} />
       </Pressable>
@@ -169,6 +171,9 @@ export default function PaywallScreen() {
                   },
                 ]}
                 onPress={() => setSelectedPlan(plan.id)}
+                accessibilityRole="radio"
+                accessibilityLabel={`${plan.name} ${plan.price}${plan.period}`}
+                accessibilityState={{ checked: selectedPlan === plan.id }}
               >
                 {plan.badge ? (
                   <View style={[styles.saveBadge, { backgroundColor: colors.tint }]}>
@@ -205,6 +210,9 @@ export default function PaywallScreen() {
           ]}
           onPress={handleSubscribe}
           disabled={isProcessing || !selectedPlanConfig}
+          accessibilityRole="button"
+          accessibilityLabel={selectedPlanConfig ? `Subscribe with ${selectedPlanConfig.name}` : 'Purchases Unavailable'}
+          accessibilityState={{ disabled: isProcessing || !selectedPlanConfig }}
         >
           {isProcessing ? (
             <ActivityIndicator color={colors.tintForeground} />
@@ -223,11 +231,11 @@ export default function PaywallScreen() {
         </ThemedText>
 
         <View style={styles.legalLinks}>
-          <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8}>
+          <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8} accessibilityRole="link" accessibilityLabel="Terms of Service">
             <ThemedText style={[styles.legalLink, { color: colors.tint }]}>Terms of Service</ThemedText>
           </Pressable>
           <ThemedText style={[styles.legalSep, { color: colors.placeholder }]}> · </ThemedText>
-          <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8}>
+          <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8} accessibilityRole="link" accessibilityLabel="Privacy Policy">
             <ThemedText style={[styles.legalLink, { color: colors.tint }]}>Privacy Policy</ThemedText>
           </Pressable>
         </View>
@@ -237,6 +245,9 @@ export default function PaywallScreen() {
             style={({ pressed }) => [styles.skipButton, pressed && styles.buttonPressed]}
             onPress={handleSkip}
             disabled={isDismissing}
+            accessibilityRole="button"
+            accessibilityLabel="Skip - Try 1 Week Free"
+            accessibilityState={{ disabled: isDismissing }}
           >
             <ThemedText style={[styles.skipButtonText, { color: colors.tint }]}>
               {isDismissing ? 'Starting trial...' : 'Skip - Try 1 Week Free'}
@@ -249,6 +260,9 @@ export default function PaywallScreen() {
             style={({ pressed }) => [styles.skipButton, pressed && styles.buttonPressed]}
             onPress={handleSkip}
             disabled={isDismissing}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Free Tier"
+            accessibilityState={{ disabled: isDismissing }}
           >
             <ThemedText style={[styles.skipButtonText, { color: colors.placeholder }]}>
               {isDismissing ? 'Loading...' : 'Continue with Free Tier'}
@@ -260,13 +274,21 @@ export default function PaywallScreen() {
           style={({ pressed }) => [styles.restoreButton, pressed && styles.buttonPressed]}
           onPress={handleRestore}
           disabled={isProcessing}
+          accessibilityRole="button"
+          accessibilityLabel="Restore Purchases"
+          accessibilityState={{ disabled: isProcessing }}
         >
           <ThemedText style={[styles.restoreText, { color: colors.placeholder, opacity: isProcessing ? 0.5 : 1 }]}>
             Restore Purchases
           </ThemedText>
         </Pressable>
 
-        <Pressable style={({ pressed }) => [styles.signOutButton, pressed && styles.buttonPressed]} onPress={handleSignOut}>
+        <Pressable
+          style={({ pressed }) => [styles.signOutButton, pressed && styles.buttonPressed]}
+          onPress={handleSignOut}
+          accessibilityRole="button"
+          accessibilityLabel="Sign Out"
+        >
           <ThemedText style={[styles.signOutText, { color: colors.danger }]}>Sign Out</ThemedText>
         </Pressable>
       </ScrollView>
