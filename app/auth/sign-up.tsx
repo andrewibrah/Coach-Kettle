@@ -272,6 +272,9 @@ export default function SignUp() {
               style={[styles.button, { backgroundColor: primaryColor, opacity: loading ? 0.7 : 1 }]}
               onPress={signUpWithEmail}
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={loading ? 'Creating account...' : 'Sign up'}
+              accessibilityState={{ disabled: loading }}
             >
               <ThemedText style={[styles.buttonText, { color: onTint }]}>{loading ? 'Creating account...' : 'Sign Up'}</ThemedText>
             </TouchableOpacity>
@@ -296,7 +299,7 @@ export default function SignUp() {
               onPress={signUpWithAppleNative}
             />
 
-            <TouchableOpacity style={[styles.oauthButton, { borderColor: oauthBorderColor }]} onPress={() => signInWithOAuth('google')}>
+            <TouchableOpacity style={[styles.oauthButton, { borderColor: oauthBorderColor }]} onPress={() => signInWithOAuth('google')} accessibilityRole="button" accessibilityLabel="Sign up with Google">
               <Ionicons name="logo-google" size={24} color={textColor} />
               <ThemedText style={styles.oauthText}>Sign up with Google</ThemedText>
             </TouchableOpacity>
@@ -306,7 +309,7 @@ export default function SignUp() {
           <View style={styles.footer}>
             <ThemedText>Already have an account? </ThemedText>
             <Link href={"/auth/sign-in" as any} asChild>
-              <TouchableOpacity>
+              <TouchableOpacity accessibilityRole="link" accessibilityLabel="Sign in">
                 <ThemedText type="link">Sign In</ThemedText>
               </TouchableOpacity>
             </Link>

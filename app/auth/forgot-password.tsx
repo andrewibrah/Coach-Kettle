@@ -60,6 +60,8 @@ export default function ForgotPassword() {
           <TouchableOpacity
             style={[styles.button, { backgroundColor: primaryColor }]}
             onPress={() => router.replace('/auth/sign-in')}
+            accessibilityRole="button"
+            accessibilityLabel="Back to sign in"
           >
             <ThemedText style={[styles.buttonText, { color: onTint }]}>Back to Sign In</ThemedText>
           </TouchableOpacity>
@@ -73,7 +75,7 @@ export default function ForgotPassword() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
 
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={24} color={textColor} />
           </TouchableOpacity>
 
@@ -104,6 +106,9 @@ export default function ForgotPassword() {
               style={[styles.button, { backgroundColor: primaryColor, opacity: loading ? 0.7 : 1 }]}
               onPress={handleResetPassword}
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={loading ? 'Sending reset link...' : 'Send reset link'}
+              accessibilityState={{ disabled: loading }}
             >
               <ThemedText style={[styles.buttonText, { color: onTint }]}>
                 {loading ? 'Sending...' : 'Send Reset Link'}
@@ -114,7 +119,7 @@ export default function ForgotPassword() {
           <View style={styles.footer}>
             <ThemedText>Remember your password? </ThemedText>
             <Link href={"/auth/sign-in" as any} asChild>
-              <TouchableOpacity>
+              <TouchableOpacity accessibilityRole="link" accessibilityLabel="Sign in">
                 <ThemedText type="link">Sign In</ThemedText>
               </TouchableOpacity>
             </Link>

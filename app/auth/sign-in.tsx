@@ -355,7 +355,7 @@ export default function SignIn() {
             </View>
 
             <Link href={"/auth/forgot-password" as any} asChild>
-              <TouchableOpacity style={styles.forgotPassword}>
+              <TouchableOpacity style={styles.forgotPassword} accessibilityRole="link" accessibilityLabel="Forgot password?">
                 <ThemedText type="link">Forgot Password?</ThemedText>
               </TouchableOpacity>
             </Link>
@@ -364,6 +364,9 @@ export default function SignIn() {
               style={[styles.button, { backgroundColor: primaryColor, opacity: loading ? 0.7 : 1 }]}
               onPress={signInWithEmail}
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={loading ? 'Signing in...' : 'Sign in'}
+              accessibilityState={{ disabled: loading }}
             >
               <ThemedText style={[styles.buttonText, { color: onTint }]}>{loading ? 'Signing in...' : 'Sign In'}</ThemedText>
             </TouchableOpacity>
@@ -391,7 +394,7 @@ export default function SignIn() {
               onPress={signInWithAppleNative}
             />
 
-            <TouchableOpacity style={[styles.oauthButton, { borderColor: oauthBorderColor }]} onPress={() => signInWithOAuth('google')}>
+            <TouchableOpacity style={[styles.oauthButton, { borderColor: oauthBorderColor }]} onPress={() => signInWithOAuth('google')} accessibilityRole="button" accessibilityLabel="Sign in with Google">
               <Ionicons name="logo-google" size={24} color={textColor} />
               <ThemedText style={styles.oauthText}>Sign in with Google</ThemedText>
             </TouchableOpacity>
@@ -401,7 +404,7 @@ export default function SignIn() {
           <View style={styles.footer}>
             <ThemedText>Don&apos;t have an account? </ThemedText>
             <Link href={"/auth/sign-up" as any} asChild>
-              <TouchableOpacity>
+              <TouchableOpacity accessibilityRole="link" accessibilityLabel="Sign up">
                 <ThemedText type="link">Sign Up</ThemedText>
               </TouchableOpacity>
             </Link>
