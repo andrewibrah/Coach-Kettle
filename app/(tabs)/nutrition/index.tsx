@@ -112,7 +112,7 @@ export default function NutritionHomeScreen() {
           {error && (
             <View style={[styles.errorBanner, { backgroundColor: dangerColor }]}>
               <ThemedText style={styles.errorBannerText}>{error}</ThemedText>
-              <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}>
+              <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Retry">
                 <ThemedText style={styles.retryBtnText}>Retry</ThemedText>
               </Pressable>
             </View>
@@ -128,6 +128,8 @@ export default function NutritionHomeScreen() {
                   { backgroundColor: tint },
                   pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Set up your nutrition targets"
               >
                 {deriving ? (
                   <ActivityIndicator color={onTint} />
@@ -180,6 +182,8 @@ export default function NutritionHomeScreen() {
                         <Pressable
                           onPress={() => handleDelete(entry.id)}
                           style={({ pressed }) => [{ padding: 8 }, pressed && { opacity: 0.7 }]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Delete ${entry.food_name}`}
                         >
                           <IconSymbol name="trash.fill" size={18} color={dangerColor} />
                         </Pressable>
@@ -199,6 +203,8 @@ export default function NutritionHomeScreen() {
               { backgroundColor: tint, marginBottom: 12 },
               pressed && { opacity: 0.7 },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Add food"
           >
             <ThemedText style={{ color: onTint, fontWeight: '700' }}>Add food</ThemedText>
           </Pressable>
@@ -211,6 +217,8 @@ export default function NutritionHomeScreen() {
               { borderColor: border },
               pressed && { opacity: 0.7 },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="View weekly meal plan"
           >
             <ThemedText style={{ color: textColor, fontWeight: '600' }}>View weekly meal plan</ThemedText>
           </Pressable>
@@ -222,6 +230,8 @@ export default function NutritionHomeScreen() {
               { borderColor: border, marginTop: 8 },
               pressed && { opacity: 0.7 },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Edit targets"
           >
             <ThemedText style={{ color: textColor, fontWeight: '600' }}>Edit targets</ThemedText>
           </Pressable>
