@@ -34,6 +34,8 @@ export default function RestingHrScreen() {
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
+  const dangerColor = useThemeColor({}, 'danger');
+  const successColor = useThemeColor({}, 'success');
 
   const [summary, setSummary] = useState<RestingHeartRateSummary | null>(null);
   const [entries, setEntries] = useState<RestingHeartRateEntry[]>([]);
@@ -97,7 +99,7 @@ export default function RestingHrScreen() {
 
   const delta = summary?.trend_delta_bpm ?? 0;
   const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '·';
-  const deltaColor = delta > 0 ? '#EF4444' : delta < 0 ? '#10B981' : placeholder;
+  const deltaColor = delta > 0 ? dangerColor : delta < 0 ? successColor : placeholder;
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
@@ -172,7 +174,7 @@ export default function RestingHrScreen() {
                   pressed && { opacity: 0.7 },
                 ]}
               >
-                <ThemedText style={styles.deleteBtnText}>Delete</ThemedText>
+                <ThemedText style={[styles.deleteBtnText, { color: dangerColor }]}>Delete</ThemedText>
               </Pressable>
             </View>
           ))
