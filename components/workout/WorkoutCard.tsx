@@ -247,6 +247,8 @@ export function WorkoutCard({
                     onLongPress={() => !isSyncing && onBeginEditCell?.(row.id, "set", row.set.toString())}
                     hitSlop={10}
                     disabled={isSyncing}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Set ${row.set} — tap to increment, long press to edit`}
                 >
                     {editingField === "set" ? renderInput("Set", "numeric") : (
                         <ThemedText style={[styles.set, { color: setLabelColor, backgroundColor: setLabelBg }, isSyncing && { color: labelColor }]}>Set {row.set}</ThemedText>
@@ -306,7 +308,7 @@ export function WorkoutCard({
                             {editingField === "weightLbs" ? (
                                 renderInput("Lbs", "numeric")
                             ) : (
-                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)}>
+                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)} accessibilityRole="button" accessibilityLabel={`Weight: ${row.weightLbs && row.weightLbs !== "0" ? `${row.weightLbs} lbs` : 'not set'}, tap to edit`}>
                                     <ThemedText style={styles.detailValue}>
                                         {row.weightLbs && row.weightLbs !== "0" ? row.weightLbs : "—"}
                                         <ThemedText style={[styles.detailLabel, { color: labelColor }]}> lbs</ThemedText>
@@ -322,7 +324,7 @@ export function WorkoutCard({
                             {editingField === "reps" ? (
                                 renderInput("Reps", "numeric")
                             ) : (
-                                <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)}>
+                                <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)} accessibilityRole="button" accessibilityLabel={`Reps: ${row.reps || 'not set'}, tap to edit`}>
                                     <ThemedText style={styles.detailValue}>
                                         {row.reps || "—"}
                                         <ThemedText style={[styles.detailLabel, { color: labelColor }]}> reps</ThemedText>
@@ -340,7 +342,7 @@ export function WorkoutCard({
                     {editingField === "notes" ? (
                         renderInput("Add a note...")
                     ) : (
-                        <Pressable onPress={() => onBeginEditCell?.(row.id, "notes", row.notes)}>
+                        <Pressable onPress={() => onBeginEditCell?.(row.id, "notes", row.notes)} accessibilityRole="button" accessibilityLabel={`Note: ${row.notes}, tap to edit`}>
                             <ThemedText style={[styles.noteText, { color: noteColor }]}>{row.notes}</ThemedText>
                         </Pressable>
                     )}
