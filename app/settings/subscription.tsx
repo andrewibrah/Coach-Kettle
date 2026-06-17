@@ -25,6 +25,7 @@ export default function SubscriptionScreen() {
   const onTint = useThemeColor({}, 'tintForeground');
   const cardBg = useThemeColor({}, 'cardBackground');
   const successColor = useThemeColor({}, 'success');
+  const dangerColor = useThemeColor({}, 'danger');
 
   const { session } = useAuth();
   const { entitlement, isPro, refreshEntitlement } = useEntitlement();
@@ -97,7 +98,7 @@ export default function SubscriptionScreen() {
     return (
       <View style={[styles.statusRow, { backgroundColor: cardBg }]}>
         <View style={styles.statusContent}>
-          <View style={[styles.statusDot, { backgroundColor: '#FF3B30' }]} />
+          <View style={[styles.statusDot, { backgroundColor: dangerColor }]} />
           <View style={styles.statusText}>
             <ThemedText style={styles.statusLabel}>No Active Plan</ThemedText>
             <ThemedText style={styles.statusDescription}>

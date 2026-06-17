@@ -26,6 +26,7 @@ export default function SettingsScreen() {
 
     // Dynamic colors for dark mode
     const cardBg = useThemeColor({}, 'cardBackground');
+    const dangerColor = useThemeColor({}, 'danger');
     const sectionTitleColor = '#8E8E93'; // iOS system gray — same in both themes
     const cacheBg = isDark ? '#3d2d00' : '#FFF8E6';
     const logoutBg = isDark ? '#3d1515' : '#FFF1F0';
@@ -264,8 +265,8 @@ export default function SettingsScreen() {
                         style={({ pressed }) => [styles.logoutButton, { backgroundColor: logoutBg }, pressed && styles.buttonPressed]}
                         onPress={handleLogout}
                     >
-                        <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color="#FF3B30" />
-                        <Text style={styles.logoutText}>Log Out</Text>
+                        <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color={dangerColor} />
+                        <Text style={[styles.logoutText, { color: dangerColor }]}>Log Out</Text>
                     </Pressable>
                 </View>
             </ScrollView>
@@ -336,7 +337,6 @@ const styles = StyleSheet.create({
     logoutText: {
         fontSize: 17,
         fontWeight: '600',
-        color: '#FF3B30',
     },
     emailContainer: {
         paddingVertical: 12,
