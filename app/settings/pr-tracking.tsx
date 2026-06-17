@@ -45,6 +45,7 @@ export default function PRTrackingScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const sectionTitleColor = '#8E8E93'; // iOS system gray, same in both themes
   const successColor = useThemeColor({}, 'success');
+  const dangerColor = useThemeColor({}, 'danger');
 
   const [trackedLifts, setTrackedLifts] = useState<PRTrackedLift[]>([]);
   const [prLifts, setPRLifts] = useState<PRLift[]>([]);
@@ -593,7 +594,7 @@ export default function PRTrackingScreen() {
                           style={styles.actionButton}
                           onPress={() => handleRemoveLift(lift)}
                         >
-                          <IconSymbol name="trash" size={20} color="#FF3B30" />
+                          <IconSymbol name="trash" size={20} color={dangerColor} />
                         </Pressable>
                       </View>
                     </Pressable>
