@@ -40,6 +40,8 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
   const borderColor = useThemeColor({}, "border");
   const accentColor = useThemeColor({}, "tint");
   const onTint = useThemeColor({}, "tintForeground");
+  const secondaryBg = useThemeColor({}, "secondaryBackground");
+  const inputBg = useThemeColor({}, "inputBackground");
 
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,7 +163,7 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
           onPress={() => handleExpand(template.id)}
           style={[
             styles.templateCard,
-            { backgroundColor: isDark ? "#1c1c1e" : "#f5f5f5", borderColor },
+            { backgroundColor: secondaryBg, borderColor },
           ]}
         >
           <View style={styles.templateHeader}>
@@ -184,7 +186,7 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
               </Pressable>
               <Pressable
                 onPress={() => handleDelete(template)}
-                style={[styles.actionButton, { backgroundColor: isDark ? "#3a3a3c" : "#e0e0e0" }]}
+                style={[styles.actionButton, { backgroundColor: inputBg }]}
               >
                 <MaterialCommunityIcons name="trash-can-outline" size={16} color={textColor} />
               </Pressable>

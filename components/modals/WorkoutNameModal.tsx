@@ -104,7 +104,7 @@ export function WorkoutNameModal({ visible, userId, onClose, onConfirm, onSelect
                 disabled={isSelecting}
                 style={({ pressed }) => [
                     styles.templateItem,
-                    { backgroundColor: isDark ? '#2c2c2e' : '#f5f5f5' },
+                    { backgroundColor: inputBg },
                     pressed && { opacity: 0.7 },
                 ]}
             >
