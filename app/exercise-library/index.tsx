@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,8 +48,8 @@ export default function ExerciseLibraryScreen() {
     };
   }, []);
 
-  const handleSearchSubmit = async () => {
-    if (!query.trim()) {
+  const handleSearchSubmit = useCallback(async (q: string) => {
+    if (!q.trim()) {
       try {
         const list = await fetchExerciseLibrary();
         setExercises(list);
@@ -60,7 +60,7 @@ export default function ExerciseLibraryScreen() {
     }
     setLoading(true);
     try {
-      const results = await searchExercises(query);
+      const results = await searchExercises(q);
       setExercises(results);
     } catch (e) {
       console.warn('[exercise-library] search failed', e);
@@ -68,7 +68,18 @@ export default function ExerciseLibraryScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      handleSearchSubmit(query);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, handleSearchSubmit]);
 
   const filtered = useMemo(() => {
     if (!bodyPartFilter) return exercises;
@@ -83,7 +94,7 @@ export default function ExerciseLibraryScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            onSubmitEditing={handleSearchSubmit}
+            onSubmitEditing={() => handleSearchSubmit(query)}
             placeholder="Search exercises…"
             placeholderTextColor={placeholder}
             returnKeyType="search"
