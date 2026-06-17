@@ -60,7 +60,6 @@ const styles = StyleSheet.create({
     card: {
         width: "100%",
         maxWidth: 320,
-        backgroundColor: "#FFFFFF",
         borderRadius: 14,
         padding: 24,
         gap: 16,
@@ -73,12 +72,10 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 20,
         fontWeight: "700",
-        color: "#111827",
         textAlign: "center",
     },
     message: {
         fontSize: 15,
-        color: "#6B7280",
         textAlign: "center",
         lineHeight: 22,
     },
@@ -92,7 +89,6 @@ const styles = StyleSheet.create({
         padding: 12,
         alignItems: "center",
         borderRadius: 14,
-        backgroundColor: "#F3F4F6",
     },
     cancelText: {
         fontWeight: "600",
@@ -103,7 +99,6 @@ const styles = StyleSheet.create({
         padding: 12,
         alignItems: "center",
         borderRadius: 14,
-        backgroundColor: "#EF4444",
     },
     deleteText: {
         color: "#FFFFFF",

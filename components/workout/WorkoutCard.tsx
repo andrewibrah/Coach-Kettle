@@ -239,7 +239,7 @@ export function WorkoutCard({
                 ]}
             >
             <View style={styles.header}>
-                <ThemedText type="defaultSemiBold" style={[styles.exercise, isSyncing && styles.syncingText]}>
+                <ThemedText type="defaultSemiBold" style={[styles.exercise, isSyncing && { color: labelColor }]}>
                     {row.exercise}
                 </ThemedText>
                 <Pressable
@@ -249,7 +249,7 @@ export function WorkoutCard({
                     disabled={isSyncing}
                 >
                     {editingField === "set" ? renderInput("Set", "numeric") : (
-                        <ThemedText style={[styles.set, { color: setLabelColor, backgroundColor: setLabelBg }, isSyncing && styles.syncingText]}>Set {row.set}</ThemedText>
+                        <ThemedText style={[styles.set, { color: setLabelColor, backgroundColor: setLabelBg }, isSyncing && { color: labelColor }]}>Set {row.set}</ThemedText>
                     )}
                 </Pressable>
             </View>
@@ -428,8 +428,5 @@ const styles = StyleSheet.create({
     },
     syncingRow: {
         opacity: 0.5,
-    },
-    syncingText: {
-        color: "#9CA3AF",
     },
 });

@@ -41,6 +41,7 @@ export function WorkoutBottomBar({
   const placeholder = useThemeColor({}, 'placeholder');
   const inputBg = useThemeColor({}, 'inputBackground');
   const borderColor = useThemeColor({}, 'border');
+  const dangerColor = useThemeColor({}, 'danger');
 
   const disabledSend = !workoutActive || loading || !messageInput.trim();
 
@@ -105,7 +106,7 @@ export function WorkoutBottomBar({
           style={({ pressed }) => [
             styles.pillButton,
             { backgroundColor: textColor, borderColor: textColor },
-            workoutActive && styles.pillDanger,
+            workoutActive && { backgroundColor: dangerColor, borderColor: dangerColor },
             pressed && styles.pillPressed,
           ]}
         >
@@ -172,7 +173,6 @@ const styles = StyleSheet.create({
   clearText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#9CA3AF',
   },
   inputTapCatcher: {
     position: "absolute",
@@ -217,10 +217,7 @@ const styles = StyleSheet.create({
   pillPrimary: {
     // backgroundColor and borderColor set dynamically via isDark inline styles
   },
-  pillDanger: {
-    backgroundColor: "#B91C1C",
-    borderColor: "#B91C1C",
-  },
+  pillDanger: {},
   pillDisabled: {
     opacity: 0.45,
   },
@@ -250,9 +247,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     // color set dynamically via isDark inline styles
   },
-  errorText: {
-    color: "#B00020",
-  },
+  errorText: {},
   hint: {
     opacity: 0.7,
   },

@@ -67,7 +67,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
 
                         <View style={styles.formContext}>
                             <View style={styles.inputGroup}>
-                                <ThemedText style={styles.label}>Exercise</ThemedText>
+                                <ThemedText style={[styles.label, { color: placeholderColor }]}>Exercise</ThemedText>
                                 <TextInput
                                     style={[styles.input, { color: textColor, borderColor, backgroundColor: inputBg }]}
                                     value={exercise}
@@ -79,7 +79,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
 
                             <View style={styles.row}>
                                 <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                                    <ThemedText style={styles.label}>Weight (lbs)</ThemedText>
+                                    <ThemedText style={[styles.label, { color: placeholderColor }]}>Weight (lbs)</ThemedText>
                                     <TextInput
                                         style={[styles.input, { color: textColor, borderColor, backgroundColor: inputBg }]}
                                         value={weight}
@@ -91,7 +91,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                                 </View>
 
                                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                                    <ThemedText style={styles.label}>Reps</ThemedText>
+                                    <ThemedText style={[styles.label, { color: placeholderColor }]}>Reps</ThemedText>
                                     <TextInput
                                         style={[styles.input, { color: textColor, borderColor, backgroundColor: inputBg }]}
                                         value={reps}
@@ -104,7 +104,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                             </View>
 
                             <View style={styles.inputGroup}>
-                                <ThemedText style={styles.label}>Notes</ThemedText>
+                                <ThemedText style={[styles.label, { color: placeholderColor }]}>Notes</ThemedText>
                                 <TextInput
                                     style={[styles.input, styles.textArea, { color: textColor, borderColor, backgroundColor: inputBg }]}
                                     value={notes}
@@ -161,7 +161,6 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: "600",
-        color: "#6B7280",
     },
     input: {
         borderWidth: 1,
@@ -173,7 +172,6 @@ const styles = StyleSheet.create({
         minHeight: 80,
     },
     doneButton: {
-        color: "#3B82F6",
         fontSize: 16,
         fontWeight: "600",
     },
