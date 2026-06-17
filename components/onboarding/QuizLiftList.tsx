@@ -67,6 +67,8 @@ export function QuizLiftAdder({
           ]}
           onPress={handleAdd}
           disabled={!value.trim()}
+          accessibilityRole="button"
+          accessibilityLabel="Add lift"
         >
           <IconSymbol name="plus" size={20} color={onTint} />
         </TouchableOpacity>
@@ -81,6 +83,8 @@ export function QuizLiftAdder({
                 key={suggestion}
                 style={[styles.suggestionChip, { backgroundColor: secondaryBg }]}
                 onPress={() => handleSuggestion(suggestion)}
+                accessibilityRole="button"
+                accessibilityLabel={`Quick add ${suggestion}`}
               >
                 <ThemedText style={styles.suggestionText}>{suggestion}</ThemedText>
               </TouchableOpacity>
@@ -149,7 +153,7 @@ function LiftItem({ lift, onRemove }: LiftItemProps) {
     >
       <View style={[styles.liftItem, { backgroundColor: secondaryBg }]}>
         <ThemedText style={styles.liftName}>{lift}</ThemedText>
-        <TouchableOpacity onPress={handleRemove} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={handleRemove} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={`Remove ${lift}`}>
           <IconSymbol name="xmark.circle.fill" size={22} color={iconColor} />
         </TouchableOpacity>
       </View>

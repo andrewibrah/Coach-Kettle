@@ -23,6 +23,8 @@ export function QuizSkipButton({ onPress, disabled }: QuizSkipButtonProps) {
         onPress={handlePress}
         disabled={disabled}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Skip"
       >
         <ThemedText style={[styles.skipText, disabled && styles.disabledText]}>
           Skip
@@ -80,6 +82,9 @@ export function QuizContinueButton({
         onPressOut={handlePressOut}
         disabled={disabled || loading}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled: disabled || loading }}
       >
         {loading ? (
           <ActivityIndicator color={onTint} />
