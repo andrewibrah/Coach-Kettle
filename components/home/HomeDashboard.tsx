@@ -100,6 +100,8 @@ export function HomeDashboard({
             { backgroundColor: cardBackground },
             pressed && styles.cardPressed,
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="Start today's workout"
         >
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
@@ -127,6 +129,8 @@ export function HomeDashboard({
             { backgroundColor: cardBackground },
             pressed && styles.cardPressed,
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="Build your program"
         >
           <ThemedText style={[styles.eyebrow, { color: placeholder }]}>PROGRAM</ThemedText>
           <ThemedText type="defaultSemiBold" style={styles.cardTitle}>
@@ -154,6 +158,8 @@ export function HomeDashboard({
           { backgroundColor: cardBackground },
           pressed && styles.cardPressed,
         ]}
+        accessibilityRole="button"
+        accessibilityLabel="View coaching focus"
       >
         <View style={styles.coachHeader}>
           <View style={[styles.coachDot, { backgroundColor: coachColor }]} />
@@ -182,6 +188,8 @@ export function HomeDashboard({
             { backgroundColor: cardBackground },
             pressed && styles.cardPressed,
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="View nutrition today"
         >
           <ThemedText style={[styles.eyebrow, { color: placeholder }]}>
             NUTRITION TODAY

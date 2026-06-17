@@ -168,6 +168,9 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
             styles.templateCard,
             { backgroundColor: secondaryBg, borderColor },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={`${template.name}${isExpanded ? ', collapse' : ', expand'}`}
+          accessibilityState={{ expanded: isExpanded }}
         >
           <View style={styles.templateHeader}>
             <View style={styles.templateInfo}>
@@ -184,12 +187,16 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
               <Pressable
                 onPress={() => handleSelect(template)}
                 style={[styles.actionButton, { backgroundColor: accentColor }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Load ${template.name}`}
               >
                 <IconSymbol name="plus" size={16} color={onTint} />
               </Pressable>
               <Pressable
                 onPress={() => handleDelete(template)}
                 style={[styles.actionButton, { backgroundColor: inputBg }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${template.name}`}
               >
                 <MaterialCommunityIcons name="trash-can-outline" size={16} color={textColor} />
               </Pressable>
@@ -247,7 +254,7 @@ export function RoutineModal({ visible, userId, onClose, onSelectTemplate }: Pro
           <View style={[styles.card, { backgroundColor: cardBg }]}>
             <View style={styles.header}>
               <Text style={[styles.title, { color: textColor }]}>Workout Routines</Text>
-              <Pressable onPress={onClose} style={styles.closeButton}>
+              <Pressable onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
                 <IconSymbol name="xmark" size={20} color={subtextColor} />
               </Pressable>
             </View>

@@ -209,7 +209,7 @@ export function CoachModal({
             title="Coach"
             onBack={onClose}
             rightElement={
-              <Pressable onPress={handleClear} style={[styles.iconBtn, { opacity: history.length ? 1 : 0.3 }]} disabled={!history.length}>
+              <Pressable onPress={handleClear} style={[styles.iconBtn, { opacity: history.length ? 1 : 0.3 }]} disabled={!history.length} accessibilityRole="button" accessibilityLabel="Clear chat history">
                 <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
               </Pressable>
             }
@@ -258,6 +258,8 @@ export function CoachModal({
               <Pressable
                 onPress={handleSend}
                 disabled={disabled}
+                accessibilityRole="button"
+                accessibilityLabel="Send message"
                 style={({ pressed }) => [
                   styles.sendBtn,
                   { backgroundColor: sendBtnColor },
