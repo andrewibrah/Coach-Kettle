@@ -191,7 +191,7 @@ export default function WorkoutDetail() {
         if (isMounted.current) setLoading(false);
       }
     })();
-  }, [id]);
+  }, [id, showToast]);
 
   const groups = useMemo(() => {
     if (!workout) return [];
@@ -210,7 +210,7 @@ export default function WorkoutDetail() {
     } finally {
       setReflectionSaving(false);
     }
-  }, [id, reflection]);
+  }, [id, reflection, showToast]);
 
   const handleAddMedia = useCallback(async () => {
     if (!userId || !id) return;
@@ -269,7 +269,7 @@ export default function WorkoutDetail() {
       const msg = err instanceof Error ? err.message : "Could not access photos";
       showToast(msg, 'error');
     }
-  }, [mediaThumbs.length, userId, id]);
+  }, [mediaThumbs.length, userId, id, showToast]);
 
   const handleRemoveMedia = useCallback(async (index: number) => {
     const item = mediaThumbs[index];

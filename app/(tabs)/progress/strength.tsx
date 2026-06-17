@@ -42,7 +42,7 @@ export default function StrengthProgressionScreen() {
     } finally {
       setLoading(false);
     }
-  }, [exercise]);
+  }, [exercise, showToast]);
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>

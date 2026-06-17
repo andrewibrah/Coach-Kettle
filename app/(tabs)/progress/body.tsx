@@ -130,7 +130,7 @@ export default function BodyMetricsScreen() {
     } finally {
       setSaving(false);
     }
-  }, [form, load]);
+  }, [form, load, showToast]);
 
   const onDelete = useCallback((entry: BodyMetricsEntry) => {
     Alert.alert('Delete entry?', `Delete measurements from ${entry.measured_date}?`, [
@@ -148,7 +148,7 @@ export default function BodyMetricsScreen() {
         },
       },
     ]);
-  }, [load]);
+  }, [load, showToast]);
 
   const formatField = (key: FormKey, val: number): string => {
     if (key === 'body_fat_pct') return `${val}%`;

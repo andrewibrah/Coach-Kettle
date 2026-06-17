@@ -82,7 +82,7 @@ export default function RestingHrScreen() {
     } finally {
       setSaving(false);
     }
-  }, [bpm, load]);
+  }, [bpm, load, showToast]);
 
   const onDelete = useCallback((entry: RestingHeartRateEntry) => {
     Alert.alert('Delete entry?', `Delete ${entry.bpm} bpm from ${entry.measured_date}?`, [
@@ -100,7 +100,7 @@ export default function RestingHrScreen() {
         },
       },
     ]);
-  }, [load]);
+  }, [load, showToast]);
 
   const delta = summary?.trend_delta_bpm ?? 0;
   const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '·';

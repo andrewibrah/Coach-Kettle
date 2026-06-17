@@ -146,7 +146,7 @@ export function SessionReviewModal({
       const msg = err instanceof Error ? err.message : "Could not access photos";
       showToast(msg, "error");
     }
-  }, [mediaItems.length, workoutId, userId]);
+  }, [mediaItems.length, workoutId, userId, showToast]);
 
   const handleRemoveMedia = useCallback((index: number) => {
     setMediaItems((prev) => prev.filter((_, i) => i !== index));

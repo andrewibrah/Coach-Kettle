@@ -94,7 +94,7 @@ export default function BodyPhotosScreen() {
     } finally {
       setUploading(false);
     }
-  }, [userId, pose, load]);
+  }, [userId, pose, load, showToast]);
 
   const onDelete = useCallback((id: string) => {
     Alert.alert('Delete photo?', 'This cannot be undone.', [
@@ -112,7 +112,7 @@ export default function BodyPhotosScreen() {
         },
       },
     ]);
-  }, [load]);
+  }, [load, showToast]);
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
