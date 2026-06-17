@@ -127,6 +127,9 @@ export default function TimerScreen() {
                         backgroundColor: active ? tint : cardBg,
                       },
                     ]}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${formatTime(sec)} preset`}
+                    accessibilityState={{ selected: active }}
                   >
                     <ThemedText
                       style={[
@@ -162,6 +165,8 @@ export default function TimerScreen() {
                 { backgroundColor: tint },
                 pressed && styles.pressed,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Start rest timer"
             >
               <ThemedText style={[styles.primaryText, { color: tintFg }]}>
                 Start rest
@@ -177,6 +182,8 @@ export default function TimerScreen() {
                 { backgroundColor: tint },
                 pressed && styles.pressed,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Start rest timer again"
             >
               <ThemedText style={[styles.primaryText, { color: tintFg }]}>
                 Start again
@@ -192,6 +199,8 @@ export default function TimerScreen() {
                 { backgroundColor: tint },
                 pressed && styles.pressed,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Pause timer"
             >
               <ThemedText style={[styles.primaryText, { color: tintFg }]}>
                 Pause
@@ -207,6 +216,8 @@ export default function TimerScreen() {
                 { backgroundColor: tint },
                 pressed && styles.pressed,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Resume timer"
             >
               <ThemedText style={[styles.primaryText, { color: tintFg }]}>
                 Resume
@@ -223,6 +234,8 @@ export default function TimerScreen() {
                   { borderColor: border, backgroundColor: cardBg },
                   pressed && styles.pressed,
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Skip rest"
               >
                 <ThemedText style={[styles.secondaryText, { color: textColor }]}>
                   Skip
@@ -235,6 +248,8 @@ export default function TimerScreen() {
                   { borderColor: border, backgroundColor: cardBg },
                   pressed && styles.pressed,
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel rest timer"
               >
                 <ThemedText style={[styles.secondaryText, { color: textColor }]}>
                   Cancel
