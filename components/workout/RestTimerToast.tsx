@@ -72,6 +72,8 @@ export function RestTimerToast() {
         <Pressable
           onPress={() => router.push(TIMER_ROUTE)}
           style={[styles.chip, { backgroundColor: cardBg, borderColor }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Rest timer, ${formatTime(remainingSec)} remaining`}
         >
           <View style={[styles.chipBar, { backgroundColor: borderColor }]}>
             <View
@@ -98,6 +100,8 @@ export function RestTimerToast() {
                   hitSlop={10}
                   onPress={pause}
                   style={({ pressed }) => [styles.chipBtn, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Pause rest timer"
                 >
                   <ThemedText style={[styles.chipBtnText, { color: tint }]}>Pause</ThemedText>
                 </Pressable>
@@ -106,6 +110,8 @@ export function RestTimerToast() {
                   hitSlop={10}
                   onPress={resume}
                   style={({ pressed }) => [styles.chipBtn, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Resume rest timer"
                 >
                   <ThemedText style={[styles.chipBtnText, { color: tint }]}>Resume</ThemedText>
                 </Pressable>
@@ -114,6 +120,8 @@ export function RestTimerToast() {
                 hitSlop={10}
                 onPress={skip}
                 style={({ pressed }) => [styles.chipBtn, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Skip rest timer"
               >
                 <ThemedText style={[styles.chipBtnText, { color: placeholder }]}>Skip</ThemedText>
               </Pressable>
@@ -135,6 +143,8 @@ export function RestTimerToast() {
           router.push(TIMER_ROUTE);
         }}
         style={[styles.card, { backgroundColor: cardBg, borderColor }]}
+        accessibilityRole="button"
+        accessibilityLabel="Rest complete, tap to open timer"
       >
         <View style={[styles.dot, { backgroundColor: tint }]} />
         <View style={{ flex: 1 }}>
@@ -148,6 +158,8 @@ export function RestTimerToast() {
             cancel();
           }}
           style={({ pressed }) => [styles.dismiss, pressed && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
         >
           <ThemedText style={[styles.dismissText, { color: textColor }]}>Dismiss</ThemedText>
         </Pressable>

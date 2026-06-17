@@ -137,6 +137,9 @@ export default function BodyPhotosScreen() {
                     active && { backgroundColor: tint, borderColor: tint },
                     pressed && { opacity: 0.7 },
                   ]}
+                  accessibilityRole="radio"
+                  accessibilityLabel={p[0].toUpperCase() + p.slice(1)}
+                  accessibilityState={{ selected: active }}
                 >
                   <ThemedText
                     type="defaultSemiBold"
@@ -157,6 +160,9 @@ export default function BodyPhotosScreen() {
               pressed && { opacity: 0.7 },
               uploading && { opacity: 0.5 },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={uploading ? 'Uploading photo...' : 'Add progress photo'}
+            accessibilityState={{ disabled: uploading }}
           >
             <ThemedText type="defaultSemiBold" style={[styles.addBtnText, { color: onTint }]}>
               {uploading ? 'Uploading…' : 'Add photo'}
@@ -181,6 +187,8 @@ export default function BodyPhotosScreen() {
                     styles.thumbWrap,
                     pressed && { opacity: 0.7 },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="View progress photo"
                 >
                   {photo.signed_url ? (
                     <Image source={{ uri: photo.signed_url }} style={styles.thumb} />
@@ -209,7 +217,7 @@ export default function BodyPhotosScreen() {
         animationType="fade"
         onRequestClose={() => setPreview(null)}
       >
-        <Pressable style={styles.modalBg} onPress={() => setPreview(null)}>
+        <Pressable style={styles.modalBg} onPress={() => setPreview(null)} accessibilityRole="button" accessibilityLabel="Close photo preview">
           {preview?.signed_url && (
             <Image
               source={{ uri: preview.signed_url }}

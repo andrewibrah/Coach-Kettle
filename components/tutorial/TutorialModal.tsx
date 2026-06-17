@@ -145,6 +145,8 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
             style={[styles.skipBtn, { top: insets.top + 16 }]}
             onPress={handleDismiss}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Skip tutorial"
           >
             <ThemedText style={[styles.skipText, { color: iconColor }]}>Skip</ThemedText>
           </Pressable>
@@ -193,6 +195,8 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
                 { opacity: pressed ? 0.7 : 1 },
               ]}
               onPress={goToNext}
+              accessibilityRole="button"
+              accessibilityLabel="Next"
             >
               <ThemedText style={[styles.nextText, { color: tintColor }]}>
                 Next →
@@ -205,6 +209,8 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
                 { backgroundColor: tintColor, opacity: pressed ? 0.8 : 1 },
               ]}
               onPress={handleDismiss}
+              accessibilityRole="button"
+              accessibilityLabel="Get started"
             >
               <ThemedText style={[styles.getStartedText, { color: onTintColor }]}>Get Started →</ThemedText>
             </Pressable>

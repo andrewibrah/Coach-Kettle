@@ -131,6 +131,9 @@ export default function NutritionPreferencesScreen() {
         styles.pill,
         { backgroundColor: active ? tint : cardBg, opacity: pressed ? 0.7 : 1 },
       ]}
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
     >
       <ThemedText style={{ color: active ? onTint : undefined, fontWeight: '600' }}>{label}</ThemedText>
     </Pressable>
@@ -166,6 +169,9 @@ export default function NutritionPreferencesScreen() {
               key={a.v}
               onPress={() => setActivity(a.v)}
               style={({ pressed }) => [styles.activityRow, pressed && { opacity: 0.7 }, activity === a.v && { borderColor: tint }]}
+              accessibilityRole="radio"
+              accessibilityLabel={a.label}
+              accessibilityState={{ selected: activity === a.v }}
             >
               <View style={{ flex: 1 }}>
                 <ThemedText style={{ fontWeight: '600' }}>{a.label}</ThemedText>
@@ -181,7 +187,7 @@ export default function NutritionPreferencesScreen() {
           <View style={styles.pillRow}>
             {GOALS.map((g) => pill(g.label, goal === g.v, () => setGoal(g.v)))}
           </View>
-          <Pressable onPress={seedTemplates} style={({ pressed }) => [styles.btnGhost, { borderColor: tint }, pressed && { opacity: 0.7 }]}>
+          <Pressable onPress={seedTemplates} style={({ pressed }) => [styles.btnGhost, { borderColor: tint }, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Seed default meal plan templates">
             <ThemedText style={{ color: tint, fontWeight: '700' }}>Seed default templates for this goal</ThemedText>
           </Pressable>
         </View>
@@ -219,6 +225,9 @@ export default function NutritionPreferencesScreen() {
           onPress={save}
           disabled={saving}
           style={({ pressed }) => [styles.saveBtn, { backgroundColor: tint }, pressed && { opacity: 0.8 }]}
+          accessibilityRole="button"
+          accessibilityLabel={saving ? 'Saving preferences...' : 'Save preferences'}
+          accessibilityState={{ disabled: saving }}
         >
           <ThemedText style={{ color: onTint, fontWeight: '700' }}>{saving ? 'Saving…' : 'Save preferences'}</ThemedText>
         </Pressable>

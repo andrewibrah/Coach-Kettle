@@ -52,22 +52,22 @@ export function RestTimerBar({ onSkip, bottom = 96 }: Props) {
           {subtitle ? <ThemedText style={[styles.sub, { color: textColor }]}>{subtitle}</ThemedText> : null}
         </View>
         {state.kind === 'running' && (
-          <Pressable onPress={pause} style={({ pressed }) => [styles.btn, pressed && styles.pressed]}>
+          <Pressable onPress={pause} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Pause rest timer">
             <ThemedText style={[styles.btnText, { color: tint }]}>Pause</ThemedText>
           </Pressable>
         )}
         {state.kind === 'paused' && (
-          <Pressable onPress={resume} style={({ pressed }) => [styles.btn, pressed && styles.pressed]}>
+          <Pressable onPress={resume} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Resume rest timer">
             <ThemedText style={[styles.btnText, { color: tint }]}>Resume</ThemedText>
           </Pressable>
         )}
         {state.kind !== 'done' && (
-          <Pressable onPress={handleSkip} style={({ pressed }) => [styles.btn, pressed && styles.pressed]}>
+          <Pressable onPress={handleSkip} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Skip rest">
             <ThemedText style={[styles.btnText, { color: tint }]}>Skip</ThemedText>
           </Pressable>
         )}
         {state.kind === 'done' && (
-          <Pressable onPress={cancel} style={({ pressed }) => [styles.btn, pressed && styles.pressed]}>
+          <Pressable onPress={cancel} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Dismiss">
             <ThemedText style={[styles.btnText, { color: tint }]}>Dismiss</ThemedText>
           </Pressable>
         )}

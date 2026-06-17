@@ -107,6 +107,8 @@ export function WorkoutNameModal({ visible, userId, onClose, onConfirm, onSelect
                     { backgroundColor: inputBg },
                     pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Load routine ${template.name}`}
             >
                 <Text style={[styles.templateName, { color: textColor }]}>
                     {template.name}
@@ -168,7 +170,7 @@ export function WorkoutNameModal({ visible, userId, onClose, onConfirm, onSelect
                         )}
 
                         <View style={styles.buttonRow}>
-                            <Pressable onPress={onClose} style={[styles.cancelButton, { backgroundColor: buttonBg }]}>
+                            <Pressable onPress={onClose} style={[styles.cancelButton, { backgroundColor: buttonBg }]} accessibilityRole="button" accessibilityLabel="Cancel">
                                 <Text style={[styles.cancelText, { color: textColor }]}>Cancel</Text>
                             </Pressable>
 
@@ -176,6 +178,9 @@ export function WorkoutNameModal({ visible, userId, onClose, onConfirm, onSelect
                                 onPress={handleConfirm}
                                 style={[styles.confirmButton, { backgroundColor: primaryBtn }, !name.trim() && styles.disabled]}
                                 disabled={!name.trim()}
+                                accessibilityRole="button"
+                                accessibilityLabel="Start workout"
+                                accessibilityState={{ disabled: !name.trim() }}
                             >
                                 <Text style={[styles.confirmText, { color: primaryBtnText }]}>Start</Text>
                             </Pressable>

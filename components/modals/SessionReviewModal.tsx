@@ -182,6 +182,8 @@ export function SessionReviewModal({
           <Pressable
             onPress={handleDone}
             style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Close session review"
           >
             <IconSymbol name="xmark" size={24} color={iconColor} />
           </Pressable>
@@ -285,6 +287,9 @@ export function SessionReviewModal({
                 ]}
                 onPress={handleDone}
                 disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel={saving ? 'Saving session...' : 'Save and finish'}
+                accessibilityState={{ disabled: saving }}
               >
                 {saving ? (
                   <ActivityIndicator size="small" color={doneButtonTextColor} />
@@ -319,6 +324,8 @@ export function SessionReviewModal({
                   pressed && styles.doneButtonPressed,
                 ]}
                 onPress={handleDone}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
               >
                 <Text style={[styles.doneButtonText, { color: doneButtonTextColor }]}>Close</Text>
               </Pressable>

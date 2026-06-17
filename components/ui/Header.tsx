@@ -24,6 +24,8 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: Hea
                     <Pressable
                         onPress={onMenuPress}
                         style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Open menu"
                     >
                         <IconSymbol name="line.3.horizontal" size={24} color={iconColor} />
                     </Pressable>
@@ -40,6 +42,8 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: Hea
                         <Pressable
                             onPress={onRoutinePress}
                             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Load routine"
                         >
                             <MaterialCommunityIcons name="clipboard-list-outline" size={24} color={iconColor} />
                         </Pressable>
@@ -47,6 +51,8 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: Hea
                     <Pressable
                         onPress={onClearPress}
                         style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Clear workout"
                     >
                         <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
                     </Pressable>

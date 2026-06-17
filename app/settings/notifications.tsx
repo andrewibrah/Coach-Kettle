@@ -92,6 +92,9 @@ export default function NotificationsSettingsScreen() {
               onPress={handleRequestPermission}
               style={({ pressed }) => [styles.btn, { backgroundColor: tint }, pressed && { opacity: 0.7 }]}
               disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={busy ? 'Working...' : 'Enable notifications'}
+              accessibilityState={{ disabled: busy }}
             >
               <ThemedText style={[styles.btnText, { color: onTint }]}>
                 {busy ? 'Working…' : 'Enable notifications'}
@@ -103,6 +106,9 @@ export default function NotificationsSettingsScreen() {
               onPress={handleTestPush}
               style={({ pressed }) => [styles.btnGhost, pressed && { opacity: 0.7 }]}
               disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="Send test push notification"
+              accessibilityState={{ disabled: busy }}
             >
               <ThemedText style={[styles.btnText, { color: tint }]}>Send test push</ThemedText>
             </Pressable>
@@ -158,11 +164,11 @@ export default function NotificationsSettingsScreen() {
 function Stepper({ value, onDec, onInc, suffix, tint }: { value: number; onDec: () => void; onInc: () => void; suffix?: string; tint: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Pressable onPress={onDec} style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]}>
+      <Pressable onPress={onDec} style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Decrease">
         <ThemedText style={{ color: tint, fontSize: 18, fontWeight: '700' }}>−</ThemedText>
       </Pressable>
       <ThemedText style={{ minWidth: 50, textAlign: 'center', fontWeight: '600' }}>{value.toString().padStart(2, '0')}{suffix ?? ''}</ThemedText>
-      <Pressable onPress={onInc} style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]}>
+      <Pressable onPress={onInc} style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Increase">
         <ThemedText style={{ color: tint, fontSize: 18, fontWeight: '700' }}>+</ThemedText>
       </Pressable>
     </View>
