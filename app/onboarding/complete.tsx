@@ -105,6 +105,8 @@ export default function CompleteScreen() {
             style={[styles.button, { backgroundColor: tint }]}
             onPress={handleRetry}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Try Again"
           >
             <ThemedText style={[styles.buttonText, { color: onTint }]}>Try Again</ThemedText>
           </TouchableOpacity>
@@ -139,6 +141,8 @@ export default function CompleteScreen() {
             style={[styles.button, { backgroundColor: tint }]}
             onPress={handleContinue}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Continue"
           >
             <ThemedText style={[styles.buttonText, { color: onTint }]}>Continue</ThemedText>
           </TouchableOpacity>

@@ -127,6 +127,9 @@ export default function ExerciseLibraryScreen() {
                     },
                     pressed && { opacity: 0.7 },
                   ]}
+                  accessibilityRole="radio"
+                  accessibilityLabel={bp}
+                  accessibilityState={{ selected }}
                 >
                   <ThemedText
                     style={[styles.pillText, { color: selected ? onTint : textColor }]}
@@ -159,6 +162,8 @@ export default function ExerciseLibraryScreen() {
                   { backgroundColor: cardBackground },
                   pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${ex.name}, ${ex.category}, ${ex.body_part}`}
               >
                 <ThemedText style={[styles.itemName, { color: textColor }]}>{ex.name}</ThemedText>
                 <View style={styles.metaRow}>

@@ -8,17 +8,13 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 import { useCoaching } from '@/contexts/CoachingContext';
-import type { ColorGrade } from '@/types/nutrition';
 
-const COLOR_MAP: Record<ColorGrade, string> = {
-  green: '#10B981',
-  yellow: '#F59E0B',
-  red: '#EF4444',
-};
-
-function dotColor(grade: ColorGrade | null | undefined, fallback: string): string {
-  if (!grade) return fallback;
-  return COLOR_MAP[grade] ?? fallback;
+function useDotColors() {
+  return {
+    green: useThemeColor({}, 'success'),
+    yellow: useThemeColor({}, 'warning'),
+    red: useThemeColor({}, 'danger'),
+  };
 }
 
 function formatDate(iso: string): string {
@@ -40,6 +36,7 @@ export default function CoachHistoryScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
 
+  const dotColors = useDotColors();
   const { loading, recent } = useCoaching();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -72,6 +69,9 @@ export default function CoachHistoryScreen() {
                     { backgroundColor: cardBackground },
                     pressed && { opacity: 0.7 },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${formatDate(item.feedback_date)} coach report, ${isOpen ? 'collapse' : 'expand'}`}
+                  accessibilityState={{ expanded: isOpen }}
                 >
                   <View style={styles.rowHeader}>
                     <ThemedText style={{ fontWeight: '700' }}>
@@ -81,7 +81,7 @@ export default function CoachHistoryScreen() {
                       <View
                         style={[
                           styles.dot,
-                          { backgroundColor: dotColor(item.overall_color, border) },
+                          { backgroundColor: item.overall_color ? dotColors[item.overall_color] : border },
                         ]}
                       />
                       <ThemedText style={{ fontSize: 12, color: placeholder }}>

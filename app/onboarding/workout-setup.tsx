@@ -154,6 +154,8 @@ export default function WorkoutSetupScreen() {
             <TouchableOpacity
               style={[styles.choiceButton, { backgroundColor: tint }]}
               onPress={handleYes}
+              accessibilityRole="button"
+              accessibilityLabel="Yes, set up templates"
             >
               <ThemedText style={[styles.choiceButtonText, { color: onTint }]}>Yes, let&apos;s set them up</ThemedText>
             </TouchableOpacity>
@@ -164,6 +166,8 @@ export default function WorkoutSetupScreen() {
                 { backgroundColor: inputBg },
               ]}
               onPress={handleNo}
+              accessibilityRole="button"
+              accessibilityLabel="Skip for now"
             >
               <ThemedText style={styles.choiceButtonTextSecondary}>Skip for now</ThemedText>
             </TouchableOpacity>
@@ -260,6 +264,8 @@ export default function WorkoutSetupScreen() {
                     { backgroundColor: inputBg },
                   ]}
                   onPress={handleCancelEdit}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel edit"
                 >
                   <IconSymbol name="xmark" size={20} color={textColor} />
                 </TouchableOpacity>
@@ -272,6 +278,8 @@ export default function WorkoutSetupScreen() {
                 ]}
                 onPress={handleAddLift}
                 disabled={!currentLift.name.trim()}
+                accessibilityRole="button"
+                accessibilityLabel={editingIndex !== null ? 'Save exercise' : 'Add exercise'}
               >
                 <IconSymbol name={editingIndex !== null ? "checkmark" : "plus"} size={20} color={onTint} />
               </TouchableOpacity>
@@ -299,6 +307,8 @@ export default function WorkoutSetupScreen() {
                       { backgroundColor: secondaryBg },
                       editingIndex === index && { borderColor: tint, borderWidth: 2 },
                     ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit ${lift.name}`}
                   >
                     <View style={styles.liftInfo}>
                       <ThemedText style={styles.liftName}>{lift.name}</ThemedText>
@@ -310,12 +320,14 @@ export default function WorkoutSetupScreen() {
                         </ThemedText>
                       )}
                     </View>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       onPress={(e) => {
                         e.stopPropagation();
                         handleRemoveLift(index);
                       }}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${lift.name}`}
                     >
                       <IconSymbol
                         name="xmark.circle.fill"
@@ -362,6 +374,8 @@ export default function WorkoutSetupScreen() {
           <TouchableOpacity
             style={[styles.choiceButton, { backgroundColor: tint }]}
             onPress={handleAddAnother}
+            accessibilityRole="button"
+            accessibilityLabel="Add another workout"
           >
             <ThemedText style={[styles.choiceButtonText, { color: onTint }]}>Add another workout</ThemedText>
           </TouchableOpacity>
@@ -372,6 +386,8 @@ export default function WorkoutSetupScreen() {
               { backgroundColor: inputBg },
             ]}
             onPress={finishOnboarding}
+            accessibilityRole="button"
+            accessibilityLabel="Done, finish setup"
           >
             <ThemedText style={styles.choiceButtonTextSecondary}>
               I&apos;m done

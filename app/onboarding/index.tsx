@@ -63,6 +63,8 @@ export default function OnboardingWelcome() {
           style={[styles.button, { backgroundColor: tint }]}
           onPress={handleGetStarted}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Get Started"
         >
           <ThemedText style={[styles.buttonText, { color: onTint }]}>Get Started</ThemedText>
         </TouchableOpacity>
@@ -71,6 +73,8 @@ export default function OnboardingWelcome() {
           style={styles.skipButton}
           onPress={handleSkip}
           disabled={skipping}
+          accessibilityRole="button"
+          accessibilityLabel="Skip for now"
         >
           {skipping ? (
             <ActivityIndicator size="small" color={placeholder} />
