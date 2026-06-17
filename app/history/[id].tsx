@@ -311,7 +311,7 @@ export default function WorkoutDetail() {
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: backBtnPressedBg }]}>
+          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: backBtnPressedBg }]} accessibilityRole="button" accessibilityLabel="Go back">
             <IconSymbol name="chevron.left" size={24} color={textColor} />
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -332,6 +332,8 @@ export default function WorkoutDetail() {
                 },
                 pressed && { opacity: 0.8 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel={showReview ? 'Hide workout review' : 'Show workout review'}
             >
               <Text style={[styles.reviewToggleRating, { color: getRatingColor(workout.review!.rating, successColor, tintColor, warningColor, dangerColor) }]}>
                 {workout.review!.rating}/10
@@ -409,6 +411,8 @@ export default function WorkoutDetail() {
               <Pressable
                 onPress={() => setReflectionEditing(true)}
                 style={({ pressed }) => [styles.reflectionEditBtn, pressed && { opacity: 0.6 }]}
+                accessibilityRole="button"
+                accessibilityLabel={reflection ? 'Edit reflection' : 'Add reflection'}
               >
                 <Text style={[styles.reflectionEditText, { color: tintColor }]}>
                   {reflection ? 'Edit' : 'Add'}
@@ -441,6 +445,8 @@ export default function WorkoutDetail() {
                     setReflectionEditing(false);
                   }}
                   style={({ pressed }) => [styles.reflectionActionBtn, pressed && { opacity: 0.6 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel editing reflection"
                 >
                   <Text style={[styles.reflectionCancelText, { color: mutedTextColor }]}>Cancel</Text>
                 </Pressable>
@@ -453,6 +459,8 @@ export default function WorkoutDetail() {
                     { backgroundColor: textColor },
                     pressed && { opacity: 0.8 },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Save reflection"
                 >
                   {reflectionSaving ? (
                     <ActivityIndicator size="small" color={backgroundColor} />
