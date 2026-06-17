@@ -33,13 +33,25 @@ const SLIDES = [
     title: "Start a Session",
     subtitle: "Pick a template or go freestyle",
     body: "Choose a saved template to pre-load your exercises, or tap New Workout to start from scratch.",
-    videoSource: require("@/assets/videos/guide_start_session.mp4"),
+    videoSource: require("@/assets/videos/guide_reel_start_session.mp4"),
+    videoStartTime: 2,
+    videoEndTime: 10,
   },
   {
     title: "Log Sets Naturally",
     subtitle: "Type it like you'd say it",
     body: '"Bench 185 x 8", "Squat 225 3x5", "Run 20 min 2 miles" — we parse it all instantly.',
-    videoSource: require("@/assets/videos/guide_log_set.mp4"),
+    videoSource: require("@/assets/videos/guide_reel_workout_logging.mp4"),
+    videoStartTime: 1,
+    videoEndTime: 14,
+  },
+  {
+    title: "Ask Your Coach",
+    subtitle: "Get answers between sets",
+    body: "Tap the coach bubble anytime to ask about form, programming, or what to do next. It knows your training history.",
+    videoSource: require("@/assets/videos/guide_reel_ask_coach.mp4"),
+    videoStartTime: 17,
+    videoEndTime: 23,
   },
   {
     title: "Meet Your Coach",
@@ -95,7 +107,13 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
 
   const renderSlide = ({ item }: { item: typeof SLIDES[number]; index: number }) => {
     const visual = 'videoSource' in item
-      ? <GuideVideo source={item.videoSource} />
+      ? (
+        <GuideVideo
+          source={item.videoSource}
+          startTime={'videoStartTime' in item ? item.videoStartTime : undefined}
+          endTime={'videoEndTime' in item ? item.videoEndTime : undefined}
+        />
+      )
       : undefined;
 
     return (
