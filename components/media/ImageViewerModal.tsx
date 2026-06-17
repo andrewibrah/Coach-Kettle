@@ -44,13 +44,15 @@ export function ImageViewerModal({ visible, uri, onClose }: Props) {
     >
       <View style={styles.backdrop}>
         {/* Tap background to close */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
 
         {/* Close button */}
         <Pressable
           onPress={onClose}
           style={[styles.closeBtn, { top: insets.top + 12 }]}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
         >
           <Text style={styles.closeBtnText}>✕</Text>
         </Pressable>

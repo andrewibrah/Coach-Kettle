@@ -79,6 +79,8 @@ export default function ProgramWeekScreen() {
                     { borderColor: border },
                     pressed && navigable && { opacity: 0.7 },
                   ]}
+                  accessibilityRole={navigable ? 'button' : 'text'}
+                  accessibilityLabel={ex.exercise_name}
                 >
                   <ThemedText style={[styles.exerciseName, { color: textColor }]}>
                     {ex.exercise_name}

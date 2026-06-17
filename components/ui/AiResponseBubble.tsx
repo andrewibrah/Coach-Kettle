@@ -30,7 +30,7 @@ export function AiResponseBubble({ text, onDismiss }: Props) {
       exiting={FadeOutDown.duration(200)}
       style={styles.container}
     >
-      <Pressable onPress={onDismiss} style={styles.touchableContainer}>
+      <Pressable onPress={onDismiss} style={styles.touchableContainer} accessibilityRole="button" accessibilityLabel="Dismiss AI suggestion">
         <ThemedView style={[styles.bubble, { backgroundColor, borderColor }]}>
           <View style={styles.header}>
             <View style={[styles.botIcon, { backgroundColor: tint }]}>

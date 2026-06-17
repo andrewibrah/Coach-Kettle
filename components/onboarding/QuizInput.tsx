@@ -105,6 +105,9 @@ export function QuizUnitPicker({ options, selected, onSelect }: QuizUnitPickerPr
           ]}
           onPress={() => handleSelect(option.value)}
           activeOpacity={0.7}
+          accessibilityRole="radio"
+          accessibilityLabel={option.label}
+          accessibilityState={{ selected: selected === option.value }}
         >
           <ThemedText
             style={[

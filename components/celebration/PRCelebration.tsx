@@ -107,6 +107,8 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
       style={StyleSheet.absoluteFill}
       activeOpacity={1}
       onPress={handleDismiss}
+      accessibilityRole="button"
+      accessibilityLabel="Dismiss PR celebration"
     >
       <Animated.View style={[styles.overlay, overlayStyle]}>
         <BlurView intensity={20} style={StyleSheet.absoluteFill} tint={colorScheme === 'dark' ? 'dark' : 'light'} />

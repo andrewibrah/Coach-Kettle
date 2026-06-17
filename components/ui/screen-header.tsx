@@ -48,6 +48,8 @@ export function ScreenHeader({ title, subtitle, onBack, rightElement, style, ski
                         <Pressable
                             onPress={handleBack}
                             style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Go back"
                         >
                             <IconSymbol name="chevron.left" size={24} color={iconColor} />
                         </Pressable>

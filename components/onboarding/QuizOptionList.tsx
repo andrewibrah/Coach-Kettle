@@ -95,6 +95,9 @@ function OptionCard({ option, isSelected, onPress, delay }: OptionCardProps) {
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.8}
+        accessibilityRole="radio"
+        accessibilityLabel={option.label}
+        accessibilityState={{ selected: isSelected }}
       >
         <View style={styles.optionContent}>
           {option.icon && (

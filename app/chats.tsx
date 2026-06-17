@@ -106,6 +106,8 @@ export default function ChatsScreen() {
           <Pressable
             style={[styles.signInButton, { backgroundColor: tint }]}
             onPress={() => router.push('/auth/sign-in')}
+            accessibilityRole="button"
+            accessibilityLabel="Sign in"
           >
             <Text style={[styles.signInButtonText, { color: onTint }]}>Sign In</Text>
           </Pressable>

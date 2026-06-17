@@ -28,7 +28,7 @@ export function QuizProgress({ currentStep, totalSteps, onBack }: QuizProgressPr
     <View style={styles.container}>
       <View style={styles.header}>
         {onBack ? (
-          <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Go back">
             <IconSymbol name="chevron.left" size={20} color={textColor} />
             <ThemedText style={styles.backText}>Back</ThemedText>
           </TouchableOpacity>
