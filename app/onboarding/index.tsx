@@ -14,6 +14,7 @@ export default function OnboardingWelcome() {
   const insets = useSafeAreaInsets();
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
+  const placeholder = useThemeColor({}, 'placeholder');
   const { profile } = useProfile();
   const { draft, skipOnboarding } = useOnboarding();
   const [skipping, setSkipping] = useState(false);
@@ -72,9 +73,9 @@ export default function OnboardingWelcome() {
           disabled={skipping}
         >
           {skipping ? (
-            <ActivityIndicator size="small" color="#999" />
+            <ActivityIndicator size="small" color={placeholder} />
           ) : (
-            <ThemedText style={styles.skipButtonText}>Skip for now</ThemedText>
+            <ThemedText style={[styles.skipButtonText, { color: placeholder }]}>Skip for now</ThemedText>
           )}
         </TouchableOpacity>
       </Animated.View>
@@ -135,7 +136,6 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 16,
-    color: '#999',
     fontWeight: '500',
   },
 });

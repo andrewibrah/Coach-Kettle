@@ -280,9 +280,9 @@ export default function SignUp() {
             </TouchableOpacity>
 
             <View style={styles.divider}>
-              <View style={styles.line} />
+              <View style={[styles.line, { backgroundColor: inputBorderColor }]} />
               <ThemedText style={styles.orText}>OR</ThemedText>
-              <View style={styles.line} />
+              <View style={[styles.line, { backgroundColor: inputBorderColor }]} />
             </View>
 
             {/*
@@ -384,7 +384,6 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ccc',
     opacity: 0.3,
   },
   orText: {
