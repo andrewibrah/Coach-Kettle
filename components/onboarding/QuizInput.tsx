@@ -8,8 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/ui/themed-text';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 interface QuizInputProps {
   value: string;
@@ -30,7 +29,12 @@ export function QuizInput({
   maxLength,
   error,
 }: QuizInputProps) {
-  const colorScheme = useColorScheme();
+  const secondaryBg = useThemeColor({}, 'secondaryBackground');
+  const textColor = useThemeColor({}, 'text');
+  const placeholderColor = useThemeColor({}, 'placeholder');
+  const tint = useThemeColor({}, 'tint');
+  const dangerColor = useThemeColor({}, 'danger');
+
   const [isFocused, setIsFocused] = useState(false);
   const scale = useSharedValue(1);
 
@@ -54,26 +58,22 @@ export function QuizInput({
         style={[
           styles.input,
           {
-            backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5',
-            color: colorScheme === 'dark' ? '#fff' : '#000',
-            borderColor: error
-              ? '#ff4444'
-              : isFocused
-              ? Colors[colorScheme ?? 'light'].tint
-              : 'transparent',
+            backgroundColor: secondaryBg,
+            color: textColor,
+            borderColor: error ? dangerColor : isFocused ? tint : 'transparent',
           },
         ]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colorScheme === 'dark' ? '#666' : '#999'}
+        placeholderTextColor={placeholderColor}
         keyboardType={keyboardType}
         autoFocus={autoFocus}
         maxLength={maxLength}
         onFocus={handleFocus}
         onBlur={handleBlur}
       />
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+      {error && <ThemedText style={[styles.error, { color: dangerColor }]}>{error}</ThemedText>}
     </Animated.View>
   );
 }
@@ -85,7 +85,9 @@ interface QuizUnitPickerProps {
 }
 
 export function QuizUnitPicker({ options, selected, onSelect }: QuizUnitPickerProps) {
-  const colorScheme = useColorScheme();
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
+  const secondaryBg = useThemeColor({}, 'secondaryBackground');
 
   const handleSelect = (value: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -99,14 +101,7 @@ export function QuizUnitPicker({ options, selected, onSelect }: QuizUnitPickerPr
           key={option.value}
           style={[
             styles.pickerOption,
-            {
-              backgroundColor:
-                selected === option.value
-                  ? Colors[colorScheme ?? 'light'].tint
-                  : colorScheme === 'dark'
-                  ? '#1c1c1e'
-                  : '#f5f5f5',
-            },
+            { backgroundColor: selected === option.value ? tint : secondaryBg },
           ]}
           onPress={() => handleSelect(option.value)}
           activeOpacity={0.7}
@@ -114,7 +109,7 @@ export function QuizUnitPicker({ options, selected, onSelect }: QuizUnitPickerPr
           <ThemedText
             style={[
               styles.pickerText,
-              selected === option.value && [styles.pickerTextSelected, { color: Colors[colorScheme ?? 'light'].tintForeground }],
+              selected === option.value && [styles.pickerTextSelected, { color: onTint }],
             ]}
           >
             {option.label}
@@ -170,7 +165,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   error: {
-    color: '#ff4444',
     fontSize: 14,
     marginTop: 8,
   },
@@ -190,7 +184,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   pickerTextSelected: {
-    color: '#fff',
+    fontWeight: '700',
   },
   numberWithUnitContainer: {
     gap: 16,

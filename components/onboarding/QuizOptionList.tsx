@@ -3,8 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/ui/themed-text';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 interface Option {
@@ -27,8 +26,6 @@ export function QuizOptionList({
   onSelect,
   multiSelect = false,
 }: QuizOptionListProps) {
-  const colorScheme = useColorScheme();
-
   const isSelected = (value: string): boolean => {
     if (multiSelect && Array.isArray(selected)) {
       return selected.includes(value);
@@ -50,7 +47,6 @@ export function QuizOptionList({
           isSelected={isSelected(option.value)}
           onPress={() => handleSelect(option.value)}
           delay={index * 50}
-          colorScheme={colorScheme}
         />
       ))}
     </View>
@@ -62,10 +58,15 @@ interface OptionCardProps {
   isSelected: boolean;
   onPress: () => void;
   delay: number;
-  colorScheme: 'light' | 'dark' | null;
 }
 
-function OptionCard({ option, isSelected, onPress, delay, colorScheme }: OptionCardProps) {
+function OptionCard({ option, isSelected, onPress, delay }: OptionCardProps) {
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
+  const secondaryBg = useThemeColor({}, 'secondaryBackground');
+  const iconColor = useThemeColor({}, 'icon');
+  const border = useThemeColor({}, 'border');
+
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -86,14 +87,8 @@ function OptionCard({ option, isSelected, onPress, delay, colorScheme }: OptionC
         style={[
           styles.optionCard,
           {
-            backgroundColor: isSelected
-              ? Colors[colorScheme ?? 'light'].tint + '15'
-              : colorScheme === 'dark'
-              ? '#1c1c1e'
-              : '#f5f5f5',
-            borderColor: isSelected
-              ? Colors[colorScheme ?? 'light'].tint
-              : 'transparent',
+            backgroundColor: isSelected ? tint + '15' : secondaryBg,
+            borderColor: isSelected ? tint : 'transparent',
           },
         ]}
         onPress={onPress}
@@ -106,22 +101,13 @@ function OptionCard({ option, isSelected, onPress, delay, colorScheme }: OptionC
             <IconSymbol
               name={option.icon as any}
               size={24}
-              color={
-                isSelected
-                  ? Colors[colorScheme ?? 'light'].tint
-                  : colorScheme === 'dark'
-                  ? '#aaa'
-                  : '#666'
-              }
+              color={isSelected ? tint : iconColor}
               style={styles.optionIcon}
             />
           )}
           <View style={styles.optionTextContainer}>
             <ThemedText
-              style={[
-                styles.optionLabel,
-                isSelected && { color: Colors[colorScheme ?? 'light'].tint },
-              ]}
+              style={[styles.optionLabel, isSelected && { color: tint }]}
             >
               {option.label}
             </ThemedText>
@@ -136,19 +122,13 @@ function OptionCard({ option, isSelected, onPress, delay, colorScheme }: OptionC
           style={[
             styles.checkbox,
             {
-              backgroundColor: isSelected
-                ? Colors[colorScheme ?? 'light'].tint
-                : 'transparent',
-              borderColor: isSelected
-                ? Colors[colorScheme ?? 'light'].tint
-                : colorScheme === 'dark'
-                ? '#444'
-                : '#ccc',
+              backgroundColor: isSelected ? tint : 'transparent',
+              borderColor: isSelected ? tint : border,
             },
           ]}
         >
           {isSelected && (
-            <IconSymbol name="checkmark" size={14} color={Colors[colorScheme ?? 'light'].tintForeground} />
+            <IconSymbol name="checkmark" size={14} color={onTint} />
           )}
         </View>
       </TouchableOpacity>
@@ -185,9 +165,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   optionDescription: {
-    fontSize: 14,
-    opacity: 0.6,
+    fontSize: 13,
     marginTop: 2,
+    opacity: 0.7,
   },
   checkbox: {
     width: 24,

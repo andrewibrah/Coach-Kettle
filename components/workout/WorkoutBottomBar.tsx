@@ -39,6 +39,7 @@ export function WorkoutBottomBar({
 }: Props) {
   const colorScheme = useColorScheme();
   const textColor = useThemeColor({}, 'text');
+  const bgColor = useThemeColor({}, 'background');
   const isDark = colorScheme === 'dark';
 
   const disabledSend = !workoutActive || loading || !messageInput.trim();
@@ -104,12 +105,12 @@ export function WorkoutBottomBar({
           onPress={workoutActive ? handleEndWorkout : handleStartWorkout}
           style={({ pressed }) => [
             styles.pillButton,
-            { backgroundColor: isDark ? '#F5F5F5' : '#111827', borderColor: isDark ? '#F5F5F5' : '#111827' },
+            { backgroundColor: textColor, borderColor: textColor },
             workoutActive && styles.pillDanger,
             pressed && styles.pillPressed,
           ]}
         >
-          <Text style={[styles.pillText, { color: workoutActive ? '#FFFFFF' : (isDark ? '#111827' : '#FFFFFF') }]}>
+          <Text style={[styles.pillText, { color: workoutActive ? '#FFFFFF' : bgColor }]}>
             {workoutActive ? "End" : "Start"}
           </Text>
         </Pressable>
@@ -118,15 +119,15 @@ export function WorkoutBottomBar({
           onPress={handleSend}
           style={({ pressed }) => [
             styles.pillButton,
-            { backgroundColor: isDark ? '#F5F5F5' : '#111827', borderColor: isDark ? '#F5F5F5' : '#111827' },
+            { backgroundColor: textColor, borderColor: textColor },
             disabledSend && styles.pillDisabled,
             pressed && !disabledSend && styles.pillPressed,
           ]}
         >
           {loading ? (
-            <ActivityIndicator size="small" color={isDark ? '#111827' : '#FFFFFF'} />
+            <ActivityIndicator size="small" color={bgColor} />
           ) : (
-            <Text style={[styles.pillText, { color: isDark ? '#111827' : '#FFFFFF' }]}>Send</Text>
+            <Text style={[styles.pillText, { color: bgColor }]}>Send</Text>
           )}
         </Pressable>
       </View>
@@ -134,7 +135,7 @@ export function WorkoutBottomBar({
       {startToastOpen ? (
         <View style={styles.toastWrap} pointerEvents="none">
           <View style={styles.toastCard}>
-            <Text style={[styles.toastText, { color: isDark ? '#E5E7EB' : '#374151' }]}>Start a workout to send your first set</Text>
+            <Text style={[styles.toastText, { color: textColor }]}>Start a workout to send your first set</Text>
           </View>
         </View>
       ) : null}

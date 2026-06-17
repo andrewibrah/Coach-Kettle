@@ -1,7 +1,6 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -16,7 +15,9 @@ interface QuizProgressProps {
 }
 
 export function QuizProgress({ currentStep, totalSteps, onBack }: QuizProgressProps) {
-  const colorScheme = useColorScheme();
+  const tint = useThemeColor({}, 'tint');
+  const textColor = useThemeColor({}, 'text');
+  const border = useThemeColor({}, 'border');
   const progress = (currentStep / totalSteps) * 100;
 
   const animatedWidth = useAnimatedStyle(() => ({
@@ -28,7 +29,7 @@ export function QuizProgress({ currentStep, totalSteps, onBack }: QuizProgressPr
       <View style={styles.header}>
         {onBack ? (
           <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={20} color={colorScheme === 'dark' ? '#fff' : '#000'} />
+            <IconSymbol name="chevron.left" size={20} color={textColor} />
             <ThemedText style={styles.backText}>Back</ThemedText>
           </TouchableOpacity>
         ) : (
@@ -41,13 +42,13 @@ export function QuizProgress({ currentStep, totalSteps, onBack }: QuizProgressPr
       <View
         style={[
           styles.track,
-          { backgroundColor: colorScheme === 'dark' ? '#333' : '#e0e0e0' },
+          { backgroundColor: border },
         ]}
       >
         <Animated.View
           style={[
             styles.fill,
-            { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+            { backgroundColor: tint },
             animatedWidth,
           ]}
         />

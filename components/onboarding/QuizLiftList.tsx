@@ -11,8 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/ui/themed-text';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 interface QuizLiftAdderProps {
@@ -26,7 +25,13 @@ export function QuizLiftAdder({
   placeholder = 'Enter lift name...',
   suggestions = ['Bench Press', 'Squat', 'Deadlift', 'Overhead Press', 'Barbell Row'],
 }: QuizLiftAdderProps) {
-  const colorScheme = useColorScheme();
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
+  const secondaryBg = useThemeColor({}, 'secondaryBackground');
+  const inputBg = useThemeColor({}, 'inputBackground');
+  const textColor = useThemeColor({}, 'text');
+  const placeholderColor = useThemeColor({}, 'placeholder');
+
   const [value, setValue] = useState('');
 
   const handleAdd = () => {
@@ -46,30 +51,24 @@ export function QuizLiftAdder({
     <Animated.View entering={FadeInUp.duration(300).delay(200)}>
       <View style={styles.inputRow}>
         <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5',
-              color: colorScheme === 'dark' ? '#fff' : '#000',
-            },
-          ]}
+          style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
           value={value}
           onChangeText={setValue}
           placeholder={placeholder}
-          placeholderTextColor={colorScheme === 'dark' ? '#666' : '#999'}
+          placeholderTextColor={placeholderColor}
           onSubmitEditing={handleAdd}
           returnKeyType="done"
         />
         <TouchableOpacity
           style={[
             styles.addButton,
-            { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+            { backgroundColor: tint },
             !value.trim() && styles.addButtonDisabled,
           ]}
           onPress={handleAdd}
           disabled={!value.trim()}
         >
-          <IconSymbol name="plus" size={20} color={Colors[colorScheme ?? 'light'].tintForeground} />
+          <IconSymbol name="plus" size={20} color={onTint} />
         </TouchableOpacity>
       </View>
 
@@ -80,12 +79,7 @@ export function QuizLiftAdder({
             {suggestions.map((suggestion) => (
               <TouchableOpacity
                 key={suggestion}
-                style={[
-                  styles.suggestionChip,
-                  {
-                    backgroundColor: colorScheme === 'dark' ? '#2c2c2e' : '#e8e8e8',
-                  },
-                ]}
+                style={[styles.suggestionChip, { backgroundColor: secondaryBg }]}
                 onPress={() => handleSuggestion(suggestion)}
               >
                 <ThemedText style={styles.suggestionText}>{suggestion}</ThemedText>
@@ -104,8 +98,6 @@ interface QuizLiftListProps {
 }
 
 export function QuizLiftList({ lifts, onRemove }: QuizLiftListProps) {
-  const colorScheme = useColorScheme();
-
   if (lifts.length === 0) {
     return (
       <Animated.View entering={FadeIn} style={styles.emptyState}>
@@ -121,7 +113,6 @@ export function QuizLiftList({ lifts, onRemove }: QuizLiftListProps) {
           key={`${lift}-${index}`}
           lift={lift}
           onRemove={() => onRemove(lift)}
-          colorScheme={colorScheme}
         />
       ))}
     </View>
@@ -131,10 +122,12 @@ export function QuizLiftList({ lifts, onRemove }: QuizLiftListProps) {
 interface LiftItemProps {
   lift: string;
   onRemove: () => void;
-  colorScheme: 'light' | 'dark' | null;
 }
 
-function LiftItem({ lift, onRemove, colorScheme }: LiftItemProps) {
+function LiftItem({ lift, onRemove }: LiftItemProps) {
+  const secondaryBg = useThemeColor({}, 'secondaryBackground');
+  const iconColor = useThemeColor({}, 'icon');
+
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -154,21 +147,10 @@ function LiftItem({ lift, onRemove, colorScheme }: LiftItemProps) {
       layout={Layout.springify()}
       style={animatedStyle}
     >
-      <View
-        style={[
-          styles.liftItem,
-          {
-            backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#f5f5f5',
-          },
-        ]}
-      >
+      <View style={[styles.liftItem, { backgroundColor: secondaryBg }]}>
         <ThemedText style={styles.liftName}>{lift}</ThemedText>
         <TouchableOpacity onPress={handleRemove} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <IconSymbol
-            name="xmark.circle.fill"
-            size={22}
-            color={colorScheme === 'dark' ? '#666' : '#999'}
-          />
+          <IconSymbol name="xmark.circle.fill" size={22} color={iconColor} />
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -212,23 +194,22 @@ const styles = StyleSheet.create({
   },
   suggestionChip: {
     paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderRadius: 20,
   },
   suggestionText: {
     fontSize: 14,
+    fontWeight: '500',
+  },
+  listContainer: {
+    gap: 8,
   },
   emptyState: {
-    paddingVertical: 24,
+    paddingVertical: 20,
     alignItems: 'center',
   },
   emptyText: {
     opacity: 0.5,
-    fontSize: 14,
-  },
-  listContainer: {
-    gap: 10,
-    marginTop: 20,
   },
   liftItem: {
     flexDirection: 'row',
@@ -241,5 +222,6 @@ const styles = StyleSheet.create({
   liftName: {
     fontSize: 16,
     fontWeight: '500',
+    flex: 1,
   },
 });
