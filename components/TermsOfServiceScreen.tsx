@@ -265,9 +265,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
-    tabTextActive: {
-        color: '#fff',
-    },
+    tabTextActive: {},
     contentContainer: {
         flex: 1,
         marginHorizontal: 16,
@@ -298,7 +296,6 @@ const styles = StyleSheet.create({
     },
     acceptButton: {},
     buttonText: {
-        color: '#fff',
         fontSize: 18,
         fontWeight: '600',
     },

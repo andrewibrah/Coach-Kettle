@@ -30,7 +30,8 @@ export default function SettingsScreen() {
     // Dynamic colors for dark mode
     const cardBg = useThemeColor({}, 'cardBackground');
     const dangerColor = useThemeColor({}, 'danger');
-    const sectionTitleColor = '#8E8E93'; // iOS system gray — same in both themes
+    const warningColor = useThemeColor({}, 'warning');
+    const sectionTitleColor = useThemeColor({}, 'placeholder');
     const cacheBg = isDark ? '#3d2d00' : '#FFF8E6';
     const logoutBg = isDark ? '#3d1515' : '#FFF1F0';
 
@@ -276,8 +277,8 @@ export default function SettingsScreen() {
                         accessibilityRole="button"
                         accessibilityLabel="Clear local cache"
                     >
-                        <IconSymbol name="trash" size={20} color={isDark ? '#FFD60A' : '#FF9500'} />
-                        <Text style={[styles.cacheText, { color: isDark ? '#FFD60A' : '#FF9500' }]}>{isClearing ? 'Clearing...' : 'Clear Local Cache'}</Text>
+                        <IconSymbol name="trash" size={20} color={warningColor} />
+                        <Text style={[styles.cacheText, { color: warningColor }]}>{isClearing ? 'Clearing...' : 'Clear Local Cache'}</Text>
                     </Pressable>
                 </View>
 
@@ -317,7 +318,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#8E8E93',
         marginBottom: 8,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
@@ -325,7 +325,6 @@ const styles = StyleSheet.create({
     cacheButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF8E6',
         paddingVertical: 14,
         paddingHorizontal: 16,
         borderRadius: 12,
@@ -335,7 +334,6 @@ const styles = StyleSheet.create({
     cacheText: {
         fontSize: 17,
         fontWeight: '600',
-        color: '#FF9500',
     },
     systemThemeButton: {
         flexDirection: 'row',
@@ -353,7 +351,6 @@ const styles = StyleSheet.create({
     logoutButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF1F0',
         paddingVertical: 14,
         paddingHorizontal: 16,
         borderRadius: 12,
@@ -366,7 +363,6 @@ const styles = StyleSheet.create({
     emailContainer: {
         paddingVertical: 12,
         paddingHorizontal: 16,
-        backgroundColor: '#F2F2F7',
         borderRadius: 12,
         marginBottom: 12,
     },
@@ -396,7 +392,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#F2F2F7',
         paddingVertical: 14,
         paddingHorizontal: 16,
         borderRadius: 12,
@@ -414,36 +409,6 @@ const styles = StyleSheet.create({
     settingDescription: {
         fontSize: 13,
         opacity: 0.6,
-    },
-    infoBox: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        backgroundColor: '#E8F4FD',
-        padding: 12,
-        borderRadius: 8,
-        gap: 8,
-        marginBottom: 12,
-    },
-    infoText: {
-        flex: 1,
-        fontSize: 13,
-        lineHeight: 18,
-        color: '#0066CC',
-    },
-    warningBox: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        backgroundColor: '#FFF8E6',
-        padding: 12,
-        borderRadius: 8,
-        gap: 8,
-        marginBottom: 12,
-    },
-    warningText: {
-        flex: 1,
-        fontSize: 13,
-        lineHeight: 18,
-        color: '#996600',
     },
     navRow: {
         flexDirection: 'row',
