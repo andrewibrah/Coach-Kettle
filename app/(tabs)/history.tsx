@@ -1,12 +1,14 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
+import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useToast } from "@/hooks/useToast";
 import { api } from "@/lib/api";
 import { type WorkoutSession } from "@/lib/workoutStorage";
 
@@ -51,6 +53,7 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { toast, showToast, hideToast } = useToast();
 
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -103,7 +106,7 @@ export default function HistoryScreen() {
     } catch (e) {
       console.warn('[history] delete failed', e);
       setItems(previousItems);
-      Alert.alert("Error", "Failed to delete workout. Please try again.");
+      showToast('Failed to delete workout. Please try again.', 'error');
     }
   };
 
@@ -209,6 +212,7 @@ export default function HistoryScreen() {
 
   return (
     <ThemedView style={[styles.screen, { paddingTop: insets.top + 12, backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader
         title="History"
         subtitle={`${headerStats.totalWorkouts} workouts • ${headerStats.totalSets} sets`}

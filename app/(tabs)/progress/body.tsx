@@ -13,7 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 
 import {
   fetchBodyMetrics,
@@ -61,6 +63,7 @@ export default function BodyMetricsScreen() {
   const [entries, setEntries] = useState<BodyMetricsEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
   const [form, setForm] = useState<Record<FormKey, string>>({
     weight_lbs: '',
     body_fat_pct: '',
@@ -123,7 +126,7 @@ export default function BodyMetricsScreen() {
       });
       await load();
     } catch (e: any) {
-      Alert.alert('Could not save', e?.message ?? 'Unknown error');
+      showToast(e?.message ?? 'Could not save. Please try again.', 'error');
     } finally {
       setSaving(false);
     }
@@ -140,7 +143,7 @@ export default function BodyMetricsScreen() {
             await deleteBodyMetric(entry.id);
             await load();
           } catch (e: any) {
-            Alert.alert('Could not delete', e?.message ?? 'Unknown error');
+            showToast(e?.message ?? 'Could not delete. Please try again.', 'error');
           }
         },
       },
@@ -155,6 +158,7 @@ export default function BodyMetricsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Body measurements" />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}

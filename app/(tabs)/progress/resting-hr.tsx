@@ -12,7 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 
 import {
   fetchRestingHRSummary,
@@ -41,6 +43,7 @@ export default function RestingHrScreen() {
   const [entries, setEntries] = useState<RestingHeartRateEntry[]>([]);
   const [bpm, setBpm] = useState('');
   const [saving, setSaving] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -62,7 +65,7 @@ export default function RestingHrScreen() {
   const onLog = useCallback(async () => {
     const parsed = parseInt(bpm, 10);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      Alert.alert('Invalid BPM', 'Please enter a positive whole number.');
+      showToast('Please enter a positive whole number.', 'error');
       return;
     }
     setSaving(true);
@@ -75,7 +78,7 @@ export default function RestingHrScreen() {
       setBpm('');
       await load();
     } catch (e: any) {
-      Alert.alert('Could not log', e?.message ?? 'Unknown error');
+      showToast(e?.message ?? 'Could not log. Please try again.', 'error');
     } finally {
       setSaving(false);
     }
@@ -92,7 +95,7 @@ export default function RestingHrScreen() {
             await deleteRestingHR(entry.id);
             await load();
           } catch (e: any) {
-            Alert.alert('Could not delete', e?.message ?? 'Unknown error');
+            showToast(e?.message ?? 'Could not delete. Please try again.', 'error');
           }
         },
       },
@@ -105,6 +108,7 @@ export default function RestingHrScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Resting heart rate" />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}

@@ -5,9 +5,11 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { TutorialModal } from '@/components/tutorial/TutorialModal';
+import { Toast } from '@/components/ui/Toast';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useEntitlement } from '@/contexts/EntitlementContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
@@ -23,6 +25,7 @@ export default function SettingsScreen() {
     const activeColor = useThemeColor({}, 'tint');
     const [isClearing, setIsClearing] = useState(false);
     const [tutorialVisible, setTutorialVisible] = useState(false);
+    const { toast, showToast, hideToast } = useToast();
 
     // Dynamic colors for dark mode
     const cardBg = useThemeColor({}, 'cardBackground');
@@ -53,10 +56,10 @@ export default function SettingsScreen() {
                         setIsClearing(true);
                         try {
                             await clearAllCaches();
-                            Alert.alert('Success', 'All local caches have been cleared.');
+                            showToast('Cache cleared', 'success');
                         } catch (error) {
                             console.error('Failed to clear cache:', error);
-                            Alert.alert('Error', 'Failed to clear cache. Please try again.');
+                            showToast('Failed to clear cache. Please try again.', 'error');
                         } finally {
                             setIsClearing(false);
                         }
@@ -68,6 +71,7 @@ export default function SettingsScreen() {
 
     return (
         <ThemedView style={[styles.container, { backgroundColor }]}>
+            {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
             <ScreenHeader title="Settings" />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>

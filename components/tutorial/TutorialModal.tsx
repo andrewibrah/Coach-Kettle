@@ -42,6 +42,12 @@ const SLIDES = [
     videoSource: require("@/assets/videos/guide_log_set.mp4"),
   },
   {
+    title: "Meet Your Coach",
+    subtitle: "Honest. Personal. Daily.",
+    body: "Every morning your AI coach reads your training and nutrition and gives you a straight breakdown — no sugarcoating.",
+    videoSource: require("@/assets/videos/guide_ai_coach.mp4"),
+  },
+  {
     title: "Review & Track Progress",
     subtitle: "Every rep, every record",
     body: "After each session, see your full recap — volume, top sets, and new PRs. Browse all past workouts in History.",
