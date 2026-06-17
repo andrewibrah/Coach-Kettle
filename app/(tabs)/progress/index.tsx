@@ -190,6 +190,8 @@ function NavCard({
         { backgroundColor: cardBackground },
         pressed && { opacity: 0.7 },
       ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <View style={styles.navCardLeft}>
         <IconSymbol name={icon as any} size={22} color={iconColor} />
