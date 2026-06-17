@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
@@ -32,9 +32,10 @@ export default function StrengthProgressionScreen() {
       const data = await fetchStrengthProgression(exercise.trim(), 60);
       setPoints(data);
       setHasLoaded(true);
-    } catch {
+    } catch (e: any) {
       setPoints([]);
       setHasLoaded(true);
+      Alert.alert('Could not load', e?.message ?? 'Failed to load progression data.');
     } finally {
       setLoading(false);
     }

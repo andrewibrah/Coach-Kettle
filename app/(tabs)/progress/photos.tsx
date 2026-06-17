@@ -48,7 +48,9 @@ export default function BodyPhotosScreen() {
     try {
       const list = await fetchBodyPhotos(180);
       setPhotos(list);
-    } catch {}
+    } catch (e) {
+      console.warn('[photos] load failed', e);
+    }
   }, []);
 
   useEffect(() => {
