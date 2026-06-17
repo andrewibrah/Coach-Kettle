@@ -38,6 +38,7 @@ export default function TemplatesScreen() {
     const textColor = useThemeColor({}, 'text');
     const activeColor = useThemeColor({}, 'tint');
     const onTint = useThemeColor({}, 'tintForeground');
+    const dangerColor = useThemeColor({}, 'danger');
 
     const { session } = useAuth();
 
@@ -591,7 +592,7 @@ export default function TemplatesScreen() {
                                                 <MaterialCommunityIcons
                                                     name="trash-can-outline"
                                                     size={20}
-                                                    color="#FF3B30"
+                                                    color={dangerColor}
                                                 />
                                             </Pressable>
                                             <IconSymbol
@@ -671,7 +672,7 @@ export default function TemplatesScreen() {
                                                                         </View>
                                                                         <View style={styles.editActions}>
                                                                             <Pressable
-                                                                                style={[styles.editActionButton, { backgroundColor: '#FF3B30' }]}
+                                                                                style={[styles.editActionButton, { backgroundColor: dangerColor }]}
                                                                                 onPress={() => handleRemoveExercise(item.id, template.id)}
                                                                             >
                                                                                 <ThemedText style={styles.editActionText}>Delete</ThemedText>

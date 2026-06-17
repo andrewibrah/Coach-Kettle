@@ -36,6 +36,7 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
   const tint = useThemeColor({}, 'tint');
   const cardBg = useThemeColor({}, 'cardBackground');
   const secondaryBg = useThemeColor({}, 'secondaryBackground');
+  const successColor = useThemeColor({}, 'success');
 
   const overlayOpacity = useSharedValue(0);
   const cardScale = useSharedValue(0.5);
@@ -145,8 +146,8 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
               {data.newE1rm.toFixed(0)} lbs
             </ThemedText>
             {improvement && (
-              <View style={styles.improvementBadge}>
-                <ThemedText style={styles.improvementText}>+{improvement}%</ThemedText>
+              <View style={[styles.improvementBadge, { backgroundColor: successColor + '20' }]}>
+                <ThemedText style={[styles.improvementText, { color: successColor }]}>+{improvement}%</ThemedText>
               </View>
             )}
           </View>
@@ -310,14 +311,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   improvementBadge: {
-    backgroundColor: '#34C75920',
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 12,
     marginTop: 8,
   },
   improvementText: {
-    color: '#34C759',
     fontSize: 14,
     fontWeight: '600',
   },

@@ -44,6 +44,7 @@ export default function PRTrackingScreen() {
   const inputBg = useThemeColor({}, 'inputBackground');
   const placeholder = useThemeColor({}, 'placeholder');
   const sectionTitleColor = '#8E8E93'; // iOS system gray, same in both themes
+  const successColor = useThemeColor({}, 'success');
 
   const [trackedLifts, setTrackedLifts] = useState<PRTrackedLift[]>([]);
   const [prLifts, setPRLifts] = useState<PRLift[]>([]);
@@ -302,8 +303,8 @@ export default function PRTrackingScreen() {
                     {new Date(record.achieved_at).toLocaleDateString()}
                   </ThemedText>
                   {record.improvement_pct && (
-                    <View style={[styles.improvementBadge, { backgroundColor: '#34C75920' }]}>
-                      <ThemedText style={styles.improvementText}>
+                    <View style={[styles.improvementBadge, { backgroundColor: successColor + '20' }]}>
+                      <ThemedText style={[styles.improvementText, { color: successColor }]}>
                         +{record.improvement_pct.toFixed(1)}%
                       </ThemedText>
                     </View>
@@ -826,7 +827,6 @@ const styles = StyleSheet.create({
   improvementText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#34C759',
   },
   historyStats: {
     flexDirection: 'row',

@@ -24,6 +24,7 @@ export default function SubscriptionScreen() {
   const activeColor = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const cardBg = useThemeColor({}, 'cardBackground');
+  const successColor = useThemeColor({}, 'success');
 
   const { session } = useAuth();
   const { entitlement, isPro, refreshEntitlement } = useEntitlement();
@@ -63,7 +64,7 @@ export default function SubscriptionScreen() {
       return (
         <View style={[styles.statusRow, { backgroundColor: cardBg }]}>
           <View style={styles.statusContent}>
-            <View style={[styles.statusDot, { backgroundColor: '#34C759' }]} />
+            <View style={[styles.statusDot, { backgroundColor: successColor }]} />
             <View style={styles.statusText}>
               <ThemedText style={styles.statusLabel}>Coach Kettle Pro</ThemedText>
               <ThemedText style={styles.statusDescription}>
