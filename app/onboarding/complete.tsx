@@ -2,7 +2,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -19,10 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CompleteScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
+  const placeholder = useThemeColor({}, 'placeholder');
+  const dangerColor = useThemeColor({}, 'danger');
   const { batchSaveAndComplete } = useOnboarding();
 
   const [saving, setSaving] = useState(true);
@@ -80,7 +79,7 @@ export default function CompleteScreen() {
       <ThemedView style={styles.container}>
         <View style={[styles.centered, { paddingBottom: insets.bottom }]}>
           <ActivityIndicator size="large" color={tint} />
-          <ThemedText style={[styles.loadingText, { color: isDark ? '#999' : '#666' }]}>
+          <ThemedText style={[styles.loadingText, { color: placeholder }]}>
             Saving your profile...
           </ThemedText>
         </View>
@@ -93,12 +92,12 @@ export default function CompleteScreen() {
     return (
       <ThemedView style={styles.container}>
         <View style={[styles.centered, { paddingBottom: insets.bottom }]}>
-          <View style={[styles.iconCircle, { backgroundColor: '#FF3B30' }]}>
+          <View style={[styles.iconCircle, { backgroundColor: dangerColor }]}>
             <IconSymbol name="xmark" size={32} color="#fff" />
           </View>
 
           <ThemedText style={styles.title}>Something went wrong</ThemedText>
-          <ThemedText style={[styles.message, { color: isDark ? '#999' : '#666' }]}>
+          <ThemedText style={[styles.message, { color: placeholder }]}>
             {error}
           </ThemedText>
 
@@ -130,7 +129,7 @@ export default function CompleteScreen() {
 
         <Animated.View entering={FadeIn.duration(400).delay(400)} style={styles.textContainer}>
           <ThemedText style={styles.title}>You’re all set!</ThemedText>
-          <ThemedText style={[styles.message, { color: isDark ? '#999' : '#666' }]}>
+          <ThemedText style={[styles.message, { color: placeholder }]}>
             Your profile has been saved. Ready to start tracking your workouts.
           </ThemedText>
         </Animated.View>
