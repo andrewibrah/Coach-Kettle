@@ -154,6 +154,9 @@ export default function LogFoodScreen() {
               { borderColor: border, backgroundColor: active ? tint : 'transparent' },
               pressed && { opacity: 0.7 },
             ]}
+            accessibilityRole="tab"
+            accessibilityLabel={slot}
+            accessibilityState={{ selected: active }}
           >
             <ThemedText
               style={{
@@ -189,6 +192,8 @@ export default function LogFoodScreen() {
                 {recentFoods.map((food: RecentFood, idx: number) => (
                   <Pressable
                     key={`${food.food_id ?? food.food_name}-${idx}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${food.food_name}, ${Math.round(food.calories)} calories`}
                     onPress={() => {
                       setSelected({
                         id: food.food_id ?? '',
@@ -260,6 +265,8 @@ export default function LogFoodScreen() {
                 <Pressable
                   key={item.id}
                   onPress={() => { setSelected(item); setResults([]); setQuery(''); setLogError(null); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.name}, ${Math.round(item.calories)} cal, ${Math.round(item.protein_g)}g protein`}
                   style={({ pressed }) => [
                     styles.resultRow,
                     { borderColor: border },
@@ -312,6 +319,8 @@ export default function LogFoodScreen() {
                 { backgroundColor: tint, marginTop: 4 },
                 pressed && { opacity: 0.7 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Log food entry"
             >
               {submitting ? (
                 <ActivityIndicator color={onTint} />
@@ -414,6 +423,8 @@ export default function LogFoodScreen() {
               { backgroundColor: tint, marginTop: 4 },
               pressed && { opacity: 0.7 },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Log quick entry"
           >
             {quickSubmitting ? (
               <ActivityIndicator color={onTint} />
