@@ -75,6 +75,8 @@ export default function StrengthProgressionScreen() {
               pressed && { opacity: 0.7 },
               (loading || !exercise.trim()) && { opacity: 0.5 },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Load strength progression"
           >
             <ThemedText type="defaultSemiBold" style={[styles.loadBtnText, { color: onTint }]}>
               {loading ? 'Loading…' : 'Load'}

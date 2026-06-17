@@ -149,6 +149,8 @@ export default function RestingHrScreen() {
               pressed && { opacity: 0.7 },
               (saving || !bpm.trim()) && { opacity: 0.5 },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Log resting heart rate"
           >
             <ThemedText type="defaultSemiBold" style={[styles.logBtnText, { color: onTint }]}>
               {saving ? 'Saving…' : 'Log today'}
@@ -179,6 +181,8 @@ export default function RestingHrScreen() {
                   { borderColor: border },
                   pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${e.bpm} bpm entry from ${e.measured_date}`}
               >
                 <ThemedText style={[styles.deleteBtnText, { color: dangerColor }]}>Delete</ThemedText>
               </Pressable>
