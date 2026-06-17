@@ -108,15 +108,9 @@ export default function AuthCallback() {
       setStatus('Checking terms acceptance...');
       const termsStatus = await checkServerTermsAcceptance();
 
-      console.log('[AuthCallback] Terms status:', termsStatus);
-
       if (termsStatus?.needsAcceptance) {
-        // User needs to accept terms - redirect to terms screen
-        console.log('[AuthCallback] User needs to accept terms, redirecting...');
         router.replace('/terms-of-service');
       } else {
-        // User has accepted terms - go to main app
-        console.log('[AuthCallback] Terms accepted, going to app...');
         router.replace('/(tabs)');
       }
     }

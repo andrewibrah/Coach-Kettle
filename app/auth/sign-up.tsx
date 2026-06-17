@@ -122,8 +122,6 @@ export default function SignUp() {
         throw new Error('No identity token received from Apple');
       }
 
-      console.log('[SignUp] Apple credential received, signing in with Supabase...');
-
       const { error } = await supabase.auth.signInWithIdToken({
         provider: 'apple',
         token: credential.identityToken,
@@ -135,7 +133,6 @@ export default function SignUp() {
       router.replace('/(tabs)');
     } catch (err: any) {
       if (err?.code === 'ERR_REQUEST_CANCELED' || err?.code === '1001') {
-        console.log('[SignUp] User cancelled Apple Sign In');
         return;
       }
       console.error('[SignUp] Apple Sign In error:', {

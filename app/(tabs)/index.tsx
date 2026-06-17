@@ -242,7 +242,6 @@ export default function HomeScreen() {
           draft.createdAt,
           draft.dateISO
         );
-        console.log('[WorkoutDraft] Restored draft with', draft.rows.length, 'rows');
         setDraftRestoredToast(true);
         draftToastTimerRef.current = setTimeout(() => {
           setDraftRestoredToast(false);
@@ -251,7 +250,6 @@ export default function HomeScreen() {
       } else {
         // Stale draft from a different day — clear it silently
         clearWorkoutDraft();
-        console.log('[WorkoutDraft] Cleared stale draft from', draft.dateISO);
       }
     }).finally(() => {
       setDraftChecked(true);
@@ -312,8 +310,6 @@ export default function HomeScreen() {
     const userId = session?.user?.id;
     if (!userId) return;
 
-    console.log('[PR] Setting up Realtime subscription for PR breakthroughs...');
-
     const channel = supabase
       .channel('pr_breakthroughs')
       .on(
@@ -325,7 +321,6 @@ export default function HomeScreen() {
           filter: `user_id=eq.${userId}`,
         },
         async (payload) => {
-          console.log('[PR] New PR detected via Realtime!', payload.new);
           const prData = payload.new as any;
 
           // Deduplicate against client-side PR check
@@ -348,12 +343,9 @@ export default function HomeScreen() {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('[PR] Realtime subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('[PR] Cleaning up Realtime subscription');
       channel.unsubscribe();
     };
   }, [session?.user?.id, showCelebration]);
