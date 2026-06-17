@@ -49,11 +49,12 @@ export function SessionReviewModal({
   const textColor = useThemeColor({}, "text");
   const iconColor = useThemeColor({}, "icon");
   const subtextColor = useThemeColor({}, "placeholder");
-  const cardBg = isDark ? "#1C1C1E" : "#F3F4F6";
-  const doneButtonBg = isDark ? "#FFFFFF" : "#111827";
-  const doneButtonTextColor = isDark ? "#111827" : "#FFFFFF";
-  const accentColor = "#10B981"; // Green for positive
-  const warningColor = "#F59E0B"; // Orange for improvement
+  const cardBg = useThemeColor({}, "secondaryBackground");
+  const doneButtonBg = useThemeColor({}, "text");
+  const doneButtonTextColor = useThemeColor({}, "background");
+  const accentColor = useThemeColor({}, "success");
+  const warningColor = useThemeColor({}, "warning");
+  const dangerThemeColor = useThemeColor({}, "danger");
 
   // Reflection + media state
   const [reflection, setReflection] = useState("");
@@ -71,10 +72,10 @@ export function SessionReviewModal({
   }, [visible]);
 
   const getRatingColor = (rating: number) => {
-    if (rating >= 8) return "#10B981"; // Green
-    if (rating >= 6) return themeAccent(isDark); // Blue (neutral gray in dark mode)
-    if (rating >= 4) return "#F59E0B"; // Orange
-    return "#EF4444"; // Red
+    if (rating >= 8) return accentColor;
+    if (rating >= 6) return themeAccent(isDark);
+    if (rating >= 4) return warningColor;
+    return dangerThemeColor;
   };
 
   // Format today's date
