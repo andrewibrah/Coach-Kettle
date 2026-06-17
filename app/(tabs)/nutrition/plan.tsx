@@ -124,6 +124,8 @@ export default function MealPlanScreen() {
                 { backgroundColor: tint },
                 pressed && { opacity: 0.7 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Generate meal plan"
             >
               {generating ? (
                 <ActivityIndicator color={onTint} />
@@ -150,6 +152,9 @@ export default function MealPlanScreen() {
                       { borderColor: border, backgroundColor: active ? tint : 'transparent' },
                       pressed && { opacity: 0.7 },
                     ]}
+                    accessibilityRole="tab"
+                    accessibilityLabel={label}
+                    accessibilityState={{ selected: active }}
                   >
                     <ThemedText style={{ color: active ? onTint : textColor, fontWeight: '600', fontSize: 13 }}>
                       {label}
@@ -174,6 +179,8 @@ export default function MealPlanScreen() {
                 { borderColor: border },
                 pressed && { opacity: 0.7 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Recalibrate plan from last 7 days"
             >
               {recal ? (
                 <ActivityIndicator />

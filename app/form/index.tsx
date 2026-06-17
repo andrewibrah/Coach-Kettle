@@ -107,6 +107,8 @@ export default function FormAnalysisScreen() {
             onPress={handleCapture}
             disabled={loading}
             style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint }, pressed && { opacity: 0.7 }, loading && { opacity: 0.6 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Record form check"
           >
             {loading ? <ActivityIndicator color={onTint} /> : <ThemedText style={[styles.primaryText, { color: onTint }]}>Record form check</ThemedText>}
           </Pressable>
