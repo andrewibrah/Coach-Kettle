@@ -119,6 +119,8 @@ export default function SubscriptionScreen() {
         <Pressable
           onPress={() => router.back()}
           style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <IconSymbol name="chevron.left" size={28} color={textColor} />
         </Pressable>
@@ -164,6 +166,8 @@ export default function SubscriptionScreen() {
             <Pressable
               style={({ pressed }) => [styles.upgradeButton, { backgroundColor: activeColor }, pressed && styles.buttonPressed]}
               onPress={() => router.push('/paywall' as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Upgrade to Pro"
             >
               <IconSymbol name="crown.fill" size={20} color={onTint} />
               <ThemedText style={[styles.upgradeText, { color: onTint }]}>Upgrade to Pro</ThemedText>
@@ -174,6 +178,8 @@ export default function SubscriptionScreen() {
             style={({ pressed }) => [styles.actionRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed, isProcessing && { opacity: 0.5 }]}
             onPress={handleRestore}
             disabled={isProcessing}
+            accessibilityRole="button"
+            accessibilityLabel="Restore purchases"
           >
             <View style={styles.actionContent}>
               <IconSymbol name="arrow.clockwise" size={20} color={activeColor} />
@@ -186,6 +192,8 @@ export default function SubscriptionScreen() {
             <Pressable
               style={({ pressed }) => [styles.actionRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
               onPress={handleManageSubscription}
+              accessibilityRole="button"
+              accessibilityLabel="Manage subscription"
             >
               <View style={styles.actionContent}>
                 <IconSymbol name="gear" size={20} color={activeColor} />
