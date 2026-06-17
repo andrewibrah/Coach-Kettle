@@ -46,7 +46,6 @@ export function WorkoutBottomBar({
 
   const handleSend = () => {
     // Debug log to trace button presses
-    console.log(`[WorkoutBottomBar] Send pressed. disabledSend=${disabledSend}, loading=${loading}, input='${messageInput}'`);
     if (disabledSend) return;
     if (Platform.OS === "ios") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

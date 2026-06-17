@@ -971,8 +971,6 @@ export default function HomeScreen() {
       let next = [...currentRows];
       const parsedRows = gateDecision.rows ?? [];
 
-      console.log("[sendMessage] Fast parse result:", parsedRows);
-
       if (!parsedRows.length) {
         // Parsing failed but continue silently - parsing logic intact
         return;
