@@ -138,6 +138,8 @@ export default function ProfileSettingsScreen() {
         <Pressable
           onPress={() => router.back()}
           style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <IconSymbol name="chevron.left" size={28} color={textColor} />
         </Pressable>
@@ -148,6 +150,8 @@ export default function ProfileSettingsScreen() {
           onPress={handleSave}
           disabled={saving}
           style={({ pressed }) => [styles.saveButton, pressed && styles.buttonPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Save profile"
         >
           <ThemedText style={[styles.saveText, { color: activeColor }]}>
             {saving ? 'Saving...' : 'Save'}
@@ -187,6 +191,8 @@ export default function ProfileSettingsScreen() {
                     heightValue
                   );
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Height: ${heightValue || 'not set'}`}
               >
                 <ThemedText>{heightValue || 'Not set'}</ThemedText>
               </Pressable>
@@ -197,6 +203,9 @@ export default function ProfileSettingsScreen() {
                     heightUnit === 'in' && { backgroundColor: activeColor },
                   ]}
                   onPress={() => setHeightUnit('in')}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Inches"
+                  accessibilityState={{ selected: heightUnit === 'in' }}
                 >
                   <ThemedText style={[styles.unitText, heightUnit === 'in' && [styles.unitTextActive, { color: onTint }]]}>
                     in
@@ -208,6 +217,9 @@ export default function ProfileSettingsScreen() {
                     heightUnit === 'cm' && { backgroundColor: activeColor },
                   ]}
                   onPress={() => setHeightUnit('cm')}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Centimeters"
+                  accessibilityState={{ selected: heightUnit === 'cm' }}
                 >
                   <ThemedText style={[styles.unitText, heightUnit === 'cm' && [styles.unitTextActive, { color: onTint }]]}>
                     cm
@@ -221,6 +233,8 @@ export default function ProfileSettingsScreen() {
           <Pressable
             style={[styles.fieldRow, { backgroundColor: cardBg }]}
             onPress={() => setShowDatePicker(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Date of birth: ${dob ? `${dob.toLocaleDateString()}, ${calculateAge(dob)} years old` : 'not set'}`}
           >
             <ThemedText style={styles.fieldLabel}>Date of Birth</ThemedText>
             <View style={styles.fieldValue}>
@@ -261,6 +275,8 @@ export default function ProfileSettingsScreen() {
                     currentWeight
                   );
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Current weight: ${currentWeight || 'not set'}`}
               >
                 <ThemedText>{currentWeight || 'Not set'}</ThemedText>
               </Pressable>
@@ -271,6 +287,9 @@ export default function ProfileSettingsScreen() {
                     weightUnit === 'lb' && { backgroundColor: activeColor },
                   ]}
                   onPress={() => setWeightUnit('lb')}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Pounds"
+                  accessibilityState={{ selected: weightUnit === 'lb' }}
                 >
                   <ThemedText style={[styles.unitText, weightUnit === 'lb' && [styles.unitTextActive, { color: onTint }]]}>
                     lb
@@ -282,6 +301,9 @@ export default function ProfileSettingsScreen() {
                     weightUnit === 'kg' && { backgroundColor: activeColor },
                   ]}
                   onPress={() => setWeightUnit('kg')}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Kilograms"
+                  accessibilityState={{ selected: weightUnit === 'kg' }}
                 >
                   <ThemedText style={[styles.unitText, weightUnit === 'kg' && [styles.unitTextActive, { color: onTint }]]}>
                     kg
@@ -306,6 +328,8 @@ export default function ProfileSettingsScreen() {
                     goalWeight
                   );
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Goal weight: ${goalWeight || 'not set'}`}
               >
                 <ThemedText>{goalWeight || 'Not set'}</ThemedText>
               </Pressable>
@@ -331,6 +355,9 @@ export default function ProfileSettingsScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setFocus(option.value);
               }}
+              accessibilityRole="radio"
+              accessibilityLabel={option.label}
+              accessibilityState={{ selected: focus === option.value }}
             >
               <ThemedText style={styles.focusLabel}>{option.label}</ThemedText>
               {focus === option.value && (
@@ -351,6 +378,8 @@ export default function ProfileSettingsScreen() {
                   focusOther
                 );
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`Fitness focus description: ${focusOther || 'not set'}`}
             >
               <ThemedText style={styles.fieldLabel}>Describe</ThemedText>
               <ThemedText style={{ opacity: focusOther ? 1 : 0.5 }}>
