@@ -7,8 +7,6 @@ import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/theme';
 import { useProgram } from '@/contexts/ProgramContext';
 import type { GoalType, SplitType, Periodization } from '@/types/programming';
 
@@ -37,14 +35,13 @@ const PERIODIZATIONS: { value: Periodization; label: string }[] = [
 export default function CreateProgramScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme() ?? 'light';
   const backgroundColor = useThemeColor({}, 'background');
   const cardBackground = useThemeColor({}, 'cardBackground');
   const textColor = useThemeColor({}, 'text');
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
-  const tint = Colors[scheme === 'dark' ? 'dark' : 'light'].tint;
-  const onTint = Colors[scheme === 'dark' ? 'dark' : 'light'].tintForeground;
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
 
   const { create } = useProgram();
 
