@@ -22,7 +22,7 @@ export default function CompleteScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const tint = useThemeColor({}, 'tint');
-  const onTint = useThemeColor({}, 'onTint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const { batchSaveAndComplete } = useOnboarding();
 
   const [saving, setSaving] = useState(true);
