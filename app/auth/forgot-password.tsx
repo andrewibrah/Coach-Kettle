@@ -15,7 +15,6 @@ import {
 import { AppLogo } from '@/components/AppLogo';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
-import { Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
 
@@ -28,6 +27,7 @@ export default function ForgotPassword() {
   const primaryColor = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const textColor = useThemeColor({}, 'text');
+  const iconColor = useThemeColor({}, 'icon');
 
   async function handleResetPassword() {
     if (!email) {
@@ -89,7 +89,7 @@ export default function ForgotPassword() {
             <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Email</ThemedText>
               <TextInput
-                style={[styles.input, { color: textColor, borderColor: Colors.light.icon }]}
+                style={[styles.input, { color: textColor, borderColor: iconColor }]}
                 onChangeText={setEmail}
                 value={email}
                 placeholder="user@example.com"

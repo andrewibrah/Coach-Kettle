@@ -20,7 +20,6 @@ import {
 import { AppLogo } from '@/components/AppLogo';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
-import { Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { checkServerTermsAcceptance, setLastAuthenticatedAt } from '@/lib/authLock';
 import { supabase } from '@/lib/supabase';
@@ -38,9 +37,9 @@ export default function SignIn() {
   const primaryColor = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const textColor = useThemeColor({}, 'text');
-  const inputBorderColor = isDark ? Colors.dark.icon : Colors.light.icon;
-  const placeholderColor = isDark ? Colors.dark.placeholder : Colors.light.placeholder;
-  const oauthBorderColor = isDark ? Colors.dark.border : Colors.light.border;
+  const inputBorderColor = useThemeColor({}, 'icon');
+  const placeholderColor = useThemeColor({}, 'placeholder');
+  const oauthBorderColor = useThemeColor({}, 'border');
 
   // Helper: Complete auth and navigate based on terms acceptance
   const completeAuthAndNavigate = useCallback(async () => {
