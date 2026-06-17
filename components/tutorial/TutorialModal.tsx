@@ -31,8 +31,8 @@ const SLIDES = [
   },
   {
     title: "Start a Session",
-    subtitle: "Pick your focus, name your workout",
-    body: "Tap the routine icon or just start typing — Coach Kettle creates your session automatically.",
+    subtitle: "Pick a template or go freestyle",
+    body: "Choose a saved template to pre-load your exercises, or tap New Workout to start from scratch.",
     videoSource: require("@/assets/videos/guide_start_session.mp4"),
   },
   {
@@ -42,9 +42,9 @@ const SLIDES = [
     videoSource: require("@/assets/videos/guide_log_set.mp4"),
   },
   {
-    title: "Track History & PRs",
+    title: "Review & Track Progress",
     subtitle: "Every rep, every record",
-    body: "Browse every workout in History. Hit a new PR? Expect confetti.",
+    body: "After each session, see your full recap — volume, top sets, and new PRs. Browse all past workouts in History.",
     videoSource: require("@/assets/videos/guide_history_prs.mp4"),
   },
   {
