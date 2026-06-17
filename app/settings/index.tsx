@@ -90,6 +90,8 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => router.push('/settings/subscription' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel={isPro ? 'Coach Kettle Pro — manage subscription' : 'Subscription — upgrade to Pro'}
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="crown.fill" size={20} color={isPro ? '#FFD700' : activeColor} />
@@ -112,6 +114,8 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => router.push('/settings/profile' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit Profile"
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="person.fill" size={20} color={activeColor} />
@@ -136,6 +140,8 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => router.push('/settings/pr-tracking' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Personal Records — manage tracked lifts"
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="trophy.fill" size={20} color="#FFD700" />
@@ -156,6 +162,8 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => router.push('/form' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Form check — camera rep count and technique cues"
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="camera.fill" size={20} color={activeColor} />
@@ -171,6 +179,8 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => router.push('/settings/nutrition-preferences' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Nutrition preferences — dietary settings and macro targets"
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="fork.knife" size={20} color={activeColor} />
@@ -186,6 +196,8 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => router.push('/settings/notifications' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Notifications — rest timer, coach reports, workout reminders"
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="bell.fill" size={20} color={activeColor} />
@@ -220,6 +232,9 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.systemThemeButton, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => setThemeMode('system')}
+                        accessibilityRole="button"
+                        accessibilityLabel="Use system theme setting"
+                        accessibilityState={{ selected: themeMode === 'system' }}
                     >
                         <IconSymbol name="gear" size={20} color={textColor} />
                         <Text style={[styles.systemThemeText, { color: textColor }]}>Use System Setting</Text>
@@ -235,6 +250,8 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => setTutorialVisible(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel="How to use Coach Kettle — replay app walkthrough"
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="questionmark.circle" size={20} color={activeColor} />
@@ -256,6 +273,8 @@ export default function SettingsScreen() {
                         style={({ pressed }) => [styles.cacheButton, { backgroundColor: cacheBg }, pressed && styles.buttonPressed]}
                         onPress={handleClearCache}
                         disabled={isClearing}
+                        accessibilityRole="button"
+                        accessibilityLabel="Clear local cache"
                     >
                         <IconSymbol name="trash" size={20} color={isDark ? '#FFD60A' : '#FF9500'} />
                         <Text style={[styles.cacheText, { color: isDark ? '#FFD60A' : '#FF9500' }]}>{isClearing ? 'Clearing...' : 'Clear Local Cache'}</Text>
@@ -268,6 +287,8 @@ export default function SettingsScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.logoutButton, { backgroundColor: logoutBg }, pressed && styles.buttonPressed]}
                         onPress={handleLogout}
+                        accessibilityRole="button"
+                        accessibilityLabel="Log out"
                     >
                         <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color={dangerColor} />
                         <Text style={[styles.logoutText, { color: dangerColor }]}>Log Out</Text>
