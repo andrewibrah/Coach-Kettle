@@ -464,6 +464,8 @@ export default function TemplatesScreen() {
                     <Pressable
                         onPress={() => setShowNewForm(true)}
                         style={({ pressed }) => [styles.addButton, pressed && styles.buttonPressed]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Add template"
                     >
                         <IconSymbol name="plus" size={24} color={activeColor} />
                     </Pressable>
@@ -524,6 +526,8 @@ export default function TemplatesScreen() {
                                     setNewName('');
                                     setNewDescription('');
                                 }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Cancel"
                             >
                                 <ThemedText>Cancel</ThemedText>
                             </Pressable>
@@ -535,6 +539,8 @@ export default function TemplatesScreen() {
                                 ]}
                                 onPress={handleCreateTemplate}
                                 disabled={!newName.trim()}
+                                accessibilityRole="button"
+                                accessibilityLabel="Create template"
                             >
                                 <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Create</ThemedText>
                             </Pressable>
@@ -576,6 +582,8 @@ export default function TemplatesScreen() {
                                     <Pressable
                                         onPress={() => handleExpand(template.id)}
                                         style={styles.templateHeader}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`${template.name}, ${exerciseCount} exercise${exerciseCount !== 1 ? 's' : ''}, ${isExpanded ? 'collapse' : 'expand'}`}
                                     >
                                         <View style={styles.templateInfo}>
                                             <ThemedText style={styles.templateName}>{template.name}</ThemedText>
@@ -592,6 +600,8 @@ export default function TemplatesScreen() {
                                             <Pressable
                                                 onPress={() => handleDeleteTemplate(template)}
                                                 style={styles.actionButton}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={`Delete ${template.name}`}
                                             >
                                                 <MaterialCommunityIcons
                                                     name="trash-can-outline"
@@ -678,6 +688,8 @@ export default function TemplatesScreen() {
                                                                             <Pressable
                                                                                 style={[styles.editActionButton, { backgroundColor: dangerColor }]}
                                                                                 onPress={() => handleRemoveExercise(item.id, template.id)}
+                                                                                accessibilityRole="button"
+                                                                                accessibilityLabel={`Delete ${item.lift_name}`}
                                                                             >
                                                                                 <ThemedText style={styles.editActionText}>Delete</ThemedText>
                                                                             </Pressable>
@@ -685,6 +697,8 @@ export default function TemplatesScreen() {
                                                                                 <Pressable
                                                                                     style={styles.cancelButton}
                                                                                     onPress={() => setEditingItemId(null)}
+                                                                                    accessibilityRole="button"
+                                                                                    accessibilityLabel="Cancel editing"
                                                                                 >
                                                                                     <ThemedText>Cancel</ThemedText>
                                                                                 </Pressable>
@@ -696,6 +710,8 @@ export default function TemplatesScreen() {
                                                                                     ]}
                                                                                     onPress={() => handleSaveEdit(item.id, template.id)}
                                                                                     disabled={!editName.trim()}
+                                                                                    accessibilityRole="button"
+                                                                                    accessibilityLabel="Save exercise"
                                                                                 >
                                                                                     <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Save</ThemedText>
                                                                                 </Pressable>
@@ -711,6 +727,8 @@ export default function TemplatesScreen() {
                                                                                 onPress={() => handleMoveItem(template.id, item.id, 'up')}
                                                                                 style={[styles.reorderBtn, idx === 0 && styles.reorderBtnDisabled]}
                                                                                 disabled={idx === 0}
+                                                                                accessibilityRole="button"
+                                                                                accessibilityLabel={`Move ${item.lift_name} up`}
                                                                             >
                                                                                 <IconSymbol name="chevron.up" size={14} color={idx === 0 ? sectionTitleColor : textColor} />
                                                                             </Pressable>
@@ -718,6 +736,8 @@ export default function TemplatesScreen() {
                                                                                 onPress={() => handleMoveItem(template.id, item.id, 'down')}
                                                                                 style={[styles.reorderBtn, idx === items.length - 1 && styles.reorderBtnDisabled]}
                                                                                 disabled={idx === items.length - 1}
+                                                                                accessibilityRole="button"
+                                                                                accessibilityLabel={`Move ${item.lift_name} down`}
                                                                             >
                                                                                 <IconSymbol name="chevron.down" size={14} color={idx === items.length - 1 ? sectionTitleColor : textColor} />
                                                                             </Pressable>
@@ -746,6 +766,8 @@ export default function TemplatesScreen() {
                                                                                 styles.editButton,
                                                                                 pressed && styles.buttonPressed,
                                                                             ]}
+                                                                            accessibilityRole="button"
+                                                                            accessibilityLabel={`Edit ${item.lift_name}`}
                                                                         >
                                                                             <MaterialCommunityIcons
                                                                                 name="pencil-outline"
@@ -827,7 +849,7 @@ export default function TemplatesScreen() {
                                                                 />
                                                             </View>
                                                             <View style={styles.formButtons}>
-                                                                <Pressable style={styles.cancelButton} onPress={resetExerciseForm}>
+                                                                <Pressable style={styles.cancelButton} onPress={resetExerciseForm} accessibilityRole="button" accessibilityLabel="Cancel">
                                                                     <ThemedText>Cancel</ThemedText>
                                                                 </Pressable>
                                                                 <Pressable
@@ -838,6 +860,8 @@ export default function TemplatesScreen() {
                                                                     ]}
                                                                     onPress={handleAddExercise}
                                                                     disabled={!newExerciseName.trim()}
+                                                                    accessibilityRole="button"
+                                                                    accessibilityLabel="Add exercise"
                                                                 >
                                                                     <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Add</ThemedText>
                                                                 </Pressable>
@@ -850,6 +874,8 @@ export default function TemplatesScreen() {
                                                                 setAddingToTemplateId(template.id);
                                                                 requestAnimationFrame(() => addExerciseNameInputRef.current?.focus());
                                                             }}
+                                                            accessibilityRole="button"
+                                                            accessibilityLabel={`Add exercise to ${template.name}`}
                                                         >
                                                             <IconSymbol name="plus" size={16} color={activeColor} />
                                                             <ThemedText style={[styles.addExerciseText, { color: activeColor }]}>
