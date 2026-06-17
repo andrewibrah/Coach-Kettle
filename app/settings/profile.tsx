@@ -43,7 +43,8 @@ export default function ProfileSettingsScreen() {
   }, [refreshProfile]);
 
   const cardBg = useThemeColor({}, 'cardBackground');
-  const sectionTitleColor = '#8E8E93';
+  const inputBg = useThemeColor({}, 'inputBackground');
+  const sectionTitleColor = '#8E8E93'; // iOS system gray, same in both themes
 
   // Form state
   const [heightValue, setHeightValue] = useState(profile?.height_value?.toString() || '');
@@ -172,7 +173,7 @@ export default function ProfileSettingsScreen() {
             <ThemedText style={styles.fieldLabel}>Height</ThemedText>
             <View style={styles.fieldInput}>
               <Pressable
-                style={[styles.inputField, { backgroundColor: isDark ? '#2c2c2e' : '#fff' }]}
+                style={[styles.inputField, { backgroundColor: inputBg }]}
                 onPress={() => {
                   Alert.prompt(
                     'Enter Height',
@@ -246,7 +247,7 @@ export default function ProfileSettingsScreen() {
             <ThemedText style={styles.fieldLabel}>Current Weight</ThemedText>
             <View style={styles.fieldInput}>
               <Pressable
-                style={[styles.inputField, { backgroundColor: isDark ? '#2c2c2e' : '#fff' }]}
+                style={[styles.inputField, { backgroundColor: inputBg }]}
                 onPress={() => {
                   Alert.prompt(
                     'Enter Weight',
@@ -291,7 +292,7 @@ export default function ProfileSettingsScreen() {
             <ThemedText style={styles.fieldLabel}>Goal Weight</ThemedText>
             <View style={styles.fieldInput}>
               <Pressable
-                style={[styles.inputField, { backgroundColor: isDark ? '#2c2c2e' : '#fff' }]}
+                style={[styles.inputField, { backgroundColor: inputBg }]}
                 onPress={() => {
                   Alert.prompt(
                     'Enter Goal Weight',

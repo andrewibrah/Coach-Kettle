@@ -60,6 +60,8 @@ export default function HistoryScreen() {
   const chevronColor = useThemeColor({}, 'icon');
   const tintColor = useThemeColor({}, 'tint');
   const dangerColor = useThemeColor({}, 'danger');
+  const successColor = useThemeColor({}, 'success');
+  const warningColor = useThemeColor({}, 'warning');
 
   const load = async (isInitial = false) => {
     try {
@@ -133,10 +135,10 @@ export default function HistoryScreen() {
   };
 
   const getRatingColor = (rating: number) => {
-    if (rating >= 8) return "#10B981";
+    if (rating >= 8) return successColor;
     if (rating >= 6) return tintColor;
-    if (rating >= 4) return "#F59E0B";
-    return "#EF4444";
+    if (rating >= 4) return warningColor;
+    return dangerColor;
   };
 
   const renderWorkoutCard = ({ item }: { item: WorkoutSession }) => {

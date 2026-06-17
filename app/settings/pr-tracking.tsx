@@ -17,7 +17,6 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { E1RMInfoTooltip } from '@/components/ui/E1RMInfoTooltip';
 import { useAuth } from '@/contexts/AuthProvider';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import {
   PRTrackedLift,
@@ -34,8 +33,6 @@ import {
 
 export default function PRTrackingScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const activeColor = useThemeColor({}, 'tint');
@@ -44,7 +41,9 @@ export default function PRTrackingScreen() {
   const { session } = useAuth();
 
   const cardBg = useThemeColor({}, 'cardBackground');
-  const sectionTitleColor = '#8E8E93';
+  const inputBg = useThemeColor({}, 'inputBackground');
+  const placeholder = useThemeColor({}, 'placeholder');
+  const sectionTitleColor = '#8E8E93'; // iOS system gray, same in both themes
 
   const [trackedLifts, setTrackedLifts] = useState<PRTrackedLift[]>([]);
   const [prLifts, setPRLifts] = useState<PRLift[]>([]);
@@ -368,12 +367,12 @@ export default function PRTrackingScreen() {
                 <TextInput
                   style={[
                     styles.addInput,
-                    { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                    { color: textColor, backgroundColor: inputBg },
                   ]}
                   value={newLiftName}
                   onChangeText={setNewLiftName}
                   placeholder="Enter lift name (e.g., Bench Press)"
-                  placeholderTextColor={isDark ? '#666' : '#999'}
+                  placeholderTextColor={placeholder}
                   autoFocus
                   onSubmitEditing={() => {
                     if (newLiftName.trim()) setAddStep('values');
@@ -410,10 +409,10 @@ export default function PRTrackingScreen() {
                   <TextInput
                     style={[
                       styles.prInput,
-                      { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                      { color: textColor, backgroundColor: inputBg },
                     ]}
                     placeholder="Weight (lbs)"
-                    placeholderTextColor={isDark ? '#666' : '#999'}
+                    placeholderTextColor={placeholder}
                     keyboardType="decimal-pad"
                     value={prWeight}
                     onChangeText={(text) => {
@@ -425,10 +424,10 @@ export default function PRTrackingScreen() {
                   <TextInput
                     style={[
                       styles.prInput,
-                      { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                      { color: textColor, backgroundColor: inputBg },
                     ]}
                     placeholder="Reps"
-                    placeholderTextColor={isDark ? '#666' : '#999'}
+                    placeholderTextColor={placeholder}
                     keyboardType="numeric"
                     value={prReps}
                     onChangeText={(text) => {
@@ -493,25 +492,25 @@ export default function PRTrackingScreen() {
                           <TextInput
                             style={[
                               styles.prInput,
-                              { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                              { color: textColor, backgroundColor: inputBg },
                             ]}
                             value={editWeight}
                             onChangeText={setEditWeight}
                             keyboardType="decimal-pad"
                             placeholder="Weight"
-                            placeholderTextColor={isDark ? '#666' : '#999'}
+                            placeholderTextColor={placeholder}
                           />
                           <ThemedText style={styles.multiplier}>×</ThemedText>
                           <TextInput
                             style={[
                               styles.prInput,
-                              { color: textColor, backgroundColor: isDark ? '#2c2c2e' : '#fff' },
+                              { color: textColor, backgroundColor: inputBg },
                             ]}
                             value={editReps}
                             onChangeText={setEditReps}
                             keyboardType="numeric"
                             placeholder="Reps"
-                            placeholderTextColor={isDark ? '#666' : '#999'}
+                            placeholderTextColor={placeholder}
                           />
                         </View>
                         <View style={styles.editButtonRow}>
