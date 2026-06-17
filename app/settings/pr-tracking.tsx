@@ -277,6 +277,8 @@ export default function PRTrackingScreen() {
               setSelectedLiftName(null);
             }}
             style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <IconSymbol name="chevron.left" size={28} color={textColor} />
           </Pressable>
@@ -346,6 +348,8 @@ export default function PRTrackingScreen() {
         <Pressable
           onPress={() => router.back()}
           style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <IconSymbol name="chevron.left" size={28} color={textColor} />
         </Pressable>
@@ -355,6 +359,8 @@ export default function PRTrackingScreen() {
         <Pressable
           onPress={() => setShowAddInput(true)}
           style={({ pressed }) => [styles.addButton, pressed && styles.buttonPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Add lift"
         >
           <IconSymbol name="plus" size={24} color={activeColor} />
         </Pressable>
@@ -388,6 +394,8 @@ export default function PRTrackingScreen() {
                   <Pressable
                     style={styles.cancelButton}
                     onPress={resetAddForm}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel"
                   >
                     <ThemedText>Cancel</ThemedText>
                   </Pressable>
@@ -401,6 +409,8 @@ export default function PRTrackingScreen() {
                       if (newLiftName.trim()) setAddStep('values');
                     }}
                     disabled={!newLiftName.trim()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Continue"
                   >
                     <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Continue</ThemedText>
                   </Pressable>
@@ -450,12 +460,14 @@ export default function PRTrackingScreen() {
                   </View>
                 )}
                 <View style={styles.addInputButtons}>
-                  <Pressable style={styles.cancelButton} onPress={handleSkipPRValues}>
+                  <Pressable style={styles.cancelButton} onPress={handleSkipPRValues} accessibilityRole="button" accessibilityLabel="Skip PR values">
                     <ThemedText>Skip</ThemedText>
                   </Pressable>
                   <Pressable
                     style={[styles.confirmButton, { backgroundColor: activeColor }]}
                     onPress={handleAddWithPR}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add lift"
                   >
                     <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Add Lift</ThemedText>
                   </Pressable>
@@ -527,12 +539,16 @@ export default function PRTrackingScreen() {
                               setEditWeight('');
                               setEditReps('');
                             }}
+                            accessibilityRole="button"
+                            accessibilityLabel="Cancel editing"
                           >
                             <ThemedText>Cancel</ThemedText>
                           </Pressable>
                           <Pressable
                             style={[styles.confirmButton, { backgroundColor: activeColor }]}
                             onPress={() => handleSaveEdit(lift)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Save PR"
                           >
                             <ThemedText style={[styles.confirmButtonText, { color: onTint }]}>Save</ThemedText>
                           </Pressable>
@@ -543,6 +559,8 @@ export default function PRTrackingScreen() {
                     <Pressable
                       style={styles.liftCardContent}
                       onPress={() => handleViewHistory(lift.lift_name)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${lift.lift_name} history`}
                     >
                       <View style={styles.liftInfo}>
                         <ThemedText
@@ -580,6 +598,8 @@ export default function PRTrackingScreen() {
                               setEditWeight(pr.weight_lbs.toString());
                               setEditReps(pr.reps.toString());
                             }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Edit PR for ${lift.lift_name}`}
                           >
                             <IconSymbol name="pencil" size={20} color={activeColor} />
                           </Pressable>
@@ -587,6 +607,8 @@ export default function PRTrackingScreen() {
                         <Pressable
                           style={styles.actionButton}
                           onPress={() => handleToggleLift(lift)}
+                          accessibilityRole="button"
+                          accessibilityLabel={lift.is_active ? `Hide ${lift.lift_name}` : `Show ${lift.lift_name}`}
                         >
                           <IconSymbol
                             name={lift.is_active ? 'eye.fill' : 'eye.slash.fill'}
@@ -597,6 +619,8 @@ export default function PRTrackingScreen() {
                         <Pressable
                           style={styles.actionButton}
                           onPress={() => handleRemoveLift(lift)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${lift.lift_name}`}
                         >
                           <IconSymbol name="trash" size={20} color={dangerColor} />
                         </Pressable>
