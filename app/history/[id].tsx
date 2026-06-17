@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { accentColor } from "@/constants/theme";
 import {
@@ -127,6 +127,10 @@ export default function WorkoutDetail() {
   const { session } = useAuth();
   const userId = session?.user?.id;
 
+  const [loading, setLoading] = useState(true);
+  const isMounted = useRef(true);
+  useEffect(() => () => { isMounted.current = false; }, []);
+
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const backgroundColor = useThemeColor({}, 'background');
@@ -190,7 +194,9 @@ export default function WorkoutDetail() {
         }
       } catch (error) {
         console.error("[WorkoutDetail] Failed to fetch history:", error);
-        setWorkout(null);
+        if (isMounted.current) setWorkout(null);
+      } finally {
+        if (isMounted.current) setLoading(false);
       }
     })();
   }, [id]);
@@ -284,6 +290,15 @@ export default function WorkoutDetail() {
     }
     setMediaThumbs((prev) => prev.filter((_, i) => i !== index));
   }, [mediaThumbs]);
+
+  if (loading) {
+    return (
+      <View style={[styles.screen, { paddingTop: Math.max(insets.top, 16), backgroundColor }]}>
+        <Stack.Screen options={{ title: "Workout", headerBackTitle: "Back" }} />
+        <ActivityIndicator style={styles.loadingIndicator} />
+      </View>
+    );
+  }
 
   if (!workout) {
     return (
@@ -712,5 +727,9 @@ const styles = StyleSheet.create({
   reflectionSaveText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  loadingIndicator: {
+    flex: 1,
+    alignSelf: 'center',
   },
 });

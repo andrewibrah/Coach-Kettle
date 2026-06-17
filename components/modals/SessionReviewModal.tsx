@@ -295,7 +295,7 @@ export function SessionReviewModal({
           ) : (
             <View style={styles.errorContainer}>
               <ThemedText style={styles.errorText}>
-                Workout saved. The AI review couldn't be generated — tap Close to continue.
+                Workout saved. The AI review could not be generated — tap Close to continue.
               </ThemedText>
 
               {/* Still show media + reflection even without AI review */}
