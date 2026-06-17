@@ -2,12 +2,14 @@
 // notification category, pick reminder times, and send a test push.
 
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import type { NotificationPreferences } from '@/types/notifications';
@@ -20,7 +22,7 @@ const KIND_LABELS: { key: keyof NotificationPreferences; label: string; descript
   { key: 'pr_celebration_enabled',        label: 'PR celebrations',         description: 'Push when you hit a new PR.' },
   { key: 'streak_milestones_enabled',     label: 'Streak milestones',       description: 'Acknowledge 3/7/14/30-day streaks.' },
   { key: 'harshness_escalation_enabled',  label: 'Accountability nudges',   description: 'Direct messages when you slip multiple days.' },
-  { key: 'meal_plan_enabled',             label: 'Meal plan ready',         description: 'When this week’s plan is generated.' },
+  { key: 'meal_plan_enabled',             label: 'Meal plan ready',         description: "When this week's plan is generated." },
   { key: 'weekly_recalibration_enabled',  label: 'Weekly recalibration',    description: 'Sunday reminder to review and adjust.' },
   { key: 'body_weight_reminder_enabled',  label: 'Weekly weigh-in',         description: 'Sunday reminder to log your weight.' },
   { key: 'resting_hr_alert_enabled',      label: 'Resting HR alerts',       description: 'When RHR spikes — recovery flag.' },
@@ -36,6 +38,7 @@ export default function NotificationsSettingsScreen() {
   const onTint = useThemeColor({}, 'tintForeground');
   const subtle = useThemeColor({}, 'placeholder');
 
+  const { toast, showToast, hideToast } = useToast();
   const [busy, setBusy] = useState(false);
 
   const handleRequestPermission = async () => {
@@ -43,10 +46,7 @@ export default function NotificationsSettingsScreen() {
     try {
       const r = await requestPermission();
       if (!r.granted) {
-        Alert.alert(
-          'Notifications disabled',
-          'Enable notifications for Coach Kettle in iOS Settings to receive coach reports, workout reminders, and rest-timer alerts.'
-        );
+        showToast('Go to iOS Settings → Coach Kettle to enable notifications.', 'info');
       }
     } finally {
       setBusy(false);
@@ -57,7 +57,8 @@ export default function NotificationsSettingsScreen() {
     setBusy(true);
     try {
       const r = await sendTestPush();
-      Alert.alert(r.ok ? 'Sent' : 'Could not send', r.ok ? `Test push sent to ${r.sent_to} device(s).` : 'Make sure notifications are enabled and you’re running on a real device.');
+      const testMsg = r.ok ? `Test push sent to ${r.sent_to} device(s).` : 'Make sure notifications are enabled on a real device.';
+      showToast(testMsg, r.ok ? 'success' : 'error');
     } finally {
       setBusy(false);
     }
@@ -76,6 +77,7 @@ export default function NotificationsSettingsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: bg }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Notifications" />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
 

@@ -14,7 +14,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/contexts/AuthProvider';
 
 import {
@@ -39,6 +41,7 @@ export default function BodyPhotosScreen() {
   const { session } = useAuth();
   const userId = session?.user?.id ?? '';
 
+  const { toast, showToast, hideToast } = useToast();
   const [photos, setPhotos] = useState<BodyPhoto[]>([]);
   const [pose, setPose] = useState<Pose>('front');
   const [uploading, setUploading] = useState(false);
@@ -59,12 +62,12 @@ export default function BodyPhotosScreen() {
 
   const onAddPhoto = useCallback(async () => {
     if (!userId) {
-      Alert.alert('Not signed in', 'Please sign in to add photos.');
+      showToast('Please sign in to add photos.', 'error');
       return;
     }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission needed', 'Photo library access is required.');
+      showToast('Photo library access is required.', 'info');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -87,7 +90,7 @@ export default function BodyPhotosScreen() {
       });
       await load();
     } catch (e: any) {
-      Alert.alert('Upload failed', e?.message ?? 'Unknown error');
+      showToast(e?.message ?? 'Upload failed. Please try again.', 'error');
     } finally {
       setUploading(false);
     }
@@ -104,7 +107,7 @@ export default function BodyPhotosScreen() {
             await deleteBodyPhoto(id);
             await load();
           } catch (e: any) {
-            Alert.alert('Could not delete', e?.message ?? 'Unknown error');
+            showToast(e?.message ?? 'Could not delete. Please try again.', 'error');
           }
         },
       },
@@ -113,6 +116,7 @@ export default function BodyPhotosScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Progress photos" />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}

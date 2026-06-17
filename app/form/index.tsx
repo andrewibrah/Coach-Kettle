@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
+import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useToast } from '@/hooks/useToast';
 import { fetchRecentFormAnalyses, saveFormAnalysis } from '@/lib/formAnalysis';
 import type { FormAnalysis } from '@/types/form';
 
@@ -20,6 +22,7 @@ export default function FormAnalysisScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
 
+  const { toast, showToast, hideToast } = useToast();
   const [exercise, setExercise] = useState('Back Squat');
   const [expectedReps, setExpectedReps] = useState('8');
   const [loading, setLoading] = useState(false);
@@ -37,7 +40,7 @@ export default function FormAnalysisScreen() {
 
   const handleCapture = async () => {
     if (!exercise.trim()) {
-      Alert.alert('Exercise required', 'Enter the lift before recording.');
+      showToast('Enter the lift before recording.', 'error');
       return;
     }
 
@@ -45,7 +48,7 @@ export default function FormAnalysisScreen() {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Camera permission needed', 'Enable camera access to record a form check.');
+        showToast('Enable camera access to record a form check.', 'info');
         return;
       }
 
@@ -64,9 +67,9 @@ export default function FormAnalysisScreen() {
         expected_reps: Number(expectedReps) || 8,
       });
       setRecent((rows) => [analysis, ...rows].slice(0, 8));
-      Alert.alert('Form check saved', `Reps: ${analysis.rep_count ?? '-'} · Form: ${analysis.form_score ?? '-'} / 100`);
+      showToast(`Saved · ${analysis.rep_count ?? '-'} reps · Form ${analysis.form_score ?? '-'}/100`, 'success');
     } catch (e) {
-      Alert.alert('Form check failed', e instanceof Error ? e.message : 'Could not save analysis.');
+      showToast(e instanceof Error ? e.message : 'Could not save analysis.', 'error');
     } finally {
       setLoading(false);
     }
@@ -74,6 +77,7 @@ export default function FormAnalysisScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Form Check" subtitle="Camera rep count + technique cues" />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
         <View style={[styles.card, { backgroundColor: cardBackground }]}>
