@@ -76,7 +76,9 @@ export default function BodyMetricsScreen() {
     try {
       const list = await fetchBodyMetrics(180);
       setEntries(list);
-    } catch {}
+    } catch (e) {
+      console.warn('[body] load failed', e);
+    }
   }, []);
 
   useEffect(() => {

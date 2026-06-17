@@ -31,7 +31,7 @@ interface WorkoutLift {
 export default function WorkoutSetupScreen() {
   const insets = useSafeAreaInsets();
   const tint = useThemeColor({}, 'tint');
-  const onTint = useThemeColor({}, 'onTint');
+  const onTint = useThemeColor({}, 'tintForeground');
   const secondaryBg = useThemeColor({}, 'secondaryBackground');
   const inputBg = useThemeColor({}, 'inputBackground');
   const textColor = useThemeColor({}, 'text');

@@ -50,7 +50,9 @@ export default function RestingHrScreen() {
       ]);
       setSummary(s);
       setEntries(list);
-    } catch {}
+    } catch (e) {
+      console.warn('[resting-hr] load failed', e);
+    }
   }, []);
 
   useEffect(() => {
