@@ -80,7 +80,7 @@ export default function LogFoodScreen() {
   const handleLogSelected = async () => {
     const today = new Date().toISOString().slice(0, 10);
     if (!selected || submitting) return;
-    const s = parseFloat(servings) || 1;
+    const s = servingsNum;
     setSubmitting(true);
     setLogError(null);
     try {
@@ -203,7 +203,7 @@ export default function LogFoodScreen() {
     const v = parseFloat(raw);
     if (!v || v <= 0) return 1;
     if (u === 'serving') return v;
-    if (!sizeG) return v;
+    if (!sizeG || sizeG <= 0) return 1; // no gram weight on record — can't convert, treat as 1 serving
     return (v * TO_GRAMS[u]) / sizeG;
   };
 

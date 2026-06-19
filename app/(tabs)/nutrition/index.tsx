@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
 import { useProfile } from '@/contexts/ProfileContext';
-import { deriveNutritionTargets } from '@/lib/nutrition';
 import { isTrainingDay as checkTrainingDay } from '@/lib/trainingSchedule';
 import type { MealSlot, FoodLogEntry } from '@/types/nutrition';
 
@@ -33,20 +32,32 @@ export default function NutritionHomeScreen() {
   const successColor = useThemeColor({}, 'success');
   const warningColor = useThemeColor({}, 'warning');
 
-  const { loading, error, date, entries, totals, targets, grade, refresh, deleteEntry } = useNutrition();
+  const { loading, error, date, entries, totals, targets, grade, refresh, deleteEntry, weeklyGoals } = useNutrition();
   const { profile } = useProfile();
-  const [deriving, setDeriving] = useState(false);
-  const { toast, showToast, hideToast } = useToast();
+  const { toast, hideToast } = useToast();
 
   const isTrainingDay = useMemo(() => {
     const dow = new Date().getDay();
     return checkTrainingDay(dow, profile?.training_days_per_week);
   }, [profile?.training_days_per_week]);
 
-  const calTarget = isTrainingDay ? targets?.training_calories : targets?.rest_calories;
-  const protTarget = isTrainingDay ? targets?.training_protein_g : targets?.rest_protein_g;
-  const carbTarget = isTrainingDay ? targets?.training_carbs_g : targets?.rest_carbs_g;
-  const fatTarget = isTrainingDay ? targets?.training_fat_g : targets?.rest_fat_g;
+  // Per-day goal takes priority; falls back to training/rest targets
+  const todayDow = new Date().getDay();
+  const dayGoal = weeklyGoals[todayDow];
+  const calTarget  = dayGoal?.calories   ?? (isTrainingDay ? targets?.training_calories  : targets?.rest_calories);
+  const protTarget = dayGoal?.protein_g  ?? (isTrainingDay ? targets?.training_protein_g : targets?.rest_protein_g);
+  const carbTarget = dayGoal?.carbs_g    ?? (isTrainingDay ? targets?.training_carbs_g   : targets?.rest_carbs_g);
+  const fatTarget  = dayGoal?.fat_g      ?? (isTrainingDay ? targets?.training_fat_g     : targets?.rest_fat_g);
+
+  const calLogged  = totals?.calories  ?? 0;
+  const protLogged = totals?.protein_g ?? 0;
+  const carbLogged = totals?.carbs_g   ?? 0;
+  const fatLogged  = totals?.fat_g     ?? 0;
+
+  const calLeft  = calTarget  != null ? calTarget  - calLogged  : null;
+  const protLeft = protTarget != null ? protTarget - protLogged : null;
+  const carbLeft = carbTarget != null ? carbTarget - carbLogged : null;
+  const fatLeft  = fatTarget  != null ? fatTarget  - fatLogged  : null;
 
   const grouped = useMemo(() => {
     const out: Record<MealSlot, FoodLogEntry[]> = {
@@ -57,20 +68,6 @@ export default function NutritionHomeScreen() {
     }
     return out;
   }, [entries]);
-
-  const handleDeriveTargets = async () => {
-    if (deriving) return;
-    setDeriving(true);
-    try {
-      await deriveNutritionTargets();
-      await refresh();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to derive targets';
-      showToast(msg, 'error');
-    } finally {
-      setDeriving(false);
-    }
-  };
 
   const handleDelete = async (id: string) => {
     try {
@@ -117,12 +114,46 @@ export default function NutritionHomeScreen() {
               </Pressable>
             </View>
           )}
+          {/* Daily budget — remaining calories & macros */}
+          {calTarget != null && (
+            <View style={[styles.card, { backgroundColor: cardBackground }]}>
+              <ThemedText style={{ fontWeight: '700', fontSize: 13, color: placeholder, marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                Today&apos;s budget
+              </ThemedText>
+              <View style={{ alignItems: 'center', marginBottom: 12 }}>
+                <ThemedText style={{ fontSize: 48, fontWeight: '800', color: (calLeft ?? 0) < 0 ? dangerColor : successColor, lineHeight: 54 }}>
+                  {Math.abs(Math.round(calLeft ?? 0))}
+                </ThemedText>
+                <ThemedText style={{ fontSize: 14, color: placeholder, marginTop: 2 }}>
+                  cal {(calLeft ?? 0) < 0 ? 'over' : 'remaining'} · goal {Math.round(calTarget)}
+                </ThemedText>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+                {([
+                  { label: 'Protein', left: protLeft, color: '#4A90D9' },
+                  { label: 'Carbs',   left: carbLeft, color: '#F5A623' },
+                  { label: 'Fat',     left: fatLeft,  color: '#7ED321' },
+                ] as const).map(({ label, left, color }) => (
+                  <View key={label} style={{ alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 20, fontWeight: '700', color: (left ?? 0) < 0 ? dangerColor : color }}>
+                      {left != null ? Math.abs(Math.round(left)) : '—'}
+                      <ThemedText style={{ fontSize: 12, fontWeight: '400' }}>g</ThemedText>
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 11, color: placeholder, marginTop: 2 }}>
+                      {label} {(left ?? 0) < 0 ? 'over' : 'left'}
+                    </ThemedText>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* Today's totals */}
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
             <ThemedText type="subtitle" style={{ marginBottom: 12 }}>Today&apos;s totals</ThemedText>
             {!targets ? (
               <Pressable
-                onPress={handleDeriveTargets}
+                onPress={() => router.push('/(tabs)/nutrition/targets')}
                 style={({ pressed }) => [
                   styles.primaryBtn,
                   { backgroundColor: tint },
@@ -131,13 +162,9 @@ export default function NutritionHomeScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Set up your nutrition targets"
               >
-                {deriving ? (
-                  <ActivityIndicator color={onTint} />
-                ) : (
-                  <ThemedText style={{ color: onTint, fontWeight: '700' }}>
-                    Set up your nutrition targets
-                  </ThemedText>
-                )}
+                <ThemedText style={{ color: onTint, fontWeight: '700' }}>
+                  Set up your nutrition targets
+                </ThemedText>
               </Pressable>
             ) : (
               <>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,7 +10,17 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
-import { deriveNutritionTargets, overrideNutritionTargets } from '@/lib/nutrition';
+import type { DayGoal } from '@/types/nutrition';
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function macrosFromCalories(cal: number): { protein_g: number; carbs_g: number; fat_g: number } {
+  return {
+    protein_g: Math.round((cal * 0.30) / 4),
+    carbs_g:   Math.round((cal * 0.40) / 4),
+    fat_g:     Math.round((cal * 0.30) / 9),
+  };
+}
 
 export default function NutritionTargetsScreen() {
   const insets = useSafeAreaInsets();
@@ -23,9 +33,10 @@ export default function NutritionTargetsScreen() {
   const border = useThemeColor({}, 'border');
   const inputBg = useThemeColor({}, 'inputBackground');
 
-  const { targets, refresh } = useNutrition();
+  const { targets, refresh, weeklyGoals, saveWeeklyGoals, saveLocalTargets } = useNutrition();
   const { toast, showToast, hideToast } = useToast();
-  const [deriving, setDeriving] = useState(false);
+
+  // Manual targets form state
   const [editMode, setEditMode] = useState(false);
   const [trainCal, setTrainCal] = useState('');
   const [trainProt, setTrainProt] = useState('');
@@ -37,17 +48,72 @@ export default function NutritionTargetsScreen() {
   const [restFat, setRestFat] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const handleDerive = async () => {
-    if (deriving) return;
-    setDeriving(true);
+  // Weekly goals editor state
+  type DayDraft = { calories: string; protein: string; carbs: string; fat: string; showMacros: boolean };
+  const emptyDay = (): DayDraft => ({ calories: '', protein: '', carbs: '', fat: '', showMacros: false });
+  const [weekDraft, setWeekDraft] = useState<DayDraft[]>(() => Array.from({ length: 7 }, emptyDay));
+  const [weekSaving, setWeekSaving] = useState(false);
+
+  // Show form immediately if no targets exist
+  useEffect(() => {
+    if (!targets) setEditMode(true);
+  }, [targets]);
+
+  // Populate draft from saved goals on mount
+  useEffect(() => {
+    setWeekDraft(Array.from({ length: 7 }, (_, i) => {
+      const g = weeklyGoals[i];
+      if (!g) return emptyDay();
+      return {
+        calories: String(g.calories),
+        protein: String(g.protein_g),
+        carbs: String(g.carbs_g),
+        fat: String(g.fat_g),
+        showMacros: true,
+      };
+    }));
+  }, [weeklyGoals]);
+
+  const updateDay = (dow: number, field: keyof DayDraft, val: string | boolean) => {
+    setWeekDraft((prev) => {
+      const next = [...prev];
+      next[dow] = { ...next[dow], [field]: val };
+      return next;
+    });
+  };
+
+  const autoFillMacros = (dow: number) => {
+    const cal = parseFloat(weekDraft[dow].calories);
+    if (!cal) return;
+    const m = macrosFromCalories(cal);
+    setWeekDraft((prev) => {
+      const next = [...prev];
+      next[dow] = { ...next[dow], protein: String(m.protein_g), carbs: String(m.carbs_g), fat: String(m.fat_g), showMacros: true };
+      return next;
+    });
+  };
+
+  const handleSaveWeeklyGoals = async () => {
+    setWeekSaving(true);
     try {
-      await deriveNutritionTargets();
-      await refresh();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to derive targets';
-      showToast(msg, 'error');
+      const goals: Record<number, DayGoal> = {};
+      weekDraft.forEach((d, i) => {
+        const cal = parseFloat(d.calories);
+        if (!cal) return;
+        const m = macrosFromCalories(cal);
+        goals[i] = {
+          calories: cal,
+          protein_g: parseFloat(d.protein) || m.protein_g,
+          carbs_g:   parseFloat(d.carbs)   || m.carbs_g,
+          fat_g:     parseFloat(d.fat)      || m.fat_g,
+        };
+      });
+      await saveWeeklyGoals(goals);
+      showToast('Weekly goals saved', 'success');
+    } catch {
+      showToast('Failed to save', 'error');
     } finally {
-      setDeriving(false);
+      setWeekSaving(false);
     }
   };
 
@@ -64,11 +130,29 @@ export default function NutritionTargetsScreen() {
     setEditMode(true);
   };
 
-  const handleSaveOverride = async () => {
+  const autoFillTraining = () => {
+    const cal = parseFloat(trainCal);
+    if (!cal) return;
+    const m = macrosFromCalories(cal);
+    setTrainProt(String(m.protein_g));
+    setTrainCarb(String(m.carbs_g));
+    setTrainFat(String(m.fat_g));
+  };
+
+  const autoFillRest = () => {
+    const cal = parseFloat(restCal);
+    if (!cal) return;
+    const m = macrosFromCalories(cal);
+    setRestProt(String(m.protein_g));
+    setRestCarb(String(m.carbs_g));
+    setRestFat(String(m.fat_g));
+  };
+
+  const handleSave = async () => {
     if (saving) return;
     setSaving(true);
     try {
-      await overrideNutritionTargets({
+      await saveLocalTargets({
         training_calories: parseInt(trainCal, 10) || 0,
         training_protein_g: parseInt(trainProt, 10) || 0,
         training_carbs_g: parseInt(trainCarb, 10) || 0,
@@ -80,9 +164,9 @@ export default function NutritionTargetsScreen() {
       });
       await refresh();
       setEditMode(false);
+      showToast('Targets saved', 'success');
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to save';
-      showToast(msg, 'error');
+      showToast(e instanceof Error ? e.message : 'Failed to save', 'error');
     } finally {
       setSaving(false);
     }
@@ -102,32 +186,64 @@ export default function NutritionTargetsScreen() {
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Nutrition Targets" />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
-        {!targets ? (
-          <View style={[styles.card, { backgroundColor: cardBackground }]}>
-            <ThemedText type="subtitle" style={{ marginBottom: 12 }}>No targets yet</ThemedText>
-            <Pressable
-              onPress={handleDerive}
-              style={({ pressed }) => [
-                styles.primaryBtn,
-                { backgroundColor: tint },
-                pressed && { opacity: 0.7 },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Derive nutrition targets from profile"
-            >
-              {deriving ? (
-                <ActivityIndicator color={onTint} />
-              ) : (
-                <ThemedText style={{ color: onTint, fontWeight: '700' }}>
-                  Derive from profile
-                </ThemedText>
-              )}
-            </Pressable>
-            <ThemedText style={{ fontSize: 12, color: placeholder, marginTop: 10 }}>
-              Needs DOB, weight, height, sex, activity, goal — set in onboarding/profile.
-            </ThemedText>
-          </View>
-        ) : (
+
+        {/* ── Weekly calorie goals ── */}
+        <View style={[styles.card, { backgroundColor: cardBackground }]}>
+          <ThemedText type="subtitle" style={{ marginBottom: 4 }}>Weekly calorie goals</ThemedText>
+          <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 12 }}>
+            Set a daily calorie target for each day. Macros auto-fill at 30/40/30 (P/C/F) or enter manually.
+          </ThemedText>
+          {DAY_LABELS.map((label, dow) => {
+            const d = weekDraft[dow];
+            return (
+              <View key={dow} style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <ThemedText style={{ fontWeight: '700', width: 36 }}>{label}</ThemedText>
+                  <TextInput
+                    value={d.calories}
+                    onChangeText={(v) => updateDay(dow, 'calories', v)}
+                    placeholder="Calories"
+                    placeholderTextColor={placeholder}
+                    keyboardType="decimal-pad"
+                    style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]}
+                  />
+                  <Pressable
+                    onPress={() => autoFillMacros(dow)}
+                    style={({ pressed }) => [styles.smallBtn, { borderColor: tint }, pressed && { opacity: 0.7 }]}
+                  >
+                    <ThemedText style={{ fontSize: 11, color: tint, fontWeight: '700' }}>Auto</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => updateDay(dow, 'showMacros', !d.showMacros)}
+                    style={({ pressed }) => [styles.smallBtn, { borderColor: border }, pressed && { opacity: 0.7 }]}
+                  >
+                    <ThemedText style={{ fontSize: 11, color: textColor, fontWeight: '700' }}>
+                      {d.showMacros ? 'Hide' : 'Macros'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+                {d.showMacros && (
+                  <View style={{ flexDirection: 'row', gap: 6, paddingLeft: 44 }}>
+                    <TextInput value={d.protein} onChangeText={(v) => updateDay(dow, 'protein', v)} placeholder="P g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, styles.macroInput, { backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+                    <TextInput value={d.carbs}   onChangeText={(v) => updateDay(dow, 'carbs', v)}   placeholder="C g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, styles.macroInput, { backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+                    <TextInput value={d.fat}     onChangeText={(v) => updateDay(dow, 'fat', v)}     placeholder="F g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, styles.macroInput, { backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+                  </View>
+                )}
+              </View>
+            );
+          })}
+          <Pressable
+            onPress={handleSaveWeeklyGoals}
+            style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint, marginTop: 4 }, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Save weekly goals"
+          >
+            {weekSaving ? <ActivityIndicator color={onTint} /> : <ThemedText style={{ color: onTint, fontWeight: '700' }}>Save weekly goals</ThemedText>}
+          </Pressable>
+        </View>
+
+        {/* ── Daily targets (training / rest day defaults) ── */}
+        {!editMode && targets ? (
           <>
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
               <View style={[styles.card, styles.halfCard, { backgroundColor: cardBackground, marginBottom: 0 }]}>
@@ -145,81 +261,91 @@ export default function NutritionTargetsScreen() {
                 {renderRow('Fat', targets.rest_fat_g, 'g')}
               </View>
             </View>
-            <View style={[styles.card, { backgroundColor: cardBackground }]}>
-              <ThemedText type="subtitle" style={{ marginBottom: 10 }}>Shared limits</ThemedText>
-              {renderRow('Fiber min', targets.fiber_g_min, 'g')}
-              {renderRow('Sat fat max', targets.saturated_fat_g_max, 'g')}
-            </View>
-            <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 12, paddingHorizontal: 4 }}>
-              BMR: {targets.bmr == null ? '—' : Math.round(targets.bmr)}  ·  TDEE: {targets.tdee == null ? '—' : Math.round(targets.tdee)}
-            </ThemedText>
-            {editMode ? (
-              <View style={[styles.card, { backgroundColor: cardBackground }]}>
-                <ThemedText type="subtitle" style={{ marginBottom: 10 }}>Edit manually</ThemedText>
-                <ThemedText style={{ fontWeight: '600', marginBottom: 6 }}>Training day</ThemedText>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                  <TextInput value={trainCal} onChangeText={setTrainCal} placeholder="Calories" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
-                  <TextInput value={trainProt} onChangeText={setTrainProt} placeholder="Protein g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                  <TextInput value={trainCarb} onChangeText={setTrainCarb} placeholder="Carbs g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
-                  <TextInput value={trainFat} onChangeText={setTrainFat} placeholder="Fat g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
-                </View>
-                <ThemedText style={{ fontWeight: '600', marginBottom: 6 }}>Rest day</ThemedText>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                  <TextInput value={restCal} onChangeText={setRestCal} placeholder="Calories" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
-                  <TextInput value={restProt} onChangeText={setRestProt} placeholder="Protein g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                  <TextInput value={restCarb} onChangeText={setRestCarb} placeholder="Carbs g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
-                  <TextInput value={restFat} onChangeText={setRestFat} placeholder="Fat g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable
-                    onPress={handleSaveOverride}
-                    style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint, flex: 1 }, pressed && { opacity: 0.7 }]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Save nutrition targets"
-                  >
-                    {saving ? <ActivityIndicator color={onTint} /> : <ThemedText style={{ color: onTint, fontWeight: '700' }}>Save</ThemedText>}
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setEditMode(false)}
-                    style={({ pressed }) => [styles.primaryBtn, { borderWidth: 1, borderColor: border, flex: 1 }, pressed && { opacity: 0.7 }]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Cancel editing"
-                  >
-                    <ThemedText style={{ fontWeight: '600' }}>Cancel</ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <Pressable
-                onPress={handleOpenEdit}
-                style={({ pressed }) => [styles.secondaryBtn, { borderColor: border, marginBottom: 12 }, pressed && { opacity: 0.7 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Edit targets manually"
-              >
-                <ThemedText style={{ fontWeight: '600' }}>Edit manually</ThemedText>
-              </Pressable>
-            )}
             <Pressable
-              onPress={handleDerive}
-              style={({ pressed }) => [
-                styles.primaryBtn,
-                { backgroundColor: tint },
-                pressed && { opacity: 0.7 },
-              ]}
+              onPress={handleOpenEdit}
+              style={({ pressed }) => [styles.secondaryBtn, { borderColor: border, marginBottom: 12 }, pressed && { opacity: 0.7 }]}
               accessibilityRole="button"
-              accessibilityLabel="Re-derive targets from profile"
+              accessibilityLabel="Edit daily targets"
             >
-              {deriving ? (
-                <ActivityIndicator color={onTint} />
-              ) : (
-                <ThemedText style={{ color: onTint, fontWeight: '700' }}>Recalibrate now</ThemedText>
-              )}
+              <ThemedText style={{ fontWeight: '600' }}>Edit daily targets</ThemedText>
             </Pressable>
           </>
+        ) : (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText type="subtitle" style={{ marginBottom: 4 }}>
+              {targets ? 'Edit daily targets' : 'Set your daily targets'}
+            </ThemedText>
+            <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 14 }}>
+              Enter your calorie and macro goals. Use &quot;Auto&quot; to calculate macros from calories (30/40/30 P/C/F).
+            </ThemedText>
+
+            <ThemedText style={{ fontWeight: '700', marginBottom: 8 }}>Training day</ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <TextInput
+                value={trainCal}
+                onChangeText={setTrainCal}
+                placeholder="Calories"
+                placeholderTextColor={placeholder}
+                keyboardType="decimal-pad"
+                style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]}
+              />
+              <Pressable
+                onPress={autoFillTraining}
+                style={({ pressed }) => [styles.smallBtn, { borderColor: tint }, pressed && { opacity: 0.7 }]}
+              >
+                <ThemedText style={{ fontSize: 11, color: tint, fontWeight: '700' }}>Auto</ThemedText>
+              </Pressable>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              <TextInput value={trainProt} onChangeText={setTrainProt} placeholder="Protein g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+              <TextInput value={trainCarb} onChangeText={setTrainCarb} placeholder="Carbs g"   placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+              <TextInput value={trainFat}  onChangeText={setTrainFat}  placeholder="Fat g"     placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+            </View>
+
+            <ThemedText style={{ fontWeight: '700', marginBottom: 8 }}>Rest day</ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <TextInput
+                value={restCal}
+                onChangeText={setRestCal}
+                placeholder="Calories"
+                placeholderTextColor={placeholder}
+                keyboardType="decimal-pad"
+                style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]}
+              />
+              <Pressable
+                onPress={autoFillRest}
+                style={({ pressed }) => [styles.smallBtn, { borderColor: tint }, pressed && { opacity: 0.7 }]}
+              >
+                <ThemedText style={{ fontSize: 11, color: tint, fontWeight: '700' }}>Auto</ThemedText>
+              </Pressable>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              <TextInput value={restProt} onChangeText={setRestProt} placeholder="Protein g" placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+              <TextInput value={restCarb} onChangeText={setRestCarb} placeholder="Carbs g"   placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+              <TextInput value={restFat}  onChangeText={setRestFat}  placeholder="Fat g"     placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pressable
+                onPress={handleSave}
+                style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint, flex: 1 }, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Save nutrition targets"
+              >
+                {saving ? <ActivityIndicator color={onTint} /> : <ThemedText style={{ color: onTint, fontWeight: '700' }}>Save targets</ThemedText>}
+              </Pressable>
+              {targets && (
+                <Pressable
+                  onPress={() => setEditMode(false)}
+                  style={({ pressed }) => [styles.primaryBtn, { borderWidth: 1, borderColor: border, flex: 1 }, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel editing"
+                >
+                  <ThemedText style={{ fontWeight: '600' }}>Cancel</ThemedText>
+                </Pressable>
+              )}
+            </View>
+          </View>
         )}
       </ScrollView>
     </ThemedView>
@@ -264,5 +390,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
+  },
+  macroInput: {
+    flex: 1,
+    fontSize: 13,
+    paddingVertical: 7,
+  },
+  smallBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

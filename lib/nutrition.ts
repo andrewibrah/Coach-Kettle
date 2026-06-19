@@ -95,14 +95,6 @@ export async function fetchNutritionTargets(): Promise<{ targets: NutritionTarge
   return get(`${API}/nutrition-targets`);
 }
 
-export async function deriveNutritionTargets(): Promise<{ targets: NutritionTargets; derived: Record<string, unknown> }> {
-  return post(`${API}/nutrition-targets`, { action: 'derive' });
-}
-
-export async function overrideNutritionTargets(patch: Partial<NutritionTargets>): Promise<{ targets: NutritionTargets }> {
-  return post(`${API}/nutrition-targets`, { action: 'override', ...patch });
-}
-
 // ---------- Meal plan ----------
 export async function fetchMealPlan(): Promise<{ plan: MealPlan | null; meals: PlannedMeal[] }> {
   return get(`${API}/meal-plan`);

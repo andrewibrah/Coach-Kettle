@@ -57,6 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear user-specific caches that must not leak between accounts
     await AsyncStorage.removeItem('cached_profile');
     await AsyncStorage.removeItem('onboarding_draft');
+    await AsyncStorage.removeItem('nutrition_weekly_goals_v1');
+    await AsyncStorage.removeItem('nutrition_targets_local_v1');
 
     // Clear all Supabase-related AsyncStorage keys
     const allKeys = await AsyncStorage.getAllKeys();

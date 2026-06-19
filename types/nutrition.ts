@@ -155,6 +155,16 @@ export interface PlannedMeal {
   created_at: string;
 }
 
+export interface DayGoal {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
+
+// Keyed by day-of-week: 0=Sun, 1=Mon … 6=Sat
+export type WeeklyGoals = Partial<Record<number, DayGoal>>;
+
 export interface RecentFood {
   food_name: string;
   food_id: string | null;

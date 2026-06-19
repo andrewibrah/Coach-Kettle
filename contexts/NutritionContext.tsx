@@ -3,6 +3,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '@/contexts/AuthProvider';
 import { useProfile } from '@/contexts/ProfileContext';
@@ -17,7 +18,10 @@ import {
   type LogFoodInput,
 } from '@/lib/nutrition';
 import { isTrainingDay } from '@/lib/trainingSchedule';
-import type { FoodLogEntry, DailyTotals, NutritionTargets, MealPlan, PlannedMeal, RecentFood } from '@/types/nutrition';
+import type { FoodLogEntry, DailyTotals, NutritionTargets, MealPlan, PlannedMeal, RecentFood, WeeklyGoals } from '@/types/nutrition';
+
+const WEEKLY_GOALS_KEY = 'nutrition_weekly_goals_v1';
+const LOCAL_TARGETS_KEY = 'nutrition_targets_local_v1';
 
 // ---------- Grade helpers (module scope, pure) ----------
 
@@ -77,6 +81,9 @@ interface NutritionContextValue {
   deleteEntry: (id: string) => Promise<void>;
   updateEntry: (id: string, patch: Partial<Pick<FoodLogEntry, 'servings' | 'meal_slot' | 'notes'>>) => Promise<FoodLogEntry>;
   recentFoods: RecentFood[];
+  weeklyGoals: WeeklyGoals;
+  saveWeeklyGoals: (goals: WeeklyGoals) => Promise<void>;
+  saveLocalTargets: (patch: Partial<NutritionTargets>) => Promise<void>;
 }
 
 const NutritionContext = createContext<NutritionContextValue>({
@@ -93,6 +100,9 @@ const NutritionContext = createContext<NutritionContextValue>({
   deleteEntry: async () => {},
   updateEntry: async () => { throw new Error('Not ready'); },
   recentFoods: [],
+  weeklyGoals: {},
+  saveWeeklyGoals: async () => {},
+  saveLocalTargets: async () => {},
 });
 
 export const useNutrition = () => useContext(NutritionContext);
@@ -114,6 +124,32 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   const [targets, setTargets] = useState<NutritionTargets | null>(null);
   const [mealPlan, setMealPlan] = useState<{ plan: MealPlan | null; meals: PlannedMeal[] }>({ plan: null, meals: [] });
   const [recentFoods, setRecentFoods] = useState<RecentFood[]>([]);
+  const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoals>({});
+  const [localTargets, setLocalTargets] = useState<Partial<NutritionTargets> | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(WEEKLY_GOALS_KEY).then((raw) => {
+      if (raw) {
+        try { setWeeklyGoals(JSON.parse(raw)); } catch { /* ignore */ }
+      }
+    });
+    AsyncStorage.getItem(LOCAL_TARGETS_KEY).then((raw) => {
+      if (raw) {
+        try { setLocalTargets(JSON.parse(raw)); } catch { /* ignore */ }
+      }
+    });
+  }, []);
+
+  const saveWeeklyGoals = useCallback(async (goals: WeeklyGoals) => {
+    setWeeklyGoals(goals);
+    await AsyncStorage.setItem(WEEKLY_GOALS_KEY, JSON.stringify(goals));
+  }, []);
+
+  const saveLocalTargets = useCallback(async (patch: Partial<NutritionTargets>) => {
+    const merged = { ...localTargets, ...patch };
+    setLocalTargets(merged);
+    await AsyncStorage.setItem(LOCAL_TARGETS_KEY, JSON.stringify(merged));
+  }, [localTargets]);
 
   const isMounted = useRef(true);
   useEffect(() => {
@@ -152,9 +188,10 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
         setTotals(null);
       }
       if (tgtRes.status === 'fulfilled') {
-        setTargets(tgtRes.value.targets);
+        // Local targets take priority; Supabase is fallback for users with existing data
+        setTargets((localTargets as NutritionTargets | null) ?? tgtRes.value.targets);
       } else {
-        setTargets(null);
+        setTargets((localTargets as NutritionTargets | null) ?? null);
       }
       if (planRes.status === 'fulfilled') {
         setMealPlan({ plan: planRes.value.plan, meals: planRes.value.meals });
@@ -178,7 +215,7 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
       if (isMounted.current) {
         setEntries([]);
         setTotals(null);
-        setTargets(null);
+        setTargets((localTargets as NutritionTargets | null) ?? null);
         setMealPlan({ plan: null, meals: [] });
         setRecentFoods([]);
         setError('Nutrition data could not be loaded. Please try again.');
@@ -186,7 +223,7 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [userId]);
+  }, [userId, localTargets]);
 
   // Initial load + on auth change
   useEffect(() => { refresh(); }, [refresh]);
@@ -228,8 +265,8 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<NutritionContextValue>(() => ({
-    loading, error, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods,
-  }), [loading, error, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods]);
+    loading, error, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods, weeklyGoals, saveWeeklyGoals, saveLocalTargets,
+  }), [loading, error, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods, weeklyGoals, saveWeeklyGoals, saveLocalTargets]);
 
   return <NutritionContext.Provider value={value}>{children}</NutritionContext.Provider>;
 }
