@@ -34,6 +34,7 @@ export default function LogFoodScreen() {
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<FoodItem | null>(null);
   const [servings, setServings] = useState('1');
+  const [unit, setUnit] = useState<'serving' | 'g' | 'oz' | 'lb' | 'cup' | 'tbsp' | 'tsp' | 'fl oz'>('serving');
   const [mealSlot, setMealSlot] = useState<MealSlot>('breakfast');
   const [submitting, setSubmitting] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
@@ -174,7 +175,39 @@ export default function LogFoodScreen() {
     </View>
   );
 
-  const servingsNum = parseFloat(servings) || 1;
+  type Unit = typeof unit;
+  const UNITS: { key: Unit; label: string; volumetric?: boolean }[] = [
+    { key: 'serving', label: 'Serving' },
+    { key: 'g',      label: 'g' },
+    { key: 'oz',     label: 'oz' },
+    { key: 'lb',     label: 'lb' },
+    { key: 'cup',    label: 'cup',   volumetric: true },
+    { key: 'tbsp',   label: 'tbsp',  volumetric: true },
+    { key: 'tsp',    label: 'tsp',   volumetric: true },
+    { key: 'fl oz',  label: 'fl oz', volumetric: true },
+  ];
+
+  // ml-equivalent per unit (volume units use water density as approximation)
+  const TO_GRAMS: Record<Unit, number> = {
+    serving: 0,
+    g:       1,
+    oz:      28.3495,
+    lb:      453.592,
+    cup:     240,
+    tbsp:    14.787,
+    tsp:     4.929,
+    'fl oz': 29.574,
+  };
+
+  const toServings = (raw: string, u: Unit, sizeG: number): number => {
+    const v = parseFloat(raw);
+    if (!v || v <= 0) return 1;
+    if (u === 'serving') return v;
+    if (!sizeG) return v;
+    return (v * TO_GRAMS[u]) / sizeG;
+  };
+
+  const servingsNum = toServings(servings, unit, selected?.serving_size_g ?? 0);
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
@@ -216,6 +249,7 @@ export default function LogFoodScreen() {
                         updated_at: '',
                       });
                       setServings(String(food.servings));
+                      setUnit('serving');
                       setMealSlot(food.meal_slot);
                       setResults([]);
                       setQuery('');
@@ -264,7 +298,7 @@ export default function LogFoodScreen() {
               {results.map((item) => (
                 <Pressable
                   key={item.id}
-                  onPress={() => { setSelected(item); setResults([]); setQuery(''); setLogError(null); }}
+                  onPress={() => { setSelected(item); setServings('1'); setUnit('serving'); setResults([]); setQuery(''); setLogError(null); }}
                   accessibilityRole="button"
                   accessibilityLabel={`${item.name}, ${Math.round(item.calories)} cal, ${Math.round(item.protein_g)}g protein`}
                   style={({ pressed }) => [
@@ -295,18 +329,55 @@ export default function LogFoodScreen() {
             <ThemedText style={{ color: placeholder, fontSize: 13, marginBottom: 10 }}>
               Per serving: {Math.round(selected.calories)} cal · {Math.round(selected.protein_g)}g/{Math.round(selected.carbs_g)}g/{Math.round(selected.fat_g)}g
             </ThemedText>
-            <ThemedText style={{ fontWeight: '600', marginBottom: 4 }}>Servings</ThemedText>
+            <ThemedText style={{ fontWeight: '600', marginBottom: 6 }}>Amount</ThemedText>
             <TextInput
               value={servings}
               onChangeText={setServings}
               keyboardType="decimal-pad"
-              placeholder="1"
+              placeholder={unit === 'serving' ? '1' : '100'}
               placeholderTextColor={placeholder}
               style={[
                 styles.input,
                 { backgroundColor: inputBg, color: textColor, borderColor: border, marginBottom: 8 },
               ]}
             />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 8 }}
+              contentContainerStyle={{ gap: 6 }}
+            >
+              {UNITS.map((u) => {
+                const needsSize = u.key !== 'serving';
+                const disabled = needsSize && !(selected.serving_size_g > 0);
+                const active = unit === u.key;
+                return (
+                  <Pressable
+                    key={u.key}
+                    onPress={() => { if (!disabled) { setUnit(u.key); setServings(''); } }}
+                    style={({ pressed }) => [
+                      styles.unitBtn,
+                      {
+                        backgroundColor: active ? tint : 'transparent',
+                        borderColor: active ? tint : border,
+                        opacity: disabled ? 0.3 : pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <ThemedText style={{ fontSize: 12, fontWeight: '600', color: active ? onTint : textColor }}>
+                      {u.label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {unit !== 'serving' && selected.serving_size_g > 0 && (
+              <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 4 }}>
+                1 serving = {selected.serving_size_g}g
+                {selected.serving_label ? ` (${selected.serving_label})` : ''}
+                {UNITS.find(u => u.key === unit)?.volumetric ? ' · volume is approximate' : ''}
+              </ThemedText>
+            )}
             <ThemedText style={{ fontSize: 13, color: placeholder, marginBottom: 4 }}>
               Total: {Math.round(selected.calories * servingsNum)} cal · {Math.round(selected.protein_g * servingsNum)}g/{Math.round(selected.carbs_g * servingsNum)}g/{Math.round(selected.fat_g * servingsNum)}g
             </ThemedText>
@@ -486,5 +557,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minWidth: 90,
     maxWidth: 140,
+  },
+  unitBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
