@@ -27,19 +27,21 @@ export const SUBSCRIPTION = {
   FREE_AI_MESSAGES_PER_DAY: 5,
   FREE_TEMPLATE_LIMIT: 5,
 
-  // Feature flags
+  // Feature flags — the single tier-to-features map. Consumed by
+  // lib/entitlements.ts (canUseFeature); trial resolves to the PRO row.
+  // Server-side mirror: supabase/functions/_shared/entitlements.ts.
   FEATURES: {
     FREE: {
       aiMessages: 5, // per day
       templates: 5, // starter templates
       analytics: 'basic', // basic history + streaks
-      ads: true,
+      mealPlanGeneration: false,
     },
     PRO: {
       aiMessages: -1, // unlimited
       templates: -1, // unlimited
       analytics: 'advanced', // trending, fatigue, 1RM projections
-      ads: false,
+      mealPlanGeneration: true,
     },
   },
 } as const;
@@ -66,8 +68,8 @@ export const PRO_FEATURES = [
     description: 'Create and save unlimited custom workout templates',
   },
   {
-    icon: '🚫',
-    title: 'Ad-Free Experience',
-    description: 'Focus on your workout without distractions',
+    icon: '🍽️',
+    title: 'AI Meal Plans',
+    description: 'Weekly meal plans generated for your goals',
   },
 ] as const;

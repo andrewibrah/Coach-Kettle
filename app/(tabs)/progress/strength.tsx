@@ -9,6 +9,8 @@ import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useToast } from '@/hooks/useToast';
 
+import { router } from 'expo-router';
+import { useEntitlement } from '@/contexts/EntitlementContext';
 import { fetchStrengthProgression } from '@/lib/bodyMetrics';
 import type { StrengthProgressionPoint } from '@/types/body';
 
@@ -22,6 +24,7 @@ export default function StrengthProgressionScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
 
+  const { can } = useEntitlement();
   const { toast, showToast, hideToast } = useToast();
   const [exercise, setExercise] = useState('');
   const [points, setPoints] = useState<StrengthProgressionPoint[]>([]);
@@ -43,6 +46,38 @@ export default function StrengthProgressionScreen() {
       setLoading(false);
     }
   }, [exercise, showToast]);
+
+  if (!can('advancedAnalytics')) {
+    return (
+      <ThemedView style={[styles.container, { backgroundColor }]}>
+        <ScreenHeader title="Strength progression" />
+        <View style={styles.scroll}>
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText type="defaultSemiBold" style={styles.pointDate}>
+              Advanced Analytics is a Pro feature
+            </ThemedText>
+            <ThemedText style={[styles.tipText, { color: placeholder }]}>
+              Unlock strength trends, fatigue monitoring, and 1RM projections with Pro.
+            </ThemedText>
+            <Pressable
+              onPress={() => router.push('/paywall' as any)}
+              style={({ pressed }) => [
+                styles.loadBtn,
+                { backgroundColor: tint },
+                pressed && { opacity: 0.7 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Upgrade to Pro"
+            >
+              <ThemedText type="defaultSemiBold" style={[styles.loadBtnText, { color: onTint }]}>
+                Upgrade to Pro
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>

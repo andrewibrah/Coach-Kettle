@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { FREE_TEMPLATE_LIMIT, requireEntitlement } from "../_shared/entitlements.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -130,6 +131,37 @@ serve(async (req) => {
             console.log("[workout-templates] POST action:", action);
 
             if (action === "create") {
+                // Free tier is capped at FREE_TEMPLATE_LIMIT saved templates
+                // (trial = full pro). Entitlement read failure fails closed.
+                try {
+                    const { tier } = await requireEntitlement(supabase, userId);
+                    if (tier === "free") {
+                        const { count, error: countError } = await supabase
+                            .from("workout_templates")
+                            .select("id", { count: "exact", head: true })
+                            .eq("user_id", userId);
+
+                        if (countError) throw new Error(countError.message);
+
+                        if ((count ?? 0) >= FREE_TEMPLATE_LIMIT) {
+                            return new Response(
+                                JSON.stringify({
+                                    error: "Free plan is limited to " + FREE_TEMPLATE_LIMIT + " templates",
+                                    code: "TEMPLATE_LIMIT_REACHED",
+                                    limit: FREE_TEMPLATE_LIMIT,
+                                }),
+                                { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                            );
+                        }
+                    }
+                } catch (e) {
+                    console.error("[workout-templates] Entitlement check failed (blocking):", e);
+                    return new Response(
+                        JSON.stringify({ error: "Entitlement check unavailable", code: "ENTITLEMENT_UNAVAILABLE" }),
+                        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+
                 const { name, description } = body;
                 const { data, error } = await supabase
                     .from("workout_templates")

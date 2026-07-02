@@ -60,16 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem('nutrition_weekly_goals_v1');
     await AsyncStorage.removeItem('nutrition_targets_local_v1');
 
-    // Clear all Supabase-related AsyncStorage keys
+    // Clear all Supabase keys + every user-namespaced nutrition-target key
+    // (draft/cache/pending-save) so target data never leaks across accounts.
     const allKeys = await AsyncStorage.getAllKeys();
-    const supabaseKeys = allKeys.filter(key =>
+    const keysToRemove = allKeys.filter(key =>
       key.startsWith('sb-') ||
       key.includes('supabase') ||
-      key.includes('auth')
+      key.includes('auth') ||
+      key.startsWith('coach-kettle:nutrition')
     );
 
-    if (supabaseKeys.length > 0) {
-      await AsyncStorage.multiRemove(supabaseKeys);
+    if (keysToRemove.length > 0) {
+      await AsyncStorage.multiRemove(keysToRemove);
     }
 
   };

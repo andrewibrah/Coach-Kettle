@@ -20,15 +20,17 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useSharedRestTimer } from '@/contexts/RestTimerContext';
 import { formatTime } from '@/lib/restTimer';
-
-const MIN_SEC = 15;
-const MAX_SEC = 600;
-const STEP_SEC = 5;
-const TICK_WIDTH = 14;
-const PRESETS = [60, 90, 120, 180];
+import {
+  TIMER_DIAL,
+  buildTimerTicks,
+  snapTimerSeconds,
+  timerOffsetToSeconds,
+  timerSecondsToOffset,
+} from '@/lib/timerDial';
 
 export default function TimerScreen() {
   const { state, remainingSec, start, pause, resume, cancel, skip } = useSharedRestTimer();
+  const { height: screenHeight } = useWindowDimensions();
 
   const background = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -40,6 +42,11 @@ export default function TimerScreen() {
 
   const [selected, setSelected] = useState(90);
   const lastHapticSecRef = useRef(90);
+
+  const compact = screenHeight < 820;
+  const ringSize = compact ? 260 : 276;
+  const timeSize = compact ? 64 : 70;
+  const timeLineHeight = compact ? 70 : 76;
 
   const isRunning = state.kind === 'running';
   const isPaused = state.kind === 'paused';
@@ -64,9 +71,15 @@ export default function TimerScreen() {
     ? 'Complete'
     : 'Ready';
 
+  const subtitleText = isActive
+    ? `of ${formatTime(activeDuration)}`
+    : isDone
+    ? 'rest complete — start again when ready'
+    : 'tap a preset or spin the dial';
+
   const handleDialChange = useCallback((sec: number) => {
     setSelected(sec);
-    // Subtle haptic each 15s increment as the dial moves
+    // Subtle haptic each 15s increment as the dial moves.
     if (Math.abs(sec - lastHapticSecRef.current) >= 15) {
       Haptics.selectionAsync().catch(() => undefined);
       lastHapticSecRef.current = sec;
@@ -90,27 +103,32 @@ export default function TimerScreen() {
         </View>
 
         <CountdownRing
-          size={280}
-          stroke={14}
+          size={ringSize}
+          stroke={13}
           progress={progress}
           trackColor={border}
-          fillColor={isPaused ? placeholder : isDone ? tint : tint}
+          fillColor={isPaused ? placeholder : tint}
         >
           <ThemedText style={[styles.statusPill, { color: placeholder }]}>
             {statusText.toUpperCase()}
           </ThemedText>
-          <ThemedText style={[styles.time, { color: textColor }]}>
+          <ThemedText
+            style={[
+              styles.time,
+              { color: textColor, fontSize: timeSize, lineHeight: timeLineHeight },
+            ]}
+          >
             {formatTime(displaySec)}
           </ThemedText>
           <ThemedText style={[styles.timeSub, { color: placeholder }]}>
-            {isActive ? `of ${formatTime(activeDuration)}` : 'tap a preset or spin the dial'}
+            {subtitleText}
           </ThemedText>
         </CountdownRing>
 
         {!isActive && (
           <View style={styles.editor}>
             <View style={styles.presetRow}>
-              {PRESETS.map((sec) => {
+              {TIMER_DIAL.presets.map((sec) => {
                 const active = selected === sec;
                 return (
                   <Pressable
@@ -202,9 +220,7 @@ export default function TimerScreen() {
               accessibilityRole="button"
               accessibilityLabel="Pause timer"
             >
-              <ThemedText style={[styles.primaryText, { color: tintFg }]}>
-                Pause
-              </ThemedText>
+              <ThemedText style={[styles.primaryText, { color: tintFg }]}>Pause</ThemedText>
             </Pressable>
           )}
 
@@ -219,9 +235,7 @@ export default function TimerScreen() {
               accessibilityRole="button"
               accessibilityLabel="Resume timer"
             >
-              <ThemedText style={[styles.primaryText, { color: tintFg }]}>
-                Resume
-              </ThemedText>
+              <ThemedText style={[styles.primaryText, { color: tintFg }]}>Resume</ThemedText>
             </Pressable>
           )}
 
@@ -237,9 +251,7 @@ export default function TimerScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Skip rest"
               >
-                <ThemedText style={[styles.secondaryText, { color: textColor }]}>
-                  Skip
-                </ThemedText>
+                <ThemedText style={[styles.secondaryText, { color: textColor }]}>Skip</ThemedText>
               </Pressable>
               <Pressable
                 onPress={cancel}
@@ -251,9 +263,7 @@ export default function TimerScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Cancel rest timer"
               >
-                <ThemedText style={[styles.secondaryText, { color: textColor }]}>
-                  Cancel
-                </ThemedText>
+                <ThemedText style={[styles.secondaryText, { color: textColor }]}>Cancel</ThemedText>
               </Pressable>
             </View>
           )}
@@ -333,24 +343,13 @@ function Dial({
   cardBg: string;
 }) {
   const { width: screenWidth } = useWindowDimensions();
-  const ticks = useMemo(() => {
-    const arr: number[] = [];
-    for (let s = MIN_SEC; s <= MAX_SEC; s += STEP_SEC) arr.push(s);
-    return arr;
-  }, []);
+  const ticks = useMemo(() => buildTimerTicks(), []);
   const scrollRef = useRef<ScrollView | null>(null);
   const isUserScrollingRef = useRef(false);
   const lastValueRef = useRef(value);
-  const dialPadding = screenWidth / 2 - TICK_WIDTH / 2;
+  const dialPadding = screenWidth / 2 - TIMER_DIAL.tickWidth / 2;
 
-  const valueToOffset = useCallback(
-    (sec: number) => {
-      const clamped = Math.max(MIN_SEC, Math.min(MAX_SEC, sec));
-      const idx = Math.round((clamped - MIN_SEC) / STEP_SEC);
-      return idx * TICK_WIDTH;
-    },
-    [],
-  );
+  const valueToOffset = useCallback((sec: number) => timerSecondsToOffset(sec), []);
 
   // Sync the dial position when the parent changes `value` (e.g. preset tap)
   // but only when the user isn't actively scrolling, to avoid fighting them.
@@ -368,9 +367,7 @@ function Dial({
 
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const x = e.nativeEvent.contentOffset.x;
-      const idx = Math.round(x / TICK_WIDTH);
-      const sec = Math.max(MIN_SEC, Math.min(MAX_SEC, MIN_SEC + idx * STEP_SEC));
+      const sec = timerOffsetToSeconds(e.nativeEvent.contentOffset.x);
       if (sec !== lastValueRef.current) {
         lastValueRef.current = sec;
         onChange(sec);
@@ -379,15 +376,30 @@ function Dial({
     [onChange],
   );
 
+  const handleAccessibilityAction = useCallback(
+    (event: { nativeEvent: { actionName: string } }) => {
+      const delta = event.nativeEvent.actionName === 'increment' ? TIMER_DIAL.stepSec : -TIMER_DIAL.stepSec;
+      const next = snapTimerSeconds(value + delta);
+      lastValueRef.current = next;
+      onChange(next);
+    },
+    [onChange, value],
+  );
+
   return (
-    <View style={[styles.dialWrap, { backgroundColor: cardBg, borderColor: border }]}>
+    <View
+      style={[styles.dialWrap, { backgroundColor: cardBg, borderColor: border }]}
+      accessibilityRole="adjustable"
+      accessibilityLabel={`Rest duration dial, selected ${formatTime(value)}, range ${formatTime(TIMER_DIAL.minSec)} to ${formatTime(TIMER_DIAL.maxSec)}`}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={handleAccessibilityAction}
+    >
       <View style={styles.dialValueRow}>
         <ThemedText style={[styles.dialValue, { color: textColor }]}>
           {formatTime(value)}
         </ThemedText>
-        <ThemedText style={[styles.dialUnit, { color: placeholder }]}>
-          min : sec
-        </ThemedText>
+        <ThemedText style={[styles.dialUnit, { color: placeholder }]}>min : sec</ThemedText>
+        <ThemedText style={[styles.dialHint, { color: placeholder }]}>drag to fine-tune in 5 sec steps</ThemedText>
       </View>
 
       <View style={styles.dialTrack}>
@@ -395,7 +407,7 @@ function Dial({
           ref={scrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          snapToInterval={TICK_WIDTH}
+          snapToInterval={TIMER_DIAL.tickWidth}
           decelerationRate="fast"
           onScrollBeginDrag={() => {
             isUserScrollingRef.current = true;
@@ -404,7 +416,7 @@ function Dial({
             isUserScrollingRef.current = false;
           }}
           onScrollEndDrag={() => {
-            // user lifted finger; momentum may or may not follow
+            // User lifted finger; momentum may or may not follow.
             setTimeout(() => {
               isUserScrollingRef.current = false;
             }, 50);
@@ -418,13 +430,13 @@ function Dial({
             const isMajor = sec % 30 === 0;
             const isMinute = sec % 60 === 0;
             return (
-              <View key={sec} style={[styles.tickCell, { width: TICK_WIDTH }]}>
+              <View key={sec} style={[styles.tickCell, { width: TIMER_DIAL.tickWidth }]}>
                 <View
                   style={[
                     styles.tick,
                     {
                       backgroundColor: placeholder,
-                      height: isMinute ? 28 : isMajor ? 20 : 12,
+                      height: isMinute ? 34 : isMajor ? 22 : 12,
                       opacity: isMinute ? 0.9 : isMajor ? 0.6 : 0.35,
                     },
                   ]}
@@ -451,23 +463,28 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 32,
-    gap: 24,
+    paddingTop: 10,
+    paddingBottom: 28,
+    gap: 18,
     alignItems: 'center',
   },
   header: {
     alignSelf: 'stretch',
-    gap: 4,
-    marginBottom: 4,
+    gap: 2,
+    marginBottom: 6,
   },
   eyebrow: {
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.5,
+    fontWeight: '800',
+    letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
-  heading: { fontSize: 34, fontWeight: '800', letterSpacing: -0.5 },
+  heading: {
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -0.7,
+  },
 
   ringWrap: { alignItems: 'center', justifyContent: 'center' },
   ringContent: {
@@ -483,50 +500,58 @@ const styles = StyleSheet.create({
   statusPill: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 2.4,
   },
   time: {
-    fontSize: 72,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
     letterSpacing: -2,
-    lineHeight: 80,
   },
   timeSub: {
     fontSize: 13,
+    lineHeight: 18,
     fontWeight: '500',
     textAlign: 'center',
-    maxWidth: 200,
+    maxWidth: 220,
   },
 
   editor: { alignSelf: 'stretch', gap: 14 },
   presetRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     justifyContent: 'space-between',
   },
   preset: {
     flex: 1,
+    minHeight: 54,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 10,
+    borderRadius: 18,
+    paddingVertical: 0,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  presetText: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  presetText: {
+    fontSize: 16,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
 
   dialWrap: {
     borderWidth: 1,
-    borderRadius: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+    borderRadius: 22,
+    paddingTop: 14,
+    paddingBottom: 10,
+    minHeight: 168,
+    overflow: 'hidden',
   },
   dialValueRow: {
     alignItems: 'center',
     gap: 2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   dialValue: {
-    fontSize: 28,
+    fontSize: 30,
+    lineHeight: 34,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
     letterSpacing: -1,
@@ -537,16 +562,21 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
+  dialHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.82,
+  },
   dialTrack: {
-    height: 64,
+    height: 74,
     justifyContent: 'center',
     position: 'relative',
   },
   tickCell: {
     alignItems: 'center',
     justifyContent: 'flex-start',
-    height: 64,
-    paddingTop: 8,
+    height: 74,
+    paddingTop: 10,
   },
   tick: {
     width: 2,
@@ -560,31 +590,39 @@ const styles = StyleSheet.create({
   dialIndicator: {
     position: 'absolute',
     left: '50%',
-    top: 6,
-    width: 3,
-    height: 36,
-    marginLeft: -1.5,
-    borderRadius: 2,
+    top: 8,
+    width: 4,
+    height: 42,
+    marginLeft: -2,
+    borderRadius: 3,
   },
 
   controls: {
     alignSelf: 'stretch',
     gap: 10,
-    marginTop: 4,
+    marginTop: 2,
   },
   primaryBtn: {
-    borderRadius: 16,
-    paddingVertical: 18,
+    minHeight: 64,
+    borderRadius: 18,
+    paddingVertical: 0,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  primaryText: { fontSize: 17, fontWeight: '700', letterSpacing: 0.2 },
+  primaryText: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.1,
+  },
   secondaryRow: { flexDirection: 'row', gap: 10 },
   secondaryBtn: {
     flex: 1,
+    minHeight: 52,
     borderWidth: 1,
     borderRadius: 16,
-    paddingVertical: 14,
+    paddingVertical: 0,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   secondaryText: { fontSize: 15, fontWeight: '600' },
   pressed: { opacity: 0.85 },

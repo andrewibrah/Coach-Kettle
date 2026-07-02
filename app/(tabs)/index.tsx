@@ -35,6 +35,8 @@ import { isCompoundExercise } from "@/lib/restTimer";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow } from "@/lib/api";
+import { FeatureGateError } from "@/lib/entitlements";
+import { showAiLimitAlert } from "@/lib/upgradePrompt";
 import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { type WorkoutTemplate, type WorkoutTemplateItem } from "@/lib/profile";
 import { checkForPR } from "@/lib/prTracking";
@@ -403,8 +405,13 @@ export default function HomeScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Coach is unavailable right now.";
-      setCoachError(message);
+      if (err instanceof FeatureGateError && err.code === "AI_LIMIT_REACHED") {
+        setCoachError("You've hit today's free message limit.");
+        showAiLimitAlert();
+      } else {
+        const message = err instanceof Error ? err.message : "Coach is unavailable right now.";
+        setCoachError(message);
+      }
       if (Platform.OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
@@ -1175,6 +1182,9 @@ export default function HomeScreen() {
       } catch (e) {
         console.warn('[workout] sendMessage failed', e);
         if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));
+        if (e instanceof FeatureGateError && e.code === 'AI_LIMIT_REACHED') {
+          showAiLimitAlert();
+        }
       } finally {
         setLoading(false);
       }

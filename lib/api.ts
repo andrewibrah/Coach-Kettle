@@ -1,6 +1,7 @@
 import { supabaseUrl } from './supabase';
 import { fetchWithAuth } from './auth';
 import { fetchProfile, UserProfile } from './profile';
+import { parseFeatureGateError } from './entitlements';
 
 // Domain API re-exports (Phase 1 expansion)
 export * as NutritionAPI from './nutrition';
@@ -113,6 +114,8 @@ export const api = {
 
         if (!res.ok) {
             const body = await res.text();
+            const gateError = parseFeatureGateError(res.status, body);
+            if (gateError) throw gateError;
             throw new Error(`HTTP ${res.status}: ${body}`);
         }
 
@@ -137,6 +140,8 @@ export const api = {
 
         if (!res.ok) {
             const body = await res.text();
+            const gateError = parseFeatureGateError(res.status, body);
+            if (gateError) throw gateError;
             throw new Error(`HTTP ${res.status}: ${body}`);
         }
 

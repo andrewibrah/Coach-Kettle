@@ -4,6 +4,7 @@
 
 import { supabaseUrl } from './supabase';
 import { fetchWithAuth } from './auth';
+import { parseFeatureGateError } from './entitlements';
 import type {
   FoodItem,
   FoodLogEntry,
@@ -14,6 +15,13 @@ import type {
   MealSlot,
   RecentFood,
 } from '@/types/nutrition';
+import type {
+  NutritionTargetsGetResponse,
+  NutritionTargetSaveRequest,
+  NutritionTargetSaveResponse,
+  NutritionTargetSuggestRequest,
+  NutritionTargetSuggestResponse,
+} from '@/types/nutritionTargets';
 
 const API = `${supabaseUrl}/functions/v1`;
 
@@ -25,7 +33,12 @@ async function get<T>(url: string): Promise<T> {
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetchWithAuth(url, { method: 'POST', body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const text = await res.text();
+    const gateError = parseFeatureGateError(res.status, text);
+    if (gateError) throw gateError;
+    throw new Error(`HTTP ${res.status}: ${text}`);
+  }
   return (await res.json()) as T;
 }
 
@@ -90,9 +103,26 @@ export async function createFood(input: CreateFoodInput): Promise<{ food: FoodIt
   return post(`${API}/food-log`, { action: 'create_food', ...input });
 }
 
-// ---------- Nutrition targets ----------
+// ---------- Nutrition targets (legacy training/rest row) ----------
 export async function fetchNutritionTargets(): Promise<{ targets: NutritionTargets | null }> {
   return get(`${API}/nutrition-targets`);
+}
+
+// ---------- Hybrid nutrition target sets (provenance-tracked) ----------
+export async function fetchNutritionTargetSet(): Promise<NutritionTargetsGetResponse> {
+  return get(`${API}/nutrition-targets?action=get_set`);
+}
+
+export async function suggestNutritionTargets(
+  req: NutritionTargetSuggestRequest,
+): Promise<NutritionTargetSuggestResponse> {
+  return post(`${API}/nutrition-targets`, { action: 'suggest', ...req });
+}
+
+export async function saveNutritionTargetSet(
+  req: NutritionTargetSaveRequest,
+): Promise<NutritionTargetSaveResponse> {
+  return post(`${API}/nutrition-targets`, { action: 'save_set', ...req });
 }
 
 // ---------- Meal plan ----------

@@ -19,6 +19,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Toast } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthProvider';
+import { useEntitlement } from '@/contexts/EntitlementContext';
+import { FeatureGateError } from '@/lib/entitlements';
+import { showUpgradeAlert } from '@/lib/upgradePrompt';
+import { SUBSCRIPTION } from '@/constants/subscription';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useToast } from '@/hooks/useToast';
 import {
@@ -43,6 +47,7 @@ export default function TemplatesScreen() {
     const dangerColor = useThemeColor({}, 'danger');
 
     const { session } = useAuth();
+    const { can } = useEntitlement();
 
     const cardBg = useThemeColor({}, 'cardBackground');
     const inputBg = useThemeColor({}, 'inputBackground');
@@ -154,6 +159,15 @@ export default function TemplatesScreen() {
     const handleCreateTemplate = async () => {
         if (!session?.user?.id || !newName.trim()) return;
 
+        // Client-side gate (server enforces the same cap)
+        if (!can('unlimitedTemplates') && templates.length >= SUBSCRIPTION.FREE_TEMPLATE_LIMIT) {
+            showUpgradeAlert(
+                'Template Limit Reached',
+                `Free accounts can save up to ${SUBSCRIPTION.FREE_TEMPLATE_LIMIT} templates — upgrade for unlimited.`
+            );
+            return;
+        }
+
         const name = newName.trim();
         const description = newDescription.trim() || null;
 
@@ -192,7 +206,14 @@ export default function TemplatesScreen() {
         } catch (error) {
             console.error('[Templates] Error creating:', error);
             setTemplates((prev) => prev.filter((t) => t.id !== tempId));
-            showToast('Failed to create template', 'error');
+            if (error instanceof FeatureGateError && error.code === 'TEMPLATE_LIMIT_REACHED') {
+                showUpgradeAlert(
+                    'Template Limit Reached',
+                    `Free accounts can save up to ${SUBSCRIPTION.FREE_TEMPLATE_LIMIT} templates — upgrade for unlimited.`
+                );
+            } else {
+                showToast('Failed to create template', 'error');
+            }
         }
     };
 

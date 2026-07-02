@@ -10,15 +10,51 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
+import { macrosFromCalories } from '@/lib/nutritionTargets';
+import { buildManualSaveRequest } from '@/lib/nutritionTargetStorage';
 import type { DayGoal } from '@/types/nutrition';
+import type {
+  NutritionMacroTarget,
+  NutritionTargetSuggestRequest,
+  NutritionAgeRange,
+  NutritionSex,
+  NutritionActivityLevel,
+  NutritionGoalType,
+} from '@/types/nutritionTargets';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function macrosFromCalories(cal: number): { protein_g: number; carbs_g: number; fat_g: number } {
+type DayDraft = { calories: string; protein: string; carbs: string; fat: string; showMacros: boolean };
+
+function emptyDay(): DayDraft {
+  return { calories: '', protein: '', carbs: '', fat: '', showMacros: false };
+}
+
+const AGE_RANGES: { v: NutritionAgeRange; label: string }[] = [
+  { v: 'under_18', label: '<18' }, { v: '18_24', label: '18–24' }, { v: '25_34', label: '25–34' },
+  { v: '35_44', label: '35–44' }, { v: '45_54', label: '45–54' }, { v: '55_64', label: '55–64' },
+  { v: '65_plus', label: '65+' },
+];
+const SEXES: { v: NutritionSex; label: string }[] = [
+  { v: 'male', label: 'Male' }, { v: 'female', label: 'Female' }, { v: 'other', label: 'Other' }, { v: 'prefer_not_to_say', label: 'Prefer not to say' },
+];
+const ACTIVITIES: { v: NutritionActivityLevel; label: string }[] = [
+  { v: 'sedentary', label: 'Sedentary' }, { v: 'light', label: 'Light' }, { v: 'moderate', label: 'Moderate' },
+  { v: 'active', label: 'Active' }, { v: 'very_active', label: 'Very active' },
+];
+const GOALS: { v: NutritionGoalType; label: string }[] = [
+  { v: 'fat_loss', label: 'Fat loss' }, { v: 'maintenance', label: 'Maintenance' }, { v: 'muscle_gain', label: 'Muscle gain' },
+  { v: 'performance', label: 'Performance' }, { v: 'general_health', label: 'General health' },
+];
+
+function macro(cal: string, prot: string, carb: string, fat: string): NutritionMacroTarget | undefined {
+  const c = parseInt(cal, 10);
+  if (!Number.isFinite(c) || c <= 0) return undefined;
   return {
-    protein_g: Math.round((cal * 0.30) / 4),
-    carbs_g:   Math.round((cal * 0.40) / 4),
-    fat_g:     Math.round((cal * 0.30) / 9),
+    calories: c,
+    protein_g: parseInt(prot, 10) || undefined,
+    carbs_g: parseInt(carb, 10) || undefined,
+    fat_g: parseInt(fat, 10) || undefined,
   };
 }
 
@@ -32,8 +68,14 @@ export default function NutritionTargetsScreen() {
   const textColor = useThemeColor({}, 'text');
   const border = useThemeColor({}, 'border');
   const inputBg = useThemeColor({}, 'inputBackground');
+  const warning = useThemeColor({}, 'warning');
 
-  const { targets, refresh, weeklyGoals, saveWeeklyGoals, saveLocalTargets } = useNutrition();
+  const {
+    targets, weeklyGoals, saveWeeklyGoals,
+    saveTargets, savedTargets, syncStatus, savedTargetsStatus, todayTarget,
+    suggestedTargets, suggestionStatus, requestSuggestion, clearSuggestion,
+    legacyImport, importLegacyTargets, dismissLegacyImport,
+  } = useNutrition();
   const { toast, showToast, hideToast } = useToast();
 
   // Manual targets form state
@@ -47,10 +89,18 @@ export default function NutritionTargetsScreen() {
   const [restCarb, setRestCarb] = useState('');
   const [restFat, setRestFat] = useState('');
   const [saving, setSaving] = useState(false);
+  const [fromSuggestionId, setFromSuggestionId] = useState<string | undefined>(undefined);
+
+  // Suggestion form state
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [ageRange, setAgeRange] = useState<NutritionAgeRange | undefined>(undefined);
+  const [sex, setSex] = useState<NutritionSex | undefined>(undefined);
+  const [activity, setActivity] = useState<NutritionActivityLevel>('moderate');
+  const [goal, setGoal] = useState<NutritionGoalType>('maintenance');
+  const [suggestDays, setSuggestDays] = useState('4');
+  const [suggestCals, setSuggestCals] = useState('');
 
   // Weekly goals editor state
-  type DayDraft = { calories: string; protein: string; carbs: string; fat: string; showMacros: boolean };
-  const emptyDay = (): DayDraft => ({ calories: '', protein: '', carbs: '', fat: '', showMacros: false });
   const [weekDraft, setWeekDraft] = useState<DayDraft[]>(() => Array.from({ length: 7 }, emptyDay));
   const [weekSaving, setWeekSaving] = useState(false);
 
@@ -127,6 +177,7 @@ export default function NutritionTargetsScreen() {
     setRestProt(String(Math.round(targets.rest_protein_g)));
     setRestCarb(String(Math.round(targets.rest_carbs_g)));
     setRestFat(String(Math.round(targets.rest_fat_g)));
+    setFromSuggestionId(undefined);
     setEditMode(true);
   };
 
@@ -150,27 +201,96 @@ export default function NutritionTargetsScreen() {
 
   const handleSave = async () => {
     if (saving) return;
+    const training = macro(trainCal, trainProt, trainCarb, trainFat);
+    const rest = macro(restCal, restProt, restCarb, restFat);
+    const req = buildManualSaveRequest(training, rest, {
+      suggestionId: fromSuggestionId,
+      editedAfterSuggestion: Boolean(fromSuggestionId),
+    });
+    if (!req) { showToast('Enter at least a training- or rest-day calorie target.', 'error'); return; }
     setSaving(true);
     try {
-      await saveLocalTargets({
-        training_calories: parseInt(trainCal, 10) || 0,
-        training_protein_g: parseInt(trainProt, 10) || 0,
-        training_carbs_g: parseInt(trainCarb, 10) || 0,
-        training_fat_g: parseInt(trainFat, 10) || 0,
-        rest_calories: parseInt(restCal, 10) || 0,
-        rest_protein_g: parseInt(restProt, 10) || 0,
-        rest_carbs_g: parseInt(restCarb, 10) || 0,
-        rest_fat_g: parseInt(restFat, 10) || 0,
-      });
-      await refresh();
+      await saveTargets(req);
       setEditMode(false);
-      showToast('Targets saved', 'success');
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to save', 'error');
+      setFromSuggestionId(undefined);
+      showToast('Saved to your account', 'success');
+    } catch {
+      // saveTargets queues the payload for retry on failure, so the save isn't
+      // lost — tell the user that rather than surfacing the raw network error.
+      showToast('Saved on device — will sync when online.', 'info');
+      setEditMode(false);
     } finally {
       setSaving(false);
     }
   };
+
+  // ---------- Suggestion ----------
+  const handleSuggest = async () => {
+    const req: NutritionTargetSuggestRequest = {
+      age_range: ageRange,
+      sex,
+      activity_level: activity,
+      goal_type: goal,
+      training_days_per_week: parseInt(suggestDays, 10) || undefined,
+      user_entered_calorie_target: parseInt(suggestCals, 10) || undefined,
+    };
+    try {
+      await requestSuggestion(req);
+    } catch {
+      showToast('Could not get a suggestion. Try again.', 'error');
+    }
+  };
+
+  const useSuggestion = () => {
+    if (!suggestedTargets) return;
+    const t = suggestedTargets.targets.training_day ?? suggestedTargets.targets.base;
+    const r = suggestedTargets.targets.rest_day ?? suggestedTargets.targets.base;
+    if (t) {
+      setTrainCal(String(t.calories));
+      setTrainProt(t.protein_g != null ? String(t.protein_g) : '');
+      setTrainCarb(t.carbs_g != null ? String(t.carbs_g) : '');
+      setTrainFat(t.fat_g != null ? String(t.fat_g) : '');
+    }
+    if (r) {
+      setRestCal(String(r.calories));
+      setRestProt(r.protein_g != null ? String(r.protein_g) : '');
+      setRestCarb(r.carbs_g != null ? String(r.carbs_g) : '');
+      setRestFat(r.fat_g != null ? String(r.fat_g) : '');
+    }
+    setFromSuggestionId(suggestedTargets.suggestion_id);
+    setShowSuggest(false);
+    setEditMode(true);
+  };
+
+  // ---------- Provenance label ----------
+  const sourceLabel = (): string => {
+    if (syncStatus === 'pending') return 'Saved on this device — will sync when you’re back online.';
+    if (savedTargets) {
+      const base =
+        savedTargets.source === 'manual' ? 'Custom target — you entered this.'
+        : savedTargets.source === 'backend_suggested' ? 'Suggested target — based on optional inputs you provided.'
+        : savedTargets.source === 'imported_existing' ? 'Imported target — saved from this device.'
+        : 'Draft target.';
+      const stale = todayTarget.stale ? ' This target may be stale.' : '';
+      return `${base} Saved to your account.${stale}`;
+    }
+    if (savedTargetsStatus === 'error' && targets) return 'Using offline cache.';
+    if (targets) return 'Custom target — set on this device.';
+    return 'Draft only — not saved yet.';
+  };
+
+  const pill = (label: string, active: boolean, onPress: () => void) => (
+    <Pressable
+      key={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.pill, { backgroundColor: active ? tint : cardBackground, borderColor: border, borderWidth: 1 }, pressed && { opacity: 0.7 }]}
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+    >
+      <ThemedText style={{ color: active ? onTint : textColor, fontWeight: '600', fontSize: 13 }}>{label}</ThemedText>
+    </Pressable>
+  );
 
   const renderRow = (label: string, value: number | null | undefined, suffix: string) => (
     <View style={styles.row}>
@@ -186,6 +306,106 @@ export default function NutritionTargetsScreen() {
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader title="Nutrition Targets" />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
+
+        {/* ── Migration prompt: detected ant2 local targets ── */}
+        {legacyImport && (
+          <View style={[styles.card, { backgroundColor: cardBackground, borderColor: warning, borderWidth: 1 }]}>
+            <ThemedText type="subtitle" style={{ marginBottom: 4 }}>Targets found on this device</ThemedText>
+            <ThemedText style={{ fontSize: 13, color: placeholder, marginBottom: 12 }}>
+              We found nutrition targets saved on this device. Save them to your account so they sync across devices?
+            </ThemedText>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              <Pressable
+                onPress={async () => { try { await importLegacyTargets(); showToast('Saved to your account', 'success'); } catch { showToast('Could not save. Try again.', 'error'); } }}
+                style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint, flexGrow: 1 }, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button" accessibilityLabel="Save targets to account"
+              >
+                <ThemedText style={{ color: onTint, fontWeight: '700' }}>Save to account</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={() => dismissLegacyImport()}
+                style={({ pressed }) => [styles.secondaryBtn, { borderColor: border, flexGrow: 1 }, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button" accessibilityLabel="Keep only on this device"
+              >
+                <ThemedText style={{ fontWeight: '600' }}>Keep on device</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* ── Source / provenance ── */}
+        {targets && !editMode && (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText style={{ fontSize: 13, color: placeholder }}>{sourceLabel()}</ThemedText>
+          </View>
+        )}
+
+        {/* ── Suggest for me ── */}
+        <View style={[styles.card, { backgroundColor: cardBackground }]}>
+          <Pressable onPress={() => setShowSuggest((s) => !s)} accessibilityRole="button" accessibilityLabel="Toggle suggest targets">
+            <ThemedText type="subtitle">{showSuggest ? 'Suggest for me ▲' : 'Suggest for me ▾'}</ThemedText>
+          </Pressable>
+          {showSuggest && (
+            <View style={{ marginTop: 10 }}>
+              <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 8 }}>
+                Optional inputs only — no date of birth, weight, or height required.
+              </ThemedText>
+
+              <ThemedText style={styles.fieldLabel}>Age range (optional)</ThemedText>
+              <View style={styles.pillRow}>{AGE_RANGES.map((a) => pill(a.label, ageRange === a.v, () => setAgeRange(ageRange === a.v ? undefined : a.v)))}</View>
+
+              <ThemedText style={styles.fieldLabel}>Sex (optional)</ThemedText>
+              <View style={styles.pillRow}>{SEXES.map((s) => pill(s.label, sex === s.v, () => setSex(sex === s.v ? undefined : s.v)))}</View>
+
+              <ThemedText style={styles.fieldLabel}>Activity level</ThemedText>
+              <View style={styles.pillRow}>{ACTIVITIES.map((a) => pill(a.label, activity === a.v, () => setActivity(a.v)))}</View>
+
+              <ThemedText style={styles.fieldLabel}>Goal</ThemedText>
+              <View style={styles.pillRow}>{GOALS.map((g) => pill(g.label, goal === g.v, () => setGoal(g.v)))}</View>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.fieldLabel}>Training days/wk</ThemedText>
+                  <TextInput value={suggestDays} onChangeText={setSuggestDays} keyboardType="number-pad" maxLength={1} style={[styles.input, { backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.fieldLabel}>I know my calories</ThemedText>
+                  <TextInput value={suggestCals} onChangeText={setSuggestCals} keyboardType="number-pad" placeholder="optional" placeholderTextColor={placeholder} style={[styles.input, { backgroundColor: inputBg, color: textColor, borderColor: border }]} />
+                </View>
+              </View>
+
+              <Pressable
+                onPress={handleSuggest}
+                style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint, marginTop: 12 }, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button" accessibilityLabel="Get suggestion"
+              >
+                {suggestionStatus === 'loading' ? <ActivityIndicator color={onTint} /> : <ThemedText style={{ color: onTint, fontWeight: '700' }}>Get suggestion</ThemedText>}
+              </Pressable>
+
+              {suggestedTargets && (
+                <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: border }}>
+                  <ThemedText style={{ fontWeight: '700' }}>{suggestedTargets.explanation.summary}</ThemedText>
+                  <ThemedText style={{ fontSize: 12, color: placeholder, marginTop: 4 }}>
+                    Confidence: {suggestedTargets.confidence} · {suggestedTargets.explanation.calculation_basis}
+                  </ThemedText>
+                  {suggestedTargets.explanation.assumptions.length > 0 && (
+                    <ThemedText style={{ fontSize: 12, color: placeholder, marginTop: 4 }}>
+                      Assumptions: {suggestedTargets.explanation.assumptions.join(' ')}
+                    </ThemedText>
+                  )}
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    <Pressable onPress={useSuggestion} style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint, flex: 1 }, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Use and edit suggestion">
+                      <ThemedText style={{ color: onTint, fontWeight: '700' }}>Use &amp; edit</ThemedText>
+                    </Pressable>
+                    <Pressable onPress={clearSuggestion} style={({ pressed }) => [styles.secondaryBtn, { borderColor: border, flex: 1 }, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Dismiss suggestion">
+                      <ThemedText style={{ fontWeight: '600' }}>Dismiss</ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
 
         {/* ── Weekly calorie goals ── */}
         <View style={[styles.card, { backgroundColor: cardBackground }]}>
@@ -277,6 +497,7 @@ export default function NutritionTargetsScreen() {
             </ThemedText>
             <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 14 }}>
               Enter your calorie and macro goals. Use &quot;Auto&quot; to calculate macros from calories (30/40/30 P/C/F).
+              {fromSuggestionId ? ' Pre-filled from a suggestion — edit anything before saving.' : ''}
             </ThemedText>
 
             <ThemedText style={{ fontWeight: '700', marginBottom: 8 }}>Training day</ThemedText>
@@ -336,7 +557,7 @@ export default function NutritionTargetsScreen() {
               </Pressable>
               {targets && (
                 <Pressable
-                  onPress={() => setEditMode(false)}
+                  onPress={() => { setEditMode(false); setFromSuggestionId(undefined); }}
                   style={({ pressed }) => [styles.primaryBtn, { borderWidth: 1, borderColor: border, flex: 1 }, pressed && { opacity: 0.7 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Cancel editing"
@@ -345,6 +566,9 @@ export default function NutritionTargetsScreen() {
                 </Pressable>
               )}
             </View>
+            <ThemedText style={{ fontSize: 11, color: placeholder, marginTop: 10 }}>
+              Saved targets sync to your account and override any suggestion.
+            </ThemedText>
           </View>
         )}
       </ScrollView>
@@ -369,6 +593,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
   },
+  fieldLabel: { fontSize: 12, fontWeight: '700', marginTop: 8, marginBottom: 4 },
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pill: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18 },
   primaryBtn: {
     paddingVertical: 14,
     paddingHorizontal: 18,

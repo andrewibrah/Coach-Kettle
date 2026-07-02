@@ -3,7 +3,12 @@
     "allow": [
       "Bash(npx expo config:*)",
       "Bash(node -e:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\),indent=2\\)\\); print\\('deps:', 'typescript' in {**d.get\\('dependencies',{}\\),**d.get\\('devDependencies',{}\\)}\\)\")",
+      "Bash(node --experimental-strip-types --test lib/__tests__/nutritionTargetStorage.test.ts lib/__tests__/nutritionTargets.test.ts lib/__tests__/entitlements.test.ts)",
+      "Bash(node --experimental-strip-types --test lib/__tests__/nutritionTargetStorage.test.ts)",
+      "Bash(command -v deno)",
+      "Bash(deno check *)"
     ]
   }
 }

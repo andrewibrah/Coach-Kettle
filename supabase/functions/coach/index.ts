@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { gateAiRequest } from "../_shared/entitlements.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -106,36 +107,13 @@ serve(async (req) => {
         );
     }
 
-    // --- Entitlement + AI usage gating ---
-    try {
-        const { data: entitlementData } = await supabaseAdmin
-            .rpc("get_entitlement", { p_user_id: userId });
-
-        const row = entitlementData?.[0] ?? entitlementData;
-        const status = row?.entitlement_status;
-        const isPro = status === "sub_active";
-
-        if (!isPro) {
-            if (status !== "trial_active") {
-                const { data: usageCount } = await supabaseAdmin
-                    .rpc("get_ai_usage", { p_user_id: userId });
-                const count = usageCount ?? 0;
-                if (count >= 5) {
-                    return new Response(
-                        JSON.stringify({
-                            error: "Daily AI message limit reached",
-                            code: "AI_LIMIT_REACHED",
-                            limit: 5,
-                            count,
-                        }),
-                        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                    );
-                }
-            }
-            await supabaseAdmin.rpc("increment_ai_usage", { p_user_id: userId });
-        }
-    } catch (gateError) {
-        console.warn("[coach] Entitlement check failed (allowing request):", gateError);
+    // --- Entitlement + AI usage gating (fail closed, atomic) ---
+    const gate = await gateAiRequest(supabaseAdmin, userId, "coach");
+    if (!gate.allowed) {
+        return new Response(
+            JSON.stringify(gate.body),
+            { status: gate.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
     }
 
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
@@ -294,7 +272,7 @@ serve(async (req) => {
 
     try {
         // Build messages array with conversation history for multi-turn context
-        const messages: Array<{ role: string; content: string }> = [
+        const messages: { role: string; content: string }[] = [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "system", content: `User Context:\n${userContextStr}` },
         ];

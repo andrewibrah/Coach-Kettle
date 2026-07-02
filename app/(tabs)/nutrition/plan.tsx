@@ -10,6 +10,9 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
+import { useEntitlement } from '@/contexts/EntitlementContext';
+import { FeatureGateError } from '@/lib/entitlements';
+import { showUpgradeAlert } from '@/lib/upgradePrompt';
 import { generateMealPlan, recalibrateMealPlan } from '@/lib/nutrition';
 import { fireMealPlanReady } from '@/lib/notifications';
 import type { MealSlot, PlannedMeal } from '@/types/nutrition';
@@ -28,6 +31,7 @@ export default function MealPlanScreen() {
   const onTint = useThemeColor({}, 'tintForeground');
 
   const { mealPlan, refresh } = useNutrition();
+  const { can } = useEntitlement();
   const { toast, showToast, hideToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [recal, setRecal] = useState(false);
@@ -41,8 +45,15 @@ export default function MealPlanScreen() {
     return out;
   }, [mealPlan.meals]);
 
+  const showMealPlanUpgrade = () =>
+    showUpgradeAlert('Pro Feature', 'AI meal plans are a Pro feature — upgrade to unlock weekly plans built for your goals.');
+
   const handleGenerate = async () => {
     if (generating) return;
+    if (!can('mealPlanGeneration')) {
+      showMealPlanUpgrade();
+      return;
+    }
     setGenerating(true);
     try {
       await generateMealPlan();
@@ -50,7 +61,11 @@ export default function MealPlanScreen() {
       fireMealPlanReady().catch(() => undefined);
       showToast('Meal plan ready', 'success');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to generate meal plan. Try again.', 'error');
+      if (e instanceof FeatureGateError && e.code === 'PRO_REQUIRED') {
+        showMealPlanUpgrade();
+      } else {
+        showToast(e instanceof Error ? e.message : 'Failed to generate meal plan. Try again.', 'error');
+      }
     } finally {
       setGenerating(false);
     }
@@ -58,13 +73,21 @@ export default function MealPlanScreen() {
 
   const handleRecalibrate = async () => {
     if (recal) return;
+    if (!can('mealPlanGeneration')) {
+      showMealPlanUpgrade();
+      return;
+    }
     setRecal(true);
     try {
       await recalibrateMealPlan();
       await refresh();
       showToast('Meal plan updated', 'success');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to recalibrate. Try again.', 'error');
+      if (e instanceof FeatureGateError && e.code === 'PRO_REQUIRED') {
+        showMealPlanUpgrade();
+      } else {
+        showToast(e instanceof Error ? e.message : 'Failed to recalibrate. Try again.', 'error');
+      }
     } finally {
       setRecal(false);
     }

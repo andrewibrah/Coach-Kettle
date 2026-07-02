@@ -26,7 +26,7 @@ const FEATURES = [
   { icon: 'bubble.left.and.bubble.right.fill', label: 'Unlimited AI Coach Messages' },
   { icon: 'chart.bar.fill', label: 'Advanced Workout Analytics' },
   { icon: 'doc.text.fill', label: 'Unlimited Custom Templates' },
-  { icon: 'sparkles', label: 'Ad-Free Experience' },
+  { icon: 'fork.knife', label: 'AI Meal Plans' },
 ] as const;
 
 export default function PaywallScreen() {
@@ -41,12 +41,12 @@ export default function PaywallScreen() {
     text: useThemeColor({}, 'text'),
     danger: useThemeColor({}, 'danger'),
   };
-  const { needsPaywall, needsInitialPaywall, dismissPaywall, refreshEntitlement } = useEntitlement();
+  const { needsPaywall, needsInitialPaywall, dismissPaywall, syncPurchase } = useEntitlement();
   const { session, signOut } = useAuth();
   const { products, purchase, restore, isLoadingProducts, isProcessing, error: iapError } = useIAP({
     appUserID: session?.user?.id,
     email: session?.user?.email,
-    onPurchaseSuccess: refreshEntitlement,
+    onPurchaseSuccess: syncPurchase,
   });
   const [selectedPlan, setSelectedPlan] = useState<Plan>('yearly');
   const [isDismissing, setIsDismissing] = useState(false);
@@ -95,7 +95,7 @@ export default function PaywallScreen() {
 
     const unlocked = await purchase(selectedPlan);
     if (unlocked) {
-      await refreshEntitlement();
+      await syncPurchase();
       router.replace('/(tabs)' as any);
     }
   };

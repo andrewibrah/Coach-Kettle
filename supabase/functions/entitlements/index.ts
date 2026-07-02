@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { activateProEntitlement, FREE_AI_MESSAGES_PER_DAY } from "../_shared/entitlements.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -224,16 +225,82 @@ serve(async (req) => {
                 }
 
                 const row = Array.isArray(entitlementData) ? entitlementData[0] : entitlementData;
-                const isPro = row?.entitlement_status === "sub_active";
+                // Trial = full pro: unlimited AI, counter not consulted.
+                const isPro = row?.entitlement_status === "sub_active" ||
+                    row?.entitlement_status === "trial_active";
                 const count = usageData ?? 0;
-                const limit = isPro ? -1 : 5;
-                const remaining = isPro ? -1 : Math.max(0, 5 - count);
+                const limit = isPro ? -1 : FREE_AI_MESSAGES_PER_DAY;
+                const remaining = isPro ? -1 : Math.max(0, FREE_AI_MESSAGES_PER_DAY - count);
 
                 return new Response(
                     JSON.stringify({
                         ok: true,
                         data: { count, limit, is_pro: isPro, remaining },
                     }),
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+            }
+
+            // POST { action: "sync_revenuecat" } — Pull the caller's subscriber state
+            // from RevenueCat's REST API and materialize it into user_entitlements.
+            // Called by the client right after a purchase/restore so the server is
+            // pro immediately (the webhook is the durable path; this closes the gap).
+            if (action === "sync_revenuecat") {
+                const rcApiKey = Deno.env.get("REVENUECAT_SECRET_API_KEY");
+                if (!rcApiKey) {
+                    console.error("[entitlements] REVENUECAT_SECRET_API_KEY not configured");
+                    return new Response(
+                        JSON.stringify({ error: "RevenueCat sync not configured" }),
+                        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+
+                const rcRes = await fetch(
+                    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`,
+                    { headers: { Authorization: `Bearer ${rcApiKey}` } }
+                );
+
+                if (!rcRes.ok) {
+                    console.error("[entitlements] RevenueCat API error:", rcRes.status);
+                    return new Response(
+                        JSON.stringify({ error: "RevenueCat lookup failed" }),
+                        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+
+                const rcBody = await rcRes.json();
+                const rcEntitlements = rcBody?.subscriber?.entitlements ?? {};
+
+                // Must match REVENUECAT.ENTITLEMENT_ALIASES in constants/revenuecat.ts
+                const ENTITLEMENT_ALIASES = ["Coach Kettle Pro", "pro", "coach_kettle_pro"];
+                let activeExpiresAt: string | null = null;
+                for (const alias of ENTITLEMENT_ALIASES) {
+                    const ent = rcEntitlements[alias];
+                    if (ent?.expires_date && new Date(ent.expires_date).getTime() > Date.now()) {
+                        activeExpiresAt = new Date(ent.expires_date).toISOString();
+                        break;
+                    }
+                }
+
+                if (activeExpiresAt) {
+                    const { error: provisionError } = await activateProEntitlement(supabase, {
+                        userId,
+                        expiresAt: activeExpiresAt,
+                    });
+                    if (provisionError) {
+                        console.error("[entitlements] Sync provision failed:", provisionError);
+                        return new Response(
+                            JSON.stringify({ error: provisionError.message }),
+                            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                        );
+                    }
+                }
+                // If RevenueCat shows no active entitlement, do NOT expire here —
+                // expiry is webhook-driven (EXPIRATION event) to avoid clobbering
+                // legacy receipt-verified subscriptions RevenueCat doesn't know about.
+
+                return new Response(
+                    JSON.stringify({ ok: true, data: { is_pro: activeExpiresAt !== null, expires_at: activeExpiresAt } }),
                     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                 );
             }

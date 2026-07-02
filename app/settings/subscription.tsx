@@ -29,11 +29,11 @@ export default function SubscriptionScreen() {
   const dangerColor = useThemeColor({}, 'danger');
 
   const { session } = useAuth();
-  const { entitlement, isPro, refreshEntitlement } = useEntitlement();
+  const { entitlement, isPro, refreshEntitlement, syncPurchase } = useEntitlement();
   const { restore, presentCustomerCenter, isProcessing } = useIAP({
     appUserID: session?.user?.id,
     email: session?.user?.email,
-    onPurchaseSuccess: refreshEntitlement,
+    onPurchaseSuccess: syncPurchase,
   });
   const sectionTitleColor = useThemeColor({}, 'placeholder');
   const { toast, showToast, hideToast } = useToast();

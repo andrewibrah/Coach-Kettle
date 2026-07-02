@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { requireEntitlement } from "../_shared/entitlements.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -256,6 +257,17 @@ serve(async (req) => {
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       const action = body?.action ?? "generate";
+
+      // Meal-plan generation is Pro-only (trial = full pro). Fail closed.
+      try {
+        const { tier } = await requireEntitlement(admin, userId);
+        if (tier === "free") {
+          return jsonRes({ error: "Meal plan generation requires Pro", code: "PRO_REQUIRED" }, 403);
+        }
+      } catch (e) {
+        console.error("[meal-plan] Entitlement check failed (blocking):", e);
+        return jsonRes({ error: "Entitlement check unavailable", code: "ENTITLEMENT_UNAVAILABLE" }, 503);
+      }
 
       const [{ data: targets }, { data: profile }] = await Promise.all([
         admin.from("nutrition_targets").select("*").eq("user_id", userId).maybeSingle(),

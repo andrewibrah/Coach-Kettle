@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabaseUrl } from './supabase';
 import { fetchWithAuth } from './auth';
+import { FeatureGateError, parseFeatureGateError } from './entitlements';
 
 const PROFILE_CACHE_KEY = 'cached_profile';
 const API_BASE = `${supabaseUrl}/functions/v1`;
@@ -243,19 +244,19 @@ export interface BatchOnboardingData {
     focus_other?: string | null;
   };
   tracked_lifts?: string[];
-  pr_values?: Array<{
+  pr_values?: {
     lift_name: string;
     weight_lbs: number;
     reps: number;
-  }>;
-  workout_templates?: Array<{
+  }[];
+  workout_templates?: {
     name: string;
-    lifts: Array<{
+    lifts: {
       name: string;
       sets: number;
       reps: number;
-    }>;
-  }>;
+    }[];
+  }[];
 }
 
 // Batch save all onboarding data in a single call
@@ -529,6 +530,9 @@ export async function createWorkoutTemplate(
     });
 
     if (!response.ok) {
+      const body = await response.text();
+      const gateError = parseFeatureGateError(response.status, body);
+      if (gateError) throw gateError;
       console.error('[Profile] Error creating workout template:', response.status);
       return null;
     }
@@ -536,6 +540,7 @@ export async function createWorkoutTemplate(
     const data = await response.json();
     return data.template;
   } catch (error) {
+    if (error instanceof FeatureGateError) throw error;
     console.error('[Profile] Error creating workout template:', error);
     return null;
   }
@@ -676,7 +681,7 @@ export async function updateTemplateItem(
 
 // Reorder template items via Edge Function
 export async function reorderTemplateItems(
-  items: Array<{ id: string; display_order: number }>
+  items: { id: string; display_order: number }[]
 ): Promise<boolean> {
   try {
     const response = await fetchWithAuth(`${API_BASE}/workout-templates`, {

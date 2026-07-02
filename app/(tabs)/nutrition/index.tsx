@@ -32,7 +32,7 @@ export default function NutritionHomeScreen() {
   const successColor = useThemeColor({}, 'success');
   const warningColor = useThemeColor({}, 'warning');
 
-  const { loading, error, date, entries, totals, targets, grade, refresh, deleteEntry, weeklyGoals } = useNutrition();
+  const { loading, error, date, entries, totals, targets, grade, refresh, deleteEntry, weeklyGoals, todayTarget } = useNutrition();
   const { profile } = useProfile();
   const { toast, hideToast } = useToast();
 
@@ -145,6 +145,9 @@ export default function NutritionHomeScreen() {
                   </View>
                 ))}
               </View>
+              <ThemedText style={{ fontSize: 11, color: placeholder, marginTop: 10, textAlign: 'center' }}>
+                {dayGoal ? 'Weekly goal for today.' : todayTarget.source ? todayTarget.explanation : ''}
+              </ThemedText>
             </View>
           )}
 

@@ -1,7 +1,7 @@
 // Nutrition preferences — sex, activity level, goal type, dietary preferences,
 // allergies, dislikes, cuisines, training days/week, calorie override.
 // Writes to the profile table via updateProfile (extended fields land in
-// migration 0031). Re-derives nutrition targets when key inputs change.
+// migration 0031). Nutrition targets are now set manually in the targets screen.
 
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/useToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/contexts/ProfileContext';
-import { deriveNutritionTargets } from '@/lib/nutrition';
 import { seedDefaultTemplates, type DefaultTemplateGoal } from '@/lib/programming';
 
 const SEXES: { v: 'male' | 'female' | 'other'; label: string }[] = [
@@ -99,8 +98,6 @@ export default function NutritionPreferencesScreen() {
         preferred_cuisines: cuisines,
       } as never);
       if (!ok) throw new Error('save failed');
-      // Re-derive targets (best-effort, ignore failure)
-      await deriveNutritionTargets().catch(() => undefined);
       showToast('Preferences saved', 'success');
     } catch (e) {
       showToast((e as Error).message || 'Save failed. Please try again.', 'error');
@@ -159,7 +156,7 @@ export default function NutritionPreferencesScreen() {
           <View style={styles.pillRow}>
             {SEXES.map((s) => pill(s.label, sex === s.v, () => setSex(s.v)))}
           </View>
-          <ThemedText style={{ color: subtle, marginTop: 4, fontSize: 12 }}>Used for BMR/TDEE calculations.</ThemedText>
+          <ThemedText style={{ color: subtle, marginTop: 4, fontSize: 12 }}>Optionally used to tailor target suggestions.</ThemedText>
         </View>
 
         <View style={[styles.card, { backgroundColor: cardBg }]}>
@@ -206,7 +203,8 @@ export default function NutritionPreferencesScreen() {
         <View style={[styles.card, { backgroundColor: cardBg }]}>
           <ThemedText type="subtitle">Calorie override (optional)</ThemedText>
           <ThemedText style={{ color: subtle, fontSize: 12, marginBottom: 6 }}>
-            Leave blank to let Coach Kettle derive your target from BMR/TDEE.
+            Optional. Set your daily calorie and macro targets in Nutrition → Targets,
+            or use “Suggest for me” there for a quick estimate.
           </ThemedText>
           <TextInput
             value={calOverride}

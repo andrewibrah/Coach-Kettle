@@ -8,11 +8,19 @@ import {
   getRevenueCatCustomerInfo,
 } from '@/lib/iap';
 import { supabaseUrl } from '@/lib/supabase';
+import {
+  canUseFeature,
+  deriveEntitlementFlags,
+  EntitlementStatus,
+  FeatureKey,
+  Tier,
+} from '@/lib/entitlements';
+import { SUBSCRIPTION } from '@/constants/subscription';
 import Purchases, { CustomerInfo } from 'react-native-purchases';
 
 const API_BASE = `${supabaseUrl}/functions/v1`;
 
-export type EntitlementStatus = 'trial_active' | 'trial_expired' | 'sub_active' | 'sub_expired' | 'unknown';
+export type { EntitlementStatus, FeatureKey, Tier };
 
 export interface EntitlementState {
   status: EntitlementStatus;
@@ -35,10 +43,17 @@ interface EntitlementContextType {
   needsInitialPaywall: boolean;
   /** Whether user is a paying subscriber (not trial) */
   isPro: boolean;
+  /** Enforcement tier: sub_active → pro, trial_active → trial, else free */
+  tier: Tier;
+  /** Whether the current tier can use a feature (trial = full pro) */
+  can: (feature: FeatureKey) => boolean;
   /** Dismiss the initial paywall (user tapped "Skip — Try Free") */
   dismissPaywall: () => Promise<void>;
   /** Force refresh entitlement state */
   refreshEntitlement: () => Promise<void>;
+  /** Sync RevenueCat purchase state to the backend, then refresh.
+   *  Call after a successful purchase/restore so server-side gates see pro immediately. */
+  syncPurchase: () => Promise<void>;
 }
 
 const defaultEntitlement: EntitlementState = {
@@ -58,8 +73,11 @@ const EntitlementContext = createContext<EntitlementContextType>({
   needsPaywall: false,
   needsInitialPaywall: false,
   isPro: false,
+  tier: 'free',
+  can: () => false,
   dismissPaywall: async () => {},
   refreshEntitlement: async () => {},
+  syncPurchase: async () => {},
 });
 
 export const useEntitlement = () => useContext(EntitlementContext);
@@ -237,8 +255,45 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
     await Promise.all([loadEntitlement(), loadRevenueCatCustomerInfo()]);
   }, [loadEntitlement, loadRevenueCatCustomerInfo]);
 
+  const syncPurchase = useCallback(async () => {
+    if (!session?.user?.id) return;
+
+    try {
+      await fetchWithAuth(`${API_BASE}/entitlements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync_revenuecat' }),
+      });
+    } catch (error) {
+      // Non-fatal: the RevenueCat webhook will provision the entitlement.
+      console.warn('[EntitlementContext] Purchase sync failed (webhook will catch up):', error);
+    }
+    await refreshEntitlement();
+  }, [session?.user?.id, refreshEntitlement]);
+
   const activeRevenueCatEntitlement = getActiveCoachKettleEntitlement(revenueCatCustomerInfo);
   const revenueCatIsPro = activeRevenueCatEntitlement?.isActive ?? false;
+
+  // Reconcile drift: RevenueCat says pro but the backend doesn't. Server-side
+  // gates (chat/coach limits) read the backend, so push RC state to it once.
+  const reconciledRef = useRef(false);
+  useEffect(() => {
+    reconciledRef.current = false;
+  }, [session?.user?.id]);
+  useEffect(() => {
+    if (
+      revenueCatIsPro &&
+      !isLoading &&
+      entitlement.status !== 'sub_active' &&
+      !reconciledRef.current
+    ) {
+      // Includes status === 'unknown': if the backend entitlement failed to load
+      // but RevenueCat says the user is pro, still push pro to the server so the
+      // paying user isn't gated (429/403) by stale server-side state.
+      reconciledRef.current = true;
+      syncPurchase();
+    }
+  }, [revenueCatIsPro, isLoading, entitlement.status, syncPurchase]);
   const effectiveEntitlement: EntitlementState = revenueCatIsPro
     ? {
         ...entitlement,
@@ -250,27 +305,16 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
       }
     : entitlement;
 
-  // Derived flags
-  // Free tier: trial/sub expired but user explicitly chose to continue free
-  const isFree =
-    (effectiveEntitlement.status === 'trial_expired' || effectiveEntitlement.status === 'sub_expired') &&
-    effectiveEntitlement.paywallDismissed;
+  // Derived flags — single derivation point (unit-tested in lib/__tests__)
+  const { tier, isPro, hasAccess, needsPaywall, needsInitialPaywall } = deriveEntitlementFlags(
+    effectiveEntitlement.status,
+    effectiveEntitlement.paywallDismissed
+  );
 
-  const hasAccess =
-    (effectiveEntitlement.status === 'trial_active' && effectiveEntitlement.paywallDismissed) ||
-    effectiveEntitlement.status === 'sub_active' ||
-    isFree;
-
-  // Only block with paywall if expired AND user hasn't dismissed (i.e., chosen free tier)
-  const needsPaywall =
-    (effectiveEntitlement.status === 'trial_expired' || effectiveEntitlement.status === 'sub_expired') &&
-    !effectiveEntitlement.paywallDismissed;
-
-  const needsInitialPaywall =
-    (effectiveEntitlement.status === 'trial_active' || effectiveEntitlement.status === 'sub_active') &&
-    !effectiveEntitlement.paywallDismissed;
-
-  const isPro = effectiveEntitlement.status === 'sub_active';
+  const can = useCallback(
+    (feature: FeatureKey) => canUseFeature(SUBSCRIPTION.FEATURES, tier, feature),
+    [tier]
+  );
 
   return (
     <EntitlementContext.Provider
@@ -281,8 +325,11 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
         needsPaywall,
         needsInitialPaywall,
         isPro,
+        tier,
+        can,
         dismissPaywall,
         refreshEntitlement,
+        syncPurchase,
       }}
     >
       {children}

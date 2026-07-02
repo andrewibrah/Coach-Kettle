@@ -1,4 +1,6 @@
 import { api, type ApiWorkoutRow } from "@/lib/api";
+import { FeatureGateError } from "@/lib/entitlements";
+import { showAiLimitAlert } from "@/lib/upgradePrompt";
 import { LogRow } from "@/types/workout";
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
@@ -48,8 +50,13 @@ export function useCoachLogic() {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
         } catch (err) {
-            const message = err instanceof Error ? err.message : "Coach is unavailable right now.";
-            setCoachError(message);
+            if (err instanceof FeatureGateError && err.code === "AI_LIMIT_REACHED") {
+                setCoachError("You've hit today's free message limit.");
+                showAiLimitAlert();
+            } else {
+                const message = err instanceof Error ? err.message : "Coach is unavailable right now.";
+                setCoachError(message);
+            }
             if (Platform.OS === "ios") {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             }
