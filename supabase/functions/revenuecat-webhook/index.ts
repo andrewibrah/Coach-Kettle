@@ -65,6 +65,14 @@ function msToIso(ms: number | undefined | null): string | null {
     return typeof ms === "number" && ms > 0 ? new Date(ms).toISOString() : null;
 }
 
+// Constant-time string compare (caller guarantees equal length). Avoids leaking
+// the secret via response-timing on the auth check.
+function timingSafeEqualStr(a: string, b: string): boolean {
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return diff === 0;
+}
+
 function json(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
         status,
@@ -132,12 +140,22 @@ serve(async (req) => {
         return json({ error: "Method not allowed" }, 405);
     }
 
-    // Authenticate: RevenueCat echoes back the configured Authorization header
+    // Authenticate: RevenueCat sends the configured Authorization header verbatim.
+    // Normalize both sides so an optional "Bearer " prefix or stray whitespace
+    // on either side doesn't cause a spurious 401 (the token entropy is the
+    // actual secret, not the prefix). Constant-time compare on the normalized
+    // values.
     if (!webhookAuth) {
         console.error("[revenuecat-webhook] REVENUECAT_WEBHOOK_AUTH not configured — rejecting");
         return json({ error: "Webhook not configured" }, 500);
     }
-    if (req.headers.get("Authorization") !== webhookAuth) {
+    const normalize = (v: string) => v.replace(/^Bearer\s+/i, "").trim();
+    const provided = normalize(req.headers.get("Authorization") ?? "");
+    const expected = normalize(webhookAuth);
+    const authOk = provided.length > 0 &&
+        provided.length === expected.length &&
+        timingSafeEqualStr(provided, expected);
+    if (!authOk) {
         console.error("[revenuecat-webhook] Invalid Authorization header");
         return json({ error: "Unauthorized" }, 401);
     }
