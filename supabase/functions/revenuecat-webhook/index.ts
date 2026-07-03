@@ -174,6 +174,13 @@ serve(async (req) => {
 
     console.log(`[revenuecat-webhook] ${eventType} event=${eventId} user=${userId ?? "unresolved"}`);
 
+    // TEST events are connectivity checks from the RevenueCat dashboard. Their
+    // app_user_id is a synthetic UUID that isn't in auth.users, so writing the
+    // event log would violate the user_id FK. Acknowledge without touching the DB.
+    if (eventType === "TEST") {
+        return json({ ok: true, test: true });
+    }
+
     try {
         // Idempotency: record the event first; duplicate delivery short-circuits.
         if (eventId) {
