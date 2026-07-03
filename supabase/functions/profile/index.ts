@@ -164,8 +164,10 @@ serve(async (req) => {
             if (action === "update") {
                 const { updates } = body;
                 const ALLOWED_FIELDS = [
-                    'display_name', 'focus', 'experience', 'training_days', 'ai_context', 'unit_preference',
+                    'display_name', 'focus', 'focus_other', 'experience', 'training_days', 'ai_context', 'unit_preference',
                     'sex', 'activity_level', 'goal_type',
+                    'height_value', 'height_unit', 'dob',
+                    'current_weight', 'goal_weight', 'weight_unit',
                     'dietary_preferences', 'dietary_allergies', 'disliked_foods', 'preferred_cuisines',
                     'available_equipment', 'training_days_per_week', 'session_minutes_target',
                     'measurement_system', 'calorie_target_override', 'protein_g_per_lb'

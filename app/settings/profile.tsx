@@ -59,6 +59,7 @@ export default function ProfileSettingsScreen() {
   const [weightUnit, setWeightUnit] = useState<'lb' | 'kg'>(profile?.weight_unit || 'lb');
   const [focus, setFocus] = useState<string | null>(profile?.focus || null);
   const [focusOther, setFocusOther] = useState(profile?.focus_other || '');
+  const [trainingDays, setTrainingDays] = useState<number[]>(profile?.training_days ?? []);
   const [saving, setSaving] = useState(false);
 
   // Update state when profile loads
@@ -72,6 +73,7 @@ export default function ProfileSettingsScreen() {
       setWeightUnit(profile.weight_unit || 'lb');
       setFocus(profile.focus || null);
       setFocusOther(profile.focus_other || '');
+      setTrainingDays(profile.training_days ?? []);
     }
   }, [profile]);
 
@@ -105,6 +107,8 @@ export default function ProfileSettingsScreen() {
 
       updates.focus = focus;
       updates.focus_other = focus === 'other' ? focusOther : null;
+      // Empty selection = fall back to the days-per-week heuristic.
+      updates.training_days = trainingDays.length > 0 ? [...trainingDays].sort() : null;
 
       const success = await updateProfile(updates);
 
@@ -388,6 +392,43 @@ export default function ProfileSettingsScreen() {
             </Pressable>
           )}
         </View>
+
+        {/* Training Days */}
+        <View style={styles.section}>
+          <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Training Days
+          </ThemedText>
+          <View style={[styles.trainingDaysRow, { backgroundColor: cardBg }]}>
+            {(['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const).map((label, dow) => {
+              const selected = trainingDays.includes(dow);
+              return (
+                <Pressable
+                  key={dow}
+                  style={[
+                    styles.dayChip,
+                    { backgroundColor: selected ? activeColor : inputBg },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setTrainingDays((prev) =>
+                      prev.includes(dow) ? prev.filter((d) => d !== dow) : [...prev, dow]
+                    );
+                  }}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dow]}
+                  accessibilityState={{ checked: selected }}
+                >
+                  <ThemedText style={[styles.dayChipText, selected && { color: onTint }]}>
+                    {label}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+          <ThemedText style={[styles.trainingDaysHint, { color: sectionTitleColor }]}>
+            The coach only expects workouts on these days. Leave all unselected to use an automatic schedule.
+          </ThemedText>
+        </View>
       </ScrollView>
     </ThemedView>
   );
@@ -515,5 +556,28 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.7,
+  },
+  trainingDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  dayChip: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  trainingDaysHint: {
+    fontSize: 12,
+    marginTop: 8,
+    paddingHorizontal: 4,
   },
 });

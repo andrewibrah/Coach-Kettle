@@ -22,6 +22,7 @@ import {
   upsertRestingHR,
   deleteRestingHR,
 } from '@/lib/bodyMetrics';
+import { todayISO } from '@/lib/workoutRules';
 import type {
   RestingHeartRateEntry,
   RestingHeartRateSummary,
@@ -71,7 +72,7 @@ export default function RestingHrScreen() {
     setSaving(true);
     try {
       await upsertRestingHR({
-        measured_date: new Date().toISOString().slice(0, 10),
+        measured_date: todayISO(),
         bpm: parsed,
         source: 'manual',
       });

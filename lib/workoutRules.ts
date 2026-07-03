@@ -7,8 +7,18 @@ export function getTodayMMDD(): string {
   return `${mm}/${dd}`;
 }
 
+/**
+ * Local-calendar date as YYYY-MM-DD.
+ * IMPORTANT: intentionally local time, not UTC. A workout logged at 8pm EST
+ * belongs to the user's "today", not tomorrow's UTC date. All client-side
+ * day bucketing (drafts, sessions, nutrition, coach) uses this.
+ */
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function makeId(): string {

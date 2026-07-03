@@ -24,6 +24,7 @@ import {
   uploadAndRecordBodyPhoto,
   deleteBodyPhoto,
 } from '@/lib/bodyMetrics';
+import { todayISO } from '@/lib/workoutRules';
 import type { BodyPhoto } from '@/types/body';
 
 type Pose = 'front' | 'side' | 'back';
@@ -83,7 +84,7 @@ export default function BodyPhotosScreen() {
       await uploadAndRecordBodyPhoto({
         userId,
         localUri: asset.uri,
-        capturedDate: new Date().toISOString().slice(0, 10),
+        capturedDate: todayISO(),
         pose,
         width: asset.width,
         height: asset.height,

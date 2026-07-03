@@ -103,6 +103,7 @@ serve(async (req) => {
                     .from("workout_template_items")
                     .select("*")
                     .eq("template_id", templateId)
+                    .eq("user_id", userId)
                     .order("display_order", { ascending: true });
 
                 if (error) {
@@ -211,14 +212,26 @@ serve(async (req) => {
 
             if (action === "add_item") {
                 const { template_id, lift_name, target_sets, target_reps, target_weight, notes, display_order } = body;
+                if (!template_id || typeof lift_name !== "string" || !lift_name.trim()) {
+                    return new Response(
+                        JSON.stringify({ error: "template_id and lift_name are required" }),
+                        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+                // Clamp targets to sane bounds — a template with 500 sets would
+                // freeze the client when expanded into skeleton rows.
+                const clamp = (v: unknown, lo: number, hi: number) => {
+                    const n = Number(v);
+                    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : null;
+                };
                 const { data, error } = await supabase
                     .from("workout_template_items")
                     .insert({
                         template_id,
                         user_id: userId,
-                        lift_name,
-                        target_sets,
-                        target_reps,
+                        lift_name: lift_name.trim().slice(0, 80),
+                        target_sets: clamp(target_sets, 1, 20),
+                        target_reps: clamp(target_reps, 1, 100),
                         target_weight,
                         notes,
                         display_order,

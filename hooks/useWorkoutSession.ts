@@ -40,9 +40,13 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
   );
 
   const ensureFreshSession = useCallback(() => {
+    // Never reset while a workout is in progress — a session crossing
+    // midnight must survive until the user ends it. The date rolls over
+    // on the next check after the workout ends.
+    if (workoutActive) return;
     const today = getTodayMMDD();
     if (today !== sessionDate) resetSessionState(today);
-  }, [sessionDate, resetSessionState]);
+  }, [workoutActive, sessionDate, resetSessionState]);
 
   useEffect(() => {
     const interval = setInterval(() => {

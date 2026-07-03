@@ -32,6 +32,8 @@ export interface UserProfile {
   preferred_cuisines?: string[];
   available_equipment?: string[];
   training_days_per_week?: number | null;
+  /** Explicit training weekdays (0=Sun..6=Sat). NULL → heuristic fallback. */
+  training_days?: number[] | null;
   session_minutes_target?: number | null;
   measurement_system?: 'imperial' | 'metric' | null;
   calorie_target_override?: number | null;

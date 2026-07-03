@@ -100,6 +100,20 @@ export type CoachResponse = {
     answer: string;
 };
 
+export type LogSetPR = {
+    liftName: string;
+    weight: number;
+    reps: number;
+    newE1rm: number;
+    previousE1rm: number | null;
+};
+
+export type LogSetResult = {
+    ok: boolean;
+    exercise?: string;
+    pr?: LogSetPR | null;
+};
+
 export const api = {
     chat: async (message: string, rows: ApiWorkoutRow[], lastExercise?: string) => {
         const res = await fetchWithAuth(`${API_BASE}/chat`, {
@@ -276,14 +290,17 @@ JSON shape — respond with exactly this structure:
         }
     },
 
-    logSet: async (row: ApiWorkoutRow) => {
+    logSet: async (row: ApiWorkoutRow & { dateISO?: string }): Promise<LogSetResult | null> => {
         try {
-            await fetchWithAuth(`${API_BASE}/log-set`, {
+            const res = await fetchWithAuth(`${API_BASE}/log-set`, {
                 method: 'POST',
                 body: JSON.stringify(row),
             });
+            if (!res.ok) return null;
+            return (await res.json()) as LogSetResult;
         } catch {
             // Fail silently for logging
+            return null;
         }
     },
 

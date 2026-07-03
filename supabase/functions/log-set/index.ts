@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { epley1rm, normalizeLiftName, resolveTrackedLift } from "../_shared/liftMatching.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -29,6 +30,8 @@ interface WorkoutRow {
     weightLbs: string;
     reps: string;
     notes: string;
+    // Local calendar date of the session (client-provided; server UTC fallback)
+    dateISO?: string;
     // Cardio fields
     isCardio?: boolean;
     durationMins?: number;
@@ -101,7 +104,63 @@ serve(async (req) => {
     }
 
     try {
-        const today = new Date().toISOString().split("T")[0];
+        // Prefer the client's local calendar date — an 8pm EST set belongs to
+        // the user's today, not tomorrow's UTC date.
+        const today = typeof payload.dateISO === "string" && /^\d{4}-\d{2}-\d{2}$/.test(payload.dateISO)
+            ? payload.dateISO
+            : new Date().toISOString().split("T")[0];
+
+        // ── Canonical lift resolution + deterministic PR pre-check ──────────
+        // Resolve typed shorthand ("bench") to the tracked lift's canonical
+        // name ("Bench Press") so the PR trigger actually fires, and read the
+        // previous e1RM BEFORE inserting so we can tell the client whether
+        // this set is a PR in the response (no realtime/race dependency).
+        let canonicalExercise = exercise;
+        let pr: {
+            liftName: string;
+            weight: number;
+            reps: number;
+            newE1rm: number;
+            previousE1rm: number | null;
+        } | null = null;
+
+        const weightNum = parseFloat(weightLbs ?? "");
+        const repsNum = parseInt(reps ?? "", 10);
+        const prEligible = !isCardio
+            && Number.isFinite(weightNum) && weightNum > 0
+            && Number.isFinite(repsNum) && repsNum > 0;
+
+        try {
+            const { data: tracked } = await supabaseAdmin
+                .from("pr_tracked_lifts")
+                .select("lift_name")
+                .eq("user_id", userId)
+                .eq("is_active", true);
+            const trackedNames = (tracked ?? []).map((t: { lift_name: string }) => t.lift_name);
+            const resolved = resolveTrackedLift(exercise, trackedNames);
+
+            if (resolved) {
+                canonicalExercise = resolved;
+                if (prEligible) {
+                    const { data: prRows } = await supabaseAdmin
+                        .from("pr_lifts")
+                        .select("lift_name, estimated_1rm")
+                        .eq("user_id", userId);
+                    const target = normalizeLiftName(resolved);
+                    const current = (prRows ?? []).find(
+                        (r: { lift_name: string }) => normalizeLiftName(r.lift_name) === target
+                    );
+                    const previousE1rm = current ? Number(current.estimated_1rm) : null;
+                    const newE1rm = epley1rm(weightNum, repsNum);
+                    if (previousE1rm === null || newE1rm > previousE1rm) {
+                        pr = { liftName: resolved, weight: weightNum, reps: repsNum, newE1rm, previousE1rm };
+                    }
+                }
+            }
+        } catch (matchErr) {
+            // PR detection is best-effort — never block set logging.
+            console.warn("[log-set] PR pre-check failed:", matchErr);
+        }
 
         const { error } = await supabaseAdmin
             .from("workout_log")
@@ -109,7 +168,7 @@ serve(async (req) => {
                 workout_id: `live-${today}`,
                 workout_date: today,
                 user_id: userId,
-                exercise: exercise,
+                exercise: canonicalExercise,
                 set_number: set || 1,
                 weight_lbs: weightLbs || '0',
                 reps: reps || '0',
@@ -134,12 +193,12 @@ serve(async (req) => {
         }
 
         const logMsg = isCardio
-            ? `[log-set] Inserted cardio: ${exercise} ${durationMins ?? ''}min ${distance ?? ''}${distanceUnit ?? ''} for user ${userId}`
-            : `[log-set] Inserted: ${exercise} ${weightLbs}x${reps} for user ${userId}`;
+            ? `[log-set] Inserted cardio: ${canonicalExercise} ${durationMins ?? ''}min ${distance ?? ''}${distanceUnit ?? ''} for user ${userId}`
+            : `[log-set] Inserted: ${canonicalExercise} ${weightLbs}x${reps} for user ${userId}${pr ? ' — PR!' : ''}`;
         console.log(logMsg);
 
         return new Response(
-            JSON.stringify({ ok: true, pr_check: true }),
+            JSON.stringify({ ok: true, exercise: canonicalExercise, pr }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     } catch (error) {

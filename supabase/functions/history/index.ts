@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { resolveTrackedLift } from "../_shared/liftMatching.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -130,13 +131,38 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
         return respondJson({ error: "Database error" }, 500);
     }
 
-    // Insert rows into workout_log for PR detection trigger
+    // Reconcile workout_log: the final saved rows REPLACE the live per-set
+    // rows logged during the session (otherwise every set is double-counted
+    // and corrected typos live forever). Delete the day's live rows and any
+    // previous save of this workout, then insert the final rows.
     if (data && rows.length > 0) {
+        const { error: delError } = await supabaseAdmin
+            .from("workout_log")
+            .delete()
+            .eq("user_id", userId)
+            .in("workout_id", [`live-${data.dateISO}`, data.id]);
+        if (delError) {
+            console.error("[history] Failed to clear live workout_log rows:", delError);
+            // Continue — worst case we keep the old double-insert behavior.
+        }
+
+        // Canonicalize exercise names against tracked lifts so workout_log
+        // stores one name per lift (same resolution as log-set).
+        let trackedNames: string[] = [];
+        try {
+            const { data: tracked } = await supabaseAdmin
+                .from("pr_tracked_lifts")
+                .select("lift_name")
+                .eq("user_id", userId)
+                .eq("is_active", true);
+            trackedNames = (tracked ?? []).map((t: { lift_name: string }) => t.lift_name);
+        } catch { /* non-blocking */ }
+
         const workoutLogRows = rows.map((row: WorkoutRow, index: number) => ({
             workout_id: data.id,
             workout_date: data.dateISO,
             user_id: userId,
-            exercise: row.exercise,
+            exercise: resolveTrackedLift(row.exercise, trackedNames) ?? row.exercise,
             set_number: index + 1,
             weight_lbs: row.weightLbs || '0',
             reps: row.reps || '0',
@@ -161,7 +187,17 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
             console.error('[history] Error inserting workout_log (PR detection may not trigger):', logError);
             // Don't fail the entire request - workout is already saved
         } else {
-            console.log(`[history] Inserted ${workoutLogRows.length} rows into workout_log for PR detection`);
+            console.log(`[history] Reconciled ${workoutLogRows.length} rows into workout_log`);
+
+            // Retract any PR recorded today whose backing set was corrected
+            // away before this final save (e.g. the "Bench 1850" typo).
+            const { error: prError } = await supabaseAdmin.rpc("reconcile_workout_prs", {
+                p_user_id: userId,
+                p_date: data.dateISO,
+            });
+            if (prError) {
+                console.error("[history] PR reconciliation failed:", prError.message);
+            }
         }
     }
 

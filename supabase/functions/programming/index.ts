@@ -84,6 +84,15 @@ async function generateProgramFromTemplate(
   const prByLower = new Map<string, PRStateRow>();
   for (const p of prs) prByLower.set(p.lift_name.toLowerCase().trim(), p);
 
+  // Remember the currently-active program so we can restore it if
+  // generation fails partway (the insert loop is not transactional).
+  const { data: prevActive } = await admin
+    .from("workout_programs")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+
   // Archive any existing active program
   await admin.from("workout_programs")
     .update({ status: "archived" })
@@ -110,6 +119,7 @@ async function generateProgramFromTemplate(
 
   if (pErr) throw pErr;
 
+  try {
   for (let wk = 1; wk <= weeksTotal; wk++) {
     const isDeload = periodization !== "none" && wk % 4 === 0;
     const intensityPct = isDeload ? 0.7 : 1 + Math.min(0.04 * (wk - 1), 0.16);
@@ -187,6 +197,26 @@ async function generateProgramFromTemplate(
         if (exErr) throw exErr;
       }
     }
+  }
+  } catch (genErr) {
+    // Compensate: remove the partially-created program and restore the
+    // previously-active one so the user is never left with a broken program.
+    console.error("[programming] generation failed, rolling back:", genErr);
+    try {
+      await admin.from("program_exercises").delete().eq("program_id", program.id);
+      await admin.from("program_days").delete().eq("program_id", program.id);
+      await admin.from("program_weeks").delete().eq("program_id", program.id);
+      await admin.from("workout_programs").delete().eq("id", program.id);
+      if (prevActive?.id) {
+        await admin.from("workout_programs")
+          .update({ status: "active" })
+          .eq("id", prevActive.id)
+          .eq("user_id", userId);
+      }
+    } catch (rollbackErr) {
+      console.error("[programming] rollback failed:", rollbackErr);
+    }
+    throw genErr;
   }
 
   return program;
@@ -307,8 +337,11 @@ serve(async (req) => {
           .eq("user_id", userId)
           .maybeSingle();
         if (!cur) return jsonRes({ error: "not found" }, 404);
-        const next = Math.min(cur.current_week + 1, cur.weeks_total);
-        const newStatus = next > cur.weeks_total ? "completed" : cur.status;
+        // Advancing past the final week completes the program (the old
+        // clamp-then-compare made "completed" unreachable).
+        const isFinalWeek = cur.current_week >= cur.weeks_total;
+        const next = isFinalWeek ? cur.weeks_total : cur.current_week + 1;
+        const newStatus = isFinalWeek ? "completed" : cur.status;
         const { data, error } = await admin
           .from("workout_programs")
           .update({ current_week: next, status: newStatus })

@@ -10,7 +10,8 @@ import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useToast } from "@/hooks/useToast";
 import { api } from "@/lib/api";
-import { type WorkoutSession } from "@/lib/workoutStorage";
+import { listWorkouts as listLocalWorkouts, syncPendingWorkouts, WORKOUT_HISTORY_KEY, type WorkoutSession } from "@/lib/workoutStorage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function formatDateHeader(dateISO: string) {
   const date = new Date(dateISO);
@@ -69,13 +70,34 @@ export default function HistoryScreen() {
   const load = async (isInitial = false) => {
     try {
       setLoadError(false);
+
+      // Push any locally-saved workouts that never reached the server.
+      await syncPendingWorkouts().catch(() => 0);
+
       const data = await api.getHistory();
+      // Merge: server is truth, but keep local-only (still-pending) sessions
+      // so an offline save is never invisible to the user.
+      const local = await listLocalWorkouts().catch(() => [] as WorkoutSession[]);
+      const serverIds = new Set((data as WorkoutSession[]).map((w) => w.id));
+      const localOnly = local.filter((w) => w.pendingSync && !serverIds.has(w.id));
+      const merged = [...(data as WorkoutSession[]), ...localOnly];
+
+      // Refresh the offline cache with the merged view.
+      AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(merged)).catch(() => undefined);
+
       // newest first
-      const sorted = [...data].sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+      const sorted = merged.sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
       setItems(sorted);
     } catch (e) {
-      console.warn('[history] load failed', e);
-      setLoadError(true);
+      console.warn('[history] server load failed, falling back to local cache', e);
+      // Offline: show the local cache instead of an empty error screen.
+      const local = await listLocalWorkouts().catch(() => [] as WorkoutSession[]);
+      if (local.length > 0) {
+        setItems([...local].sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0)));
+        setLoadError(false);
+      } else {
+        setLoadError(true);
+      }
     } finally {
       if (isInitial) setInitialLoading(false);
     }
@@ -103,6 +125,12 @@ export default function HistoryScreen() {
 
     try {
       await api.deleteWorkout(deleteId);
+      // Keep the offline cache consistent so the workout can't resurrect.
+      const local = await listLocalWorkouts().catch(() => [] as WorkoutSession[]);
+      AsyncStorage.setItem(
+        WORKOUT_HISTORY_KEY,
+        JSON.stringify(local.filter((w) => w.id !== deleteId))
+      ).catch(() => undefined);
     } catch (e) {
       console.warn('[history] delete failed', e);
       setItems(previousItems);

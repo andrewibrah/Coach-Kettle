@@ -280,25 +280,48 @@ async function updateBehaviorState(
   return { level, goodStreak, badStreak };
 }
 
-async function generateFeedback(userClient: ReturnType<typeof createClient>, userId: string, date: string) {
-  const [{ data: targets }, { data: profile }] = await Promise.all([
+/** Calendar date (YYYY-MM-DD) in the given IANA timezone. */
+function todayInTz(timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+  } catch {
+    return today();
+  }
+}
+
+async function generateFeedback(userClient: ReturnType<typeof createClient>, userId: string, requestedDate: string | null) {
+  const [{ data: targets }, { data: profile }, { data: notifPrefs }] = await Promise.all([
     admin.from("nutrition_targets").select("*").eq("user_id", userId).maybeSingle(),
     admin.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+    admin.from("notification_preferences").select("timezone").eq("user_id", userId).maybeSingle(),
   ]);
+
+  const timezone = notifPrefs?.timezone ?? "America/New_York";
+  const localToday = todayInTz(timezone);
+  const date = requestedDate ?? localToday;
+  // An in-progress day must never be graded as failed — the user may still
+  // train and eat. Only completed (past) days can be "bad".
+  const isInProgressDay = date >= localToday;
 
   const totals = await getNutritionTotals(userClient, userId, date);
   const workoutDone = await getWorkoutDoneForDate(userId, date);
 
-  // Determine if this was a workout day (loose: use profile.training_days_per_week)
+  // Did the user log any food at all for this date? Zero logs must not be
+  // graded red — it just means "nothing logged yet".
+  const { count: foodLogCount } = await admin
+    .from("food_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("log_date", date);
+  const hasFoodLogs = (foodLogCount ?? 0) > 0;
+
+  // Determine if this was a workout day: explicit user-selected days win,
+  // otherwise fall back to the days-per-week heuristic.
   const dpw = Number(profile?.training_days_per_week ?? 0);
 
-  // Derive local DOW using user's timezone from notification_preferences
-  const { data: notifPrefs } = await admin
-    .from("notification_preferences")
-    .select("timezone")
-    .eq("user_id", userId)
-    .maybeSingle();
-  const timezone = notifPrefs?.timezone ?? "America/New_York";
   const localDow = new Intl.DateTimeFormat("en-US", {
     weekday: "short",
     timeZone: timezone,
@@ -309,20 +332,25 @@ async function generateFeedback(userClient: ReturnType<typeof createClient>, use
   const TRAINING_DAY_MAP_LOCAL: Record<number, number[]> = {
     1: [3], 2: [1, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6],
   };
-  const wasWorkoutDay = (TRAINING_DAY_MAP_LOCAL[dpw] ?? []).includes(dow);
+  const explicitDays: number[] | null = Array.isArray(profile?.training_days) && profile.training_days.length > 0
+    ? profile.training_days.map((d: unknown) => Number(d))
+    : null;
+  const wasWorkoutDay = explicitDays
+    ? explicitDays.includes(dow)
+    : (TRAINING_DAY_MAP_LOCAL[dpw] ?? []).includes(dow);
   // Schedule-based only — spontaneous training on a rest day doesn't change calorie targets
   const isTrainingDay = wasWorkoutDay;
 
   let nutritionColor: 'green'|'yellow'|'red'|null = null;
   let nutritionScore: number|null = null;
   let gaps: Record<string, unknown> = {};
-  if (targets) {
+  if (targets && hasFoodLogs) {
     const g = gradeNutrition(totals, targets as NutritionTargets, isTrainingDay);
     nutritionColor = g.color; nutritionScore = g.score; gaps = g.gaps;
   }
 
   // Snapshot daily_nutrition_summary
-  if (targets) {
+  if (targets && hasFoodLogs) {
     await admin.from("daily_nutrition_summaries").upsert({
       user_id: userId,
       summary_date: date,
@@ -343,9 +371,13 @@ async function generateFeedback(userClient: ReturnType<typeof createClient>, use
     }, { onConflict: "user_id,summary_date" });
   }
 
-  // Determine good vs bad day
-  const isBad = nutritionColor === "red" || (wasWorkoutDay && !workoutDone);
+  // Determine good vs bad day.
+  // In-progress days can earn "good" but never "bad" — grading a day as
+  // failed at breakfast (no food logged, workout not yet done) was both
+  // wrong and demoralizing. Bad days are only assessed for completed days.
   const isGood = nutritionColor === "green" && (workoutDone || !wasWorkoutDay);
+  const isBad = !isInProgressDay && !isGood
+    && (nutritionColor === "red" || (wasWorkoutDay && !workoutDone));
 
   const { level, goodStreak, badStreak } = await updateBehaviorState(userId, date, isGood, isBad, {
     score: nutritionScore,
@@ -419,9 +451,9 @@ serve(async (req) => {
       const action = url.searchParams.get("action") ?? "today";
 
       if (action === "today") {
-        const date = today();
-        // Always regenerate so it reflects today's logging in real time
-        const fb = await generateFeedback(userClient, userId, date);
+        // Always regenerate so it reflects today's logging in real time.
+        // null → generateFeedback resolves "today" in the user's timezone.
+        const fb = await generateFeedback(userClient, userId, null);
         return jsonRes({ feedback: fb });
       }
 
@@ -443,9 +475,10 @@ serve(async (req) => {
       const action = body?.action;
 
       if (action === "generate") {
-        const date = body.date ?? today();
-        if (!isIsoDate(date)) return jsonRes({ error: "date YYYY-MM-DD required" }, 400);
-        const fb = await generateFeedback(userClient, userId, date);
+        if (body.date !== undefined && !isIsoDate(body.date)) {
+          return jsonRes({ error: "date YYYY-MM-DD required" }, 400);
+        }
+        const fb = await generateFeedback(userClient, userId, body.date ?? null);
         return jsonRes({ feedback: fb });
       }
 

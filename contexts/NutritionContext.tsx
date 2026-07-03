@@ -31,6 +31,7 @@ import {
   type LogFoodInput,
 } from '@/lib/nutrition';
 import { isTrainingDay } from '@/lib/trainingSchedule';
+import { todayISO as localTodayISO } from '@/lib/workoutRules';
 import { resolveTodayNutritionTarget } from '@/lib/nutritionTargets';
 import {
   targetStorageKey,
@@ -180,7 +181,8 @@ const NutritionContext = createContext<NutritionContextValue>({
 export const useNutrition = () => useContext(NutritionContext);
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Local calendar day (shared semantics with workout dates).
+  return localTodayISO();
 }
 
 export function NutritionProvider({ children }: { children: React.ReactNode }) {
@@ -475,7 +477,11 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
     return result.entry;
   }, [refresh]);
 
-  const trainingToday = isTrainingDay(new Date().getDay(), profile?.training_days_per_week);
+  const trainingToday = isTrainingDay(
+    new Date().getDay(),
+    profile?.training_days_per_week,
+    profile?.training_days,
+  );
 
   const grade = useMemo(
     () => computeGrade(totals, targets, trainingToday),

@@ -13,10 +13,16 @@ export const TRAINING_DAY_MAP: Record<number, number[]> = {
 };
 
 /**
- * Returns true if the given local day-of-week (0=Sun…6=Sat)
- * is a training day for the given days-per-week setting.
+ * Returns true if the given local day-of-week (0=Sun…6=Sat) is a training day.
+ * Explicit user-selected days (profiles.training_days) take priority; the
+ * days-per-week heuristic map is only a fallback for users who never chose.
  */
-export function isTrainingDay(dow: number, daysPerWeek: number | null | undefined): boolean {
+export function isTrainingDay(
+  dow: number,
+  daysPerWeek: number | null | undefined,
+  explicitDays?: number[] | null,
+): boolean {
+  if (explicitDays && explicitDays.length > 0) return explicitDays.includes(dow);
   if (!daysPerWeek) return false;
   return (TRAINING_DAY_MAP[daysPerWeek] ?? []).includes(dow);
 }

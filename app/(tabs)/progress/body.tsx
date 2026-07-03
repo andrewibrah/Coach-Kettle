@@ -22,6 +22,7 @@ import {
   upsertBodyMetric,
   deleteBodyMetric,
 } from '@/lib/bodyMetrics';
+import { todayISO } from '@/lib/workoutRules';
 import type { BodyMetricsEntry } from '@/types/body';
 
 type FormKey =
@@ -104,7 +105,7 @@ export default function BodyMetricsScreen() {
     setSaving(true);
     try {
       await upsertBodyMetric({
-        measured_date: new Date().toISOString().slice(0, 10),
+        measured_date: todayISO(),
         weight_lbs: parseOrNull(form.weight_lbs),
         body_fat_pct: parseOrNull(form.body_fat_pct),
         waist_in: parseOrNull(form.waist_in),

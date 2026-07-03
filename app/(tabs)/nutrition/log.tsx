@@ -10,6 +10,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 
 import { useNutrition } from '@/contexts/NutritionContext';
 import { searchFoods } from '@/lib/nutrition';
+import { todayISO } from '@/lib/workoutRules';
 import type { FoodItem, MealSlot, RecentFood } from '@/types/nutrition';
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -78,7 +79,7 @@ export default function LogFoodScreen() {
   }, [query]);
 
   const handleLogSelected = async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     if (!selected || submitting) return;
     const s = servingsNum;
     setSubmitting(true);
@@ -107,7 +108,7 @@ export default function LogFoodScreen() {
   };
 
   const handleQuickLog = async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     setQuickError(null);
     const cal = parseFloat(quickCal);
     const prot = parseFloat(quickProt);

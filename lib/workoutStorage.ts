@@ -46,6 +46,8 @@ export type WorkoutSession = {
   review?: SessionReview;
   reflection?: string;
   media?: WorkoutMediaRecord[];
+  /** True while the workout exists locally but hasn't reached Supabase. */
+  pendingSync?: boolean;
 };
 
 export const WORKOUT_HISTORY_KEY = "workout_history_v1";
@@ -61,19 +63,48 @@ export async function listWorkouts(): Promise<WorkoutSession[]> {
   }
 }
 
-export async function saveWorkout(session: WorkoutSession) {
-  // 1. Local Write (Upsert)
+async function upsertLocal(session: WorkoutSession) {
   const existing = await listWorkouts();
   const next = [session, ...existing.filter((w) => w.id !== session.id)];
   await AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(next));
+}
+
+/**
+ * Local-first save: AsyncStorage always succeeds first, the remote write is
+ * best-effort. Returns whether the remote sync succeeded — unsynced sessions
+ * are flagged pendingSync and retried by syncPendingWorkouts().
+ */
+export async function saveWorkout(session: WorkoutSession): Promise<{ synced: boolean }> {
+  // 1. Local Write (Upsert) — the workout is safe from this point on.
+  await upsertLocal({ ...session, pendingSync: true });
 
   // 2. Remote Sync (Best Effort)
   try {
     await api.saveWorkout(session);
+    await upsertLocal({ ...session, pendingSync: false });
+    return { synced: true };
   } catch (e) {
-    // Fail silently if Supabase is unreachable
     console.warn("[saveWorkout] Supabase sync failed, saved locally only.", e);
+    return { synced: false };
   }
+}
+
+/** Retry any locally-saved workouts that never reached Supabase. */
+export async function syncPendingWorkouts(): Promise<number> {
+  const existing = await listWorkouts();
+  const pending = existing.filter((w) => w.pendingSync);
+  let synced = 0;
+  for (const session of pending) {
+    try {
+      const { pendingSync: _p, media: _m, ...payload } = session;
+      await api.saveWorkout(payload);
+      await upsertLocal({ ...session, pendingSync: false });
+      synced += 1;
+    } catch {
+      // Still offline — retry on next call.
+    }
+  }
+  return synced;
 }
 
 export async function deleteWorkout(id: string) {

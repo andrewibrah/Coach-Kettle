@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 import { useCoaching } from '@/contexts/CoachingContext';
+import { todayISO } from '@/lib/workoutRules';
 import type { ColorGrade } from '@/types/nutrition';
 
 const COLOR_MAP: Record<ColorGrade, string> = {
@@ -43,7 +44,7 @@ export default function CoachScreen() {
   const { loading, error, today, refresh, regenerateToday } = useCoaching();
   const [regenerating, setRegenerating] = useState(false);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayISO();
 
   const handleRegenerate = async () => {
     if (regenerating) return;

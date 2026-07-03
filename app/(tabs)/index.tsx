@@ -34,16 +34,15 @@ import { useSharedRestTimer } from "@/contexts/RestTimerContext";
 import { isCompoundExercise } from "@/lib/restTimer";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
-import { api, type ApiWorkoutRow } from "@/lib/api";
+import { api, type ApiWorkoutRow, type LogSetPR } from "@/lib/api";
 import { FeatureGateError } from "@/lib/entitlements";
 import { showAiLimitAlert } from "@/lib/upgradePrompt";
 import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { type WorkoutTemplate, type WorkoutTemplateItem } from "@/lib/profile";
-import { checkForPR } from "@/lib/prTracking";
 import { firePRCelebration } from "@/lib/notifications";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
 import { expandTemplateToRows, getLastExerciseFromRows, makeId, makeRestRow, nextSetNumberForExercise, normalizeExercise, resequenceSets, todayISO } from "@/lib/workoutRules";
-import { type SessionReview } from "@/lib/workoutStorage";
+import { saveWorkout as saveWorkoutLocalFirst, type SessionReview } from "@/lib/workoutStorage";
 import { type LogRow } from "@/types/workout";
 import { clearWorkoutDraft, getWorkoutDraft, saveWorkoutDraft } from "@/lib/workoutDraft";
 import { TutorialModal } from "@/components/tutorial/TutorialModal";
@@ -298,6 +297,25 @@ export default function HomeScreen() {
   const lastCelebratedRef = useRef<string>('');
   const { start: startRestTimer, registerRestEntrySink } = useSharedRestTimer();
 
+  // Primary celebration path: the log-set response tells us deterministically
+  // whether the set was a PR (server-computed, no realtime/race dependency).
+  const celebratePR = useCallback((pr: LogSetPR) => {
+    const dedupKey = `${pr.liftName}-${pr.weight}-${pr.reps}`;
+    if (lastCelebratedRef.current === dedupKey) return;
+    lastCelebratedRef.current = dedupKey;
+    showCelebration({
+      liftName: pr.liftName,
+      weight: pr.weight,
+      reps: pr.reps,
+      newE1rm: pr.newE1rm,
+      previousE1rm: pr.previousE1rm ?? undefined,
+    });
+    firePRCelebration(pr.liftName, pr.weight, pr.reps).catch(() => undefined);
+    if (Platform.OS === 'ios') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    }
+  }, [showCelebration]);
+
   // When a rest timer is started (e.g. from the Timer tab), drop a clear marker
   // into the active workout log between sets — appended, never overwriting input.
   useEffect(() => {
@@ -345,7 +363,12 @@ export default function HomeScreen() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        // Backup path only (log-set response is primary) — but never fail silently.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[pr] realtime channel unavailable:', status, err?.message);
+        }
+      });
 
     return () => {
       channel.unsubscribe();
@@ -821,15 +844,16 @@ export default function HomeScreen() {
       setSessionReview(review);
       setReviewLoading(false);
 
-      // Save workout with review
+      // Save workout with review — local-first: AsyncStorage always succeeds,
+      // remote sync is retried later if the gym has no signal.
       const workoutPayload = {
         ...buildWorkoutToSave(storedRows),
         review,
       };
 
-      await api.saveWorkout(workoutPayload);
+      const { synced } = await saveWorkoutLocalFirst(workoutPayload);
 
-      // Clear draft + UI after successful save
+      // Clear draft + UI after successful (local) save
       clearWorkoutDraft();
       endWorkoutSession();
       setRows([]);
@@ -837,24 +861,28 @@ export default function HomeScreen() {
       setEditingCell(null);
       setEditValue("");
 
+      if (!synced) {
+        showToast('Saved on this device — will sync when back online.', 'info');
+      }
+
       if (Platform.OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
+      // Review generation failed (offline / AI limit) — the workout itself
+      // still saves local-first and syncs later.
       console.error("[handleEndWorkoutWithReview] Error:", error);
       setReviewLoading(false);
 
-      // Still try to save workout without review
-      try {
-        await api.saveWorkout(buildWorkoutToSave(storedRows));
-        clearWorkoutDraft();
-        endWorkoutSession();
-        setRows([]);
-        setMessageInput("");
-      } catch (saveError) {
-        console.error("[handleEndWorkoutWithReview] Save also failed:", saveError);
-        setReviewModalVisible(false);
-        showToast('Could not save your workout. Please try again.', 'error');
+      const { synced } = await saveWorkoutLocalFirst(buildWorkoutToSave(storedRows));
+      clearWorkoutDraft();
+      endWorkoutSession();
+      setRows([]);
+      setMessageInput("");
+      setEditingCell(null);
+      setEditValue("");
+      if (!synced) {
+        showToast('Saved on this device — will sync when back online.', 'info');
       }
     }
   };
@@ -868,26 +896,13 @@ export default function HomeScreen() {
       weightLbs: weight,
       reps: repsToUse,
       notes: filledRow.notes || "",
-    }).catch(err => console.error("Failed to sync skeleton fill", err));
-
-    // Client-side PR check fallback
-    const skUserId = session?.user?.id;
-    const skW = parseFloat(weight);
-    const skR = parseInt(repsToUse, 10);
-    if (skUserId && !isNaN(skW) && !isNaN(skR) && skW > 0 && skR > 0) {
-      checkForPR(skUserId, filledRow.exercise, skW, skR)
-        .then(result => {
-          if (result && result.isPR) {
-            const dedupKey = `${result.liftName}-${result.weight}-${result.reps}`;
-            if (lastCelebratedRef.current === dedupKey) return;
-            lastCelebratedRef.current = dedupKey;
-            showCelebration(result);
-            firePRCelebration(result.liftName, result.weight, result.reps).catch(() => undefined);
-          }
-        })
-        .catch(err => console.error('[PR] Client-side check failed:', err));
-    }
-  }, [session?.user?.id, showCelebration]);
+      dateISO: workoutDateISO ?? undefined,
+    })
+      .then((res) => {
+        if (res?.pr) celebratePR(res.pr);
+      })
+      .catch(err => console.error("Failed to sync skeleton fill", err));
+  }, [workoutDateISO, celebratePR]);
 
   const sendMessage = async () => {
     const message = messageInput.trim();
@@ -1048,7 +1063,8 @@ export default function HomeScreen() {
       setLoading(false);
 
       // Sync log to backend using actual set numbers from newly-added rows
-      // (fill-path rows are handled separately by syncSkeletonFilledRow)
+      // (fill-path rows are handled separately by syncSkeletonFilledRow).
+      // The response tells us deterministically whether the set was a PR.
       const addedRows = next.slice(prevLength);
       addedRows.forEach(row => {
         api.logSet({
@@ -1057,6 +1073,7 @@ export default function HomeScreen() {
           weightLbs: row.weightLbs,
           reps: row.reps,
           notes: row.notes,
+          dateISO: workoutDateISO ?? undefined,
           isCardio: row.isCardio,
           durationMins: row.durationMins,
           distance: row.distance,
@@ -1064,30 +1081,12 @@ export default function HomeScreen() {
           heartRate: row.heartRate,
           calories: row.calories,
           level: row.level,
-        }).catch(err => console.error("Failed to sync row", err));
+        })
+          .then((res) => {
+            if (res?.pr) celebratePR(res.pr);
+          })
+          .catch(err => console.error("Failed to sync row", err));
       });
-
-      // Client-side PR check fallback (skip cardio entries)
-      const prUserId = session?.user?.id;
-      if (prUserId) {
-        addedRows.forEach(row => {
-          if (row.isCardio) return; // Cardio doesn't have PRs
-          const w = parseFloat(row.weightLbs);
-          const r = parseInt(row.reps);
-          if (!row.weightLbs || !row.reps || isNaN(w) || isNaN(r) || w <= 0 || r <= 0) return;
-          checkForPR(prUserId, row.exercise, w, r)
-            .then(result => {
-              if (result && result.isPR) {
-                const dedupKey = `${result.liftName}-${result.weight}-${result.reps}`;
-                if (lastCelebratedRef.current === dedupKey) return;
-                lastCelebratedRef.current = dedupKey;
-                showCelebration(result);
-                firePRCelebration(result.liftName, result.weight, result.reps).catch(() => undefined);
-              }
-            })
-            .catch(err => console.error('[PR] Client-side check failed:', err));
-        });
-      }
 
       // Start rest timer for the last logged non-cardio set
       const lastWorking = [...parsedRows].reverse().find((r) => !r.isCardio);
@@ -1164,6 +1163,22 @@ export default function HomeScreen() {
               ? prev.filter((r) => r.id !== ghostId).concat(newRows)
               : prev.concat(newRows)
           );
+          // Sync AI-parsed rows live (same path as fast-parsed rows) so PR
+          // detection and next-set suggestions see them immediately.
+          newRows.forEach((row) => {
+            api.logSet({
+              exercise: row.exercise,
+              set: row.set,
+              weightLbs: row.weightLbs,
+              reps: row.reps,
+              notes: row.notes,
+              dateISO: workoutDateISO ?? undefined,
+            })
+              .then((res) => {
+                if (res?.pr) celebratePR(res.pr);
+              })
+              .catch(err => console.error("Failed to sync AI row", err));
+          });
           // Start rest timer for the last AI-parsed non-cardio row
           const lastWorking = [...newRows].reverse().find((r) => !r.isCardio);
           if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
