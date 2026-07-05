@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { Modal, Keyboard } from 'react-native';
 import { PRCelebration, PRCelebrationData } from '@/components/celebration/PRCelebration';
 
 interface PRCelebrationContextType {
@@ -22,6 +23,7 @@ export function PRCelebrationProvider({ children }: { children: React.ReactNode 
   celebrationDataRef.current = celebrationData;
 
   const showCelebration = useCallback((data: PRCelebrationData) => {
+    Keyboard.dismiss();
     if (celebrationDataRef.current) {
       // Queue the celebration if one is already showing
       setQueue((prev) => [...prev, data]);
@@ -49,7 +51,9 @@ export function PRCelebrationProvider({ children }: { children: React.ReactNode 
     <PRCelebrationContext.Provider value={{ showCelebration, hideCelebration }}>
       {children}
       {celebrationData && (
-        <PRCelebration data={celebrationData} onDismiss={hideCelebration} />
+        <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={hideCelebration}>
+          <PRCelebration data={celebrationData} onDismiss={hideCelebration} />
+        </Modal>
       )}
     </PRCelebrationContext.Provider>
   );

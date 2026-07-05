@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as Haptics from "expo-haptics";
@@ -48,6 +48,7 @@ export function WorkoutBottomBar({
   const handleSend = () => {
     // Debug log to trace button presses
     if (disabledSend) return;
+    Keyboard.dismiss();
     if (Platform.OS === "ios") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }

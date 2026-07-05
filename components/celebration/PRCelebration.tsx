@@ -41,7 +41,6 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
   const overlayOpacity = useSharedValue(0);
   const cardScale = useSharedValue(0.5);
   const cardOpacity = useSharedValue(0);
-  const titleScale = useSharedValue(0);
   const confettiOpacity = useSharedValue(0);
 
   const triggerHaptics = useCallback(() => {
@@ -53,10 +52,6 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
     overlayOpacity.value = withTiming(1, { duration: 200 });
     cardScale.value = withDelay(100, withSpring(1, { damping: 12, stiffness: 100 }));
     cardOpacity.value = withDelay(100, withTiming(1, { duration: 200 }));
-    titleScale.value = withDelay(300, withSequence(
-      withSpring(1.2, { damping: 8 }),
-      withSpring(1, { damping: 15 })
-    ));
     confettiOpacity.value = withDelay(200, withTiming(1, { duration: 300 }));
 
     // Trigger haptics
@@ -90,10 +85,6 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
     opacity: cardOpacity.value,
   }));
 
-  const titleAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: titleScale.value }],
-  }));
-
   const confettiAnimatedStyle = useAnimatedStyle(() => ({
     opacity: confettiOpacity.value,
   }));
@@ -115,18 +106,18 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
 
         {/* Confetti */}
         <Animated.View style={[styles.confettiContainer, confettiAnimatedStyle]}>
-          {[...Array(30)].map((_, i) => (
+          {[...Array(18)].map((_, i) => (
             <ConfettiPiece key={i} index={i} />
           ))}
         </Animated.View>
 
         <Animated.View style={[styles.card, cardAnimatedStyle, { backgroundColor: cardBg }]}>
-          <Animated.View style={titleAnimatedStyle}>
+          <View>
             <ThemedText style={styles.trophy}>🏆</ThemedText>
             <ThemedText style={[styles.title, { color: tint }]}>
               NEW PR!
             </ThemedText>
-          </Animated.View>
+          </View>
 
           <ThemedText style={styles.liftName}>{data.liftName}</ThemedText>
 
