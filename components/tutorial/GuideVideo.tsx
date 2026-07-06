@@ -39,9 +39,16 @@ function PlayerVideo({ source, startTime = 0, endTime }: GuideVideoProps) {
   useEffect(() => {
     if (!endTime) return;
     const sub = player.addListener('timeUpdate', ({ currentTime }) => {
-      if (currentTime >= endTime) {
-        player.currentTime = startTime;
-        player.play();
+      // A queued timeUpdate can land after the native player is released
+      // (modal dismissed mid-playback); touching the player then throws a
+      // fatal JS error in release builds.
+      try {
+        if (currentTime >= endTime) {
+          player.currentTime = startTime;
+          player.play();
+        }
+      } catch {
+        // Player already released — nothing to do.
       }
     });
     return () => sub.remove();
