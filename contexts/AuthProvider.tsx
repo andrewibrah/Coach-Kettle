@@ -51,8 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearWorkouts();
     await clearWorkoutDraft();
 
-    // Clear tutorial state
-    await AsyncStorage.removeItem('tutorial_shown_v1');
+    // NOTE: tutorial_shown_v1 is intentionally NOT cleared — the tutorial
+    // auto-shows only on the device's first-ever login; after that it's
+    // reachable via the ? help button.
 
     // Clear user-specific caches that must not leak between accounts
     await AsyncStorage.removeItem('cached_profile');

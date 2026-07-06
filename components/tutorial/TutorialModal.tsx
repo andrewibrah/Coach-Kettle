@@ -105,15 +105,19 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
 
   const isLastSlide = currentIndex === SLIDES.length - 1;
 
-  const renderSlide = ({ item }: { item: typeof SLIDES[number]; index: number }) => {
+  const renderSlide = ({ item, index }: { item: typeof SLIDES[number]; index: number }) => {
+    // Only the active slide gets a live video player — mounting all five at
+    // once (and releasing them all at once on dismiss) is a native crash risk.
     const visual = 'videoSource' in item
-      ? (
-        <GuideVideo
-          source={item.videoSource}
-          startTime={'videoStartTime' in item ? item.videoStartTime : undefined}
-          endTime={'videoEndTime' in item ? item.videoEndTime : undefined}
-        />
-      )
+      ? (index === currentIndex
+        ? (
+          <GuideVideo
+            source={item.videoSource}
+            startTime={'videoStartTime' in item ? item.videoStartTime : undefined}
+            endTime={'videoEndTime' in item ? item.videoEndTime : undefined}
+          />
+        )
+        : <View style={styles.videoStandIn} />)
       : undefined;
 
     return (
@@ -162,6 +166,7 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
           scrollEnabled={false}
           showsHorizontalScrollIndicator={false}
           renderItem={renderSlide}
+          extraData={currentIndex}
           style={styles.flatList}
           getItemLayout={(_, index) => ({
             length: width,
@@ -227,6 +232,15 @@ const styles = StyleSheet.create({
   },
   flatList: {
     flex: 1,
+  },
+  // Same footprint as GuideVideo's wrapper so slides don't shift when the
+  // player mounts on arrival.
+  videoStandIn: {
+    height: "90%",
+    aspectRatio: 9 / 16,
+    alignSelf: "center",
+    borderRadius: 16,
+    backgroundColor: "#1c1c1e",
   },
   skipBtn: {
     position: "absolute",
