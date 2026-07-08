@@ -21,4 +21,9 @@ export interface Exercise {
   demo_image_url: string | null;
   created_at: string;
   updated_at: string;
+  // Additive fields from the open-source dataset import (list rows omit these).
+  instructions?: Record<string, string[] | string> | null; // {en,es,it,tr,ru,zh}
+  media_id?: string | null;
+  target?: string | null;
+  source?: string;
 }
