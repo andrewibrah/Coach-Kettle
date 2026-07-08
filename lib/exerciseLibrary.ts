@@ -6,7 +6,7 @@ import { fetchWithAuth } from './auth';
 import type { Exercise } from '@/types/exercise';
 
 const API = `${supabaseUrl}/functions/v1`;
-const CACHE_KEY = 'exercise_library_v1';
+const CACHE_KEY = 'exercise_library_v2';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
 
 interface CachedShape { cachedAt: number; exercises: Exercise[] }

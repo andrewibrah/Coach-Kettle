@@ -52,9 +52,11 @@ serve(async (req) => {
 
   try {
     if (action === "list") {
+      // Trimmed projection: never ship 6-language instructions in the list
+      // (the list screen only needs these columns; keeps the 24h cache small).
       const { data, error } = await supabaseAdmin
         .from("exercises")
-        .select("*")
+        .select("id, slug, name, category, body_part, equipment, cues, difficulty")
         .order("body_part", { ascending: true })
         .order("name", { ascending: true });
       if (error) throw error;

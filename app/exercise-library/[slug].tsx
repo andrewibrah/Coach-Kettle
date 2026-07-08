@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,6 +9,9 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { getExerciseBySlug } from '@/lib/exerciseLibrary';
 import type { Exercise } from '@/types/exercise';
+
+// Media licensing is contested — ship text-only until a licensed media set exists.
+const SHOW_EXERCISE_MEDIA = false;
 
 export default function ExerciseDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -70,10 +73,27 @@ export default function ExerciseDetailScreen() {
     );
   }
 
+  // English-only for now (dataset ships 6 locales; surface en, fall through gracefully).
+  const rawEn = exercise.instructions?.en;
+  const instructionsEn = Array.isArray(rawEn) ? rawEn.join('\n') : (rawEn ?? null);
+
+  // Media (GIF) is licensing-contested — default OFF, only media_id is stored.
+  const gifUrl = SHOW_EXERCISE_MEDIA && exercise.media_id
+    ? `https://static.exercisedb.dev/media/${exercise.media_id}.gif`
+    : null;
+
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
       <ScreenHeader title={exercise.name} />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
+        {gifUrl && (
+          <Image
+            source={{ uri: gifUrl }}
+            style={styles.media}
+            resizeMode="contain"
+            accessibilityLabel={`${exercise.name} demonstration`}
+          />
+        )}
         <View style={[styles.card, { backgroundColor: cardBackground }]}>
           <ThemedText style={styles.cardTitle}>Overview</ThemedText>
           <ThemedText style={[styles.row, { color: textColor }]}>
@@ -139,6 +159,13 @@ export default function ExerciseDetailScreen() {
           </ThemedText>
         </View>
 
+        {instructionsEn && (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText style={styles.cardTitle}>Instructions</ThemedText>
+            <ThemedText style={[styles.body, { color: textColor }]}>{instructionsEn}</ThemedText>
+          </View>
+        )}
+
       </ScrollView>
     </ThemedView>
   );
@@ -147,6 +174,7 @@ export default function ExerciseDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16 },
+  media: { width: '100%', height: 220, borderRadius: 14, marginBottom: 12 },
   card: { borderRadius: 14, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10 },
   row: { fontSize: 14, marginBottom: 4 },
