@@ -7,6 +7,8 @@ export interface FoodItem {
   id: string;
   user_id: string | null;
   is_global: boolean;
+  catalog_key?: string | null;
+  source?: string | null;
   name: string;
   brand: string | null;
   serving_size_g: number;
@@ -176,4 +178,43 @@ export interface RecentFood {
   saturated_fat_g: number;
   servings: number;
   meal_slot: MealSlot;
+}
+
+export type NutritionAnalysisMode = 'text' | 'photo';
+
+export interface NutritionAnalysisItem {
+  food_type: string;
+  estimated_weight_g: number;
+  estimated_calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  confidence: number;
+  catalog_match: 'exact' | 'none';
+  reason: string;
+}
+
+// The app does not return or persist raw text/photo input. Provider-side handling
+// remains governed by the configured provider/account policy.
+export type NutritionAnalysisRequest =
+  | { action: 'analyze'; mode: 'text'; text: string }
+  | { action: 'analyze'; mode: 'photo'; image_data_url: string };
+
+export interface NutritionAnalysisResult {
+  // Exact catalog matches do not create a transient analysis session.
+  analysis_id: string | null;
+  mode: NutritionAnalysisMode;
+  items: NutritionAnalysisItem[];
+}
+
+export interface ConfirmNutritionAnalysisRequest {
+  analysis_id: string;
+  date: string;
+  meal_slot: MealSlot;
+  items: NutritionAnalysisItem[];
+}
+
+export interface ConfirmedNutritionLog {
+  analysis_id: string;
+  entries: FoodLogEntry[];
 }

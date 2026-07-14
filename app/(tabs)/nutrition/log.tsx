@@ -1,7 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { File as ExpoFile } from 'expo-file-system';
 
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
@@ -9,11 +21,123 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 import { useNutrition } from '@/contexts/NutritionContext';
-import { searchFoods } from '@/lib/nutrition';
+import { trackProductEvent } from '@/lib/analytics';
+import {
+  analyzeNutritionPhoto,
+  analyzeNutritionText,
+  confirmNutritionAnalysis,
+  searchFoods,
+} from '@/lib/nutrition';
 import { todayISO } from '@/lib/workoutRules';
-import type { FoodItem, MealSlot, RecentFood } from '@/types/nutrition';
+import type {
+  FoodItem,
+  MealSlot,
+  NutritionAnalysisItem,
+  NutritionAnalysisMode,
+  NutritionAnalysisResult,
+  RecentFood,
+} from '@/types/nutrition';
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
+
+type ReviewItemDraft = Omit<
+  NutritionAnalysisItem,
+  'estimated_weight_g' | 'estimated_calories' | 'protein_g' | 'carbs_g' | 'fat_g'
+> & {
+  estimated_weight_g: string;
+  estimated_calories: string;
+  protein_g: string;
+  carbs_g: string;
+  fat_g: string;
+};
+
+type ReviewNumberField =
+  | 'estimated_weight_g'
+  | 'estimated_calories'
+  | 'protein_g'
+  | 'carbs_g'
+  | 'fat_g';
+
+function toReviewDraft(item: NutritionAnalysisItem): ReviewItemDraft {
+  return {
+    ...item,
+    estimated_weight_g: String(item.estimated_weight_g),
+    estimated_calories: String(item.estimated_calories),
+    protein_g: String(item.protein_g),
+    carbs_g: String(item.carbs_g),
+    fat_g: String(item.fat_g),
+  };
+}
+
+function parseReviewItems(items: ReviewItemDraft[]): NutritionAnalysisItem[] | null {
+  const limits: Record<ReviewNumberField, [number, number]> = {
+    estimated_weight_g: [0.1, 5_000],
+    estimated_calories: [0, 10_000],
+    protein_g: [0, 500],
+    carbs_g: [0, 1_000],
+    fat_g: [0, 500],
+  };
+
+  const parsed: NutritionAnalysisItem[] = [];
+  for (const item of items) {
+    const foodType = item.food_type.trim().replace(/\s+/g, ' ');
+    if (!foodType || foodType.length > 120) return null;
+
+    const numbers = {} as Record<ReviewNumberField, number>;
+    for (const field of Object.keys(limits) as ReviewNumberField[]) {
+      const value = Number(item[field]);
+      const [min, max] = limits[field];
+      if (!Number.isFinite(value) || value < min || value > max) return null;
+      numbers[field] = Math.round(value * 100) / 100;
+    }
+
+    parsed.push({
+      ...item,
+      food_type: foodType,
+      ...numbers,
+    });
+  }
+  return parsed;
+}
+
+async function readPhotoBytes(uri: string): Promise<ArrayBuffer> {
+  if (Platform.OS !== 'web' && /^(?:file|content):/i.test(uri)) {
+    return new ExpoFile(uri).arrayBuffer();
+  }
+  const response = await fetch(uri);
+  if (!response.ok) throw new Error('Photo could not be read');
+  return response.arrayBuffer();
+}
+
+function detectPhotoMime(bytes: Uint8Array): 'image/jpeg' | 'image/png' | 'image/webp' {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (
+    bytes.length >= 8 &&
+    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((byte, index) => bytes[index] === byte)
+  ) {
+    return 'image/png';
+  }
+  if (
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
+    String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+  throw new Error('Choose a JPEG, PNG, or WebP photo');
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return globalThis.btoa(binary);
+}
 
 export default function LogFoodScreen() {
   const router = useRouter();
@@ -28,7 +152,17 @@ export default function LogFoodScreen() {
   const inputBg = useThemeColor({}, 'inputBackground');
   const dangerColor = useThemeColor({}, 'danger');
 
-  const { logFood, recentFoods } = useNutrition();
+  const { logFood, recentFoods, refresh } = useNutrition();
+
+  const [captureMode, setCaptureMode] = useState<NutritionAnalysisMode>('text');
+  const [captureText, setCaptureText] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<NutritionAnalysisResult | null>(null);
+  const [reviewItems, setReviewItems] = useState<ReviewItemDraft[]>([]);
+  const [reviewMealSlot, setReviewMealSlot] = useState<MealSlot>('breakfast');
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [confirmingAnalysis, setConfirmingAnalysis] = useState(false);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoodItem[]>([]);
@@ -51,6 +185,154 @@ export default function LogFoodScreen() {
   const [quickMealSlot, setQuickMealSlot] = useState<MealSlot>('breakfast');
   const [quickError, setQuickError] = useState<string | null>(null);
   const [quickSubmitting, setQuickSubmitting] = useState(false);
+
+  const selectCaptureMode = (mode: NutritionAnalysisMode) => {
+    if (analyzing) return;
+    setCaptureMode(mode);
+    setCaptureError(null);
+    if (mode === 'photo') setCaptureText('');
+  };
+
+  const openAnalysisReview = (result: NutritionAnalysisResult) => {
+    setAnalysisResult(result);
+    setReviewItems(result.items.map(toReviewDraft));
+    setReviewMealSlot('breakfast');
+    setReviewError(null);
+    void trackProductEvent({
+      name: 'nutrition_analysis_completed',
+      properties: { mode: result.mode, cache_hit: result.analysis_id === null },
+    });
+  };
+
+  const handleAnalyzeText = async () => {
+    if (analyzing || !captureText.trim()) {
+      if (!captureText.trim()) setCaptureError('Describe the food or meal first.');
+      return;
+    }
+    setAnalyzing(true);
+    setCaptureError(null);
+    void trackProductEvent({ name: 'nutrition_capture_opened', properties: { mode: 'text' } });
+    try {
+      openAnalysisReview(await analyzeNutritionText(captureText));
+    } catch (error) {
+      console.warn('[nutrition] text analysis failed', error);
+      setCaptureError('Could not analyze that description. Please try again.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleAnalyzePhoto = async () => {
+    if (analyzing) return;
+    setCaptureError(null);
+    void trackProductEvent({ name: 'nutrition_capture_opened', properties: { mode: 'photo' } });
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setCaptureError('Photo library access is required to analyze a meal photo.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+    });
+    if (result.canceled || !result.assets?.length) return;
+
+    setAnalyzing(true);
+    try {
+      const buffer = await readPhotoBytes(result.assets[0].uri);
+      if (buffer.byteLength === 0 || buffer.byteLength > MAX_PHOTO_BYTES) {
+        throw new Error('Photo must be 6 MB or smaller');
+      }
+      const bytes = new Uint8Array(buffer);
+      const mime = detectPhotoMime(bytes);
+      const dataUrl = `data:${mime};base64,${bytesToBase64(bytes)}`;
+      openAnalysisReview(await analyzeNutritionPhoto(dataUrl));
+    } catch (error) {
+      console.warn('[nutrition] photo analysis failed', error);
+      const message = error instanceof Error && (
+        error.message === 'Photo must be 6 MB or smaller' ||
+        error.message === 'Choose a JPEG, PNG, or WebP photo'
+      ) ? error.message : 'Could not analyze that photo. Please try again.';
+      setCaptureError(message);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const updateReviewItem = (
+    index: number,
+    field: 'food_type' | ReviewNumberField,
+    value: string,
+  ) => {
+    setReviewItems((current) => current.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, [field]: value } : item
+    )));
+    setReviewError(null);
+  };
+
+  const closeAnalysisReview = () => {
+    if (confirmingAnalysis) return;
+    setAnalysisResult(null);
+    setReviewItems([]);
+    setReviewError(null);
+  };
+
+  const handleConfirmAnalysis = async () => {
+    if (!analysisResult || confirmingAnalysis) return;
+    const items = parseReviewItems(reviewItems);
+    if (!items) {
+      setReviewError('Check every food name, weight, calorie, and macro value.');
+      return;
+    }
+
+    setConfirmingAnalysis(true);
+    setReviewError(null);
+    try {
+      if (analysisResult.analysis_id) {
+        await confirmNutritionAnalysis({
+          analysis_id: analysisResult.analysis_id,
+          date: todayISO(),
+          meal_slot: reviewMealSlot,
+          items,
+        });
+        await refresh();
+      } else {
+        const item = items[0];
+        if (items.length !== 1 || item.catalog_match !== 'exact') {
+          throw new Error('Invalid catalog analysis');
+        }
+        await logFood({
+          date: todayISO(),
+          meal_slot: reviewMealSlot,
+          food_id: null,
+          food_name: item.food_type,
+          servings: 1,
+          calories: item.estimated_calories,
+          protein_g: item.protein_g,
+          carbs_g: item.carbs_g,
+          fat_g: item.fat_g,
+          fiber_g: 0,
+          saturated_fat_g: 0,
+        });
+      }
+      void trackProductEvent({
+        name: 'nutrition_log_confirmed',
+        properties: { mode: analysisResult.mode, item_count: items.length },
+      });
+      setAnalysisResult(null);
+      setReviewItems([]);
+      router.back();
+    } catch (error) {
+      console.warn('[nutrition] analysis confirmation failed', error);
+      setReviewError('Could not add this food log. The analysis may have expired; please try again.');
+    } finally {
+      setConfirmingAnalysis(false);
+    }
+  };
 
   useEffect(() => {
     if (!query.trim() || query.trim().length < 2) {
@@ -212,11 +494,114 @@ export default function LogFoodScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
-      <ScreenHeader title="Log food" subtitle="Search or quick add" />
+      <ScreenHeader title="Log food" subtitle="Analyze, search, or quick add" />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Text or photo analysis */}
+        <View style={[styles.card, { backgroundColor: cardBackground }]}>
+          <ThemedText type="subtitle" style={{ marginBottom: 4 }}>Analyze a meal</ThemedText>
+          <ThemedText style={{ color: placeholder, fontSize: 13, marginBottom: 10 }}>
+            Describe your food or choose a meal photo, then review the estimate before logging.
+          </ThemedText>
+          <View style={styles.captureTabs} accessibilityRole="tablist">
+            {(['text', 'photo'] as const).map((mode) => {
+              const active = captureMode === mode;
+              return (
+                <Pressable
+                  key={mode}
+                  onPress={() => selectCaptureMode(mode)}
+                  disabled={analyzing}
+                  style={({ pressed }) => [
+                    styles.captureTab,
+                    { borderColor: active ? tint : border, backgroundColor: active ? tint : 'transparent' },
+                    pressed && { opacity: 0.7 },
+                    analyzing && { opacity: 0.6 },
+                  ]}
+                  accessibilityRole="tab"
+                  accessibilityLabel={`${mode === 'text' ? 'Text' : 'Photo'} meal analysis`}
+                  accessibilityState={{ selected: active, disabled: analyzing }}
+                >
+                  <ThemedText style={{ color: active ? onTint : textColor, fontWeight: '600' }}>
+                    {mode === 'text' ? 'Text' : 'Photo'}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {captureMode === 'text' ? (
+            <>
+              <TextInput
+                value={captureText}
+                onChangeText={(value) => { setCaptureText(value); setCaptureError(null); }}
+                placeholder="e.g. chicken breast, rice, and broccoli"
+                placeholderTextColor={placeholder}
+                multiline
+                maxLength={1_000}
+                editable={!analyzing}
+                accessibilityLabel="Meal description"
+                style={[
+                  styles.input,
+                  styles.captureTextInput,
+                  { backgroundColor: inputBg, color: textColor, borderColor: border },
+                ]}
+              />
+              <ThemedText style={{ color: placeholder, fontSize: 11, textAlign: 'right', marginBottom: 8 }}>
+                {captureText.length}/1000
+              </ThemedText>
+              <Pressable
+                onPress={handleAnalyzeText}
+                disabled={analyzing}
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  { backgroundColor: tint },
+                  pressed && { opacity: 0.7 },
+                  analyzing && { opacity: 0.6 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={analyzing ? 'Analyzing meal description' : 'Analyze meal description'}
+                accessibilityState={{ disabled: analyzing }}
+              >
+                {analyzing ? (
+                  <ActivityIndicator color={onTint} />
+                ) : (
+                  <ThemedText style={{ color: onTint, fontWeight: '700' }}>Analyze text</ThemedText>
+                )}
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              onPress={handleAnalyzePhoto}
+              disabled={analyzing}
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                { backgroundColor: tint },
+                pressed && { opacity: 0.7 },
+                analyzing && { opacity: 0.6 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={analyzing ? 'Analyzing meal photo' : 'Choose and analyze meal photo'}
+              accessibilityState={{ disabled: analyzing }}
+            >
+              {analyzing ? (
+                <ActivityIndicator color={onTint} />
+              ) : (
+                <ThemedText style={{ color: onTint, fontWeight: '700' }}>Choose photo</ThemedText>
+              )}
+            </Pressable>
+          )}
+          {captureError && (
+            <ThemedText
+              accessibilityRole="alert"
+              style={{ color: dangerColor, fontSize: 13, marginTop: 8, textAlign: 'center' }}
+            >
+              {captureError}
+            </ThemedText>
+          )}
+        </View>
+
         {/* Recently logged */}
         {recentFoods.length > 0 && query.trim().length === 0 && (
           <View style={[styles.card, { backgroundColor: cardBackground, paddingBottom: 8 }]}>
@@ -506,6 +891,152 @@ export default function LogFoodScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={analysisResult !== null}
+        animationType="slide"
+        onRequestClose={closeAnalysisReview}
+      >
+        <ThemedView style={[styles.modalContainer, { backgroundColor }]}>
+          <KeyboardAvoidingView
+            style={styles.modalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={[styles.modalHeader, { paddingTop: insets.top + 12, borderBottomColor: border }]}>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="title">Review meal</ThemedText>
+                <ThemedText style={{ color: placeholder, fontSize: 13 }}>
+                  Edit the estimate before adding it to today&apos;s log.
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={closeAnalysisReview}
+                disabled={confirmingAnalysis}
+                accessibilityRole="button"
+                accessibilityLabel="Close nutrition analysis review"
+                accessibilityState={{ disabled: confirmingAnalysis }}
+                hitSlop={10}
+                style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
+              >
+                <ThemedText style={{ color: tint, fontWeight: '700' }}>Close</ThemedText>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={[
+                styles.modalScroll,
+                { paddingBottom: insets.bottom + 24 },
+              ]}
+            >
+              {reviewItems.map((item, index) => (
+                <View
+                  key={`review-item-${index}`}
+                  style={[styles.reviewRow, { backgroundColor: cardBackground, borderColor: border }]}
+                  accessibilityLabel={`Food ${index + 1} of ${reviewItems.length}`}
+                >
+                  <ThemedText style={styles.reviewRowTitle}>Food {index + 1}</ThemedText>
+                  <ThemedText style={styles.fieldLabel}>Food type</ThemedText>
+                  <TextInput
+                    value={item.food_type}
+                    onChangeText={(value) => updateReviewItem(index, 'food_type', value)}
+                    maxLength={120}
+                    editable={!confirmingAnalysis}
+                    placeholder="Food name"
+                    placeholderTextColor={placeholder}
+                    accessibilityLabel={`Food ${index + 1} type`}
+                    style={[styles.input, { backgroundColor: inputBg, color: textColor, borderColor: border }]}
+                  />
+
+                  <View style={styles.reviewMetricRow}>
+                    <View style={styles.reviewMetric}>
+                      <ThemedText style={styles.fieldLabel}>Weight (g)</ThemedText>
+                      <TextInput
+                        value={item.estimated_weight_g}
+                        onChangeText={(value) => updateReviewItem(index, 'estimated_weight_g', value)}
+                        keyboardType="decimal-pad"
+                        editable={!confirmingAnalysis}
+                        placeholder="0"
+                        placeholderTextColor={placeholder}
+                        accessibilityLabel={`Food ${index + 1} estimated weight in grams`}
+                        style={[styles.input, { backgroundColor: inputBg, color: textColor, borderColor: border }]}
+                      />
+                    </View>
+                    <View style={styles.reviewMetric}>
+                      <ThemedText style={styles.fieldLabel}>Calories</ThemedText>
+                      <TextInput
+                        value={item.estimated_calories}
+                        onChangeText={(value) => updateReviewItem(index, 'estimated_calories', value)}
+                        keyboardType="decimal-pad"
+                        editable={!confirmingAnalysis}
+                        placeholder="0"
+                        placeholderTextColor={placeholder}
+                        accessibilityLabel={`Food ${index + 1} estimated calories`}
+                        style={[styles.input, { backgroundColor: inputBg, color: textColor, borderColor: border }]}
+                      />
+                    </View>
+                  </View>
+
+                  <ThemedText style={styles.fieldLabel}>Macros (g)</ThemedText>
+                  <View style={styles.macroRow}>
+                    {([
+                      ['protein_g', 'Protein'],
+                      ['carbs_g', 'Carbs'],
+                      ['fat_g', 'Fat'],
+                    ] as const).map(([field, label]) => (
+                      <View key={field} style={styles.macroField}>
+                        <ThemedText style={{ color: placeholder, fontSize: 11 }}>{label}</ThemedText>
+                        <TextInput
+                          value={item[field]}
+                          onChangeText={(value) => updateReviewItem(index, field, value)}
+                          keyboardType="decimal-pad"
+                          editable={!confirmingAnalysis}
+                          placeholder="0"
+                          placeholderTextColor={placeholder}
+                          accessibilityLabel={`Food ${index + 1} ${label.toLowerCase()} grams`}
+                          style={[styles.input, { backgroundColor: inputBg, color: textColor, borderColor: border }]}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+
+              <View style={[styles.card, { backgroundColor: cardBackground }]}>
+                <ThemedText style={{ fontWeight: '600' }}>Meal</ThemedText>
+                {renderSlotPicker(reviewMealSlot, setReviewMealSlot)}
+                {reviewError && (
+                  <ThemedText
+                    accessibilityRole="alert"
+                    style={{ color: dangerColor, fontSize: 13, marginBottom: 8 }}
+                  >
+                    {reviewError}
+                  </ThemedText>
+                )}
+                <Pressable
+                  onPress={handleConfirmAnalysis}
+                  disabled={confirmingAnalysis}
+                  style={({ pressed }) => [
+                    styles.primaryBtn,
+                    { backgroundColor: tint },
+                    pressed && { opacity: 0.7 },
+                    confirmingAnalysis && { opacity: 0.6 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={confirmingAnalysis ? 'Adding nutrition log' : 'Add nutrition log'}
+                  accessibilityState={{ disabled: confirmingAnalysis }}
+                >
+                  {confirmingAnalysis ? (
+                    <ActivityIndicator color={onTint} />
+                  ) : (
+                    <ThemedText style={{ color: onTint, fontWeight: '700' }}>Add log</ThemedText>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </ThemedView>
+      </Modal>
     </ThemedView>
   );
 }
@@ -566,5 +1097,73 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  captureTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  captureTab: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 10,
+  },
+  captureTextInput: {
+    minHeight: 92,
+    paddingTop: 10,
+    textAlignVertical: 'top',
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  closeBtn: {
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalScroll: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  reviewRow: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  reviewRowTitle: {
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 5,
+    marginTop: 8,
+  },
+  reviewMetricRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  reviewMetric: {
+    flex: 1,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  macroField: {
+    flex: 1,
   },
 });

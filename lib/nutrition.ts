@@ -14,6 +14,10 @@ import type {
   PlannedMeal,
   MealSlot,
   RecentFood,
+  NutritionAnalysisResult,
+  ConfirmNutritionAnalysisRequest,
+  ConfirmedNutritionLog,
+  NutritionAnalysisItem,
 } from '@/types/nutrition';
 import type {
   NutritionTargetsGetResponse,
@@ -140,4 +144,91 @@ export async function recalibrateMealPlan(): Promise<{ plan: MealPlan; meals_ins
 
 export async function fetchRecentFoods(): Promise<{ foods: RecentFood[] }> {
   return get(`${API}/food-log?action=recent`);
+}
+
+// ---------- Transient text/photo nutrition analysis ----------
+const NUTRITION_ANALYZE_URL = `${API}/nutrition-analyze`;
+const SUPPORTED_PHOTO_DATA_URL = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+const MAX_PHOTO_BASE64_LENGTH = 8_388_608;
+const ANALYSIS_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isNutritionAnalysisItem(value: unknown): value is NutritionAnalysisItem {
+  if (typeof value !== 'object' || value === null) return false;
+  const item = value as Record<string, unknown>;
+  const boundedNumber = (key: string, min: number, max: number) =>
+    typeof item[key] === 'number' && Number.isFinite(item[key]) && (item[key] as number) >= min && (item[key] as number) <= max;
+  return (
+    typeof item.food_type === 'string' && item.food_type.trim().length >= 1 && item.food_type.length <= 120 &&
+    boundedNumber('estimated_weight_g', 0.1, 5_000) &&
+    boundedNumber('estimated_calories', 0, 10_000) &&
+    boundedNumber('protein_g', 0, 500) &&
+    boundedNumber('carbs_g', 0, 1_000) &&
+    boundedNumber('fat_g', 0, 500) &&
+    boundedNumber('confidence', 0, 1) &&
+    (item.catalog_match === 'exact' || item.catalog_match === 'none') &&
+    typeof item.reason === 'string' && item.reason.trim().length >= 1 && item.reason.length <= 160
+  );
+}
+
+function validateNutritionAnalysisResult(value: unknown): NutritionAnalysisResult {
+  if (typeof value !== 'object' || value === null) throw new Error('Invalid nutrition analysis response');
+  const result = value as Record<string, unknown>;
+  if (
+    (result.mode !== 'text' && result.mode !== 'photo') ||
+    !Array.isArray(result.items) ||
+    result.items.length < 1 ||
+    result.items.length > 10 ||
+    !result.items.every(isNutritionAnalysisItem)
+  ) {
+    throw new Error('Invalid nutrition analysis response');
+  }
+  const validAnalysisId = result.analysis_id === null
+    ? result.mode === 'text' && result.items.length === 1 && result.items[0].catalog_match === 'exact'
+    : typeof result.analysis_id === 'string' && ANALYSIS_ID.test(result.analysis_id) &&
+      result.items.every((item) => item.catalog_match === 'none');
+  if (!validAnalysisId) throw new Error('Invalid nutrition analysis response');
+  return result as unknown as NutritionAnalysisResult;
+}
+
+export async function analyzeNutritionText(text: string): Promise<NutritionAnalysisResult> {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('Nutrition text is required');
+  if (trimmed.length > 1_000) throw new Error('Nutrition text must be 1000 characters or fewer');
+
+  // The app does not include raw text in results or application persistence.
+  return validateNutritionAnalysisResult(
+    await post<unknown>(NUTRITION_ANALYZE_URL, { action: 'analyze', mode: 'text', text: trimmed }),
+  );
+}
+
+export async function analyzeNutritionPhoto(dataUrl: string): Promise<NutritionAnalysisResult> {
+  const comma = dataUrl.indexOf(',');
+  const base64Length = comma >= 0 ? dataUrl.length - comma - 1 : 0;
+  if (
+    !SUPPORTED_PHOTO_DATA_URL.test(dataUrl) ||
+    base64Length % 4 !== 0 ||
+    base64Length > MAX_PHOTO_BASE64_LENGTH
+  ) {
+    throw new Error('A valid JPEG, PNG, or WebP data URL up to 6 MB is required');
+  }
+
+  // The app does not include photo bytes in results or application persistence.
+  return validateNutritionAnalysisResult(
+    await post<unknown>(NUTRITION_ANALYZE_URL, { action: 'analyze', mode: 'photo', image_data_url: dataUrl }),
+  );
+}
+
+export async function confirmNutritionAnalysis(
+  input: ConfirmNutritionAnalysisRequest,
+): Promise<ConfirmedNutritionLog> {
+  const parsedDate = ISO_DATE.test(input.date) ? new Date(`${input.date}T00:00:00Z`) : null;
+  if (!ANALYSIS_ID.test(input.analysis_id)) throw new Error('A valid analysis ID is required');
+  if (!parsedDate || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== input.date) {
+    throw new Error('A valid nutrition log date is required');
+  }
+  if (input.items.length < 1 || input.items.length > 10 || !input.items.every(isNutritionAnalysisItem)) {
+    throw new Error('Valid nutrition analysis items are required');
+  }
+  return post(NUTRITION_ANALYZE_URL, { action: 'confirm', ...input });
 }
