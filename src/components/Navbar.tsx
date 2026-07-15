@@ -7,8 +7,10 @@ export default function Navbar() {
   // (brand-text vs brand-muted). Add an underline as a redundant,
   // non-colour channel. The desktop pill nav already carries a background
   // change, so colour is not its sole indicator.
+  // SC 2.5.8: inline-flex + py-2 lifts the 20.5px line box to a 36.5px
+  // target. -my-2 keeps the navbar's rendered height unchanged.
   const linkClass = (path: string) =>
-    `text-[0.8rem] tracking-[0.08em] transition-all duration-300 ${
+    `-my-2 inline-flex items-center py-2 text-[0.8rem] tracking-[0.08em] transition-all duration-300 ${
       pathname === path
         ? "text-brand-text underline decoration-2 underline-offset-4"
         : "text-brand-muted no-underline hover:text-brand-text"
@@ -20,9 +22,10 @@ export default function Navbar() {
 
   return (
     <nav className="animate-slide-down sticky top-0 z-50 flex items-center justify-between bg-brand-bg/80 px-6 py-4 backdrop-blur-xl sm:px-10 lg:px-16">
+      {/* SC 2.5.8: measured 87x22 — 2px under the 24px minimum. */}
       <Link
         to="/"
-        className="text-[0.85rem] font-medium tracking-[0.06em] text-brand-text no-underline transition-opacity duration-300 hover:opacity-70"
+        className="-my-2 inline-flex items-center py-2 text-[0.85rem] font-medium tracking-[0.06em] text-brand-text no-underline transition-opacity duration-300 hover:opacity-70"
       >
         Coach Kettle
       </Link>

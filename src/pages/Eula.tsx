@@ -42,7 +42,7 @@ export default function Eula() {
           href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-2 text-[0.78rem] text-brand-muted no-underline transition-colors hover:text-brand-text"
+          className="mt-4 inline-flex items-center gap-2 py-2 text-[0.78rem] text-brand-muted no-underline transition-colors hover:text-brand-text"
         >
           View on Apple.com &rarr;
         </a>
@@ -51,7 +51,7 @@ export default function Eula() {
       <div className="mx-auto max-w-[860px] px-6 pb-16 pt-12">
         <Link
           to="/"
-          className="mb-10 inline-flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+          className="mb-10 inline-flex items-center gap-1 py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
         >
           &larr; Back to Home
         </Link>
@@ -291,19 +291,19 @@ export default function Eula() {
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center gap-1 py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             &larr; Home
           </Link>
           <Link
             to="/privacy"
-            className="text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             Privacy
           </Link>
           <Link
             to="/support"
-            className="text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             Support
           </Link>

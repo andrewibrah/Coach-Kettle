@@ -12,7 +12,7 @@ export default function Guide() {
       <div className="mx-auto max-w-[900px] px-6 pt-12">
         <Link
           to="/"
-          className="inline-flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+          className="inline-flex items-center gap-1 py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
         >
           &larr; Back to Home
         </Link>
@@ -24,19 +24,19 @@ export default function Guide() {
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center gap-1 py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             &larr; Home
           </Link>
           <Link
             to="/support"
-            className="text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             Support
           </Link>
           <Link
             to="/privacy"
-            className="text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             Privacy
           </Link>

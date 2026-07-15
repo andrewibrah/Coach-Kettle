@@ -16,25 +16,25 @@ export default function Footer() {
           <div className="flex gap-8 text-[0.75rem]">
             <Link
               to="/privacy"
-              className="text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
+              className="-my-2 inline-flex items-center py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
             >
               Privacy
             </Link>
             <Link
               to="/support"
-              className="text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
+              className="-my-2 inline-flex items-center py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
             >
               Support
             </Link>
             <Link
               to="/eula"
-              className="text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
+              className="-my-2 inline-flex items-center py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
             >
               EULA
             </Link>
             <a
               href="mailto:andrew@coachkettle.app"
-              className="text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
+              className="-my-2 inline-flex items-center py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
             >
               Contact
             </a>

@@ -50,7 +50,7 @@ export default function Privacy() {
       <div className="mx-auto max-w-[780px] px-6 pb-16 pt-12">
         <Link
           to="/"
-          className="mb-10 inline-flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+          className="mb-10 inline-flex items-center gap-1 py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
         >
           &larr; Back to Home
         </Link>
@@ -409,19 +409,19 @@ export default function Privacy() {
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center gap-1 py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             &larr; Home
           </Link>
           <Link
             to="/support"
-            className="text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             Support
           </Link>
           <Link
             to="/eula"
-            className="text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
+            className="inline-flex items-center py-2 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text"
           >
             EULA
           </Link>
