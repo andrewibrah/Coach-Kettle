@@ -115,7 +115,9 @@ export default function Features() {
                 <div className="relative">
                   {/* Number row */}
                   <div className="mb-4 flex items-baseline gap-3">
-                    <span className="text-[0.7rem] font-light tabular-nums tracking-wider text-white/20">
+                    {/* On brand-card (#0e0e0e): white/20 (#3e3e3e) was 1.81:1
+                        — fails SC 1.4.3. white/50 (#878787) = 5.34:1. */}
+                    <span className="text-[0.7rem] font-light tabular-nums tracking-wider text-white/50">
                       0{i + 1}
                     </span>
                     <div className="h-px flex-1 bg-white/[0.04] transition-all duration-500 group-hover:bg-white/[0.08]" />

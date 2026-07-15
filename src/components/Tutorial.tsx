@@ -76,7 +76,10 @@ function StepCard({ step, index }: { step: Step; index: number }) {
     >
       {/* Left rail — number + connector */}
       <div className="relative flex shrink-0 flex-row items-center gap-4 sm:w-32 sm:flex-col sm:items-end sm:gap-0">
-        <span className="text-[2.25rem] font-light tabular-nums tracking-tight text-white/[0.18] sm:text-[2.5rem]">
+        {/* Step number carries meaning ("In seven steps") so it is not
+            decorative. At 36-40px it is large text -> 3:1. white/[0.18]
+            (#333333) was 1.60:1; white/40 (#6a6a6a) = 3.72:1. */}
+        <span className="text-[2.25rem] font-light tabular-nums tracking-tight text-white/40 sm:text-[2.5rem]">
           {step.number}
         </span>
         <div className="h-px flex-1 bg-white/[0.05] sm:mt-3 sm:h-24 sm:w-px sm:flex-none" />
@@ -172,7 +175,9 @@ export default function Tutorial() {
       <div className="relative mx-auto max-w-[900px]">
         {/* Intro */}
         <div className="mb-14 text-center sm:mb-16">
-          <p className="mb-4 text-[0.7rem] font-medium tracking-[0.25em] text-white/35">
+          {/* text-white/35 (#5d5d5d) was 3.08:1 — fails SC 1.4.3 at 11.2px.
+              brand-muted is an existing token at 7.20:1. */}
+          <p className="mb-4 text-[0.7rem] font-medium tracking-[0.25em] text-brand-muted">
             HOW TO TALK TO COACH KETTLE
           </p>
           {/* h1: Tutorial is the sole content of the /guide route, which

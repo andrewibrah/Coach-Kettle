@@ -206,7 +206,9 @@ export default function Hero() {
         {/* Content */}
         <div className="relative flex min-h-[85vh] flex-col items-center justify-center px-6 py-24 text-center sm:px-12 sm:py-32">
           {/* Subtitle pill */}
-          <p className="animate-fade-up mb-8 text-[0.7rem] font-medium tracking-[0.25em] text-white/35" style={{ animationDelay: "0.1s" }}>
+          {/* text-white/35 (#5d5d5d) was 3.08:1 — fails SC 1.4.3 at 11.2px.
+              brand-muted is an existing token at 7.20:1. */}
+          <p className="animate-fade-up mb-8 text-[0.7rem] font-medium tracking-[0.25em] text-brand-muted" style={{ animationDelay: "0.1s" }}>
             YOUR AI WORKOUT COACH
           </p>
 
@@ -245,7 +247,9 @@ export default function Hero() {
           </div>
 
           {/* Bottom scroll indicator */}
-          <div className="animate-fade-in absolute bottom-8 left-8 flex items-center gap-2 text-white/20" style={{ animationDelay: "1s" }}>
+          {/* text-white/20 (#383838) was 1.72:1 — fails SC 1.4.3.
+              white/50 (#838383) = 5.31:1. */}
+          <div className="animate-fade-in absolute bottom-8 left-8 flex items-center gap-2 text-white/50" style={{ animationDelay: "1s" }}>
             <svg
               width="14"
               height="14"
