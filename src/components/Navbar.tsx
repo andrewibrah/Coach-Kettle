@@ -64,7 +64,7 @@ export default function Navbar() {
       </div>
 
       {/* Mobile fallback links */}
-      <ul className="flex list-none gap-6 sm:hidden">
+      <ul role="list" className="flex list-none gap-6 sm:hidden">
         <li>
           <Link to="/guide" className={linkClass("/guide")}>
             Guide

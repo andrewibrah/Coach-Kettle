@@ -85,7 +85,7 @@ export default function Privacy() {
           <h3 className="mb-2 mt-5 text-[0.95rem] font-bold text-brand-text">
             Account Data
           </h3>
-          <ul className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
+          <ul role="list" className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
             <BulletItem>
               <strong>Email address</strong> — collected via Apple Sign In during
               account creation.
@@ -95,7 +95,7 @@ export default function Privacy() {
           <h3 className="mb-2 mt-5 text-[0.95rem] font-bold text-brand-text">
             Fitness Data
           </h3>
-          <ul className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
+          <ul role="list" className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
             {[
               "Exercise names, sets, reps, and weights",
               "Body part categories",
@@ -113,7 +113,7 @@ export default function Privacy() {
           <h3 className="mb-2 mt-5 text-[0.95rem] font-bold text-brand-text">
             User Content
           </h3>
-          <ul className="mb-2 space-y-2 pl-5 text-sm text-brand-muted">
+          <ul role="list" className="mb-2 space-y-2 pl-5 text-sm text-brand-muted">
             <BulletItem>
               Photos and videos you choose to attach to workout sessions
             </BulletItem>
@@ -127,7 +127,7 @@ export default function Privacy() {
           <h3 className="mb-2 mt-5 text-[0.95rem] font-bold text-brand-text">
             Technical Data
           </h3>
-          <ul className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
+          <ul role="list" className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
             <BulletItem>
               Session tokens for authentication
             </BulletItem>
@@ -139,7 +139,7 @@ export default function Privacy() {
           <h3 className="mb-2 mt-5 text-[0.95rem] font-bold text-brand-text">
             Data We Do NOT Collect
           </h3>
-          <ul className="space-y-2 pl-5 text-sm text-brand-muted">
+          <ul role="list" className="space-y-2 pl-5 text-sm text-brand-muted">
             {[
               "Location data",
               "Contacts or address book data",
@@ -249,7 +249,7 @@ export default function Privacy() {
             Your data is stored on infrastructure hosted in the United States
             with the following safeguards:
           </p>
-          <ul className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
+          <ul role="list" className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
             {[
               "All data in transit encrypted via TLS/HTTPS",
               "Data at rest encrypted using AES-256",
@@ -278,7 +278,7 @@ export default function Privacy() {
           <h3 className="mb-2 mt-3 text-[0.95rem] font-bold text-brand-text">
             All Users
           </h3>
-          <ul className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
+          <ul role="list" className="mb-4 space-y-2 pl-5 text-sm text-brand-muted">
             <BulletItem>
               <strong>Access</strong> — request a copy of your data
             </BulletItem>

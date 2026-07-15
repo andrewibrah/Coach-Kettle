@@ -89,9 +89,9 @@ function StepCard({ step, index }: { step: Step; index: number }) {
           <div className="absolute right-4 top-4 h-6 w-px bg-white/[0.06] transition-all duration-500 group-hover:h-10 group-hover:bg-white/[0.12]" />
           <div className="absolute right-4 top-4 h-px w-6 bg-white/[0.06] transition-all duration-500 group-hover:w-10 group-hover:bg-white/[0.12]" />
 
-          <h3 className="mb-3 text-lg font-semibold tracking-tight text-brand-text sm:text-xl">
+          <h2 className="mb-3 text-lg font-semibold tracking-tight text-brand-text sm:text-xl">
             {step.title}
-          </h3>
+          </h2>
           <p className="text-[0.88rem] font-light leading-[1.75] text-brand-muted">
             {step.description}
           </p>
@@ -175,11 +175,13 @@ export default function Tutorial() {
           <p className="mb-4 text-[0.7rem] font-medium tracking-[0.25em] text-white/35">
             HOW TO TALK TO COACH KETTLE
           </p>
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          {/* h1: Tutorial is the sole content of the /guide route, which
+              otherwise had no h1 at all (SC 1.3.1). Styling unchanged. */}
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             From install to your first PR.
             <br />
             <span className="text-brand-muted">In seven steps.</span>
-          </h2>
+          </h1>
           <div className="mx-auto mt-10 h-px max-w-[200px] bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
         </div>
 

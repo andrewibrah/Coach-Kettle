@@ -88,9 +88,9 @@ export default function Support() {
         </div>
 
         {/* DATA & ACCOUNT */}
-        <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
+        <h2 className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Data &amp; Account Management
-        </p>
+        </h2>
 
         <FaqCard>
           <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
@@ -99,7 +99,7 @@ export default function Support() {
           <p className="mb-2 text-sm text-brand-muted">
             You can request complete account and data deletion in two ways:
           </p>
-          <ol className="mb-3 space-y-2 pl-5 text-sm text-brand-muted">
+          <ol role="list" className="mb-3 space-y-2 pl-5 text-sm text-brand-muted">
             <li className="relative pl-5 before:absolute before:left-0 before:font-bold before:text-brand-text before:content-['1.']">
               <strong>In-app:</strong> Go to Settings &rarr; Account &rarr;
               Delete Account. This will permanently delete your account and all
@@ -148,7 +148,7 @@ export default function Support() {
             Coach Kettle saves data locally first (AsyncStorage) and then syncs
             to the cloud in the background. If you lose a session:
           </p>
-          <ul className="space-y-2 pl-5">
+          <ul role="list" className="space-y-2 pl-5">
             <Bullet>
               Check your workout history — the session may appear after
               reconnecting to the internet.
@@ -165,9 +165,9 @@ export default function Support() {
         </FaqCard>
 
         {/* PRIVACY */}
-        <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
+        <h2 className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Privacy Questions
-        </p>
+        </h2>
 
         <FaqCard>
           <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
@@ -226,9 +226,9 @@ export default function Support() {
         </FaqCard>
 
         {/* TIPS */}
-        <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
+        <h2 className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Tips &amp; Known Limitations
-        </p>
+        </h2>
 
         <div className="mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-brand-border sm:grid-cols-2">
           {[
@@ -248,9 +248,9 @@ export default function Support() {
               className="bg-brand-card p-5"
             >
               <div className="mb-3 text-brand-muted">{tip.icon}</div>
-              <h4 className="mb-1 text-sm font-medium text-brand-text">
+              <h3 className="mb-1 text-sm font-medium text-brand-text">
                 {tip.title}
-              </h4>
+              </h3>
               <p className="text-[0.82rem] leading-snug text-brand-muted">
                 {tip.desc}
               </p>
@@ -262,7 +262,7 @@ export default function Support() {
           <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
             <QIcon char="!" /> Known Limitations
           </h3>
-          <ul className="space-y-2 pl-5">
+          <ul role="list" className="space-y-2 pl-5">
             <Bullet>
               AI coaching requires an internet connection and may be slower during
               peak usage.
@@ -284,9 +284,9 @@ export default function Support() {
         </FaqCard>
 
         {/* CONTACT */}
-        <p className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
+        <h2 className="mb-4 mt-10 text-[0.78rem] font-medium uppercase tracking-[0.15em] text-brand-muted">
           Contact Us
-        </p>
+        </h2>
 
         <div className="mb-5 rounded-xl border border-brand-border bg-brand-card p-7 max-sm:p-5">
           <h3 className="mb-2 text-base font-bold">Bug Reports &amp; Feature Requests</h3>
@@ -297,7 +297,7 @@ export default function Support() {
           <p className="mb-2 text-sm text-brand-muted">
             When reporting a bug, please include:
           </p>
-          <ul className="mb-4 space-y-2 pl-5">
+          <ul role="list" className="mb-4 space-y-2 pl-5">
             <Bullet>Your iOS version and Coach Kettle version</Bullet>
             <Bullet>Steps to reproduce the issue</Bullet>
             <Bullet>A screenshot or screen recording if applicable</Bullet>
