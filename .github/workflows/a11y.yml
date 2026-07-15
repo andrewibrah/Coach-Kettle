@@ -1,0 +1,45 @@
+name: Accessibility
+
+# Runs on every branch and PR. The same two checks also gate deploy.yml, so a
+# regression cannot reach coachkettle.com even if someone pushes straight to
+# landing-page without opening a PR.
+on:
+  push:
+    branches-ignore: [landing-page] # landing-page is covered by deploy.yml's gate
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  accessibility:
+    name: WCAG 2.2 AA
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Static pass: source-visible defects (missing alt, positive tabindex,
+      # click handlers on non-interactive elements, malformed ARIA).
+      - name: eslint-plugin-jsx-a11y
+        run: npm run lint
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Dynamic pass: axe-core against the real production build on all five
+      # routes, at 1280px and 320px, plus keyboard/focus/target-size/reflow/
+      # text-spacing/reduced-motion assertions.
+      - name: axe-core + Playwright
+        run: npm run test:a11y
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30

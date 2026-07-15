@@ -106,9 +106,12 @@ function StepCard({ step, index }: { step: Step; index: number }) {
                 // scrolls horizontally at ~320px. Without tabIndex it held no
                 // focusable content, leaving keyboard-only users unable to
                 // scroll it and unable to read the end of the example.
+                // role="group" (not "region") keeps it out of the landmark
+                // list — 11 extra landmarks on /guide would be worse than none.
                 <div
                   key={ex.code}
                   tabIndex={0}
+                  role="group"
                   className="flex items-center gap-3 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg px-4 py-3"
                 >
                   {/* Decorative terminal prompt glyph — not part of the

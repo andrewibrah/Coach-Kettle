@@ -14,7 +14,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Accessibility gate. This job is a hard prerequisite of `build`, so a WCAG
+  # regression fails the pipeline before anything is uploaded to Pages —
+  # coachkettle.com keeps serving the last conforming build rather than
+  # publishing the regression. Remediation that is not gated comes back on the
+  # next theme update; this is what stops that.
+  accessibility:
+    name: WCAG 2.2 AA gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - name: eslint-plugin-jsx-a11y
+        run: npm run lint
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: axe-core + Playwright
+        run: npm run test:a11y
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
   build:
+    needs: accessibility
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
