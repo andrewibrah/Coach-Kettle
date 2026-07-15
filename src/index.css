@@ -184,3 +184,47 @@ body {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
 }
+
+/* ── WCAG 2.2 SC 2.2.2 (Pause, Stop, Hide) / SC 2.3.3 (Animation from Interactions) ──
+   Every decorative animation here auto-starts, loops indefinitely, and runs in
+   parallel with content. Honour the OS-level reduced-motion setting: hold each
+   animation at a single static frame and disable smooth scrolling. Entrance
+   animations resolve to their finished state so content stays visible. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Entrance animations use `both` fill — forcing the end state keeps content
+     visible rather than stuck at opacity 0. */
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-slide-down,
+  .animate-scale-in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* IntersectionObserver-driven reveals (Features, CTA, Tutorial) transition
+     from opacity 0; ensure they are legible without waiting on a transition. */
+  .feature-grid .feature-card,
+  .cta-section .cta-el,
+  .tutorial-grid .tutorial-step {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Hover shimmer sweep is purely ornamental. */
+  .shimmer-hover:hover::after {
+    animation: none !important;
+  }
+}
