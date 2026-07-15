@@ -238,9 +238,13 @@ export default function Hero() {
             style={{ animationDelay: "0.55s" }}
           >
             <AppStoreBadge />
+            {/* Secondary CTA. Its fill (white/[0.04] = #101010) is ~1.1:1
+                against the page, so the border is the only boundary.
+                border-white/20 (#383838) was 1.72:1; white/40 (#6a6a6a) =
+                3.72:1. Hover moves to /60 to keep the state change visible. */}
             <Link
               to="/guide"
-              className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/[0.04] px-7 py-4 text-center text-[0.88rem] font-semibold text-brand-text no-underline transition-all duration-300 hover:border-white/40 hover:bg-white/[0.08] active:scale-[0.97]"
+              className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/[0.04] px-7 py-4 text-center text-[0.88rem] font-semibold text-brand-text no-underline transition-all duration-300 hover:border-white/60 hover:bg-white/[0.08] active:scale-[0.97]"
             >
               Guide
             </Link>
