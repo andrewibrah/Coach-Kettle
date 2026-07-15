@@ -100,8 +100,11 @@ export default function Hero() {
 
       {/* Main hero container */}
       <div className="relative mx-auto max-w-[1200px] overflow-hidden">
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 overflow-hidden">
+        {/* Background decorative elements — aria-hidden: the watermark, rings,
+            sparkles, floating stat labels ("BENCH 225×8"), gym icons and
+            kettlebells are ambient texture carrying no information. Exposed,
+            they were announced ahead of the headline (SC 1.1.1). */}
+        <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
           {/* Coach Kettle watermark */}
           <div className="absolute -right-20 top-1/2 -translate-y-1/2 opacity-[0.07]">
             <CoachLogo size={700} />
@@ -215,7 +218,7 @@ export default function Hero() {
             <span className="relative text-brand-muted" style={{ fontFamily: "'Caveat', cursive" }}>
               plain English.
               {/* Underline scribble */}
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none" preserveAspectRatio="none">
+              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none" preserveAspectRatio="none" aria-hidden="true">
                 <path d="M2 8c30-6 60-2 90-4s70 2 106-2" stroke="rgba(255,255,255,0.15)" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </span>
@@ -251,6 +254,7 @@ export default function Hero() {
               stroke="currentColor"
               strokeWidth="1.5"
               className="animate-bounce-subtle"
+              aria-hidden="true"
             >
               <path d="M12 5v14M5 12l7 7 7-7" />
             </svg>

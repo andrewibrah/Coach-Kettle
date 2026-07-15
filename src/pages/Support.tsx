@@ -11,7 +11,12 @@ function FaqCard({ children }: { children: React.ReactNode }) {
 
 function QIcon({ char = "Q" }: { char?: string }) {
   return (
-    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-bg text-[0.7rem] font-bold text-brand-muted">
+    // aria-hidden: purely a visual glyph. Sits inside <h3>, so exposed it made
+    // headings announce as "Q How do I delete my account" (SC 1.1.1).
+    <span
+      aria-hidden="true"
+      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-bg text-[0.7rem] font-bold text-brand-muted"
+    >
       {char}
     </span>
   );
@@ -28,7 +33,7 @@ function Bullet({ children }: { children: React.ReactNode }) {
 /* Monochrome SVG icons for tips section */
 function TipIconSync() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="23 4 23 10 17 10" />
       <polyline points="1 20 1 14 7 14" />
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
@@ -38,7 +43,7 @@ function TipIconSync() {
 }
 function TipIconLock() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>

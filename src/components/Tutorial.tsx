@@ -103,7 +103,12 @@ function StepCard({ step, index }: { step: Step; index: number }) {
                   key={ex.code}
                   className="flex items-center gap-3 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg px-4 py-3"
                 >
-                  <span className="select-none text-[0.7rem] font-light text-white/25">
+                  {/* Decorative terminal prompt glyph — not part of the
+                      example the user is meant to type (SC 1.1.1). */}
+                  <span
+                    aria-hidden="true"
+                    className="select-none text-[0.7rem] font-light text-white/25"
+                  >
                     &gt;
                   </span>
                   <span className="whitespace-nowrap font-mono text-[0.85rem] text-brand-text">
