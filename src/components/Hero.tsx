@@ -148,7 +148,11 @@ export default function Hero() {
               style={{ top: node.top, bottom: node.bottom, left: node.left, right: node.right, animationDelay: node.delay }}
             >
               <div className={`${node.size} rounded-full bg-white/10`} />
-              <span className="whitespace-nowrap text-[0.6rem] font-light tracking-wider text-white/[0.08]">
+              {/* white/[0.08] composited to #1a1a1a = 1.16:1 against the
+                  #060606 page. Although these are decorative and aria-hidden,
+                  the pure-decoration exemption in SC 1.4.3 is not relied on:
+                  white/50 (#838383) = 5.31:1 and passes outright at 9.6px. */}
+              <span className="whitespace-nowrap text-[0.6rem] font-light tracking-wider text-white/50">
                 {node.label}
               </span>
             </div>
