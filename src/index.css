@@ -20,6 +20,37 @@ body {
   width: 100%;
 }
 
+/* ── WCAG 2.2 SC 2.4.1 (Bypass Blocks) ──
+   Off-screen until focused, then pinned above the sticky navbar (z-50) so it
+   cannot be obscured on reveal (SC 2.4.11). Uses a position shift rather than
+   display/visibility so it stays in the tab order. */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  margin: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 9999px;
+  background: #f0f0f0;
+  color: #060606;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 0.2s ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link {
+    transition: none;
+  }
+}
+
 /* ── Atmospheric glow orbs ── */
 .glow-orb {
   position: absolute;

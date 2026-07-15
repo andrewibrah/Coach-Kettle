@@ -10,8 +10,13 @@ import Guide from "./pages/Guide";
 export default function App() {
   return (
     <div className="flex min-h-screen flex-col">
+      <a href="#main" className="skip-link">
+        Skip to main content
+      </a>
       <Navbar />
-      <main className="flex-1">
+      {/* tabIndex -1 makes #main a valid focus target for the skip link; the
+          sticky navbar is cleared via scroll-margin-top (SC 2.4.11). */}
+      <main id="main" tabIndex={-1} className="flex-1 scroll-mt-24">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/guide" element={<Guide />} />
