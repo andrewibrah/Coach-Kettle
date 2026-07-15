@@ -154,7 +154,17 @@ export default function Privacy() {
         {/* 3 */}
         <Section>
           <SectionTitle>3. How We Use Your Data</SectionTitle>
-          <div className="overflow-x-auto">
+          {/* SC 2.1.1: this wrapper scrolls horizontally at narrow widths. With
+              no focusable content inside, a keyboard-only user could not scroll
+              it and never reached the "Legal Basis (GDPR)" column. tabIndex=0
+              makes the region itself focusable and arrow-scrollable; role +
+              aria-label give it a name when focused. */}
+          <div
+            className="overflow-x-auto"
+            tabIndex={0}
+            role="region"
+            aria-label="Data processing purposes and legal basis"
+          >
             <table className="my-3 w-full border-collapse text-sm">
               <thead>
                 <tr>

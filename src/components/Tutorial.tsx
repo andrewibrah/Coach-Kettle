@@ -102,8 +102,13 @@ function StepCard({ step, index }: { step: Step; index: number }) {
           {step.examples && (
             <div className="mt-5 space-y-2">
               {step.examples.map((ex) => (
+                // SC 2.1.1: the example text is whitespace-nowrap, so this box
+                // scrolls horizontally at ~320px. Without tabIndex it held no
+                // focusable content, leaving keyboard-only users unable to
+                // scroll it and unable to read the end of the example.
                 <div
                   key={ex.code}
+                  tabIndex={0}
                   className="flex items-center gap-3 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg px-4 py-3"
                 >
                   {/* Decorative terminal prompt glyph — not part of the
