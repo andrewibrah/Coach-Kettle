@@ -41,6 +41,8 @@ const MAPPING = {
   'info.circle': 'info-outline',
   'doc.text.fill': 'description',
   'bubble.left.and.bubble.right.fill': 'forum',
+  'text.bubble.fill': 'chat-bubble-outline',
+  'books.vertical.fill': 'menu-book',
   'chart.bar.fill': 'bar-chart',
   'crown.fill': 'workspace-premium',
   'arrow.clockwise': 'refresh',
