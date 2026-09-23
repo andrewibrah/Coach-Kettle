@@ -54,8 +54,15 @@ export function ScreenHeader({ title, subtitle, onBack, rightElement, style, ski
                             <IconSymbol name="chevron.left" size={24} color={iconColor} />
                         </Pressable>
                     ) : null}
-                    <View>
-                        <ThemedText style={styles.title}>{title}</ThemedText>
+                    <View style={styles.titleWrap}>
+                        <ThemedText
+                            style={styles.title}
+                            numberOfLines={2}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.7}
+                        >
+                            {title}
+                        </ThemedText>
                         {subtitle && (
                             <ThemedText style={[styles.subtitle, { color: subtitleColor }]}>
                                 {subtitle}
@@ -83,6 +90,11 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
+        // Without this, React Native's flexShrink:0 default on this row
+        // stops it (and the title inside it) from ever shrinking below its
+        // natural content width, so a long title still overflows past the
+        // screen edge regardless of titleWrap's flexShrink below.
+        flexShrink: 1,
     },
     headerRight: {
         flexDirection: "row",
@@ -95,6 +107,9 @@ const styles = StyleSheet.create({
     },
     backBtnPressed: {
         backgroundColor: "rgba(0,0,0,0.05)",
+    },
+    titleWrap: {
+        flexShrink: 1,
     },
     title: {
         fontSize: 26,

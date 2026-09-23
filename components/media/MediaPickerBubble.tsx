@@ -4,6 +4,7 @@
  * Tap a thumbnail to view full-screen.
  */
 
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import React, { useCallback, useState } from "react";
 import {
@@ -68,7 +69,7 @@ export function MediaPickerBubble({
   return (
     <View style={[styles.container, { backgroundColor: cardBg }]}>
       <View style={styles.header}>
-        <Text style={[styles.headerIcon, { color: mutedColor }]}>📷</Text>
+        <IconSymbol name="camera.fill" size={14} color={mutedColor} />
         <Text style={[styles.headerText, { color: textColor }]}>
           Media
         </Text>
@@ -136,7 +137,7 @@ export function MediaPickerBubble({
                   accessibilityRole="button"
                   accessibilityLabel="Remove media"
                 >
-                  <Text style={styles.removeBtnText}>✕</Text>
+                  <IconSymbol name="xmark" size={11} color="#FFFFFF" />
                 </Pressable>
               )}
             </View>
@@ -184,9 +185,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  headerIcon: {
-    fontSize: 14,
   },
   headerText: {
     fontSize: 15,
@@ -275,11 +273,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   removeBtnPressed: {},
-  removeBtnText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "700",
-  },
   addBtn: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,

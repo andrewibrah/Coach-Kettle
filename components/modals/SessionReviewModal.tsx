@@ -252,9 +252,7 @@ export function SessionReviewModal({
               {/* Next Session Note */}
               <View style={[styles.section, { backgroundColor: cardBg }]}>
                 <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionIcon, { color: tint }]}>
-                    📝
-                  </Text>
+                  <IconSymbol name="pencil" size={14} color={tint} />
                   <ThemedText style={styles.sectionTitle}>
                     For Next Session
                   </ThemedText>

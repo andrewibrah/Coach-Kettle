@@ -32,7 +32,14 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: Hea
                 </View>
 
                 <View style={styles.titleContainer}>
-                    <ThemedText style={[styles.title, { color: textColor }]} numberOfLines={1}>
+                    {/* At accessibility text sizes the title has nowhere to grow between the
+                        menu and action icons. numberOfLines={1} alone truncated "Coach Kettle"
+                        to "Co…" (measured: docs/qa/2026-09-08-1.0.2-fable-lineheight/
+                        A0-baseline-unmodified-AX5.png). Shrinking to fit keeps the whole title
+                        readable and keeps the header one line, which is what UIKit nav bars do.
+                        Wrapping to 2 lines was tried and rejected -- it swallowed the header and
+                        collided with the icons (B1-numberOfLines2-autoshrink-AX5.png). */}
+                    <ThemedText style={[styles.title, { color: textColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
                         {title || "Coach Kettle"}
                     </ThemedText>
                 </View>

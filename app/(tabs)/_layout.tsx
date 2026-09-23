@@ -49,6 +49,15 @@ export default function TabLayout() {
     return <Redirect href="/paywall" />;
   }
 
+  // VoiceOver derives "N of M" from the number of routes in the navigator, not the
+  // number of rendered buttons. `history` below is intentionally kept as a route
+  // (reachable from More) but hidden from the bar with `href: null`, so the default
+  // announcement was "1 of 6" .. "5 of 6" for five visible tabs. Supplying explicit
+  // labels corrects the announcement WITHOUT removing a working route.
+  const visibleTabs = ['Home', 'Timer', 'Nutrition', 'Progress', 'More'];
+  const tabA11yLabel = (title: string) =>
+    `${title}, tab, ${visibleTabs.indexOf(title) + 1} of ${visibleTabs.length}`;
+
   return (
     <Tabs
       screenOptions={{
@@ -61,6 +70,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
+          tabBarAccessibilityLabel: tabA11yLabel('Home'),
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
@@ -68,6 +78,7 @@ export default function TabLayout() {
         name="timer"
         options={{
           title: 'Timer',
+          tabBarAccessibilityLabel: tabA11yLabel('Timer'),
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="timer" color={color} />,
         }}
       />
@@ -75,6 +86,7 @@ export default function TabLayout() {
         name="nutrition"
         options={{
           title: 'Nutrition',
+          tabBarAccessibilityLabel: tabA11yLabel('Nutrition'),
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="fork.knife" color={color} />,
         }}
       />
@@ -82,6 +94,7 @@ export default function TabLayout() {
         name="progress"
         options={{
           title: 'Progress',
+          tabBarAccessibilityLabel: tabA11yLabel('Progress'),
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.line.uptrend.xyaxis" color={color} />,
         }}
       />
@@ -89,6 +102,7 @@ export default function TabLayout() {
         name="more"
         options={{
           title: 'More',
+          tabBarAccessibilityLabel: tabA11yLabel('More'),
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="line.3.horizontal" color={color} />,
         }}
       />

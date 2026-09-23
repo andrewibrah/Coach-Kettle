@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/useThemeColor";
 
 type Props = {
@@ -54,7 +55,7 @@ export function ImageViewerModal({ visible, uri, onClose }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Close"
         >
-          <Text style={styles.closeBtnText}>✕</Text>
+          <IconSymbol name="xmark" size={18} color="#FFFFFF" />
         </Pressable>
 
         {/* Loading spinner */}
@@ -110,11 +111,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  closeBtnText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
   },
   loader: {
     position: "absolute",

@@ -3,6 +3,7 @@
  * Renders inside SessionReviewModal and history detail.
  */
 
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import React from "react";
 import {
@@ -35,7 +36,7 @@ export function ReflectionInput({
   return (
     <View style={[styles.container, { backgroundColor: cardBg }]}>
       <View style={styles.header}>
-        <Text style={[styles.headerIcon, { color: mutedColor }]}>💭</Text>
+        <IconSymbol name="bubble.left.and.bubble.right.fill" size={14} color={mutedColor} />
         <Text style={[styles.headerText, { color: textColor }]}>
           Session Reflection
         </Text>
@@ -82,9 +83,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  headerIcon: {
-    fontSize: 14,
   },
   headerText: {
     fontSize: 15,

@@ -92,7 +92,7 @@ export default function MoreScreen() {
         <NavItem
           icon="books.vertical.fill"
           label="Exercise Library"
-          description="Catalog of exercises with cues"
+          description="Step-by-step instructions, muscles and equipment"
           onPress={go('/exercise-library')}
           cardBackground={cardBackground}
           iconColor={iconColor}

@@ -88,7 +88,13 @@ export function TutorialModal({ visible, onDismiss }: TutorialModalProps) {
   const flatListRef = useRef<FlatList>(null);
 
   const handleDismiss = async () => {
-    await markTutorialShown();
+    // Dismissal must never depend on a successful write — an AsyncStorage
+    // failure here must not leave the modal permanently open with no exit.
+    try {
+      await markTutorialShown();
+    } catch (e) {
+      console.warn('[tutorial] persist failed', e);
+    }
     // Reset slide index BEFORE calling onDismiss so state is clean
     // if the parent re-opens the tutorial quickly (e.g. via the help button).
     setCurrentIndex(0);

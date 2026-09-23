@@ -164,14 +164,14 @@ export default function SettingsScreen() {
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => router.push('/form' as any)}
                         accessibilityRole="button"
-                        accessibilityLabel="Form check — camera rep count and technique cues"
+                        accessibilityLabel="Form check — video analysis unavailable; view previous records"
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="camera.fill" size={20} color={activeColor} />
                             <View style={styles.navRowText}>
                                 <ThemedText style={styles.navRowLabel}>Form check</ThemedText>
                                 <ThemedText style={styles.navRowDescription}>
-                                    Camera rep count, ROM score, and direct technique cues
+                                    Video analysis unavailable; view previous records
                                 </ThemedText>
                             </View>
                         </View>
@@ -228,6 +228,8 @@ export default function SettingsScreen() {
                             onValueChange={(value) => setThemeMode(value ? 'dark' : 'light')}
                             trackColor={{ false: '#767577', true: activeColor }}
                             thumbColor="#fff"
+                            accessibilityLabel="Dark mode"
+                            accessibilityHint="Switches the app between the light and dark appearance"
                         />
                     </View>
                     <Pressable
@@ -260,6 +262,47 @@ export default function SettingsScreen() {
                                 <ThemedText style={styles.navRowLabel}>How to use Coach Kettle</ThemedText>
                                 <ThemedText style={styles.navRowDescription}>
                                     Replay the walkthrough of logging, history, and coaching
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
+                </View>
+
+                {/* Legal — the only in-app path to these documents outside the paywall and the
+                    one-time sign-up acceptance gate. Both open the reader, which has no
+                    Accept/Decline footer, so viewing them cannot re-trigger acceptance. */}
+                <View style={styles.section}>
+                    <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Legal</ThemedText>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/terms-of-service?doc=terms&mode=read' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Terms of Service"
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="doc.text.fill" size={20} color={activeColor} />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>Terms of Service</ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    The agreement you accepted when you signed up
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <IconSymbol name="chevron.right" size={16} color={textColor} style={{ opacity: 0.4 }} />
+                    </Pressable>
+                    <Pressable
+                        style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/terms-of-service?doc=privacy&mode=read' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Privacy Policy"
+                    >
+                        <View style={styles.navRowContent}>
+                            <IconSymbol name="lock.shield" size={20} color={activeColor} />
+                            <View style={styles.navRowText}>
+                                <ThemedText style={styles.navRowLabel}>Privacy Policy</ThemedText>
+                                <ThemedText style={styles.navRowDescription}>
+                                    How your data is stored, used, and shared
                                 </ThemedText>
                             </View>
                         </View>

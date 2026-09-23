@@ -4,13 +4,20 @@ import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } fro
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
 import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useToast } from "@/hooks/useToast";
 import { api } from "@/lib/api";
-import { listWorkouts as listLocalWorkouts, syncPendingWorkouts, WORKOUT_HISTORY_KEY, type WorkoutSession } from "@/lib/workoutStorage";
+import {
+  deleteWorkout as deleteWorkoutLocal,
+  listWorkouts as listLocalWorkouts,
+  syncPendingWorkouts,
+  WORKOUT_HISTORY_KEY,
+  type WorkoutSession,
+} from "@/lib/workoutStorage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function formatDateHeader(dateISO: string) {
@@ -125,12 +132,10 @@ export default function HistoryScreen() {
 
     try {
       await api.deleteWorkout(deleteId);
-      // Keep the offline cache consistent so the workout can't resurrect.
-      const local = await listLocalWorkouts().catch(() => [] as WorkoutSession[]);
-      AsyncStorage.setItem(
-        WORKOUT_HISTORY_KEY,
-        JSON.stringify(local.filter((w) => w.id !== deleteId))
-      ).catch(() => undefined);
+      // Keep the offline cache consistent so the workout can't resurrect on
+      // next sync — via the existing helper rather than hand-rolling the
+      // AsyncStorage read/filter/write here.
+      await deleteWorkoutLocal(deleteId).catch(() => undefined);
     } catch (e) {
       console.warn('[history] delete failed', e);
       setItems(previousItems);
@@ -196,7 +201,14 @@ export default function HistoryScreen() {
           pressed && styles.cardPressed,
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`${item.part?.trim() || 'Workout'} — long press to delete`}
+        accessibilityLabel={item.part?.trim() || 'Workout'}
+        accessibilityActions={[{ name: 'delete', label: 'Delete workout' }]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'delete') {
+            setSelectedId(item.id);
+            setDeleteModalVisible(true);
+          }
+        }}
       >
         <View style={styles.cardRow}>
           <View style={styles.cardMain}>
@@ -206,21 +218,33 @@ export default function HistoryScreen() {
               </Text>
               {review && (
                 <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(review.rating) + '20', borderColor: getRatingColor(review.rating) }]}>
-                  <Text style={[styles.ratingBadgeText, { color: getRatingColor(review.rating) }]}>{review.rating}/10</Text>
+                  <Text style={[styles.ratingBadgeText, { color: getRatingColor(review.rating) }]} accessibilityLabel={`Session review score ${review.rating} out of 10`}>Review {review.rating}/10</Text>
                 </View>
               )}
             </View>
 
             <View style={styles.metaRow}>
               <View style={[styles.metaChip, { backgroundColor: cardBg, borderColor }]}>
-                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.exercises} Exercises</Text>
+                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.exercises} {stats.exercises === 1 ? 'Exercise' : 'Exercises'}</Text>
               </View>
               <View style={[styles.metaChip, { backgroundColor: cardBg, borderColor }]}>
-                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.sets} Sets</Text>
+                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.sets} {stats.sets === 1 ? 'Set' : 'Sets'}</Text>
               </View>
             </View>
           </View>
 
+          <Pressable
+            onPress={() => {
+              setSelectedId(item.id);
+              setDeleteModalVisible(true);
+            }}
+            hitSlop={8}
+            style={styles.deleteBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${item.part?.trim() || 'workout'}`}
+          >
+            <IconSymbol name="trash" size={18} color={dangerColor} />
+          </Pressable>
           <Text style={[styles.chevron, { color: chevronColor }]}>›</Text>
         </View>
       </Pressable>
@@ -243,7 +267,7 @@ export default function HistoryScreen() {
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
       <ScreenHeader
         title="History"
-        subtitle={`${headerStats.totalWorkouts} workouts • ${headerStats.totalSets} sets`}
+        subtitle={`${headerStats.totalWorkouts} ${headerStats.totalWorkouts === 1 ? 'workout' : 'workouts'} • ${headerStats.totalSets} ${headerStats.totalSets === 1 ? 'set' : 'sets'}`}
         skipSafeArea
       />
 
@@ -358,6 +382,13 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     marginLeft: 2,
+  },
+
+  deleteBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   sectionHeader: {

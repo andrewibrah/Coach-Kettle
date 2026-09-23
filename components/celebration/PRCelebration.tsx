@@ -11,6 +11,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -113,7 +114,9 @@ export function PRCelebration({ data, onDismiss }: PRCelebrationProps) {
 
         <Animated.View style={[styles.card, cardAnimatedStyle, { backgroundColor: cardBg }]}>
           <View>
-            <ThemedText style={styles.trophy}>🏆</ThemedText>
+            <View style={styles.trophy}>
+              <IconSymbol name="trophy.fill" size={56} color={tint} />
+            </View>
             <ThemedText style={[styles.title, { color: tint }]}>
               NEW PR!
             </ThemedText>
@@ -250,9 +253,8 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   trophy: {
-    fontSize: 56,
     marginBottom: 8,
-    textAlign: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 32,
