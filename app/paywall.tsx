@@ -231,11 +231,11 @@ export default function PaywallScreen() {
         </ThemedText>
 
         <View style={styles.legalLinks}>
-          <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8} accessibilityRole="link" accessibilityLabel="Terms of Service">
+          <Pressable onPress={() => router.push('/terms-of-service?doc=terms&mode=read' as any)} hitSlop={8} accessibilityRole="link" accessibilityLabel="Terms of Service">
             <ThemedText style={[styles.legalLink, { color: colors.tint }]}>Terms of Service</ThemedText>
           </Pressable>
           <ThemedText style={[styles.legalSep, { color: colors.placeholder }]}> · </ThemedText>
-          <Pressable onPress={() => router.push('/terms-of-service' as any)} hitSlop={8} accessibilityRole="link" accessibilityLabel="Privacy Policy">
+          <Pressable onPress={() => router.push('/terms-of-service?doc=privacy&mode=read' as any)} hitSlop={8} accessibilityRole="link" accessibilityLabel="Privacy Policy">
             <ThemedText style={[styles.legalLink, { color: colors.tint }]}>Privacy Policy</ThemedText>
           </Pressable>
         </View>
@@ -246,11 +246,15 @@ export default function PaywallScreen() {
             onPress={handleSkip}
             disabled={isDismissing}
             accessibilityRole="button"
-            accessibilityLabel="Skip - Try 1 Week Free"
+            accessibilityLabel="Continue"
             accessibilityState={{ disabled: isDismissing }}
           >
+            {/* This button only dismisses the paywall — handleSkip posts `dismiss_paywall`
+                and starts nothing. The old "Skip - Try 1 Week Free" / "Starting trial..."
+                copy promised a trial it does not begin, and was also shown to users already
+                in a trial and to active subscribers. */}
             <ThemedText style={[styles.skipButtonText, { color: colors.tint }]}>
-              {isDismissing ? 'Starting trial...' : 'Skip - Try 1 Week Free'}
+              {isDismissing ? 'Continuing...' : 'Continue'}
             </ThemedText>
           </Pressable>
         )}

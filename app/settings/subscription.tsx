@@ -16,7 +16,6 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/hooks/useToast';
-import { SUBSCRIPTION } from '@/constants/subscription';
 
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
@@ -30,11 +29,12 @@ export default function SubscriptionScreen() {
 
   const { session } = useAuth();
   const { entitlement, isPro, refreshEntitlement, syncPurchase } = useEntitlement();
-  const { restore, presentCustomerCenter, isProcessing } = useIAP({
+  const { products, restore, presentCustomerCenter, isProcessing } = useIAP({
     appUserID: session?.user?.id,
     email: session?.user?.email,
     onPurchaseSuccess: syncPurchase,
   });
+  const storeProduct = products.find((product) => product.productId === entitlement.appleProductId);
   const sectionTitleColor = useThemeColor({}, 'placeholder');
   const { toast, showToast, hideToast } = useToast();
 
@@ -146,13 +146,11 @@ export default function SubscriptionScreen() {
               <ThemedText style={styles.detailValue}>{formatDate(entitlement.expiresAt)}</ThemedText>
             </View>
             <View style={[styles.detailRow, { backgroundColor: cardBg }]}>
-              <ThemedText style={styles.detailLabel}>Plan price</ThemedText>
+              <ThemedText style={styles.detailLabel}>Current store price</ThemedText>
               <ThemedText style={styles.detailValue}>
-                {entitlement.appleProductId === SUBSCRIPTION.PRODUCT_ID_YEARLY
-                  ? `${SUBSCRIPTION.PRICE_YEARLY}/year`
-                  : entitlement.appleProductId === SUBSCRIPTION.PRODUCT_ID_MONTHLY
-                    ? `${SUBSCRIPTION.PRICE_MONTHLY}/month`
-                    : '—'}
+                {storeProduct
+                  ? `${storeProduct.localizedPrice}/${storeProduct.plan === 'yearly' ? 'year' : 'month'}`
+                  : 'See Manage Subscription for billing details'}
               </ThemedText>
             </View>
           </View>

@@ -5,6 +5,8 @@
  * Pricing and limits defined here for single source of truth.
  */
 
+import type { IconSymbolName } from '@/components/ui/icon-symbol';
+
 export const SUBSCRIPTION = {
   // App Store Connect Product IDs
   PRODUCT_ID_MONTHLY: 'com.coachkettle.pro.monthly',
@@ -51,25 +53,27 @@ export type SubscriptionTier = 'free' | 'pro';
 /**
  * Feature descriptions for paywall display
  */
-export const PRO_FEATURES = [
+// icon: IconSymbolName so a typo or an unmapped SF Symbol name fails tsc
+// instead of silently rendering nothing on Android (no Material fallback).
+export const PRO_FEATURES: { icon: IconSymbolName; title: string; description: string }[] = [
   {
-    icon: '💬',
+    icon: 'bubble.left.and.bubble.right.fill',
     title: 'Unlimited AI Coach',
     description: 'Ask Coach Kettle anything, anytime',
   },
   {
-    icon: '📊',
+    icon: 'chart.line.uptrend.xyaxis',
     title: 'Advanced Analytics',
     description: 'Performance trends, fatigue monitoring, 1RM projections',
   },
   {
-    icon: '📋',
+    icon: 'doc.text.fill',
     title: 'Unlimited Templates',
     description: 'Create and save unlimited custom workout templates',
   },
   {
-    icon: '🍽️',
+    icon: 'fork.knife',
     title: 'AI Meal Plans',
     description: 'Weekly meal plans generated for your goals',
   },
-] as const;
+];

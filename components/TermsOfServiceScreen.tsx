@@ -12,12 +12,22 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 
 type DocType = 'terms' | 'privacy';
 
-export function TermsOfServiceScreen() {
+export type TermsOfServiceScreenProps = {
+    /** Which document to show first. Defaults to 'terms' so every existing call site is unchanged. */
+    initialDoc?: DocType;
+    /**
+     * Reader mode: show both documents but hide the Accept / Decline footer.
+     * Defaults to false, so the sign-up acceptance gate keeps its exact current behaviour.
+     */
+    readOnly?: boolean;
+};
+
+export function TermsOfServiceScreen({ initialDoc = 'terms', readOnly = false }: TermsOfServiceScreenProps = {}) {
     const { acceptTerms } = useAuthLock();
     const { signOut } = useAuth();
     const router = useRouter();
     const [isAccepting, setIsAccepting] = useState(false);
-    const [activeDoc, setActiveDoc] = useState<DocType>('terms');
+    const [activeDoc, setActiveDoc] = useState<DocType>(initialDoc);
     const insets = useSafeAreaInsets();
     const primaryColor = useThemeColor({}, 'tint');
     const onTint = useThemeColor({}, 'tintForeground');
@@ -77,7 +87,9 @@ export function TermsOfServiceScreen() {
         <ThemedView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             <ThemedView style={styles.header}>
                 <ThemedText type="title">Terms & Privacy</ThemedText>
-                <ThemedText style={styles.subtitle}>Please review and accept to continue</ThemedText>
+                <ThemedText style={styles.subtitle}>
+                    {readOnly ? 'Review our Terms of Service and Privacy Policy' : 'Please review and accept to continue'}
+                </ThemedText>
             </ThemedView>
 
             {/* Tab Switcher */}
@@ -124,6 +136,7 @@ export function TermsOfServiceScreen() {
                 </ScrollView>
             </ThemedView>
 
+            {readOnly ? null : (
             <ThemedView style={styles.footer}>
                 <Pressable
                     style={({ pressed }) => [
@@ -155,6 +168,7 @@ export function TermsOfServiceScreen() {
                     <ThemedText style={styles.declineText}>Decline</ThemedText>
                 </Pressable>
             </ThemedView>
+            )}
         </ThemedView>
     );
 }
