@@ -10,17 +10,17 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { ONBOARDING_ROUTES, resolveWorkoutSetupBack, type WorkoutSetupStep } from '@/lib/onboardingNavigation';
+import { validateTemplateLift } from '@/lib/onboardingValidation';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 8;
-
-type Step = 'initial' | 'name' | 'lifts' | 'addMore';
 
 interface WorkoutLift {
   name: string;
@@ -36,19 +36,61 @@ export default function WorkoutSetupScreen() {
   const inputBg = useThemeColor({}, 'inputBackground');
   const textColor = useThemeColor({}, 'text');
   const placeholder = useThemeColor({}, 'placeholder');
-  const { draft, updateDraft } = useOnboarding();
+  const { draft, draftLoading, draftSaving, updateDraft } = useOnboarding();
 
-  const [step, setStep] = useState<Step>('initial');
+  const [step, setStep] = useState<WorkoutSetupStep>('initial');
   const [workoutName, setWorkoutName] = useState('');
   const [currentLift, setCurrentLift] = useState<WorkoutLift>({ name: '', sets: '3', reps: '10' });
-  const [lifts, setLifts] = useState<WorkoutLift[]>([]);
+  const [lifts, setLifts] = useState<{ name: string; sets: number; reps: number }[]>([]);
   // Track saved workouts locally (will be sent in batch at complete screen)
   const [savedWorkouts, setSavedWorkouts] = useState<{ name: string; lifts: { name: string; sets: number; reps: number }[] }[]>(
     draft.workout_templates || []
   );
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
+  const [errors, setErrors] = useState<Partial<Record<keyof WorkoutLift, string>>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const submitGuard = useRef(false);
+  const busy = submitting || draftSaving || draftLoading;
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const templatesKey = JSON.stringify(draft.workout_templates || []);
+  const hydratedContent = useRef(draftLoading ? undefined : templatesKey);
+  const replacement = useRef(0);
+  useEffect(() => {
+    if (draftLoading || hydratedContent.current === templatesKey) return;
+    hydratedContent.current = templatesKey;
+    replacement.current += 1;
+    setSavedWorkouts(draft.workout_templates || []);
+  }, [draftLoading, draft.workout_templates, templatesKey]);
+  const changeLift = (field: keyof WorkoutLift, text: string) => {
+    if (!mounted.current || submitGuard.current || busy) return;
+    setCurrentLift((previous) => ({ ...previous, [field]: text }));
+    setErrors((previous) => ({ ...previous, [field]: undefined }));
+  };
+
+  const handleBack = () => {
+    if (!mounted.current || submitGuard.current || busy) return;
+    setErrors({});
+    const decision = resolveWorkoutSetupBack(step, draft.tracked_lifts);
+    if ('step' in decision) {
+      if (step === 'addMore') {
+        setWorkoutName('');
+        setLifts([]);
+        setCurrentLift({ name: '', sets: '3', reps: '10' });
+        setEditingIndex(null);
+      }
+      setStep(decision.step);
+    } else {
+      router.dismissTo(decision.route);
+    }
+  };
+
   const handleYes = () => {
+    if (!mounted.current || submitGuard.current || busy) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setStep('name');
   };
@@ -58,6 +100,7 @@ export default function WorkoutSetupScreen() {
   };
 
   const handleNameContinue = () => {
+    if (!mounted.current || submitGuard.current || busy) return;
     if (workoutName.trim()) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setStep('lifts');
@@ -65,62 +108,70 @@ export default function WorkoutSetupScreen() {
   };
 
   const handleAddLift = () => {
-    if (currentLift.name.trim()) {
+    if (!mounted.current || submitGuard.current || busy) return;
+    const result = validateTemplateLift(currentLift.name, currentLift.sets, currentLift.reps);
+    setErrors(result.errors);
+    if (result.valid) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (editingIndex !== null) {
         // Update existing lift
         const updated = [...lifts];
-        updated[editingIndex] = currentLift;
+        updated[editingIndex] = result.value;
         setLifts(updated);
         setEditingIndex(null);
       } else {
         // Add new lift
-        setLifts([...lifts, currentLift]);
+        setLifts([...lifts, result.value]);
       }
       setCurrentLift({ name: '', sets: '3', reps: '10' });
     }
   };
 
   const handleEditLift = (index: number) => {
+    if (!mounted.current || submitGuard.current || busy) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setCurrentLift(lifts[index]);
+    setErrors({});
+    setCurrentLift({ name: lifts[index].name, sets: String(lifts[index].sets), reps: String(lifts[index].reps) });
     setEditingIndex(index);
   };
 
   const handleCancelEdit = () => {
+    if (!mounted.current || submitGuard.current || busy) return;
+    setErrors({});
     setEditingIndex(null);
     setCurrentLift({ name: '', sets: '3', reps: '10' });
   };
 
   const handleRemoveLift = (index: number) => {
+    if (!mounted.current || submitGuard.current || busy) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLifts(lifts.filter((_, i) => i !== index));
+    if (editingIndex === index) handleCancelEdit();
+    else if (editingIndex !== null && editingIndex > index) setEditingIndex(editingIndex - 1);
   };
 
   const handleFinishWorkout = async () => {
-    if (workoutName.trim() && lifts.length > 0) {
-      // Save workout to local state (will be batched at complete screen)
-      const newWorkout = {
-        name: workoutName,
-        lifts: lifts.map((lift) => ({
-          name: lift.name,
-          sets: lift.sets ? parseInt(lift.sets, 10) : 3,
-          reps: lift.reps ? parseInt(lift.reps, 10) : 10,
-        })),
-      };
-
-      const updatedWorkouts = [...savedWorkouts, newWorkout];
-      setSavedWorkouts(updatedWorkouts);
-
-      // Save to draft
+    if (!mounted.current || submitGuard.current || busy || !workoutName.trim() || lifts.length === 0 || editingIndex !== null) return;
+    const updatedWorkouts = [...savedWorkouts, { name: workoutName.trim(), lifts: [...lifts] }];
+    const version = replacement.current;
+    submitGuard.current = true;
+    setSubmitting(true);
+    try {
+      hydratedContent.current = JSON.stringify(updatedWorkouts);
       await updateDraft({ workout_templates: updatedWorkouts });
-
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (!mounted.current || version !== replacement.current) return;
+      setSavedWorkouts(updatedWorkouts);
       setStep('addMore');
+    } catch {
+      if (mounted.current && version === replacement.current) Alert.alert('Could not save workout', 'Please try again.');
+    } finally {
+      submitGuard.current = false;
+      if (mounted.current) setSubmitting(false);
     }
   };
 
   const handleAddAnother = () => {
+    if (!mounted.current || submitGuard.current || busy) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setWorkoutName('');
     setLifts([]);
@@ -130,20 +181,29 @@ export default function WorkoutSetupScreen() {
   };
 
   const finishOnboarding = async () => {
-    // Save current step and navigate to complete screen (batch save happens there)
-    await updateDraft({
-      workout_templates: savedWorkouts,
-      current_step: CURRENT_STEP,
-    });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.push('/onboarding/complete' as any);
+    if (!mounted.current || submitGuard.current || busy) return;
+    const version = replacement.current;
+    submitGuard.current = true;
+    setSubmitting(true);
+    try {
+      await updateDraft({ workout_templates: savedWorkouts, current_step: CURRENT_STEP });
+    } catch {
+      if (mounted.current && version === replacement.current) Alert.alert('Could not finish setup', 'Please try again.');
+      return;
+    } finally {
+      submitGuard.current = false;
+      if (mounted.current) setSubmitting(false);
+    }
+    if (!mounted.current || version !== replacement.current) return;
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    router.push(ONBOARDING_ROUTES[8]);
   };
 
   // Initial choice screen
   if (step === 'initial') {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-values' as any)} />
+        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={handleBack} />
         <QuizContainer animationKey="initial">
           <QuizQuestion
             question="Do you have workout routines you'd like to save?"
@@ -154,6 +214,7 @@ export default function WorkoutSetupScreen() {
             <TouchableOpacity
               style={[styles.choiceButton, { backgroundColor: tint }]}
               onPress={handleYes}
+              disabled={busy}
               accessibilityRole="button"
               accessibilityLabel="Yes, set up templates"
             >
@@ -166,6 +227,7 @@ export default function WorkoutSetupScreen() {
                 { backgroundColor: inputBg },
               ]}
               onPress={handleNo}
+              disabled={busy}
               accessibilityRole="button"
               accessibilityLabel="Skip for now"
             >
@@ -181,14 +243,16 @@ export default function WorkoutSetupScreen() {
   if (step === 'name') {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-values' as any)} />
+        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={handleBack} />
         <QuizContainer
           animationKey="name"
           footer={
             <QuizButtonGroup
               onSkip={finishOnboarding}
               onContinue={handleNameContinue}
-              continueDisabled={!workoutName.trim()}
+              continueDisabled={busy || !workoutName.trim()}
+              skipDisabled={busy}
+              continueLoading={submitting || draftSaving}
             />
           }
         >
@@ -197,7 +261,7 @@ export default function WorkoutSetupScreen() {
           <View style={styles.inputContainer}>
             <QuizInput
               value={workoutName}
-              onChangeText={setWorkoutName}
+              onChangeText={(text) => { if (!submitGuard.current && !busy) setWorkoutName(text); }}
               placeholder="Workout name..."
               autoFocus
             />
@@ -211,14 +275,16 @@ export default function WorkoutSetupScreen() {
   if (step === 'lifts') {
     return (
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-values' as any)} />
+        <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={handleBack} />
         <QuizContainer
           animationKey="lifts"
           footer={
             <QuizButtonGroup
               onSkip={finishOnboarding}
               onContinue={handleFinishWorkout}
-              continueDisabled={lifts.length === 0}
+              continueDisabled={busy || lifts.length === 0 || editingIndex !== null}
+              skipDisabled={busy}
+              continueLoading={submitting || draftSaving}
               continueLabel="Save Workout"
             />
           }
@@ -235,7 +301,8 @@ export default function WorkoutSetupScreen() {
           <View style={styles.liftInputs}>
             <QuizInput
               value={currentLift.name}
-              onChangeText={(text) => setCurrentLift({ ...currentLift, name: text })}
+              onChangeText={(text) => changeLift('name', text)}
+              error={errors.name}
               placeholder="Exercise name..."
             />
             <View style={styles.setsRepsRow}>
@@ -243,7 +310,8 @@ export default function WorkoutSetupScreen() {
                 <ThemedText style={styles.smallLabel}>Sets</ThemedText>
                 <QuizInput
                   value={currentLift.sets}
-                  onChangeText={(text) => setCurrentLift({ ...currentLift, sets: text })}
+                  onChangeText={(text) => changeLift('sets', text)}
+                  error={errors.sets}
                   placeholder="3"
                   keyboardType="numeric"
                 />
@@ -252,7 +320,8 @@ export default function WorkoutSetupScreen() {
                 <ThemedText style={styles.smallLabel}>Reps</ThemedText>
                 <QuizInput
                   value={currentLift.reps}
-                  onChangeText={(text) => setCurrentLift({ ...currentLift, reps: text })}
+                  onChangeText={(text) => changeLift('reps', text)}
+                  error={errors.reps}
                   placeholder="10"
                   keyboardType="numeric"
                 />
@@ -264,6 +333,7 @@ export default function WorkoutSetupScreen() {
                     { backgroundColor: inputBg },
                   ]}
                   onPress={handleCancelEdit}
+                  disabled={busy}
                   accessibilityRole="button"
                   accessibilityLabel="Cancel edit"
                 >
@@ -274,10 +344,10 @@ export default function WorkoutSetupScreen() {
                 style={[
                   styles.addLiftButton,
                   { backgroundColor: tint },
-                  !currentLift.name.trim() && styles.addLiftButtonDisabled,
+                  busy && styles.addLiftButtonDisabled,
                 ]}
                 onPress={handleAddLift}
-                disabled={!currentLift.name.trim()}
+                disabled={busy}
                 accessibilityRole="button"
                 accessibilityLabel={editingIndex !== null ? 'Save exercise' : 'Add exercise'}
               >
@@ -302,6 +372,7 @@ export default function WorkoutSetupScreen() {
                 >
                   <TouchableOpacity
                     onPress={() => handleEditLift(index)}
+                    disabled={busy}
                     style={[
                       styles.liftItem,
                       { backgroundColor: secondaryBg },
@@ -309,14 +380,15 @@ export default function WorkoutSetupScreen() {
                     ]}
                     accessibilityRole="button"
                     accessibilityLabel={`Edit ${lift.name}`}
+                    accessibilityState={{ selected: editingIndex === index, disabled: busy }}
                   >
                     <View style={styles.liftInfo}>
                       <ThemedText style={styles.liftName}>{lift.name}</ThemedText>
                       {(lift.sets || lift.reps) && (
                         <ThemedText style={styles.liftDetails}>
-                          {lift.sets && `${lift.sets} sets`}
+                          {lift.sets && `${lift.sets} ${Number(lift.sets) === 1 ? 'set' : 'sets'}`}
                           {lift.sets && lift.reps && ' × '}
-                          {lift.reps && `${lift.reps} reps`}
+                          {lift.reps && `${lift.reps} ${Number(lift.reps) === 1 ? 'rep' : 'reps'}`}
                         </ThemedText>
                       )}
                     </View>
@@ -325,6 +397,7 @@ export default function WorkoutSetupScreen() {
                         e.stopPropagation();
                         handleRemoveLift(index);
                       }}
+                      disabled={busy}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${lift.name}`}
@@ -348,7 +421,7 @@ export default function WorkoutSetupScreen() {
   // Add more workouts screen
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/pr-values' as any)} />
+      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={handleBack} />
       <QuizContainer animationKey="addMore">
         <QuizQuestion
           question="Workout saved!"
@@ -374,6 +447,7 @@ export default function WorkoutSetupScreen() {
           <TouchableOpacity
             style={[styles.choiceButton, { backgroundColor: tint }]}
             onPress={handleAddAnother}
+            disabled={busy}
             accessibilityRole="button"
             accessibilityLabel="Add another workout"
           >
@@ -386,6 +460,7 @@ export default function WorkoutSetupScreen() {
               { backgroundColor: inputBg },
             ]}
             onPress={finishOnboarding}
+            disabled={busy}
             accessibilityRole="button"
             accessibilityLabel="Done, finish setup"
           >

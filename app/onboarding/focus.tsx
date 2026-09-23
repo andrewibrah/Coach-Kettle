@@ -9,6 +9,7 @@ import {
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
+import { ONBOARDING_ROUTES, resolvePreviousOnboardingRoute } from '@/lib/onboardingNavigation';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -71,18 +72,22 @@ export default function FocusScreen() {
     });
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/pr-lifts' as any);
+    router.push(ONBOARDING_ROUTES[5]);
   };
 
   const handleSkip = async () => {
     await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/pr-lifts' as any);
+    router.push(ONBOARDING_ROUTES[5]);
   };
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/goal-weight' as any)} />
+      <QuizProgress
+        currentStep={CURRENT_STEP}
+        totalSteps={TOTAL_STEPS}
+        onBack={() => router.dismissTo(resolvePreviousOnboardingRoute('/onboarding/focus'))}
+      />
 
       <QuizContainer
         animationKey="focus"

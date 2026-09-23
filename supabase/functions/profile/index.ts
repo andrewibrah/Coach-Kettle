@@ -12,6 +12,8 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 console.log("[profile] Init - URL:", supabaseUrl);
 // Log presence and length, but NOT the key itself for security
@@ -433,6 +435,57 @@ serve(async (req) => {
                     JSON.stringify({ ok: true }),
                     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                 );
+            }
+
+            // Atomic onboarding completion: one idempotent SQL transaction keyed by request_id.
+            // Runs as the caller (anon key + bearer) so auth.uid() owns every write.
+            if (action === "complete_onboarding_atomic") {
+                const json = (payload: unknown, status: number) => new Response(
+                    JSON.stringify(payload),
+                    { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+                const { request_id, payload } = body;
+                if (typeof request_id !== "string" || !UUID_PATTERN.test(request_id)
+                    || typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+                    return json({ error: "Invalid onboarding request", code: "ONBOARDING_INVALID_REQUEST" }, 400);
+                }
+
+                const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+                    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+                    auth: { autoRefreshToken: false, persistSession: false },
+                });
+                let data: unknown;
+                let error: { code?: string; message?: string } | null;
+                try {
+                    ({ data, error } = await userClient.rpc("complete_onboarding_atomic", {
+                        p_request_id: request_id,
+                        p_payload: payload,
+                    }));
+                } catch (rpcError) {
+                    console.error("[profile] Atomic onboarding transport error:", rpcError);
+                    return json({ error: "Internal server error" }, 500);
+                }
+
+                if (error) {
+                    // Conflict and validation share errcode 22023; the migration's messages disambiguate.
+                    if (error.code === "42501") return json({ error: "Unauthorized" }, 401);
+                    if (error.code === "22023" && error.message === "request ID payload conflict") {
+                        return json({ error: "This onboarding submission conflicts with an earlier one.", code: "ONBOARDING_REQUEST_CONFLICT" }, 409);
+                    }
+                    if (error.code === "22023" && error.message === "onboarding already completed; ambiguous new request") {
+                        return json({ error: "Onboarding is already complete.", code: "ONBOARDING_ALREADY_COMPLETED" }, 409);
+                    }
+                    if (error.code === "22023") {
+                        return json({ error: "Some onboarding answers are invalid.", code: "ONBOARDING_INVALID_PAYLOAD" }, 400);
+                    }
+                    console.error("[profile] Atomic onboarding failed:", error.code);
+                    return json({ error: "Internal server error" }, 500);
+                }
+                if (typeof data !== "object" || data === null) {
+                    console.error("[profile] Atomic onboarding returned no result");
+                    return json({ error: "Internal server error" }, 500);
+                }
+                return json({ ok: true, result: data }, 200);
             }
 
             return new Response(

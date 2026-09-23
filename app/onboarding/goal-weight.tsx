@@ -8,6 +8,14 @@ import {
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
+import { ONBOARDING_ROUTES, resolvePreviousOnboardingRoute } from '@/lib/onboardingNavigation';
+import {
+  formatWeight,
+  resolveWeightInput,
+  resolveWeightState,
+  switchWeightUnit,
+  WeightUnit,
+} from '@/lib/onboardingValidation';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -22,64 +30,67 @@ export default function GoalWeightScreen() {
   const { profile } = useProfile();
   const { draft, updateDraft } = useOnboarding();
 
-  // Inherit unit from current weight step (draft first, then profile)
-  const inheritedUnit = draft.weight_unit ?? profile?.weight_unit ?? 'lb';
-  const initialGoalWeight = draft.goal_weight ?? profile?.goal_weight;
+  // Draft first (explicit null stays cleared), then profile, in the shared weight unit
+  const stored = resolveWeightState(draft, profile);
 
-  const [value, setValue] = useState(initialGoalWeight?.toString() || '');
-  const [unit, setUnit] = useState<string>(inheritedUnit);
+  const [value, setValue] = useState(formatWeight(stored.goal_weight));
+  const [unit, setUnit] = useState<WeightUnit>(stored.weight_unit);
   const [error, setError] = useState('');
 
-  const validateWeight = (): boolean => {
-    const numValue = parseFloat(value);
-    if (!value.trim()) return true;
-
-    if (isNaN(numValue)) {
-      setError('Please enter a valid number');
-      return false;
+  // Switching units converts both stored weights and the shared unit together
+  const handleUnitChange = async (next: string) => {
+    const newUnit = next as WeightUnit;
+    if (newUnit === unit) return;
+    const result = switchWeightUnit({ ...stored, weight_unit: unit }, 'goal_weight', value, newUnit);
+    if (!result.valid) {
+      setError(result.errors.weight ?? 'Please enter a valid number');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
     }
-
-    if (unit === 'lb') {
-      if (numValue < 50 || numValue > 1000) {
-        setError('Please enter a weight between 50-1000 lbs');
-        return false;
-      }
-    } else {
-      if (numValue < 20 || numValue > 450) {
-        setError('Please enter a weight between 20-450 kg');
-        return false;
-      }
+    try {
+      await updateDraft(result.value.update);
+    } catch {
+      setError('Could not save your unit change. Please try again.');
+      return;
     }
-
+    setValue(result.value.display);
+    setUnit(newUnit);
     setError('');
-    return true;
   };
 
   const handleContinue = async () => {
-    if (!validateWeight()) {
+    const result = resolveWeightInput(value, stored.weight_unit === unit ? stored.goal_weight : null, unit);
+    if (!result.valid) {
+      setError(result.errors.weight ?? 'Please enter a valid number');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
-    // Save to draft (local) - no API call, instant navigation
+    // Save to draft (local) - no API call, instant navigation. The shared unit is always
+    // written so a stored weight is never left without a unit.
     await updateDraft({
-      goal_weight: value.trim() ? parseFloat(value) : null,
+      goal_weight: result.value,
+      weight_unit: unit,
       current_step: CURRENT_STEP,
     });
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/focus' as any);
+    router.push(ONBOARDING_ROUTES[4]);
   };
 
   const handleSkip = async () => {
     await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/focus' as any);
+    router.push(ONBOARDING_ROUTES[4]);
   };
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/current-weight' as any)} />
+      <QuizProgress
+        currentStep={CURRENT_STEP}
+        totalSteps={TOTAL_STEPS}
+        onBack={() => router.dismissTo(resolvePreviousOnboardingRoute('/onboarding/goal-weight'))}
+      />
 
       <QuizContainer
         animationKey="goal-weight"
@@ -104,7 +115,7 @@ export default function GoalWeightScreen() {
               setError('');
             }}
             unit={unit}
-            onChangeUnit={setUnit}
+            onChangeUnit={handleUnitChange}
             unitOptions={[
               { label: 'lbs', value: 'lb' },
               { label: 'kg', value: 'kg' },

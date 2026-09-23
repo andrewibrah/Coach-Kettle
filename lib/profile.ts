@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabaseUrl } from './supabase';
 import { fetchWithAuth } from './auth';
 import { FeatureGateError, parseFeatureGateError } from './entitlements';
+import type { OnboardingDraft } from './onboardingDraft';
 
 const PROFILE_CACHE_KEY = 'cached_profile';
 const API_BASE = `${supabaseUrl}/functions/v1`;
@@ -233,9 +234,11 @@ export async function completeOnboarding(userId: string): Promise<boolean> {
   }
 }
 
-// Batch onboarding data structure
-export interface BatchOnboardingData {
-  profile?: {
+// Wire contract of complete_onboarding_atomic (migration 20260909000100): all four
+// top-level keys are required; optional fields are omitted, never null, except
+// profile patch fields where null clears the stored column.
+export interface OnboardingCompletionPayload {
+  profile: {
     height_value?: number | null;
     height_unit?: 'cm' | 'in' | null;
     dob?: string | null;
@@ -245,57 +248,85 @@ export interface BatchOnboardingData {
     focus?: 'strength' | 'lean_muscle' | 'fat_loss' | 'other' | null;
     focus_other?: string | null;
   };
-  tracked_lifts?: string[];
-  pr_values?: {
-    lift_name: string;
-    weight_lbs: number;
-    reps: number;
-  }[];
-  workout_templates?: {
+  tracked_lifts: string[];
+  pr_values: { lift_name: string; weight_lbs: number; reps: number }[];
+  workout_templates: {
     name: string;
-    lifts: {
-      name: string;
-      sets: number;
-      reps: number;
-    }[];
+    items: { lift_name: string; target_sets: number; target_reps: number }[];
   }[];
 }
 
-// Batch save all onboarding data in a single call
-export async function batchSaveOnboarding(
-  userId: string,
-  data: BatchOnboardingData
-): Promise<{ ok: boolean; warnings?: string[]; error?: string }> {
+const PROFILE_PAYLOAD_KEYS = [
+  'height_value', 'height_unit', 'dob', 'current_weight',
+  'goal_weight', 'weight_unit', 'focus', 'focus_other',
+] as const;
 
-  try {
-    const response = await fetchWithAuth(`${API_BASE}/profile`, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'batch_onboarding',
-        profile: data.profile,
-        tracked_lifts: data.tracked_lifts,
-        pr_values: data.pr_values,
-        workout_templates: data.workout_templates,
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      console.error('[Profile] Batch onboarding failed:', result);
-      return { ok: false, error: result.error || 'Batch save failed' };
-    }
-
-    if (result.warnings && result.warnings.length > 0) {
-      console.warn('[Profile] Batch onboarding completed with warnings:', result.warnings);
-      return { ok: true, warnings: result.warnings };
-    }
-
-    return { ok: true };
-  } catch (error) {
-    console.error('[Profile] Error in batch onboarding:', error);
-    return { ok: false, error: 'Network error during batch save' };
+export function buildOnboardingCompletionPayload(draft: OnboardingDraft): OnboardingCompletionPayload {
+  const profile: Record<string, unknown> = {};
+  for (const key of PROFILE_PAYLOAD_KEYS) {
+    const value = draft[key];
+    if (value === undefined) continue;
+    // The SQL rejects blank strings; a blank answer means "clear".
+    profile[key] = typeof value === 'string' && !value.trim() ? null : value;
   }
+  return {
+    profile: profile as OnboardingCompletionPayload['profile'],
+    tracked_lifts: [...(draft.tracked_lifts ?? [])],
+    pr_values: (draft.pr_values ?? []).map(({ lift_name, weight_lbs, reps }) => ({ lift_name, weight_lbs, reps })),
+    workout_templates: (draft.workout_templates ?? []).map((template) => ({
+      name: template.name,
+      items: template.lifts.map((lift) => ({ lift_name: lift.name, target_sets: lift.sets, target_reps: lift.reps })),
+    })),
+  };
+}
+
+export interface OnboardingCompletionResult {
+  request_id: string;
+  onboarding_completed: true;
+  template_ids: string[];
+}
+
+export type CompleteOnboardingAtomicResponse =
+  | { ok: true; result: OnboardingCompletionResult }
+  | { ok: false; error: string; code?: string; retryable: boolean };
+
+// Success requires an explicit acknowledgement for this request; anything else keeps the draft.
+export async function completeOnboardingAtomic(
+  requestId: string,
+  payload: OnboardingCompletionPayload
+): Promise<CompleteOnboardingAtomicResponse> {
+  let response: Response;
+  try {
+    response = await fetchWithAuth(`${API_BASE}/profile`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'complete_onboarding_atomic', request_id: requestId, payload }),
+    });
+  } catch (error) {
+    console.error('[Profile] Network error completing onboarding:', error);
+    return { ok: false, error: 'Network error. Check your connection and try again.', retryable: true };
+  }
+
+  let body: any = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  const result = body?.result;
+  if (response.ok && body?.ok === true && body.warnings === undefined
+    && result?.onboarding_completed === true && result.request_id === requestId) {
+    return { ok: true, result };
+  }
+
+  console.error('[Profile] Onboarding completion not acknowledged:', response.status, body?.code);
+  const code = typeof body?.code === 'string' ? body.code : undefined;
+  const retryable = response.ok || response.status === 401 || response.status >= 500;
+  // Only our own stable codes carry user-facing text (e.g. not an old deploy's "Unknown action").
+  const error = typeof body?.error === 'string' && !retryable && code?.startsWith('ONBOARDING_')
+    ? body.error
+    : 'We couldn\'t save your profile. Please try again.';
+  return { ok: false, error, ...(code ? { code } : {}), retryable };
 }
 
 // Update onboarding step via Edge Function

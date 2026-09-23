@@ -10,6 +10,15 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
+import { ONBOARDING_ROUTES, resolvePreviousOnboardingRoute } from '@/lib/onboardingNavigation';
+import {
+  displayHeight,
+  heightForStorage,
+  heightToCanonical,
+  HeightUnit,
+  resolveHeightInput,
+  switchHeightUnit,
+} from '@/lib/onboardingValidation';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -24,9 +33,15 @@ export default function HeightScreen() {
   const { profile } = useProfile();
   const { draft, updateDraft } = useOnboarding();
 
-  // Prioritize draft, then profile
-  const initialUnit = draft.height_unit ?? profile?.height_unit ?? 'in';
-  const [unit, setUnit] = useState<string>(initialUnit);
+  // Prioritize draft (including an explicit null), then profile
+  const fromDraft = draft.height_value !== undefined;
+  const storedValue = fromDraft ? draft.height_value : profile?.height_value;
+  const storedUnit = (fromDraft ? draft.height_unit : profile?.height_unit) ?? null;
+  const initialUnit: HeightUnit = draft.height_unit ?? profile?.height_unit ?? 'in';
+  const [unit, setUnit] = useState<HeightUnit>(initialUnit);
+
+  // Unrounded canonical inches; inputs below only display it
+  const [canonical, setCanonical] = useState<number | null>(null);
 
   // Metric State
   const [cmValue, setCmValue] = useState('');
@@ -41,90 +56,68 @@ export default function HeightScreen() {
 
   // Initialize values from draft or profile
   useEffect(() => {
-    const heightValue = draft.height_value ?? profile?.height_value;
-    const heightUnit = draft.height_unit ?? profile?.height_unit;
+    const value = heightToCanonical(storedValue, storedUnit);
+    const shown = displayHeight(value, storedUnit ?? 'in');
+    setCanonical(value);
+    if (storedUnit) setUnit(storedUnit);
+    setCmValue(storedUnit === 'cm' ? shown.value : '');
+    setFeet(storedUnit === 'cm' ? '' : shown.feet);
+    setInches(storedUnit === 'cm' ? '' : shown.inches);
+  }, [storedValue, storedUnit]);
 
-    if (heightValue) {
-      if (heightUnit === 'cm') {
-        setCmValue(heightValue.toString());
-      } else {
-        const totalInches = heightValue;
-        setFeet(Math.floor(totalInches / 12).toString());
-        setInches(Math.round(totalInches % 12).toString());
-      }
+  const inputs = { unit, value: cmValue, feet, inches };
+  const firstError = (errors: Partial<Record<'feet' | 'inches' | 'height', string>>) =>
+    errors.height ?? errors.feet ?? errors.inches ?? 'Please enter a valid height';
+
+  const handleUnitChange = (next: string) => {
+    const newUnit = next as HeightUnit;
+    if (newUnit === unit) return;
+    const result = switchHeightUnit(inputs, canonical, newUnit);
+    if (!result.valid) {
+      setError(firstError(result.errors));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
     }
-  }, [draft.height_value, draft.height_unit, profile?.height_value, profile?.height_unit]);
-
-  const validateHeight = (): boolean => {
-    if (unit === 'cm') {
-      if (!cmValue.trim()) return true;
-      const val = parseFloat(cmValue);
-      if (isNaN(val) || val < 50 || val > 300) {
-        setError('Please enter a height between 50-300 cm');
-        return false;
-      }
-    } else {
-      if (!feet.trim() && !inches.trim()) return true;
-      const ft = parseFloat(feet || '0');
-      const inc = parseFloat(inches || '0');
-
-      if (isNaN(ft) || isNaN(inc)) {
-        setError('Invalid number');
-        return false;
-      }
-      // Total inches check (20 inches ~ 1.6ft, 120 inches ~ 10ft)
-      const total = (ft * 12) + inc;
-      if (total < 20 || total > 120) {
-        setError('Please enter a valid height');
-        return false;
-      }
-    }
-
+    setCanonical(result.value.canonical);
+    setCmValue(newUnit === 'cm' ? result.value.display.value : '');
+    setFeet(newUnit === 'in' ? result.value.display.feet : '');
+    setInches(newUnit === 'in' ? result.value.display.inches : '');
+    setUnit(newUnit);
     setError('');
-    return true;
   };
 
   const handleContinue = async () => {
-    if (!validateHeight()) {
+    const result = resolveHeightInput(inputs, canonical);
+    if (!result.valid) {
+      setError(firstError(result.errors));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
-    let finalValue: number | null = null;
-
-    if (unit === 'cm') {
-      if (cmValue.trim()) {
-        finalValue = parseFloat(cmValue);
-      }
-    } else {
-      if (feet.trim() || inches.trim()) {
-        const ft = parseFloat(feet || '0');
-        const inc = parseFloat(inches || '0');
-        finalValue = (ft * 12) + inc;
-      }
-    }
-
     // Save to draft (local) - no API call, instant navigation
     await updateDraft({
-      height_value: finalValue,
-      height_unit: finalValue !== null ? (unit as 'cm' | 'in') : null,
+      ...heightForStorage(result.value, unit),
       current_step: CURRENT_STEP,
     });
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/age' as any);
+    router.push(ONBOARDING_ROUTES[1]);
   };
 
   const handleSkip = async () => {
     // Just update step tracking in draft
     await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/age' as any);
+    router.push(ONBOARDING_ROUTES[1]);
   };
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/' as any)} />
+      <QuizProgress
+        currentStep={CURRENT_STEP}
+        totalSteps={TOTAL_STEPS}
+        onBack={() => router.dismissTo(resolvePreviousOnboardingRoute('/onboarding/height'))}
+      />
 
       <QuizContainer
         animationKey="height"
@@ -185,7 +178,7 @@ export default function HeightScreen() {
                 { label: 'cm', value: 'cm' },
               ]}
               selected={unit}
-              onSelect={setUnit}
+              onSelect={handleUnitChange}
             />
           </View>
         </View>

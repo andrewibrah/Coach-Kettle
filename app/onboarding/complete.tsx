@@ -5,7 +5,7 @@ import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -28,8 +28,12 @@ export default function CompleteScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const checkScale = useSharedValue(0);
+  // Auto-submit once per mount; callback identity changes (e.g. after the draft clears) must not resubmit.
+  const autoSubmitted = useRef(false);
 
   useEffect(() => {
+    if (autoSubmitted.current) return;
+    autoSubmitted.current = true;
     const saveData = async () => {
       const result = await batchSaveAndComplete();
 

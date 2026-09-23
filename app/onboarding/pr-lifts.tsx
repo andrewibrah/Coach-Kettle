@@ -8,11 +8,12 @@ import {
 } from '@/components/onboarding';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { ONBOARDING_ROUTES, resolvePreviousOnboardingRoute } from '@/lib/onboardingNavigation';
 import { fetchTrackedLifts } from '@/lib/profile';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TOTAL_STEPS = 8;
@@ -21,77 +22,115 @@ const CURRENT_STEP = 6;
 export default function PRLiftsScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { draft, updateDraft } = useOnboarding();
+  const { draft, draftLoading, updateDraft } = useOnboarding();
 
   // Initialize from draft
   const [lifts, setLifts] = useState<string[]>(draft.tracked_lifts || []);
+  const liftsRef = useRef(lifts);
+  const prValuesRef = useRef(draft.pr_values ?? []);
+  const writeQueue = useRef(Promise.resolve());
+  const finishing = useRef(false);
+  const fallbackGeneration = useRef(0);
 
-  // Load any previously selected lifts from DB if not in draft
+  // A hydrated draft, including an explicit empty selection, takes precedence.
   useEffect(() => {
-    const loadLifts = async () => {
-      // If we already have draft lifts, use those
-      if (draft.tracked_lifts && draft.tracked_lifts.length > 0) {
-        setLifts(draft.tracked_lifts);
-        return;
-      }
+    // Once edited locally, delayed draft echoes must not replace newer refs.
+    if (draftLoading || fallbackGeneration.current > 0) return;
+    prValuesRef.current = draft.pr_values ?? [];
+    if (draft.tracked_lifts !== undefined) {
+      liftsRef.current = draft.tracked_lifts;
+      setLifts(liftsRef.current);
+      return;
+    }
 
-      // Otherwise fetch from DB (for users resuming after previous sessions)
-      try {
-        if (session?.user?.id) {
-          const tracked = await fetchTrackedLifts(session.user.id);
-          if (tracked.length > 0) {
-            setLifts(tracked.map((t) => t.lift_name));
+    let active = true;
+    const generation = fallbackGeneration.current;
+    liftsRef.current = [];
+    setLifts(liftsRef.current);
+    const userId = session?.user?.id;
+    if (userId) {
+      fetchTrackedLifts(userId)
+        .then((tracked) => {
+          if (active && generation === fallbackGeneration.current) {
+            liftsRef.current = tracked.map((lift) => lift.lift_name);
+            setLifts(liftsRef.current);
           }
-        }
-      } catch (err) {
-        console.error('Error loading lifts:', err);
-      }
-    };
-    loadLifts();
-  }, [session?.user?.id, draft.tracked_lifts]);
+        })
+        .catch((err) => {
+          if (active && generation === fallbackGeneration.current) {
+            console.error('Error loading lifts:', err);
+          }
+        });
+    }
+    return () => { active = false; };
+  }, [draftLoading, session?.user?.id, draft.tracked_lifts, draft.pr_values]);
+
+  // Keep the queue usable after failures, while returning rejection to callers.
+  const enqueueWrite = (write: () => Promise<void>) => {
+    const pending = writeQueue.current.then(write);
+    writeQueue.current = pending.catch(() => {});
+    return pending;
+  };
+
+  const reportWriteError = (error: unknown) => {
+    console.error('Error saving lifts:', error);
+    Alert.alert('Unable to save lifts', 'Please try again before continuing.');
+  };
+
+  const persistSelection = () => {
+    const tracked_lifts = liftsRef.current;
+    const pr_values = prValuesRef.current;
+    void enqueueWrite(() => updateDraft({ tracked_lifts, pr_values })).catch(reportWriteError);
+  };
 
   const handleAddLift = (liftName: string) => {
-    if (!lifts.some((l) => l.toLowerCase() === liftName.toLowerCase())) {
-      const updated = [...lifts, liftName];
-      setLifts(updated);
-      // Also update draft so it persists if user navigates away
-      updateDraft({ tracked_lifts: updated });
+    if (draftLoading || finishing.current) return;
+    fallbackGeneration.current += 1;
+    if (!liftsRef.current.some((l) => l.toLowerCase() === liftName.toLowerCase())) {
+      liftsRef.current = [...liftsRef.current, liftName];
+      setLifts(liftsRef.current);
+      persistSelection();
     }
   };
 
   const handleRemoveLift = (liftName: string) => {
-    const updated = lifts.filter((l) => l !== liftName);
-    setLifts(updated);
-    // Also update draft
-    updateDraft({ tracked_lifts: updated });
+    if (draftLoading || finishing.current) return;
+    fallbackGeneration.current += 1;
+    liftsRef.current = liftsRef.current.filter((lift) => lift.toLowerCase() !== liftName.toLowerCase());
+    prValuesRef.current = prValuesRef.current.filter(
+      (pr) => pr.lift_name.toLowerCase() !== liftName.toLowerCase()
+    );
+    setLifts(liftsRef.current);
+    persistSelection();
   };
 
-  const handleContinue = async () => {
-    // Save lifts to draft (local) - no API call, instant navigation
-    await updateDraft({
-      tracked_lifts: lifts,
-      current_step: CURRENT_STEP,
-    });
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    // If lifts were added, go to pr-values to enter current PRs
-    if (lifts.length > 0) {
-      router.push('/onboarding/pr-values' as any);
-    } else {
-      router.push('/onboarding/workout-setup' as any);
+  const finish = async (skip: boolean) => {
+    if (draftLoading || finishing.current) return;
+    finishing.current = true;
+    fallbackGeneration.current += 1;
+    if (skip) liftsRef.current = [];
+    prValuesRef.current = prValuesRef.current.filter(
+      (pr) => liftsRef.current.some((lift) => lift.toLowerCase() === pr.lift_name.toLowerCase())
+    );
+    setLifts(liftsRef.current);
+    try {
+      // This final authoritative snapshot is persisted after all earlier edits.
+      await enqueueWrite(() => updateDraft({
+        tracked_lifts: liftsRef.current,
+        pr_values: prValuesRef.current,
+        current_step: CURRENT_STEP,
+      }));
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      router.push(liftsRef.current.length > 0 ? ONBOARDING_ROUTES[6] : ONBOARDING_ROUTES[7]);
+    } catch (error) {
+      reportWriteError(error);
+    } finally {
+      finishing.current = false;
     }
   };
 
-  const handleSkip = async () => {
-    // Clear tracked lifts and update step
-    await updateDraft({
-      tracked_lifts: [],
-      current_step: CURRENT_STEP,
-    });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/workout-setup' as any);
-  };
+  const handleContinue = () => finish(false);
+  const handleSkip = () => finish(true);
 
   // Filter out already added lifts from suggestions
   const availableSuggestions = ['Bench Press', 'Squat', 'Deadlift', 'Overhead Press', 'Barbell Row'].filter(
@@ -100,7 +139,7 @@ export default function PRLiftsScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/focus' as any)} />
+      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => { if (!draftLoading) router.dismissTo(resolvePreviousOnboardingRoute('/onboarding/pr-lifts')); }} />
 
       <KeyboardAvoidingView
         style={styles.keyboardView}

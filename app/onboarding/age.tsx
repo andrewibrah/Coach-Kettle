@@ -8,6 +8,8 @@ import {
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
+import { ONBOARDING_ROUTES, resolvePreviousOnboardingRoute } from '@/lib/onboardingNavigation';
+import { ageFromApproximateBirthDate, approximateBirthDate, validateAge } from '@/lib/onboardingValidation';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -22,43 +24,23 @@ export default function AgeScreen() {
   const { profile } = useProfile();
   const { draft, updateDraft } = useOnboarding();
 
-  // Calculate generic age from draft or profile DOB
-  const existingDob = draft.dob ?? profile?.dob;
-  const initialAge = existingDob
-    ? (new Date().getFullYear() - new Date(existingDob).getFullYear()).toString()
-    : '';
+  // Calculate generic age from draft or profile DOB; an explicit draft null stays cleared
+  const existingDob = draft.dob !== undefined ? draft.dob : profile?.dob;
+  const initialAge = ageFromApproximateBirthDate(existingDob, new Date().getFullYear());
 
   const [age, setAge] = useState(initialAge);
   const [error, setError] = useState('');
 
-  const validateAge = (): boolean => {
-    if (!age.trim()) return true; // Empty is valid (skip)
-
-    const val = parseInt(age, 10);
-    if (isNaN(val) || val < 13 || val > 120) {
-      setError('Please enter a valid age (13-120)');
-      return false;
-    }
-
-    setError('');
-    return true;
-  };
-
   const handleContinue = async () => {
-    if (!validateAge()) {
+    const result = validateAge(age);
+    if (!result.valid) {
+      setError(result.errors.age ?? 'Please enter a valid age (13-120)');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
-    let dob: string | null = null;
-
-    if (age.trim()) {
-      const ageNum = parseInt(age, 10);
-      const currentYear = new Date().getFullYear();
-      const birthYear = currentYear - ageNum;
-      // Set to approx date: Jan 1st of that year
-      dob = `${birthYear}-01-01`;
-    }
+    // Approximate date: Jan 1st of the birth year
+    const dob = result.value === null ? null : approximateBirthDate(result.value, new Date().getFullYear());
 
     // Save to draft (local) - no API call, instant navigation
     await updateDraft({
@@ -67,18 +49,22 @@ export default function AgeScreen() {
     });
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/current-weight' as any);
+    router.push(ONBOARDING_ROUTES[2]);
   };
 
   const handleSkip = async () => {
     await updateDraft({ current_step: CURRENT_STEP });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/onboarding/current-weight' as any);
+    router.push(ONBOARDING_ROUTES[2]);
   };
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <QuizProgress currentStep={CURRENT_STEP} totalSteps={TOTAL_STEPS} onBack={() => router.push('/onboarding/height' as any)} />
+      <QuizProgress
+        currentStep={CURRENT_STEP}
+        totalSteps={TOTAL_STEPS}
+        onBack={() => router.dismissTo(resolvePreviousOnboardingRoute('/onboarding/age'))}
+      />
 
       <QuizContainer
         animationKey="age"

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthProvider';
 import {
   UserProfile,
@@ -35,31 +35,43 @@ export const useProfile = () => useContext(ProfileContext);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const { session, loading: authLoading } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const ownerId = session?.user?.id;
+  const [profileState, setProfileState] = useState<{
+    ownerId: string | undefined;
+    profile: UserProfile | null;
+    loading: boolean;
+  }>({ ownerId, profile: null, loading: true });
+  const profile = profileState.ownerId === ownerId ? profileState.profile : null;
+  const profileLoading = profileState.ownerId === ownerId ? profileState.loading : true;
+  const activeOwnerId = useRef(ownerId);
+
+  useLayoutEffect(() => {
+    activeOwnerId.current = ownerId;
+  }, [ownerId]);
 
   // Fetch or create profile when session changes
   useEffect(() => {
     let isMounted = true;
 
     const loadProfile = async () => {
-      if (!session?.user?.id) {
-        setProfile(null);
-        setProfileLoading(false);
+      if (!ownerId) {
+        setProfileState({ ownerId, profile: null, loading: false });
         return;
       }
 
-      setProfileLoading(true);
+      setProfileState({ ownerId, profile: null, loading: true });
       try {
-        const userProfile = await ensureProfile(session.user.id);
-        if (isMounted) {
-          setProfile(userProfile);
+        const userProfile = await ensureProfile(ownerId);
+        if (isMounted && activeOwnerId.current === ownerId) {
+          setProfileState({ ownerId, profile: userProfile, loading: true });
         }
       } catch (error) {
         console.error('[ProfileContext] Error loading profile:', error);
       } finally {
-        if (isMounted) {
-          setProfileLoading(false);
+        if (isMounted && activeOwnerId.current === ownerId) {
+          setProfileState((current) => current.ownerId === ownerId
+            ? { ...current, loading: false }
+            : current);
         }
       }
     };
@@ -71,41 +83,58 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [session?.user?.id, authLoading]);
+  }, [ownerId, authLoading]);
 
   // Refresh profile data
   const refreshProfile = useCallback(async () => {
-    if (!session?.user?.id) return;
+    if (!ownerId) return;
 
     try {
-      const userProfile = await fetchProfile(session.user.id);
-      setProfile(userProfile);
+      const userProfile = await fetchProfile(ownerId);
+      if (activeOwnerId.current === ownerId) {
+        setProfileState((current) => ({
+          ownerId,
+          profile: userProfile,
+          loading: current.ownerId === ownerId ? current.loading : false,
+        }));
+      }
     } catch (error) {
       console.error('[ProfileContext] Error refreshing profile:', error);
     }
-  }, [session?.user?.id]);
+  }, [ownerId]);
 
   // Update profile fields (creates profile if it doesn't exist)
   const updateProfile = useCallback(
     async (updates: Partial<UserProfile>): Promise<boolean> => {
-      if (!session?.user?.id) return false;
+      if (!ownerId) return false;
 
       try {
         // Ensure profile exists before updating
         if (!profile) {
-          const newProfile = await ensureProfile(session.user.id);
+          const newProfile = await ensureProfile(ownerId);
           if (!newProfile) {
             console.error('[ProfileContext] Failed to create profile');
             return false;
           }
-          setProfile(newProfile);
+          if (activeOwnerId.current !== ownerId) return false;
+          setProfileState((current) => ({
+            ownerId,
+            profile: newProfile,
+            loading: current.ownerId === ownerId ? current.loading : false,
+          }));
         }
 
-        const updated = await updateProfileApi(session.user.id, updates);
+        const updated = await updateProfileApi(ownerId, updates);
         if (updated) {
-          setProfile(updated);
+          if (activeOwnerId.current !== ownerId) return false;
+          setProfileState((current) => ({
+            ownerId,
+            profile: updated,
+            loading: current.ownerId === ownerId ? current.loading : false,
+          }));
           // Refresh AI context when profile changes
-          await refreshAIContext(session.user.id);
+          await refreshAIContext(ownerId);
+          if (activeOwnerId.current !== ownerId) return true;
           // Invalidate API cache so next AI call gets fresh data
           invalidateProfileCache();
           return true;
@@ -116,17 +145,19 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [session?.user?.id, profile]
+    [ownerId, profile]
   );
 
   // Complete onboarding
   const completeOnboarding = useCallback(async (): Promise<boolean> => {
-    if (!session?.user?.id) return false;
+    if (!ownerId) return false;
 
     try {
-      const success = await completeOnboardingApi(session.user.id);
+      const success = await completeOnboardingApi(ownerId);
       if (success) {
+        if (activeOwnerId.current !== ownerId) return true;
         await refreshProfile();
+        if (activeOwnerId.current !== ownerId) return true;
         // Invalidate API cache so next AI call gets fresh data
         invalidateProfileCache();
         return true;
@@ -136,17 +167,22 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       console.error('[ProfileContext] Error completing onboarding:', error);
       return false;
     }
-  }, [session?.user?.id, refreshProfile]);
+  }, [ownerId, refreshProfile]);
 
   // Update onboarding step
   const updateOnboardingStep = useCallback(
     async (step: number): Promise<boolean> => {
-      if (!session?.user?.id) return false;
+      if (!ownerId) return false;
 
       try {
-        const success = await updateOnboardingStepApi(session.user.id, step);
-        if (success) {
-          setProfile((prev) => (prev ? { ...prev, onboarding_step: step } : null));
+        const success = await updateOnboardingStepApi(ownerId, step);
+        if (success && activeOwnerId.current === ownerId) {
+          setProfileState((current) => current.ownerId === ownerId
+            ? {
+              ...current,
+              profile: current.profile ? { ...current.profile, onboarding_step: step } : null,
+            }
+            : current);
           return true;
         }
         return false;
@@ -155,7 +191,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [session?.user?.id]
+    [ownerId]
   );
 
   // Determine if user needs onboarding

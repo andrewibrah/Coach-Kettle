@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { resolveOnboardingRoute } from '@/lib/onboardingNavigation';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -15,21 +16,18 @@ export default function OnboardingWelcome() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const placeholder = useThemeColor({}, 'placeholder');
-  const { profile } = useProfile();
-  const { draft, skipOnboarding } = useOnboarding();
+  const { profile, profileLoading } = useProfile();
+  const { draft, draftLoading, skipOnboarding } = useOnboarding();
   const [skipping, setSkipping] = useState(false);
+  const loading = draftLoading || profileLoading;
 
   const handleGetStarted = () => {
+    if (loading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Resume from where user left off if they previously started (check draft first, then profile)
-    const step = draft.current_step ?? profile?.onboarding_step ?? 0;
-    const routes = ['height', 'age', 'current-weight', 'goal-weight', 'focus', 'pr-lifts', 'pr-values', 'workout-setup'];
-
-    if (step > 0 && step < routes.length) {
-      router.push(`/onboarding/${routes[step]}` as any);
-    } else {
-      router.push('/onboarding/height' as any);
-    }
+    const resumeDraft = draft.current_step === undefined
+      ? { ...draft, current_step: profile?.onboarding_step }
+      : draft;
+    router.push(resolveOnboardingRoute(resumeDraft, profile));
   };
 
   const handleSkip = async () => {
@@ -39,7 +37,7 @@ export default function OnboardingWelcome() {
     const result = await skipOnboarding();
 
     if (result.success) {
-      router.replace('/(tabs)' as any);
+      router.replace('/(tabs)');
     } else {
       console.error('Failed to skip onboarding:', result.error);
       setSkipping(false);
@@ -60,13 +58,18 @@ export default function OnboardingWelcome() {
         </View>
 
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: tint }]}
+          style={[styles.button, { backgroundColor: tint }, loading && styles.buttonDisabled]}
           onPress={handleGetStarted}
+          disabled={loading}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Get Started"
         >
-          <ThemedText style={[styles.buttonText, { color: onTint }]}>Get Started</ThemedText>
+          {loading ? (
+            <ActivityIndicator size="small" color={onTint} />
+          ) : (
+            <ThemedText style={[styles.buttonText, { color: onTint }]}>Get Started</ThemedText>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -132,6 +135,9 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.65,
   },
   skipButton: {
     marginTop: 20,
