@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { getExerciseBySlug } from '@/lib/exerciseLibrary';
+import { formatExerciseName, formatTerm, formatTermList } from '@/lib/exerciseFormat';
 import type { Exercise } from '@/types/exercise';
 
 // Media licensing is contested — ship text-only until a licensed media set exists.
@@ -77,6 +78,13 @@ export default function ExerciseDetailScreen() {
   const rawEn = exercise.instructions?.en;
   const instructionsEn = Array.isArray(rawEn) ? rawEn.join('\n') : (rawEn ?? null);
 
+  // The dataset lists some muscles as both primary and secondary. Repeating them
+  // reads as a data error, so a muscle already shown as primary is dropped here.
+  const primaryKeys = new Set(exercise.primary_muscles.map((m) => m.toLowerCase().trim()));
+  const secondaryMuscles = exercise.secondary_muscles.filter(
+    (m) => !primaryKeys.has(m.toLowerCase().trim())
+  );
+
   // Media (GIF) is licensing-contested — default OFF, only media_id is stored.
   const gifUrl = SHOW_EXERCISE_MEDIA && exercise.media_id
     ? `https://static.exercisedb.dev/media/${exercise.media_id}.gif`
@@ -84,29 +92,29 @@ export default function ExerciseDetailScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
-      <ScreenHeader title={exercise.name} />
+      <ScreenHeader title={formatExerciseName(exercise.name)} />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
         {gifUrl && (
           <Image
             source={{ uri: gifUrl }}
             style={styles.media}
             resizeMode="contain"
-            accessibilityLabel={`${exercise.name} demonstration`}
+            accessibilityLabel={`${formatExerciseName(exercise.name)} demonstration`}
           />
         )}
         <View style={[styles.card, { backgroundColor: cardBackground }]}>
           <ThemedText style={styles.cardTitle}>Overview</ThemedText>
           <ThemedText style={[styles.row, { color: textColor }]}>
-            Body part: {exercise.body_part}
+            Body part: {formatTerm(exercise.body_part)}
           </ThemedText>
           <ThemedText style={[styles.row, { color: textColor }]}>
-            Category: {exercise.category}
+            Category: {formatTerm(exercise.category)}
           </ThemedText>
           <ThemedText style={[styles.row, { color: textColor }]}>
-            Difficulty: {exercise.difficulty}
+            Difficulty: {formatTerm(exercise.difficulty)}
           </ThemedText>
           <ThemedText style={[styles.row, { color: textColor }]}>
-            Equipment: {exercise.equipment.length > 0 ? exercise.equipment.join(', ') : '—'}
+            Equipment: {formatTermList(exercise.equipment)}
           </ThemedText>
         </View>
 
@@ -117,45 +125,37 @@ export default function ExerciseDetailScreen() {
           </ThemedText>
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardBackground }]}>
-          <ThemedText style={styles.cardTitle}>Cues</ThemedText>
-          {exercise.cues.length === 0 ? (
-            <ThemedText style={[styles.muted, { color: placeholder }]}>
-              No cues available.
-            </ThemedText>
-          ) : (
-            exercise.cues.map((c, i) => (
+        {exercise.cues.length > 0 && (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText style={styles.cardTitle}>Cues</ThemedText>
+            {exercise.cues.map((c, i) => (
               <View key={i} style={styles.bulletRow}>
                 <ThemedText style={[styles.bullet, { color: textColor }]}>•</ThemedText>
                 <ThemedText style={[styles.bulletText, { color: textColor }]}>{c}</ThemedText>
               </View>
-            ))
-          )}
-        </View>
+            ))}
+          </View>
+        )}
 
-        <View style={[styles.card, { backgroundColor: cardBackground }]}>
-          <ThemedText style={styles.cardTitle}>Common mistakes</ThemedText>
-          {exercise.common_mistakes.length === 0 ? (
-            <ThemedText style={[styles.muted, { color: placeholder }]}>
-              No common mistakes listed.
-            </ThemedText>
-          ) : (
-            exercise.common_mistakes.map((m, i) => (
+        {exercise.common_mistakes.length > 0 && (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText style={styles.cardTitle}>Common mistakes</ThemedText>
+            {exercise.common_mistakes.map((m, i) => (
               <View key={i} style={styles.bulletRow}>
                 <ThemedText style={[styles.bullet, { color: textColor }]}>•</ThemedText>
                 <ThemedText style={[styles.bulletText, { color: textColor }]}>{m}</ThemedText>
               </View>
-            ))
-          )}
-        </View>
+            ))}
+          </View>
+        )}
 
         <View style={[styles.card, { backgroundColor: cardBackground }]}>
           <ThemedText style={styles.cardTitle}>Muscles worked</ThemedText>
           <ThemedText style={[styles.row, { color: textColor }]}>
-            Primary: {exercise.primary_muscles.length > 0 ? exercise.primary_muscles.join(', ') : '—'}
+            Primary: {formatTermList(exercise.primary_muscles)}
           </ThemedText>
           <ThemedText style={[styles.row, { color: textColor }]}>
-            Secondary: {exercise.secondary_muscles.length > 0 ? exercise.secondary_muscles.join(', ') : '—'}
+            Secondary: {formatTermList(secondaryMuscles)}
           </ThemedText>
         </View>
 

@@ -40,9 +40,35 @@ const GOALS: { v: 'muscle_building' | 'leaning_out' | 'weight_loss' | 'maintenan
   { v: 'endurance', label: 'Endurance' },
 ];
 
-const PREFS = ['vegetarian', 'vegan', 'pescatarian', 'gluten_free', 'dairy_free', 'low_carb', 'keto'];
-const ALLERGIES = ['peanut', 'tree_nut', 'shellfish', 'egg', 'soy', 'gluten', 'dairy'];
-const CUISINES = ['mediterranean', 'asian', 'mexican', 'italian', 'american', 'indian'];
+const PREFS = ['vegetarian', 'vegan', 'pescatarian', 'gluten_free', 'dairy_free', 'low_carb', 'keto'] as const;
+const ALLERGIES = ['peanut', 'tree_nut', 'shellfish', 'egg', 'soy', 'gluten', 'dairy'] as const;
+const CUISINES = ['mediterranean', 'asian', 'mexican', 'italian', 'american', 'indian'] as const;
+
+type PreferenceValue = typeof PREFS[number] | typeof ALLERGIES[number] | typeof CUISINES[number];
+
+// Display labels only; selections and profile writes keep the enum values above.
+const PREFERENCE_LABELS: Record<PreferenceValue, string> = {
+  vegetarian: 'Vegetarian',
+  vegan: 'Vegan',
+  pescatarian: 'Pescatarian',
+  gluten_free: 'Gluten-Free',
+  dairy_free: 'Dairy-Free',
+  low_carb: 'Low-Carb',
+  keto: 'Keto',
+  peanut: 'Peanut',
+  tree_nut: 'Tree Nut',
+  shellfish: 'Shellfish',
+  egg: 'Egg',
+  soy: 'Soy',
+  gluten: 'Gluten',
+  dairy: 'Dairy',
+  mediterranean: 'Mediterranean',
+  asian: 'Asian',
+  mexican: 'Mexican',
+  italian: 'Italian',
+  american: 'American',
+  indian: 'Indian',
+};
 
 export default function NutritionPreferencesScreen() {
   const { profile, updateProfile } = useProfile();
@@ -136,11 +162,11 @@ export default function NutritionPreferencesScreen() {
     </Pressable>
   );
 
-  const renderToggleGroup = (title: string, list: string[], values: string[], setter: (v: string[]) => void) => (
+  const renderToggleGroup = (title: string, list: readonly PreferenceValue[], values: string[], setter: (v: string[]) => void) => (
     <View style={[styles.card, { backgroundColor: cardBg }]}>
       <ThemedText type="subtitle">{title}</ThemedText>
       <View style={styles.pillRow}>
-        {list.map((v) => pill(v.replace(/_/g, ' '), values.includes(v), () => toggleIn(values, setter, v)))}
+        {list.map((v) => pill(PREFERENCE_LABELS[v], values.includes(v), () => toggleIn(values, setter, v)))}
       </View>
     </View>
   );
