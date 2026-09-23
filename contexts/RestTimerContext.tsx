@@ -1,5 +1,5 @@
 // RestTimerContext — wraps `useRestTimer` once so both the trigger code
-// (workout screen) and the display chip (`RestTimerBar`) share the same state.
+// (workout screen) and the display chip (`RestTimerToast`) share the same state.
 
 import React, { createContext, useContext } from 'react';
 import { useRestTimer } from '@/hooks/useRestTimer';

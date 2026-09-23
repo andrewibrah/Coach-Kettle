@@ -52,6 +52,7 @@ async function getPrefs(userId: string) {
     user_id: userId,
     permission_granted: false,
     rest_timer_enabled: true,
+    auto_start_rest_timer: false,
     workout_reminder_enabled: true,
     workout_reminder_hour: 8,
     workout_reminder_minute: 0,
@@ -171,7 +172,8 @@ serve(async (req) => {
       if (action === "update_prefs") {
         const allowed = [
           "permission_granted",
-          "rest_timer_enabled", "workout_reminder_enabled", "workout_reminder_hour", "workout_reminder_minute",
+          "rest_timer_enabled", "auto_start_rest_timer",
+          "workout_reminder_enabled", "workout_reminder_hour", "workout_reminder_minute",
           "nutrition_midday_enabled", "nutrition_midday_hour", "daily_feedback_enabled", "daily_feedback_hour",
           "pr_celebration_enabled", "streak_milestones_enabled", "harshness_escalation_enabled",
           "meal_plan_enabled", "weekly_recalibration_enabled", "body_weight_reminder_enabled",

@@ -13,6 +13,7 @@ import {
   reconcileScheduledNotifications,
   sendTestPush as sendTestPushApi,
 } from '@/lib/notifications';
+import { resolveTrainingDays } from '@/lib/trainingSchedule';
 import type { NotificationPreferences } from '@/types/notifications';
 
 interface NotificationsContextValue {
@@ -38,10 +39,6 @@ const NotificationsContext = createContext<NotificationsContextValue>({
 });
 
 export const useNotifications = () => useContext(NotificationsContext);
-
-const TRAINING_DAY_MAP: Record<number, number[]> = {
-  1: [3], 2: [1, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6],
-};
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
@@ -80,11 +77,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!prefs) return;
     const dpw = Number(profile?.training_days_per_week ?? 0);
-    const trainingDays = TRAINING_DAY_MAP[dpw] ?? [];
+    const trainingDays = resolveTrainingDays(dpw, profile?.training_days);
     reconcileScheduledNotifications(prefs, trainingDays).catch((e) =>
       console.warn('[NotificationsProvider] reconcile error', e)
     );
-  }, [prefs, profile?.training_days_per_week]);
+  }, [prefs, profile?.training_days_per_week, profile?.training_days]);
 
   const requestPermission = useCallback(async () => {
     const result = await requestPermissionsAndRegisterToken();
@@ -108,9 +105,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const reschedule = useCallback(async () => {
     if (!prefs) return;
     const dpw = Number(profile?.training_days_per_week ?? 0);
-    const trainingDays = TRAINING_DAY_MAP[dpw] ?? [];
+    const trainingDays = resolveTrainingDays(dpw, profile?.training_days);
     await reconcileScheduledNotifications(prefs, trainingDays);
-  }, [prefs, profile?.training_days_per_week]);
+  }, [prefs, profile?.training_days_per_week, profile?.training_days]);
 
   const value = useMemo<NotificationsContextValue>(() => ({
     loading,

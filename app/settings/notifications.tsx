@@ -121,15 +121,15 @@ export default function NotificationsSettingsScreen() {
             <ThemedText type="subtitle">Reminder times</ThemedText>
             <View style={styles.row}>
               <ThemedText style={{ flex: 1 }}>Workout reminder</ThemedText>
-              <Stepper value={prefs.workout_reminder_hour} onDec={() => adjustHour('workout_reminder_hour', -1)} onInc={() => adjustHour('workout_reminder_hour', 1)} suffix=":00" tint={tint} />
+              <Stepper value={prefs.workout_reminder_hour} onDec={() => adjustHour('workout_reminder_hour', -1)} onInc={() => adjustHour('workout_reminder_hour', 1)} suffix=":00" tint={tint} label="workout reminder hour" />
             </View>
             <View style={styles.row}>
               <ThemedText style={{ flex: 1 }}>Mid-day check</ThemedText>
-              <Stepper value={prefs.nutrition_midday_hour} onDec={() => adjustHour('nutrition_midday_hour', -1)} onInc={() => adjustHour('nutrition_midday_hour', 1)} suffix=":00" tint={tint} />
+              <Stepper value={prefs.nutrition_midday_hour} onDec={() => adjustHour('nutrition_midday_hour', -1)} onInc={() => adjustHour('nutrition_midday_hour', 1)} suffix=":00" tint={tint} label="midday nutrition reminder hour" />
             </View>
             <View style={styles.row}>
               <ThemedText style={{ flex: 1 }}>Daily coach report</ThemedText>
-              <Stepper value={prefs.daily_feedback_hour} onDec={() => adjustHour('daily_feedback_hour', -1)} onInc={() => adjustHour('daily_feedback_hour', 1)} suffix=":00" tint={tint} />
+              <Stepper value={prefs.daily_feedback_hour} onDec={() => adjustHour('daily_feedback_hour', -1)} onInc={() => adjustHour('daily_feedback_hour', 1)} suffix=":00" tint={tint} label="daily feedback hour" />
             </View>
           </View>
         )}
@@ -149,9 +149,33 @@ export default function NotificationsSettingsScreen() {
                   onValueChange={setToggle(key)}
                   trackColor={{ true: tint, false: undefined }}
                   disabled={!permissionGranted}
+                  accessibilityLabel={label}
+                  accessibilityHint={description}
+                  accessibilityState={{ disabled: !permissionGranted }}
                 />
               </View>
             ))}
+          </View>
+        )}
+
+        {/* Rest timer behavior — not a push toggle, so not gated on notification permission. */}
+        {prefs && (
+          <View style={[styles.card, { backgroundColor: cardBg }]}>
+            <View style={styles.row}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <ThemedText style={{ fontWeight: '600' }}>Auto-start rest timer</ThemedText>
+                <ThemedText style={{ color: subtle, fontSize: 12, marginTop: 2 }}>
+                  Start resting the moment you log a set. When off, you get a &ldquo;Start Rest&rdquo; prompt instead.
+                </ThemedText>
+              </View>
+              <Switch
+                value={Boolean(prefs.auto_start_rest_timer)}
+                onValueChange={setToggle('auto_start_rest_timer')}
+                trackColor={{ true: tint, false: undefined }}
+                accessibilityLabel="Auto-start rest timer"
+                accessibilityHint="Start resting the moment you log a set"
+              />
+            </View>
           </View>
         )}
 
@@ -161,14 +185,31 @@ export default function NotificationsSettingsScreen() {
   );
 }
 
-function Stepper({ value, onDec, onInc, suffix, tint }: { value: number; onDec: () => void; onInc: () => void; suffix?: string; tint: string }) {
+function Stepper({ value, onDec, onInc, suffix, tint, label }: { value: number; onDec: () => void; onInc: () => void; suffix?: string; tint: string; label: string }) {
+  const display = `${value.toString().padStart(2, '0')}${suffix ?? ''}`;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Pressable onPress={onDec} style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Decrease">
+      {/* Labels name the setting being changed: three identical "Decrease"/"Increase"
+          pairs are indistinguishable to VoiceOver on this screen. */}
+      <Pressable
+        onPress={onDec}
+        hitSlop={8}
+        style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]}
+        accessibilityRole="button"
+        accessibilityLabel={`Decrease ${label}`}
+        accessibilityValue={{ text: display }}
+      >
         <ThemedText style={{ color: tint, fontSize: 18, fontWeight: '700' }}>−</ThemedText>
       </Pressable>
-      <ThemedText style={{ minWidth: 50, textAlign: 'center', fontWeight: '600' }}>{value.toString().padStart(2, '0')}{suffix ?? ''}</ThemedText>
-      <Pressable onPress={onInc} style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Increase">
+      <ThemedText style={{ minWidth: 50, textAlign: 'center', fontWeight: '600' }} accessibilityLabel={`${label} is ${display}`}>{display}</ThemedText>
+      <Pressable
+        onPress={onInc}
+        hitSlop={8}
+        style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]}
+        accessibilityRole="button"
+        accessibilityLabel={`Increase ${label}`}
+        accessibilityValue={{ text: display }}
+      >
         <ThemedText style={{ color: tint, fontSize: 18, fontWeight: '700' }}>+</ThemedText>
       </Pressable>
     </View>
@@ -183,5 +224,6 @@ const styles = StyleSheet.create({
   btn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
   btnGhost: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
   btnText: { fontWeight: '700' },
-  stepBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  // 44x44 is this release's practical minimum target (was 32x32).
+  stepBtn: { width: 44, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 });

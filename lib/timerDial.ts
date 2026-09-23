@@ -32,6 +32,21 @@ export function timerOffsetToSeconds(offset: number, tickWidth = TIMER_DIAL.tick
   return snapTimerSeconds(TIMER_DIAL.minSec + index * TIMER_DIAL.stepSec);
 }
 
+/**
+ * Horizontal padding the dial's tick strip needs so that the tick for the
+ * selected value lands under the centre indicator.
+ *
+ * MUST be derived from the width of the TRACK the indicator is positioned in
+ * (`left: '50%'`), never from the window width: the dial card is inset from
+ * the screen edge (screen padding + its own border), so window-derived padding
+ * shifts every tick right of the indicator by that inset — a constant,
+ * silent lie between the number shown and the tick it points at.
+ */
+export function computeDialPadding(trackWidth: number, tickWidth = TIMER_DIAL.tickWidth): number {
+  if (!Number.isFinite(trackWidth) || trackWidth <= 0) return 0;
+  return Math.max(0, trackWidth / 2 - tickWidth / 2);
+}
+
 export function buildTimerTicks(): number[] {
   const ticks: number[] = [];
   for (let seconds = TIMER_DIAL.minSec; seconds <= TIMER_DIAL.maxSec; seconds += TIMER_DIAL.stepSec) {

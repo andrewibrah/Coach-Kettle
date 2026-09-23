@@ -40,6 +40,31 @@ export function suggestRestSeconds(h: IntensityHints): number {
   return 60;
 }
 
+/**
+ * Decide what should happen after a set is logged (#3): auto-start the rest
+ * timer immediately (today's behavior, opt-in via Settings), or surface a
+ * dismissible "Start Rest" prompt instead. Pure so both call sites in the
+ * workout screen — and the "no auto-start when off" regression test — share
+ * one decision instead of duplicating the branch.
+ */
+export function decideRestTimerAction(autoStartEnabled: boolean): 'start' | 'prompt' {
+  return autoStartEnabled ? 'start' : 'prompt';
+}
+
+/**
+ * True only for a genuine running -> done transition (#8). A timer
+ * rehydrated from storage already in the 'done' state (app relaunched
+ * after the rest period elapsed) must NOT re-fire completion side effects
+ * (haptic, notification) — this is the single gate `useRestTimer` checks
+ * before firing either one, so exactly one haptic fires per real completion.
+ */
+export function isGenuineRestCompletion(
+  prevKind: RestTimerState['kind'],
+  nextKind: RestTimerState['kind'],
+): boolean {
+  return prevKind === 'running' && nextKind === 'done';
+}
+
 export function startTimer(durationSec: number, opts: { setNumber?: number; exercise?: string } = {}): RestTimerState {
   const safe = Math.min(Math.max(Math.round(durationSec), 5), 600);
   return { kind: 'running', endsAt: Date.now() + safe * 1000, durationSec: safe, ...opts };

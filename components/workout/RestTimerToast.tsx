@@ -7,7 +7,6 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, usePathname, type Href } from 'expo-router';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/ui/themed-text';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -40,20 +39,25 @@ export function RestTimerToast() {
   useEffect(() => {
     if (state.kind === 'done') {
       setDoneVisible(true);
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-          () => undefined,
-        );
-      }
+      // Completion haptic now fires once, from useRestTimer's guarded
+      // running -> done transition (#8) — not from every render that
+      // observes a 'done' state (which would also fire on hydration).
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-      dismissTimerRef.current = setTimeout(() => setDoneVisible(false), AUTO_DISMISS_MS);
+      dismissTimerRef.current = setTimeout(() => {
+        setDoneVisible(false);
+        // Return the shared state machine to idle, not just hide the card —
+        // otherwise it's stuck in 'done' for the rest of the session, and
+        // the #3 "Start Rest" prompt (gated on state.kind === 'idle') never
+        // shows again after the first completed timer.
+        cancel();
+      }, AUTO_DISMISS_MS);
     } else {
       setDoneVisible(false);
     }
     return () => {
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
-  }, [state.kind]);
+  }, [state.kind, cancel]);
 
   // Hide the overlay entirely while the user is already on the Timer tab.
   const onTimerScreen = pathname?.endsWith('/timer');

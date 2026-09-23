@@ -1,9 +1,11 @@
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useContext } from "react";
 import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 
 import * as Haptics from "expo-haptics";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useLargeTextLayout } from "@/hooks/useLargeTextLayout";
 
 
 
@@ -70,9 +72,18 @@ export function WorkoutBottomBar({
   };
 
   const insets = useSafeAreaInsets();
+  // When a bottom tab bar is present it already covers the home-indicator inset.
+  // Adding insets.bottom again double-counts it and squeezes the content area.
+  const tabBarHeight = useContext(BottomTabBarHeightContext);
+  const bottomPadding = (tabBarHeight && tabBarHeight > 0 ? 0 : insets.bottom) + 10;
+
+  // Layout adapts to Dynamic Type; the field stays single-line so the keyboard
+  // keeps its "send" return key (multiline would swap it for a newline key and
+  // break the primary logging flow at accessibility sizes).
+  const { isHugeText, scaleSpace } = useLargeTextLayout();
 
   return (
-    <View style={[styles.bottomWrap, { paddingBottom: insets.bottom + 10 }]}>
+    <View style={[styles.bottomWrap, { paddingBottom: bottomPadding }]}>
       {/* Clear Button - Top Right */}
 
 
@@ -93,7 +104,9 @@ export function WorkoutBottomBar({
           style={[
             styles.input,
             styles.messageInput,
-            { color: textColor, backgroundColor: inputBg, borderColor: borderColor }
+            { color: textColor, backgroundColor: inputBg, borderColor: borderColor },
+            // Grow the field with Dynamic Type so large text is not clipped.
+            { minHeight: scaleSpace(44) },
           ]}
           returnKeyType="send"
           onSubmitEditing={handleSend}
@@ -101,14 +114,16 @@ export function WorkoutBottomBar({
         />
       </View>
 
-      <View style={styles.bottomButtons}>
+      <View style={[styles.bottomButtons, isHugeText && styles.bottomButtonsStacked]}>
         <Pressable
           onPress={workoutActive ? handleEndWorkout : handleStartWorkout}
           accessibilityRole="button"
           accessibilityLabel={workoutActive ? "End workout" : "Start workout"}
+          accessibilityHint={workoutActive ? "Finishes and saves this session" : "Begins a new workout session"}
           style={({ pressed }) => [
             styles.pillButton,
-            { backgroundColor: textColor, borderColor: textColor },
+            { backgroundColor: textColor, borderColor: textColor, minHeight: scaleSpace(44) },
+            isHugeText && styles.pillButtonStacked,
             workoutActive && { backgroundColor: dangerColor, borderColor: dangerColor },
             pressed && styles.pillPressed,
           ]}
@@ -123,9 +138,11 @@ export function WorkoutBottomBar({
           accessibilityRole="button"
           accessibilityLabel="Send set"
           accessibilityState={{ disabled: disabledSend }}
+          accessibilityHint="Logs the set you typed above"
           style={({ pressed }) => [
             styles.pillButton,
-            { backgroundColor: textColor, borderColor: textColor },
+            { backgroundColor: textColor, borderColor: textColor, minHeight: scaleSpace(44) },
+            isHugeText && styles.pillButtonStacked,
             disabledSend && styles.pillDisabled,
             pressed && !disabledSend && styles.pillPressed,
           ]}
@@ -196,6 +213,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
+    // No fixed height: the field must grow with Dynamic Type.
   },
   messageInput: {
     flex: 1,
@@ -212,12 +230,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  bottomButtonsStacked: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
+  pillButtonStacked: {
+    flex: 0,
+    width: "100%",
+  },
   pillButton: {
     flex: 1,
     borderWidth: 1,
     borderRadius: 14,
     paddingVertical: 10,
     alignItems: "center",
+    justifyContent: "center",
     // backgroundColor and borderColor set dynamically via isDark inline styles
   },
   pillPrimary: {

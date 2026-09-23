@@ -23,6 +23,7 @@ import { formatTime } from '@/lib/restTimer';
 import {
   TIMER_DIAL,
   buildTimerTicks,
+  computeDialPadding,
   snapTimerSeconds,
   timerOffsetToSeconds,
   timerSecondsToOffset,
@@ -342,12 +343,15 @@ function Dial({
   border: string;
   cardBg: string;
 }) {
-  const { width: screenWidth } = useWindowDimensions();
   const ticks = useMemo(() => buildTimerTicks(), []);
   const scrollRef = useRef<ScrollView | null>(null);
   const isUserScrollingRef = useRef(false);
   const lastValueRef = useRef(value);
-  const dialPadding = screenWidth / 2 - TIMER_DIAL.tickWidth / 2;
+  // Measure the track the indicator is centered in. Padding derived from the
+  // window instead put every tick 21pt (20pt screen padding + 1pt card border)
+  // right of the indicator, so the dial always pointed ~7.5s off the value.
+  const [trackWidth, setTrackWidth] = useState(0);
+  const dialPadding = computeDialPadding(trackWidth);
 
   const valueToOffset = useCallback((sec: number) => timerSecondsToOffset(sec), []);
 
@@ -402,54 +406,62 @@ function Dial({
         <ThemedText style={[styles.dialHint, { color: placeholder }]}>drag to fine-tune in 5 sec steps</ThemedText>
       </View>
 
-      <View style={styles.dialTrack}>
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={TIMER_DIAL.tickWidth}
-          decelerationRate="fast"
-          onScrollBeginDrag={() => {
-            isUserScrollingRef.current = true;
-          }}
-          onMomentumScrollEnd={() => {
-            isUserScrollingRef.current = false;
-          }}
-          onScrollEndDrag={() => {
-            // User lifted finger; momentum may or may not follow.
-            setTimeout(() => {
+      <View
+        style={styles.dialTrack}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          setTrackWidth((prev) => (Math.abs(prev - w) < 0.5 ? prev : w));
+        }}
+      >
+        {trackWidth > 0 && (
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={TIMER_DIAL.tickWidth}
+            decelerationRate="fast"
+            onScrollBeginDrag={() => {
+              isUserScrollingRef.current = true;
+            }}
+            onMomentumScrollEnd={() => {
               isUserScrollingRef.current = false;
-            }, 50);
-          }}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          onContentSizeChange={onContentSizeChange}
-          contentContainerStyle={{ paddingHorizontal: dialPadding }}
-        >
-          {ticks.map((sec) => {
-            const isMajor = sec % 30 === 0;
-            const isMinute = sec % 60 === 0;
-            return (
-              <View key={sec} style={[styles.tickCell, { width: TIMER_DIAL.tickWidth }]}>
-                <View
-                  style={[
-                    styles.tick,
-                    {
-                      backgroundColor: placeholder,
-                      height: isMinute ? 34 : isMajor ? 22 : 12,
-                      opacity: isMinute ? 0.9 : isMajor ? 0.6 : 0.35,
-                    },
-                  ]}
-                />
-                {isMinute && (
-                  <ThemedText style={[styles.tickLabel, { color: placeholder }]}>
-                    {Math.round(sec / 60)}
-                  </ThemedText>
-                )}
-              </View>
-            );
-          })}
-        </ScrollView>
+            }}
+            onScrollEndDrag={() => {
+              // User lifted finger; momentum may or may not follow.
+              setTimeout(() => {
+                isUserScrollingRef.current = false;
+              }, 50);
+            }}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={onContentSizeChange}
+            contentContainerStyle={{ paddingHorizontal: dialPadding }}
+          >
+            {ticks.map((sec) => {
+              const isMajor = sec % 30 === 0;
+              const isMinute = sec % 60 === 0;
+              return (
+                <View key={sec} style={[styles.tickCell, { width: TIMER_DIAL.tickWidth }]}>
+                  <View
+                    style={[
+                      styles.tick,
+                      {
+                        backgroundColor: placeholder,
+                        height: isMinute ? 34 : isMajor ? 22 : 12,
+                        opacity: isMinute ? 0.9 : isMajor ? 0.6 : 0.35,
+                      },
+                    ]}
+                  />
+                  {isMinute && (
+                    <ThemedText style={[styles.tickLabel, { color: placeholder }]}>
+                      {Math.round(sec / 60)}
+                    </ThemedText>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        )}
         <View
           pointerEvents="none"
           style={[styles.dialIndicator, { backgroundColor: tint }]}

@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import {
   RestTimerState,
   IntensityHints,
@@ -19,6 +20,7 @@ import {
   tick,
   suggestRestSeconds,
   getRemainingSec,
+  isGenuineRestCompletion,
 } from '@/lib/restTimer';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { fireRestTimerNotification, cancelLocal } from '@/lib/notifications';
@@ -120,9 +122,15 @@ export function useRestTimer() {
   // ── Fire completion side-effects only on a genuine running → done transition.
   // (Hydrating a timer that finished while the app was closed must NOT re-notify.)
   useEffect(() => {
-    if (prevKindRef.current === 'running' && state.kind === 'done') {
+    if (isGenuineRestCompletion(prevKindRef.current, state.kind) && state.kind === 'done') {
       const body = state.exercise ? `${state.exercise} — next set.` : 'Time for your next set.';
       fireWebNotification(body);
+      // Single home for the completion haptic (#8) — this guard already
+      // exists to distinguish a genuine completion from a rehydrated one,
+      // so a stale timer restored on mount won't buzz.
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      }
     }
     prevKindRef.current = state.kind;
   }, [state.kind]); // eslint-disable-line react-hooks/exhaustive-deps

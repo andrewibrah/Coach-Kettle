@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   Alert,
   AppState,
@@ -27,11 +27,13 @@ import { SessionReviewModal } from "@/components/modals/SessionReviewModal";
 import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
 import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
 import { Header } from "@/components/ui/Header";
+import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
 import { WorkoutTable } from "@/components/workout/WorkoutTable";
-import { RestTimerBar } from "@/components/workout/RestTimerBar";
 import { useSharedRestTimer } from "@/contexts/RestTimerContext";
-import { isCompoundExercise } from "@/lib/restTimer";
+import { useNotifications } from "@/contexts/NotificationsProvider";
+import { decideRestTimerAction, isCompoundExercise, suggestRestSeconds } from "@/lib/restTimer";
+import { StartRestPrompt, type RestPromptInfo } from "@/components/workout/StartRestPrompt";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { api, type ApiWorkoutRow, type LogSetPR } from "@/lib/api";
@@ -88,6 +90,9 @@ export default function HomeScreen() {
 
   const { width } = useWindowDimensions();
   const compact = width < 380;
+  // Height of the bottom tab bar this screen sits above (undefined outside a tab
+  // navigator). Used as the keyboard-avoidance offset.
+  const tabBarHeight = useContext(BottomTabBarHeightContext);
   const backgroundColor = useThemeColor({}, 'background');
   const successColor = useThemeColor({}, 'success');
   const onTint = useThemeColor({}, 'tintForeground');
@@ -295,7 +300,27 @@ export default function HomeScreen() {
   const { session } = useAuth();
   const { showCelebration } = usePRCelebration();
   const lastCelebratedRef = useRef<string>('');
-  const { start: startRestTimer, registerRestEntrySink } = useSharedRestTimer();
+  const { state: restTimerState, start: startRestTimer, registerRestEntrySink } = useSharedRestTimer();
+  const { prefs: notificationPrefs } = useNotifications();
+  const [restPrompt, setRestPrompt] = useState<RestPromptInfo | null>(null);
+
+  // Gate for both "set logged" call sites (#3): auto-start immediately when
+  // the user has opted in, otherwise surface a dismissible prompt instead of
+  // silently starting a timer for them. Suppressed entirely while a timer is
+  // already running/paused/done so the prompt and the live indicator never
+  // compete (#8).
+  const triggerRestTimer = useCallback((hints: { exercise: string; repsLastSet?: number; isCompound: boolean }) => {
+    if (decideRestTimerAction(notificationPrefs?.auto_start_rest_timer === true) === 'start') {
+      startRestTimer(hints).catch((err) => console.warn('[restTimer] start failed', err));
+      return;
+    }
+    if (restTimerState.kind !== 'idle') return;
+    setRestPrompt({
+      exercise: hints.exercise,
+      suggestedSec: suggestRestSeconds(hints),
+      at: Date.now(),
+    });
+  }, [notificationPrefs?.auto_start_rest_timer, restTimerState.kind, startRestTimer]);
 
   // Primary celebration path: the log-set response tells us deterministically
   // whether the set was a PR (server-computed, no realtime/race dependency).
@@ -1092,11 +1117,11 @@ export default function HomeScreen() {
       const lastWorking = [...parsedRows].reverse().find((r) => !r.isCardio);
       if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
         const reps = parseInt(lastWorking.reps, 10);
-        startRestTimer({
+        triggerRestTimer({
           exercise: lastWorking.exercise,
           repsLastSet: Number.isFinite(reps) ? reps : undefined,
           isCompound: isCompoundExercise(lastWorking.exercise),
-        }).catch(err => console.warn('[restTimer] start failed', err));
+        });
       }
 
       scrollToBottom();
@@ -1183,11 +1208,11 @@ export default function HomeScreen() {
           const lastWorking = [...newRows].reverse().find((r) => !r.isCardio);
           if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
             const reps = parseInt(lastWorking.reps, 10);
-            startRestTimer({
+            triggerRestTimer({
               exercise: lastWorking.exercise,
               repsLastSet: Number.isFinite(reps) ? reps : undefined,
               isCompound: isCompoundExercise(lastWorking.exercise),
-            }).catch(err => console.warn('[restTimer] start failed', err));
+            });
           }
           scrollToBottom();
         } else {
@@ -1210,6 +1235,10 @@ export default function HomeScreen() {
     <GestureDetector gesture={swipeRight}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // The screen sits above the tab bar, so the keyboard overlap is smaller
+        // than the raw keyboard height by exactly the tab bar's height. Without
+        // this offset the composer is pushed up by that much dead space.
+        keyboardVerticalOffset={tabBarHeight ?? 0}
         style={[styles.screen, { backgroundColor }]}
       >
         {/* Green dot on tab icon while a workout is in progress */}
@@ -1254,7 +1283,7 @@ export default function HomeScreen() {
               coachToday={coachToday}
               totals={nutritionTotals}
               targets={nutritionTargets}
-              onStartWorkout={() => setNameModalVisible(true)}
+              onStartWorkout={onStartWorkout}
               onNavigateProgram={() => router.push('/program')}
               onNavigateCoach={() => router.push('/coach')}
               onNavigateNutrition={() => router.push('/nutrition')}
@@ -1278,6 +1307,20 @@ export default function HomeScreen() {
         />
 
         {inlineToast && <Toast message={inlineToast.message} type={inlineToast.type} onDismiss={hideToast} />}
+
+        {restPrompt && restTimerState.kind === 'idle' && (
+          <StartRestPrompt
+            prompt={restPrompt}
+            onStart={() => {
+              startRestTimer({
+                exercise: restPrompt.exercise,
+                prescribedRestSec: restPrompt.suggestedSec,
+              }).catch((err: unknown) => console.warn('[restTimer] start failed', err));
+              setRestPrompt(null);
+            }}
+            onDismiss={() => setRestPrompt(null)}
+          />
+        )}
 
         {draftRestoredToast && (
           <View style={styles.draftRestoredToast} pointerEvents="none">
@@ -1369,8 +1412,6 @@ export default function HomeScreen() {
             }
           }}
         />
-
-        <RestTimerBar />
       </KeyboardAvoidingView>
     </GestureDetector>
   );

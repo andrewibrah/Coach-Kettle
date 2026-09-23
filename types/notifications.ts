@@ -19,6 +19,7 @@ export interface NotificationPreferences {
   user_id: string;
   permission_granted: boolean;
   rest_timer_enabled: boolean;
+  auto_start_rest_timer: boolean;
   workout_reminder_enabled: boolean;
   workout_reminder_hour: number;
   workout_reminder_minute: number;
