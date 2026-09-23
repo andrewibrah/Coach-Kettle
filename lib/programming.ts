@@ -57,7 +57,19 @@ export async function generateProgram(input: GenerateProgramInput): Promise<Work
     method: 'POST',
     body: JSON.stringify({ action: 'generate', ...input }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    // Surface the server's user-facing message when present, instead of a
+    // raw "HTTP 400: {...}" blob landing in a toast (#7).
+    const body = await res.text();
+    let message = 'Failed to create program';
+    try {
+      const parsed = JSON.parse(body);
+      if (typeof parsed?.error === 'string' && parsed.error) message = parsed.error;
+    } catch {
+      // Non-JSON body — keep the generic fallback.
+    }
+    throw new Error(message);
+  }
   const data = await res.json();
   return data?.program as WorkoutProgram;
 }

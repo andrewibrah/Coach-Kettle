@@ -29,6 +29,10 @@ function jsonRes(b: unknown, s = 200): Response {
 const VALID_GOAL = new Set(["muscle_building", "leaning_out", "weight_loss", "maintenance", "strength", "endurance"]);
 const VALID_SPLIT = new Set(["ppl_3day", "pp_sh_l_5day", "pp_sh_l_6day", "upper_lower", "full_body", "custom"]);
 
+// Message is safe to surface to the client as-is (unlike a raw internal
+// error), so the top-level handler returns it as a 400 instead of a 500.
+class UserFacingError extends Error {}
+
 interface PRStateRow {
   lift_name: string;
   weight_lbs: number;
@@ -63,14 +67,31 @@ async function generateProgramFromTemplate(
   periodization: 'linear' | 'undulating' | 'block' | 'none',
   prs: PRStateRow[]
 ) {
-  // Find a matching template
-  const { data: tpl } = await admin
+  // Find a matching template — exact (split_type, days_per_week) first,
+  // then the closest available day count for that split. days_per_week is
+  // a free 1-7 stepper in the UI, independent of split, so an exact row
+  // for every combination is not guaranteed.
+  let { data: tpl } = await admin
     .from("program_templates")
     .select("*")
     .eq("split_type", split)
+    .eq("days_per_week", daysPerWeek)
     .maybeSingle();
 
-  if (!tpl) throw new Error("template not found for split_type " + split);
+  if (!tpl) {
+    const { data: alts } = await admin
+      .from("program_templates")
+      .select("*")
+      .eq("split_type", split)
+      .order("days_per_week", { ascending: true });
+    if (alts?.length) {
+      tpl = alts.reduce((best, c) =>
+        Math.abs(c.days_per_week - daysPerWeek) < Math.abs(best.days_per_week - daysPerWeek) ? c : best
+      );
+    }
+  }
+
+  if (!tpl) throw new UserFacingError("No template is available for that split yet. Try a different split or day count.");
 
   const structure: TemplateStructure = tpl.structure as TemplateStructure;
   const exerciseNameBySlug = new Map<string, string>();
@@ -106,7 +127,14 @@ async function generateProgramFromTemplate(
       name: tpl.name,
       goal_type: goal,
       split_type: split,
-      days_per_week: daysPerWeek,
+      // The RESOLVED template's day count, not the caller's requested
+      // daysPerWeek — the closest-match fallback above can pick a template
+      // with a different day count than what was asked for (e.g. full_body
+      // at 5 days/week has no exact template). Storing the request instead
+      // of reality here previously desynced program_days' actual count from
+      // this field, which downstream (#6 weekday suggestions, notification
+      // scheduling) silently assumed were the same number.
+      days_per_week: tpl.days_per_week,
       weeks_total: weeksTotal,
       current_week: 1,
       periodization,
@@ -381,6 +409,7 @@ serve(async (req) => {
     return jsonRes({ error: "Method not allowed" }, 405);
   } catch (e) {
     console.error("[programming] error:", e);
-    return jsonRes({ error: (e as Error).message || "Internal server error" }, 500);
+    if (e instanceof UserFacingError) return jsonRes({ error: e.message }, 400);
+    return jsonRes({ error: "Something went wrong generating your program. Please try again." }, 500);
   }
 });

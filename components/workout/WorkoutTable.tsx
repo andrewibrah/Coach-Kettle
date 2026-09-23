@@ -6,6 +6,7 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { ThemedView } from "@/components/ui/themed-view";
 import { WorkoutCard } from "@/components/workout/WorkoutCard";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useLargeTextLayout } from "@/hooks/useLargeTextLayout";
 import type { LogRow } from "@/types/workout";
 import Animated, { useSharedValue, useAnimatedStyle } from "react-native-reanimated";
 
@@ -81,6 +82,7 @@ export function WorkoutTable({
 }: Props) {
   const successColor = useThemeColor({}, 'success');
   const dangerColor = useThemeColor({}, 'danger');
+  const { isLargeText, scaleSpace } = useLargeTextLayout();
 
   const openRowMenu = useCallback(
     (rowId: string) => {
@@ -123,10 +125,13 @@ export function WorkoutTable({
   );
 
   // ── Drag shared values ──
+  // Fallback height used only until the first onLayout measurement lands. A card
+  // is roughly 100pt at the default text size and grows with Dynamic Type, so
+  // the fallback has to scale too or the first drag mis-computes its target slot.
+  const fallbackRowHeight = scaleSpace(100);
   const activeDragIndex = useSharedValue(-1);
   const dragTranslationY = useSharedValue(0);
-  // Dynamic row height — measured via onLayout in WorkoutCard, default ~100px
-  const measuredRowHeight = useSharedValue(100);
+  const measuredRowHeight = useSharedValue(fallbackRowHeight);
 
   // ── Scroll lock during drag ──
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -160,10 +165,10 @@ export function WorkoutTable({
       const renderRightActions = () => {
         if (isSyncing) return null;
         return (
-          <View style={styles.swipeActions}>
+          <View style={[styles.swipeActions, isLargeText && styles.swipeActionsStacked]}>
             <Pressable
               onPress={() => onDuplicateRow(item.id)}
-              style={({ pressed }) => [styles.swipeButton, { backgroundColor: successColor }, pressed && styles.swipePressed]}
+              style={({ pressed }) => [styles.swipeButton, { backgroundColor: successColor, minWidth: scaleSpace(80), minHeight: scaleSpace(44) }, isLargeText && styles.swipeButtonStacked, pressed && styles.swipePressed]}
               accessibilityRole="button"
               accessibilityLabel="Duplicate set"
             >
@@ -171,7 +176,7 @@ export function WorkoutTable({
             </Pressable>
             <Pressable
               onPress={() => onDeleteRow(item.id)}
-              style={({ pressed }) => [styles.swipeButton, { backgroundColor: dangerColor }, pressed && styles.swipePressed]}
+              style={({ pressed }) => [styles.swipeButton, { backgroundColor: dangerColor, minWidth: scaleSpace(80), minHeight: scaleSpace(44) }, isLargeText && styles.swipeButtonStacked, pressed && styles.swipePressed]}
               accessibilityRole="button"
               accessibilityLabel="Delete set"
             >
@@ -191,7 +196,7 @@ export function WorkoutTable({
           <WorkoutCard
             row={item}
             rowIndex={index}
-            rowHeight={100}
+            rowHeight={fallbackRowHeight}
             activeDragIndex={activeDragIndex}
             dragTranslationY={dragTranslationY}
             measuredRowHeight={measuredRowHeight}
@@ -209,7 +214,7 @@ export function WorkoutTable({
         </Swipeable>
       );
     },
-    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle, successColor, dangerColor]
+    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle, successColor, dangerColor, isLargeText, scaleSpace, fallbackRowHeight]
   );
 
   const handleScrollToIndexFailed = useCallback(
@@ -244,11 +249,16 @@ export function WorkoutTable({
 const styles = StyleSheet.create({
   tableWrap: {
     flex: 1,
-    overflow: 'visible',
+    // The list MUST clip to its own bounds. With overflow:'visible' (the previous
+    // value) FlatList rows render outside the list frame and paint on top of the
+    // bottom composer and the header — reproduced at the default text size with a
+    // 4-set session. Row-level overflow stays visible via CellWrapper, which is
+    // what the drag-reorder shadow actually needs.
+    overflow: 'hidden',
   },
   tableBody: {
     flex: 1,
-    overflow: 'visible',
+    overflow: 'hidden',
   },
   tableBodyContent: {
     paddingBottom: 6,
@@ -270,11 +280,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: 8,
   },
+  swipeActionsStacked: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 8,
+  },
   swipeButton: {
     justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 14,
-    minWidth: 80,
+    paddingVertical: 8,
     borderRadius: 16,
+    marginLeft: 8,
+  },
+  swipeButtonStacked: {
+    flex: 1,
     marginLeft: 8,
   },
   swipeText: {

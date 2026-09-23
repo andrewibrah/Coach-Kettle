@@ -3,6 +3,8 @@
 // All data comes from pre-loaded root contexts — zero extra API calls.
 
 import React from 'react';
+import { useNutrition } from '@/contexts/NutritionContext';
+import { getCoachPresentation } from '@/lib/coachingEvidence';
 import {
   Pressable,
   ScrollView,
@@ -36,7 +38,6 @@ export function HomeDashboard({
   programLoading,
   coachToday,
   totals,
-  targets,
   onStartWorkout,
   onNavigateProgram,
   onNavigateCoach,
@@ -47,27 +48,19 @@ export function HomeDashboard({
   const cardBackground = useThemeColor({}, 'cardBackground');
   const placeholder = useThemeColor({}, 'placeholder');
   const textColor = useThemeColor({}, 'text');
-  const dangerColor = useThemeColor({}, 'danger');
   const successColor = useThemeColor({}, 'success');
-  const warningColor = useThemeColor({}, 'warning');
 
   // ── Calories ──────────────────────────────────────────────────────────────
-  // Use training_calories as the dashboard target (home tab is the workout hub).
-  // The full Nutrition tab shows the rest-vs-training split.
+  const nutrition = useNutrition();
+  const { todayTarget } = nutrition;
+  const coachView = coachToday ? getCoachPresentation(coachToday, nutrition) : null;
   const caloriesConsumed = Math.round(totals?.calories ?? 0);
-  const caloriesTarget = Math.round(targets?.training_calories ?? 0);
-  const proteinTarget = Math.round(targets?.training_protein_g ?? 0);
+  const caloriesTarget = Math.round(todayTarget.target?.calories ?? 0);
+  const proteinTarget = Math.round(todayTarget.target?.protein_g ?? 0);
   const calorieRatio = caloriesTarget > 0 ? Math.min(caloriesConsumed / caloriesTarget, 1) : 0;
 
   // ── Coach color dot ────────────────────────────────────────────────────────
-  const coachColor =
-    coachToday?.overall_color === 'green'
-      ? successColor
-      : coachToday?.overall_color === 'red'
-      ? dangerColor
-      : coachToday?.overall_color === 'yellow'
-      ? warningColor
-      : tintColor;
+  const coachColor = tintColor;
 
   // ── Exercise count across all program days ─────────────────────────────────
   const exerciseCount =
@@ -168,8 +161,8 @@ export function HomeDashboard({
           </ThemedText>
         </View>
         <ThemedText style={[styles.coachText, { color: textColor }]}>
-          {coachToday?.tomorrow_focus ??
-            'Complete a workout to unlock your daily coaching report.'}
+          {coachView?.tomorrow_focus ??
+            'Review your workout and food entries for daily coaching.'}
         </ThemedText>
         {coachToday && (
           <ThemedText style={[styles.cardSub, { color: placeholder }]}>
@@ -180,7 +173,7 @@ export function HomeDashboard({
       </Pressable>
 
       {/* ── Nutrition Bar ─────────────────────────────────────────────────── */}
-      {targets && (
+      {todayTarget.target && (
         <Pressable
           onPress={onNavigateNutrition}
           style={({ pressed }) => [
@@ -213,8 +206,9 @@ export function HomeDashboard({
           </ThemedText>
           <ThemedText style={[styles.cardSub, { color: placeholder }]}>
             Protein {Math.round(totals?.protein_g ?? 0)}g /{' '}
-            {proteinTarget}g
+            {todayTarget.target.protein_g != null ? `${proteinTarget}g` : '—'}
           </ThemedText>
+          <ThemedText style={[styles.cardSub, { color: placeholder }]}>{todayTarget.explanation}</ThemedText>
         </Pressable>
       )}
     </ScrollView>

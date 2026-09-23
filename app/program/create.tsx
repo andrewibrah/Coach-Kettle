@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,11 @@ import { Toast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useToast } from '@/hooks/useToast';
 import { useProgram } from '@/contexts/ProgramContext';
+import { useProfile } from '@/contexts/ProfileContext';
+import { suggestTrainingDays, resolveTrainingDaysUpdate } from '@/lib/trainingSchedule';
 import type { GoalType, SplitType, Periodization } from '@/types/programming';
+
+const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // 0=Sun..6=Sat
 
 const GOALS: { value: GoalType; label: string }[] = [
   { value: 'muscle_building', label: 'Muscle Building' },
@@ -26,6 +30,7 @@ const SPLITS: { value: SplitType; label: string }[] = [
   { value: 'pp_sh_l_5day', label: 'PPSh-L 5-day' },
   { value: 'pp_sh_l_6day', label: 'PPSh-L 6-day' },
   { value: 'full_body', label: 'Full Body' },
+  { value: 'upper_lower', label: 'Upper / Lower' },
 ];
 
 const PERIODIZATIONS: { value: Periodization; label: string }[] = [
@@ -46,6 +51,7 @@ export default function CreateProgramScreen() {
   const onTint = useThemeColor({}, 'tintForeground');
 
   const { create } = useProgram();
+  const { profile, updateProfile } = useProfile();
   const { toast, showToast, hideToast } = useToast();
 
   const [goal, setGoal] = useState<GoalType>('muscle_building');
@@ -54,6 +60,47 @@ export default function CreateProgramScreen() {
   const [weeksTotal, setWeeksTotal] = useState<number>(8);
   const [periodization, setPeriodization] = useState<Periodization>('linear');
   const [submitting, setSubmitting] = useState(false);
+
+  // Suggested training weekdays for the chosen split + day count (#6).
+  // scheduleTouched latches once the user edits the selector by hand (or
+  // once we've seeded an existing explicit schedule from their profile
+  // below), so re-picking a split/day-count afterward never clobbers it.
+  const [trainingDays, setTrainingDays] = useState<number[]>(() => suggestTrainingDays('ppl_3day', 3) ?? []);
+  const [scheduleTouched, setScheduleTouched] = useState(false);
+  const [scheduleSeeded, setScheduleSeeded] = useState(false);
+
+  // Seed from an existing explicit schedule (Settings -> Profile) once the
+  // profile loads, and lock it — otherwise merely picking a different split
+  // on this screen (the screen's primary action) would silently swap it for
+  // that split's suggestion before the user ever touches the weekday row,
+  // and submit would overwrite their real preference.
+  useEffect(() => {
+    if (scheduleSeeded) return;
+    if (!profile) return; // wait for profile to load
+    if (profile.training_days && profile.training_days.length > 0) {
+      setTrainingDays(profile.training_days);
+      setScheduleTouched(true);
+    }
+    setScheduleSeeded(true);
+  }, [profile, scheduleSeeded]);
+
+  useEffect(() => {
+    if (scheduleTouched) return;
+    setTrainingDays(suggestTrainingDays(split, daysPerWeek) ?? []);
+  }, [split, daysPerWeek, scheduleTouched]);
+
+  const suggestion = suggestTrainingDays(split, daysPerWeek);
+  const isCustomSchedule =
+    suggestion === null ||
+    trainingDays.length !== suggestion.length ||
+    !trainingDays.every((d) => suggestion.includes(d));
+
+  const toggleTrainingDay = (dow: number) => {
+    setScheduleTouched(true);
+    setTrainingDays((prev) =>
+      prev.includes(dow) ? prev.filter((d) => d !== dow) : [...prev, dow].sort((a, b) => a - b)
+    );
+  };
 
   const handleSubmit = async () => {
     if (submitting) return;
@@ -66,6 +113,14 @@ export default function CreateProgramScreen() {
         weeks_total: weeksTotal,
         periodization,
       });
+      // Only write training_days if it actually changed from the profile's
+      // current value (#6 regression fix) — see resolveTrainingDaysUpdate.
+      const trainingDaysUpdate = resolveTrainingDaysUpdate(trainingDays, profile?.training_days);
+      if (trainingDaysUpdate !== 'no-change') {
+        // Best-effort — a failure here shouldn't block program creation,
+        // which already succeeded.
+        updateProfile({ training_days: trainingDaysUpdate }).catch(() => undefined);
+      }
       router.replace('/program');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to create program', 'error');
@@ -184,6 +239,36 @@ export default function CreateProgramScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: cardBackground }]}>
+          <ThemedText style={styles.label}>Training days</ThemedText>
+          <View style={styles.weekdayRow}>
+            {WEEKDAY_LABELS.map((label, dow) => (
+              <Pressable
+                key={dow}
+                onPress={() => toggleTrainingDay(dow)}
+                style={({ pressed }) => [
+                  styles.weekdayPill,
+                  {
+                    backgroundColor: trainingDays.includes(dow) ? tint : 'transparent',
+                    borderColor: trainingDays.includes(dow) ? tint : border,
+                  },
+                  pressed && { opacity: 0.7 },
+                ]}
+                accessibilityRole="checkbox"
+                accessibilityLabel={['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dow]}
+                accessibilityState={{ checked: trainingDays.includes(dow) }}
+              >
+                <ThemedText style={[styles.weekdayPillText, { color: trainingDays.includes(dow) ? onTint : textColor }]}>
+                  {label}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+          <ThemedText style={[styles.hint, { color: placeholder }]}>
+            {isCustomSchedule ? 'Custom schedule' : 'Suggested for this split — tap a day to change it.'}
+          </ThemedText>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: cardBackground }]}>
           <ThemedText style={styles.label}>Weeks total</ThemedText>
           <Stepper value={weeksTotal} min={1} max={16} onChange={setWeeksTotal} />
         </View>
@@ -238,6 +323,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   pillText: { fontSize: 13, fontWeight: '600' },
+  weekdayRow: { flexDirection: 'row', gap: 8 },
+  weekdayPill: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekdayPillText: { fontSize: 13, fontWeight: '700' },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   stepBtn: {
     width: 40,

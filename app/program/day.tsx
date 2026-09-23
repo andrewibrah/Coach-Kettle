@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useProgram } from '@/contexts/ProgramContext';
 import { fetchNextSetSuggestion } from '@/lib/programming';
+import { formatProgramDayLabel } from '@/lib/programFormat';
 import type { NextSetSuggestion, ProgramExercise } from '@/types/programming';
 
 export default function ProgramDayScreen() {
@@ -88,7 +89,7 @@ export default function ProgramDayScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
-      <ScreenHeader title={`Day ${day.day_index} — ${day.body_part}`} />
+      <ScreenHeader title={`Day ${day.day_index} — ${formatProgramDayLabel(day)}`} />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
         {day.exercises.map((ex) => {
           const s = suggestions[ex.id];

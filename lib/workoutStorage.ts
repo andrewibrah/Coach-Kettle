@@ -27,6 +27,16 @@ export type SessionReview = {
   generatedAt: number;
 };
 
+/**
+ * Discriminated source of a workout session (#1). Optional — sessions
+ * created before this field existed, and today's freestyle-only flows,
+ * simply omit it; treat a missing `source` as freestyle.
+ */
+export type WorkoutSource =
+  | { kind: 'freestyle' }
+  | { kind: 'template'; templateId: string }
+  | { kind: 'program'; programId: string; programDayId: string; programWeek: number };
+
 export type WorkoutMediaRecord = {
   id: string;
   workout_id: string;
@@ -48,6 +58,8 @@ export type WorkoutSession = {
   media?: WorkoutMediaRecord[];
   /** True while the workout exists locally but hasn't reached Supabase. */
   pendingSync?: boolean;
+  /** How this session was started (#1). Omitted = freestyle. */
+  source?: WorkoutSource;
 };
 
 export const WORKOUT_HISTORY_KEY = "workout_history_v1";

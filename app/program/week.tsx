@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useProgram } from '@/contexts/ProgramContext';
+import { formatProgramDayLabel } from '@/lib/programFormat';
 import type { ProgramExercise } from '@/types/programming';
 
 export default function ProgramWeekScreen() {
@@ -55,8 +56,7 @@ export default function ProgramWeekScreen() {
         {days?.map((day) => (
           <View key={day.id} style={[styles.card, { backgroundColor: cardBackground }]}>
             <ThemedText style={styles.dayTitle}>
-              Day {day.day_index} · {day.body_part}
-              {day.title ? ` — ${day.title}` : ''}
+              Day {day.day_index} · {formatProgramDayLabel(day)}
             </ThemedText>
 
             {day.exercises.map((ex) => {

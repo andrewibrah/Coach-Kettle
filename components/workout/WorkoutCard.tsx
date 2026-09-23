@@ -1,5 +1,6 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useLargeTextLayout } from "@/hooks/useLargeTextLayout";
 import { LogRow } from "@/types/workout";
 import { useCallback, useEffect, useRef } from "react";
 import { LayoutChangeEvent, StyleSheet, TextInput, View, Keyboard, Pressable } from "react-native";
@@ -54,6 +55,7 @@ export function WorkoutCard({
     onCommitEditCell
 }: Props) {
     const isSyncing = row.status === 'syncing';
+    const { isLargeText, scaleSpace } = useLargeTextLayout();
     const inputRef = useRef<TextInput>(null);
     const cardBg = useThemeColor({}, 'cardBackground');
     const borderColor = useThemeColor({}, 'border');
@@ -210,7 +212,8 @@ export function WorkoutCard({
                 {
                     color: inputTextColor,
                     backgroundColor: inputBg,
-                    minWidth: 40,
+                    minWidth: scaleSpace(40),
+                    minHeight: scaleSpace(40),
                     paddingHorizontal: 6,
                     paddingVertical: 2,
                     borderRadius: 6,
@@ -238,14 +241,15 @@ export function WorkoutCard({
                     animatedStyle,
                 ]}
             >
-            <View style={styles.header}>
-                <ThemedText type="defaultSemiBold" style={[styles.exercise, isSyncing && { color: labelColor }]}>
+            <View style={[styles.header, isLargeText && styles.headerStacked]}>
+                <ThemedText type="defaultSemiBold" style={[styles.exercise, isLargeText && styles.exerciseStacked, isSyncing && { color: labelColor }]}>
                     {row.exercise}
                 </ThemedText>
                 <Pressable
                     onPress={() => !isSyncing && onIncrementSet(row.id)}
                     onLongPress={() => !isSyncing && onBeginEditCell?.(row.id, "set", row.set.toString())}
                     hitSlop={10}
+                    style={{ minHeight: scaleSpace(44), justifyContent: "center" }}
                     disabled={isSyncing}
                     accessibilityRole="button"
                     accessibilityLabel={`Set ${row.set} — tap to increment, long press to edit`}
@@ -256,7 +260,7 @@ export function WorkoutCard({
                 </Pressable>
             </View>
 
-            <View style={[styles.details, { marginBottom: (row.notes || editingField === "notes") ? 12 : 0 }]}>
+            <View style={[styles.details, isLargeText && styles.detailsStacked, { marginBottom: (row.notes || editingField === "notes") ? 12 : 0 }]}>
                 {row.isCardio ? (
                     // Cardio display: duration, distance, calories, heart rate, level
                     <View style={styles.cardioDetails}>
@@ -308,7 +312,7 @@ export function WorkoutCard({
                             {editingField === "weightLbs" ? (
                                 renderInput("Lbs", "numeric")
                             ) : (
-                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)} accessibilityRole="button" accessibilityLabel={`Weight: ${row.weightLbs && row.weightLbs !== "0" ? `${row.weightLbs} lbs` : 'not set'}, tap to edit`}>
+                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)} hitSlop={10} style={{ minHeight: scaleSpace(44), justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Weight: ${row.weightLbs && row.weightLbs !== "0" ? `${row.weightLbs} lbs` : 'not set'}, tap to edit`}>
                                     <ThemedText style={styles.detailValue}>
                                         {row.weightLbs && row.weightLbs !== "0" ? row.weightLbs : "—"}
                                         <ThemedText style={[styles.detailLabel, { color: labelColor }]}> lbs</ThemedText>
@@ -317,14 +321,16 @@ export function WorkoutCard({
                             )}
                         </View>
 
-                        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+                        {/* Decorative separator only — it has no meaning once the
+                            values are stacked, and it would clip at large sizes. */}
+                        {isLargeText ? null : <View style={[styles.divider, { backgroundColor: dividerColor }]} />}
 
                         {/* Reps */}
                         <View style={styles.detailItem}>
                             {editingField === "reps" ? (
                                 renderInput("Reps", "numeric")
                             ) : (
-                                <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)} accessibilityRole="button" accessibilityLabel={`Reps: ${row.reps || 'not set'}, tap to edit`}>
+                                <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)} hitSlop={10} style={{ minHeight: scaleSpace(44), justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Reps: ${row.reps || 'not set'}, tap to edit`}>
                                     <ThemedText style={styles.detailValue}>
                                         {row.reps || "—"}
                                         <ThemedText style={[styles.detailLabel, { color: labelColor }]}> reps</ThemedText>
@@ -342,7 +348,7 @@ export function WorkoutCard({
                     {editingField === "notes" ? (
                         renderInput("Add a note...")
                     ) : (
-                        <Pressable onPress={() => onBeginEditCell?.(row.id, "notes", row.notes)} accessibilityRole="button" accessibilityLabel={`Note: ${row.notes}, tap to edit`}>
+                        <Pressable onPress={() => onBeginEditCell?.(row.id, "notes", row.notes)} hitSlop={10} style={{ minHeight: scaleSpace(44), justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Note: ${row.notes}, tap to edit`}>
                             <ThemedText style={[styles.noteText, { color: noteColor }]}>{row.notes}</ThemedText>
                         </Pressable>
                     )}
@@ -376,6 +382,22 @@ const styles = StyleSheet.create({
         fontSize: 17,
         flex: 1,
         marginRight: 8,
+    },
+    headerStacked: {
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 8,
+    },
+    exerciseStacked: {
+        // Full width once stacked, so long names wrap instead of truncating.
+        flex: 0,
+        width: "100%",
+        marginRight: 0,
+    },
+    detailsStacked: {
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 4,
     },
     set: {
         fontSize: 13,
