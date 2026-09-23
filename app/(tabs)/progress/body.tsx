@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   RefreshControl,
@@ -25,26 +26,12 @@ import {
 import { todayISO } from '@/lib/workoutRules';
 import type { BodyMetricsEntry } from '@/types/body';
 
-type FormKey =
-  | 'weight_lbs'
-  | 'body_fat_pct'
-  | 'waist_in'
-  | 'chest_in'
-  | 'hips_in'
-  | 'arm_in'
-  | 'thigh_in'
-  | 'neck_in';
+import { useAuth } from '@/contexts/AuthProvider';
+import { BODY_METRIC_FIELDS, validateBodyMetricInput, type BodyMetricKey, type BodyMetricErrors } from '@/lib/bodyMetricValidation';
 
-const FORM_FIELDS: { key: FormKey; label: string; unit: string }[] = [
-  { key: 'weight_lbs', label: 'Weight', unit: 'lb' },
-  { key: 'body_fat_pct', label: 'Body fat', unit: '%' },
-  { key: 'waist_in', label: 'Waist', unit: 'in' },
-  { key: 'chest_in', label: 'Chest', unit: 'in' },
-  { key: 'hips_in', label: 'Hips', unit: 'in' },
-  { key: 'arm_in', label: 'Arm', unit: 'in' },
-  { key: 'thigh_in', label: 'Thigh', unit: 'in' },
-  { key: 'neck_in', label: 'Neck', unit: 'in' },
-];
+type FormKey = BodyMetricKey;
+const FORM_FIELDS = BODY_METRIC_FIELDS;
+const EMPTY_FORM: Record<FormKey, string> = { weight_lbs: '', body_fat_pct: '', waist_in: '', chest_in: '', hips_in: '', arm_in: '', thigh_in: '', neck_in: '' };
 
 const FIELD_LABELS: Record<FormKey, string> = FORM_FIELDS.reduce((acc, f) => {
   acc[f.key] = `${f.label} (${f.unit})`;
@@ -60,96 +47,131 @@ export default function BodyMetricsScreen() {
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
+  const dangerColor = useThemeColor({}, 'danger');
+  const dangerForeground = useThemeColor({}, 'dangerForeground');
 
   const [entries, setEntries] = useState<BodyMetricsEntry[]>([]);
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast, showToast, hideToast } = useToast();
-  const [form, setForm] = useState<Record<FormKey, string>>({
-    weight_lbs: '',
-    body_fat_pct: '',
-    waist_in: '',
-    chest_in: '',
-    hips_in: '',
-    arm_in: '',
-    thigh_in: '',
-    neck_in: '',
-  });
-
-  const load = useCallback(async () => {
-    try {
-      const list = await fetchBodyMetrics(180);
-      setEntries(list);
-    } catch (e) {
-      console.warn('[body] load failed', e);
-    }
-  }, []);
+  const [form, setForm] = useState<Record<FormKey, string>>({ ...EMPTY_FORM });
+  const [errors, setErrors] = useState<BodyMetricErrors>({});
+  const { session } = useAuth();
+  const ownerId = session?.user.id;
+  const owner = useRef(ownerId);
+  owner.current = ownerId;
+  const mounted = useRef(false);
+  const epoch = useRef(0);
+  const pending = useRef(false);
+  const pendingDeletes = useRef(new Set<string>());
+  const loadSequence = useRef(0);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    mounted.current = true;
+    const generation = ++epoch.current;
+    pending.current = false;
+    pendingDeletes.current.clear();
+    setSaving(false);
+    setRefreshing(false);
+    setRetrying(false);
+    setEntries([]);
+    setLoadState('loading');
+    setLoadError(null);
+    setForm({ ...EMPTY_FORM });
+    setErrors({});
+    return () => { mounted.current = false; epoch.current = generation + 1; };
+  }, [ownerId]);
+
+  const load = useCallback(async () => {
+    const generation = epoch.current;
+    const sequence = ++loadSequence.current;
+    if (!ownerId) return;
+    try {
+      const list = await fetchBodyMetrics(180);
+      if (mounted.current && owner.current === ownerId && epoch.current === generation && sequence === loadSequence.current) {
+        setEntries(list);
+        setLoadState('ready');
+        setLoadError(null);
+      }
+    } catch (e: any) {
+      console.warn('[body] load failed', e);
+      if (mounted.current && owner.current === ownerId && epoch.current === generation && sequence === loadSequence.current) {
+        const message = e?.message ?? 'Could not load measurements.';
+        // Keep any previously loaded entries visible; only fall back to the
+        // full error state when there is nothing on screen yet.
+        setLoadError(message);
+        setLoadState((prev) => (prev === 'ready' ? 'ready' : 'error'));
+      }
+    }
+  }, [ownerId]);
+
+  useEffect(() => { void load(); }, [load]);
 
   const onRefresh = useCallback(async () => {
+    const generation = epoch.current;
     setRefreshing(true);
     await load();
-    setRefreshing(false);
+    if (mounted.current && epoch.current === generation) setRefreshing(false);
   }, [load]);
 
-  const parseOrNull = (v: string): number | null => {
-    if (!v.trim()) return null;
-    const n = parseFloat(v);
-    return Number.isFinite(n) ? n : null;
-  };
+  const onRetry = useCallback(async () => {
+    const generation = epoch.current;
+    setRetrying(true);
+    await load();
+    if (mounted.current && epoch.current === generation) setRetrying(false);
+  }, [load]);
 
+  // Sparse updates merge supplied measurements; blanks leave today's saved values unchanged.
+  const hasAnyValue = Object.values(form).some((v) => v.trim().length > 0);
   const onSave = useCallback(async () => {
+    if (pending.current || !mounted.current || !ownerId || owner.current !== ownerId) return;
+    const result = validateBodyMetricInput({ measured_date: todayISO(), ...form });
+    setErrors(result.errors);
+    if (!result.valid) return;
+    pending.current = true;
+    const generation = epoch.current;
+    const current = () => mounted.current && owner.current === ownerId && epoch.current === generation;
     setSaving(true);
     try {
-      await upsertBodyMetric({
-        measured_date: todayISO(),
-        weight_lbs: parseOrNull(form.weight_lbs),
-        body_fat_pct: parseOrNull(form.body_fat_pct),
-        waist_in: parseOrNull(form.waist_in),
-        chest_in: parseOrNull(form.chest_in),
-        hips_in: parseOrNull(form.hips_in),
-        arm_in: parseOrNull(form.arm_in),
-        thigh_in: parseOrNull(form.thigh_in),
-        neck_in: parseOrNull(form.neck_in),
-      });
-      setForm({
-        weight_lbs: '',
-        body_fat_pct: '',
-        waist_in: '',
-        chest_in: '',
-        hips_in: '',
-        arm_in: '',
-        thigh_in: '',
-        neck_in: '',
-      });
+      await upsertBodyMetric(result.payload);
+      if (!current()) return;
+      setForm({ ...EMPTY_FORM });
       await load();
     } catch (e: any) {
-      showToast(e?.message ?? 'Could not save. Please try again.', 'error');
+      if (current()) showToast(e?.message ?? 'Could not save. Please try again.', 'error');
     } finally {
-      setSaving(false);
+      if (current()) { pending.current = false; setSaving(false); }
     }
-  }, [form, load, showToast]);
+  }, [form, ownerId, load, showToast]);
 
   const onDelete = useCallback((entry: BodyMetricsEntry) => {
+    if (!mounted.current || !ownerId || owner.current !== ownerId) return;
+    const generation = epoch.current;
+    const current = () => mounted.current && owner.current === ownerId && epoch.current === generation;
     Alert.alert('Delete entry?', `Delete measurements from ${entry.measured_date}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          if (!current() || pendingDeletes.current.has(entry.id)) return;
+          pendingDeletes.current.add(entry.id);
           try {
             await deleteBodyMetric(entry.id);
+            if (!current()) return;
             await load();
           } catch (e: any) {
-            showToast(e?.message ?? 'Could not delete. Please try again.', 'error');
+            if (current()) showToast(e?.message ?? 'Could not delete. Please try again.', 'error');
+          } finally {
+            if (current()) pendingDeletes.current.delete(entry.id);
           }
         },
       },
     ]);
-  }, [load, showToast]);
+  }, [ownerId, load, showToast]);
 
   const formatField = (key: FormKey, val: number): string => {
     if (key === 'body_fat_pct') return `${val}%`;
@@ -175,25 +197,37 @@ export default function BodyMetricsScreen() {
                   {f.label} ({f.unit})
                 </ThemedText>
                 <TextInput
+                  accessibilityLabel={`${f.label} (${f.unit})`}
+                  accessibilityHint={`Supported range ${f.min}–${f.max} ${f.unit}. ${errors[f.key] ?? ''}`}
+                  editable={!saving}
                   value={form[f.key]}
-                  onChangeText={(v) => setForm((prev) => ({ ...prev, [f.key]: v }))}
+                  onChangeText={(v) => {
+                    setForm((prev) => ({ ...prev, [f.key]: v }));
+                    setErrors((prev) => (prev[f.key] ? { ...prev, [f.key]: undefined } : prev));
+                  }}
                   keyboardType="decimal-pad"
                   placeholder="—"
                   placeholderTextColor={placeholder}
                   style={[styles.input, { color: text, borderColor: border }]}
                 />
+                <ThemedText style={styles.hintText}>Supported: {f.min}–{f.max} {f.unit}</ThemedText>
+                {errors[f.key] && <ThemedText accessibilityRole="alert" accessibilityLiveRegion="polite">{errors[f.key]}</ThemedText>}
               </View>
             ))}
           </View>
+          <ThemedText style={styles.hintText}>Arm and thigh: wrap the tape around the limb to measure circumference, not diameter.</ThemedText>
+          {(errors.form || errors.measured_date) && <ThemedText accessibilityRole="alert">{errors.form ?? errors.measured_date}</ThemedText>}
           <Pressable
             onPress={onSave}
-            disabled={saving}
+            disabled={saving || !hasAnyValue}
             style={({ pressed }) => [
               styles.saveBtn,
               { backgroundColor: tint },
               pressed && { opacity: 0.7 },
-              saving && { opacity: 0.5 },
+              (saving || !hasAnyValue) && { opacity: 0.5 },
             ]}
+            accessibilityState={{ disabled: saving || !hasAnyValue }}
+            accessibilityHint={hasAnyValue ? undefined : 'Enter at least one measurement first'}
             accessibilityRole="button"
             accessibilityLabel="Save body measurements"
           >
@@ -204,9 +238,43 @@ export default function BodyMetricsScreen() {
         </View>
 
         {/* List */}
-        {entries.length === 0 ? (
+        {loadState === 'error' && (
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
-            <ThemedText style={{ color: placeholder }}>No measurements yet.</ThemedText>
+            <ThemedText style={{ color: dangerColor }} accessibilityRole="alert">
+              Couldn&apos;t load measurements. Check your connection and try again.
+            </ThemedText>
+            <Pressable
+              onPress={onRetry}
+              disabled={retrying}
+              style={({ pressed }) => [
+                styles.retryBtn,
+                { backgroundColor: tint },
+                pressed && { opacity: 0.7 },
+                retrying && { opacity: 0.6 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading measurements"
+              accessibilityState={{ disabled: retrying, busy: retrying }}
+            >
+              <ThemedText type="defaultSemiBold" style={{ color: onTint }}>{retrying ? 'Retrying…' : 'Retry'}</ThemedText>
+            </Pressable>
+          </View>
+        )}
+        {loadState === 'loading' && (
+          <View style={[styles.card, styles.center]}>
+            <ActivityIndicator />
+          </View>
+        )}
+        {loadState === 'ready' && loadError && (
+          <View style={[styles.card, { backgroundColor: dangerColor }]}>
+            <ThemedText style={[styles.errorBannerText, { color: dangerForeground }]} accessibilityRole="alert">
+              Couldn&apos;t refresh. Showing previously loaded measurements.
+            </ThemedText>
+          </View>
+        )}
+        {loadState === 'ready' && entries.length === 0 ? (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText style={{ color: placeholder }}>No measurements saved yet. Enter a measurement above and tap Save.</ThemedText>
           </View>
         ) : (
           entries.map((e) => {
@@ -257,6 +325,9 @@ export default function BodyMetricsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingTop: 8 },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  retryBtn: { marginTop: 12, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  errorBannerText: { fontSize: 13, lineHeight: 18 },
   card: {
     borderRadius: 14,
     padding: 16,

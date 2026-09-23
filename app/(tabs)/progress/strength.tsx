@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
@@ -23,6 +23,8 @@ export default function StrengthProgressionScreen() {
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
+  const dangerColor = useThemeColor({}, 'danger');
+  const dangerForeground = useThemeColor({}, 'dangerForeground');
 
   const { can } = useEntitlement();
   const { toast, showToast, hideToast } = useToast();
@@ -30,20 +32,54 @@ export default function StrengthProgressionScreen() {
   const [points, setPoints] = useState<StrengthProgressionPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fixed, non-raw copy: never surface e.message directly (finding 6).
+  const LOAD_ERROR_MESSAGE = "Couldn't load progression data. Check your connection and try again.";
+
+  const mounted = useRef(false);
+  // Guards against onSubmitEditing bypassing the disabled Load button and
+  // firing a second, concurrent search: only the most recently started
+  // search may commit its result (finding 4).
+  const searchSeq = useRef(0);
+  // Tracks which exercise the currently-shown points belong to, so a failed
+  // search for a *different* exercise can never be mistaken for a stale
+  // result of the exercise still on screen (finding 1).
+  const loadedExercise = useRef<string | null>(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const onLoad = useCallback(async () => {
-    if (!exercise.trim()) return;
+    const query = exercise.trim();
+    if (!query) return;
+    const seq = ++searchSeq.current;
     setLoading(true);
     try {
-      const data = await fetchStrengthProgression(exercise.trim(), 60);
+      const data = await fetchStrengthProgression(query, 60);
+      if (!mounted.current || seq !== searchSeq.current) return;
       setPoints(data);
       setHasLoaded(true);
+      setError(null);
+      loadedExercise.current = query;
     } catch (e: any) {
-      setPoints([]);
-      setHasLoaded(true);
-      showToast(e?.message ?? 'Failed to load progression data.', 'error');
+      console.warn('[strength] load failed', e);
+      if (!mounted.current || seq !== searchSeq.current) return;
+      if (loadedExercise.current !== query) {
+        // The points on screen (if any) belong to a different exercise than
+        // the one that just failed — never show them under the wrong label.
+        // Fall back to the full error state instead of a same-exercise
+        // "stale results" banner.
+        setPoints([]);
+        setHasLoaded(false);
+        loadedExercise.current = null;
+      }
+      setError(LOAD_ERROR_MESSAGE);
+      showToast(LOAD_ERROR_MESSAGE, 'error');
     } finally {
-      setLoading(false);
+      if (mounted.current && seq === searchSeq.current) setLoading(false);
     }
   }, [exercise, showToast]);
 
@@ -119,14 +155,47 @@ export default function StrengthProgressionScreen() {
           </Pressable>
         </View>
 
-        {hasLoaded && points.length === 0 ? (
+        {loading && points.length === 0 ? (
+          <View style={[styles.card, styles.center]}>
+            <ActivityIndicator />
+          </View>
+        ) : error && points.length === 0 ? (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText style={{ color: dangerColor }} accessibilityRole="alert">
+              {error}
+            </ThemedText>
+            <Pressable
+              onPress={onLoad}
+              style={({ pressed }) => [
+                styles.loadBtn,
+                styles.retryBtn,
+                { backgroundColor: tint },
+                pressed && { opacity: 0.7 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading strength progression"
+            >
+              <ThemedText type="defaultSemiBold" style={[styles.loadBtnText, { color: onTint }]}>
+                Retry
+              </ThemedText>
+            </Pressable>
+          </View>
+        ) : hasLoaded && points.length === 0 ? (
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
             <ThemedText style={{ color: placeholder }}>
-              No data yet for this exercise.
+              No saved sets found for this exercise. Use the exact name from Workout History, or log and finish a workout first.
             </ThemedText>
           </View>
         ) : (
-          points.map((p, idx) => (
+          <>
+            {error && points.length > 0 && (
+              <View style={[styles.card, { backgroundColor: dangerColor }]}>
+                <ThemedText style={[styles.errorBannerText, { color: dangerForeground }]} accessibilityRole="alert">
+                  Couldn&apos;t refresh. Showing the last loaded results.
+                </ThemedText>
+              </View>
+            )}
+            {points.map((p, idx) => (
             <View key={`${p.workout_date}-${idx}`} style={[styles.card, { backgroundColor: cardBackground }]}>
               <ThemedText type="defaultSemiBold" style={styles.pointDate}>
                 {p.workout_date}
@@ -152,7 +221,9 @@ export default function StrengthProgressionScreen() {
               <View style={styles.pointRow}>
                 <ThemedText style={[styles.pointLabel, { color: placeholder }]}>Volume</ThemedText>
                 <ThemedText type="defaultSemiBold">
-                  {p.total_volume != null ? `${Math.round(p.total_volume)} lb` : '—'}
+                  {/* Volume is weight x reps, so its unit is lb-reps, not lb. Labelling
+                      it "lb" invited a nonsense comparison with Top weight above. */}
+                  {p.total_volume != null ? `${Math.round(p.total_volume).toLocaleString()} lb·reps` : '—'}
                 </ThemedText>
               </View>
               <View style={styles.pointRow}>
@@ -160,7 +231,8 @@ export default function StrengthProgressionScreen() {
                 <ThemedText type="defaultSemiBold">{p.set_count}</ThemedText>
               </View>
             </View>
-          ))
+            ))}
+          </>
         )}
       </ScrollView>
     </ThemedView>
@@ -175,6 +247,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  retryBtn: { marginTop: 12, minHeight: 44, justifyContent: 'center' },
+  errorBannerText: { fontSize: 13, lineHeight: 18 },
   tipText: { fontSize: 12, marginBottom: 12, fontStyle: 'italic' },
   input: {
     borderWidth: 1,

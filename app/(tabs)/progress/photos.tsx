@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -38,27 +39,57 @@ export default function BodyPhotosScreen() {
   const border = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
+  const dangerColor = useThemeColor({}, 'danger');
+  const dangerForeground = useThemeColor({}, 'dangerForeground');
 
   const { session } = useAuth();
   const userId = session?.user?.id ?? '';
 
   const { toast, showToast, hideToast } = useToast();
   const [photos, setPhotos] = useState<BodyPhoto[]>([]);
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pose, setPose] = useState<Pose>('front');
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<BodyPhoto | null>(null);
+  const [retrying, setRetrying] = useState(false);
+
+  const mounted = useRef(false);
+  // Guards retry/add-photo/delete loads (which all funnel through load())
+  // from resolving out of order and clobbering a newer result.
+  const loadSequence = useRef(0);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     try {
       const list = await fetchBodyPhotos(180);
+      if (!mounted.current || sequence !== loadSequence.current) return;
       setPhotos(list);
-    } catch (e) {
+      setLoadState('ready');
+      setLoadError(null);
+    } catch (e: any) {
+      if (!mounted.current || sequence !== loadSequence.current) return;
       console.warn('[photos] load failed', e);
+      // Keep any previously loaded photos visible; only fall back to the
+      // full error state when there is nothing on screen yet.
+      setLoadError(e?.message ?? 'Could not load progress photos.');
+      setLoadState((prev) => (prev === 'ready' ? 'ready' : 'error'));
     }
   }, []);
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  const onRetry = useCallback(async () => {
+    setRetrying(true);
+    await load();
+    if (mounted.current) setRetrying(false);
   }, [load]);
 
   const onAddPhoto = useCallback(async () => {
@@ -172,11 +203,45 @@ export default function BodyPhotosScreen() {
         </View>
 
         {/* Grid */}
-        {photos.length === 0 ? (
+        {loadState === 'error' && (
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
-            <ThemedText style={{ color: placeholder }}>No photos yet.</ThemedText>
+            <ThemedText style={{ color: dangerColor }} accessibilityRole="alert">
+              Couldn&apos;t load progress photos. Check your connection and try again.
+            </ThemedText>
+            <Pressable
+              onPress={onRetry}
+              disabled={retrying}
+              style={({ pressed }) => [
+                styles.retryBtn,
+                { backgroundColor: tint },
+                pressed && { opacity: 0.7 },
+                retrying && { opacity: 0.6 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading progress photos"
+              accessibilityState={{ disabled: retrying, busy: retrying }}
+            >
+              <ThemedText type="defaultSemiBold" style={{ color: onTint }}>{retrying ? 'Retrying…' : 'Retry'}</ThemedText>
+            </Pressable>
           </View>
-        ) : (
+        )}
+        {loadState === 'loading' && (
+          <View style={[styles.card, styles.center]}>
+            <ActivityIndicator />
+          </View>
+        )}
+        {loadState === 'ready' && loadError && (
+          <View style={[styles.card, { backgroundColor: dangerColor }]}>
+            <ThemedText style={[styles.errorBannerText, { color: dangerForeground }]} accessibilityRole="alert">
+              Couldn&apos;t refresh. Showing previously loaded photos.
+            </ThemedText>
+          </View>
+        )}
+        {loadState === 'ready' && photos.length === 0 ? (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText style={{ color: placeholder }}>No progress photos yet. Tap Add photo to start a comparison.</ThemedText>
+          </View>
+        ) : loadState === 'ready' ? (
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
             <View style={styles.grid}>
               {photos.map((photo) => (
@@ -208,7 +273,7 @@ export default function BodyPhotosScreen() {
               Tap to view · Long-press to delete
             </ThemedText>
           </View>
-        )}
+        ) : null}
       </ScrollView>
 
       {/* Fullscreen preview */}
@@ -246,6 +311,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  retryBtn: { marginTop: 12, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  errorBannerText: { fontSize: 13, lineHeight: 18 },
   cardTitle: { marginBottom: 12 },
   poseRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   poseBtn: {

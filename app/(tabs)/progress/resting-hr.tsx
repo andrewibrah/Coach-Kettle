@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -27,6 +28,19 @@ import type {
   RestingHeartRateEntry,
   RestingHeartRateSummary,
 } from '@/types/body';
+import { parseStrictInteger } from '@/lib/bodyMetricValidation';
+
+// Bounds match supabase/functions/resting-hr/index.ts (`bpm must be 25..220`).
+export const RESTING_BPM_MIN = 25;
+export const RESTING_BPM_MAX = 220;
+
+export function validateRestingBpmInput(raw: string): { value: number } | { error: string } {
+  const parsed = parseStrictInteger(raw);
+  if (parsed == null || parsed < RESTING_BPM_MIN || parsed > RESTING_BPM_MAX) {
+    return { error: `Enter a whole number between ${RESTING_BPM_MIN} and ${RESTING_BPM_MAX}.` };
+  }
+  return { value: parsed };
+}
 
 export default function RestingHrScreen() {
   const insets = useSafeAreaInsets();
@@ -38,24 +52,47 @@ export default function RestingHrScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const dangerColor = useThemeColor({}, 'danger');
+  const dangerForeground = useThemeColor({}, 'dangerForeground');
   const successColor = useThemeColor({}, 'success');
 
   const [summary, setSummary] = useState<RestingHeartRateSummary | null>(null);
   const [entries, setEntries] = useState<RestingHeartRateEntry[]>([]);
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [bpm, setBpm] = useState('');
   const [saving, setSaving] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
+  const mounted = useRef(false);
+  // Guards retry/onLog/onDelete loads (which all funnel through load()) from
+  // resolving out of order and clobbering a newer result.
+  const loadSequence = useRef(0);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     try {
       const [s, list] = await Promise.all([
         fetchRestingHRSummary(30),
         fetchRestingHRList(60),
       ]);
+      if (!mounted.current || sequence !== loadSequence.current) return;
       setSummary(s);
       setEntries(list);
-    } catch (e) {
+      setLoadState('ready');
+      setLoadError(null);
+    } catch (e: any) {
+      if (!mounted.current || sequence !== loadSequence.current) return;
       console.warn('[resting-hr] load failed', e);
+      // Keep previously loaded data visible; only fall back to the full error
+      // state when there is nothing on screen yet.
+      setLoadError(e?.message ?? 'Could not load resting heart rate data.');
+      setLoadState((prev) => (prev === 'ready' ? 'ready' : 'error'));
     }
   }, []);
 
@@ -63,17 +100,23 @@ export default function RestingHrScreen() {
     load();
   }, [load]);
 
+  const onRetry = useCallback(async () => {
+    setRetrying(true);
+    await load();
+    if (mounted.current) setRetrying(false);
+  }, [load]);
+
   const onLog = useCallback(async () => {
-    const parsed = parseInt(bpm, 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      showToast('Please enter a positive whole number.', 'error');
+    const result = validateRestingBpmInput(bpm);
+    if ('error' in result) {
+      showToast(result.error, 'error');
       return;
     }
     setSaving(true);
     try {
       await upsertRestingHR({
         measured_date: todayISO(),
-        bpm: parsed,
+        bpm: result.value,
         source: 'manual',
       });
       setBpm('');
@@ -141,6 +184,9 @@ export default function RestingHrScreen() {
             keyboardType="number-pad"
             style={[styles.input, { color: text, borderColor: border }]}
           />
+          <ThemedText style={[styles.hintText, { color: placeholder }]}>
+            Whole numbers, {RESTING_BPM_MIN}–{RESTING_BPM_MAX} bpm.
+          </ThemedText>
           <Pressable
             onPress={onLog}
             disabled={saving || !bpm.trim()}
@@ -160,9 +206,43 @@ export default function RestingHrScreen() {
         </View>
 
         {/* List */}
-        {entries.length === 0 ? (
+        {loadState === 'error' && (
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
-            <ThemedText style={{ color: placeholder }}>No entries yet.</ThemedText>
+            <ThemedText style={{ color: dangerColor }} accessibilityRole="alert">
+              Couldn&apos;t load resting heart rate data. Check your connection and try again.
+            </ThemedText>
+            <Pressable
+              onPress={onRetry}
+              disabled={retrying}
+              style={({ pressed }) => [
+                styles.retryBtn,
+                { backgroundColor: tint },
+                pressed && { opacity: 0.7 },
+                retrying && { opacity: 0.6 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading resting heart rate data"
+              accessibilityState={{ disabled: retrying, busy: retrying }}
+            >
+              <ThemedText type="defaultSemiBold" style={{ color: onTint }}>{retrying ? 'Retrying…' : 'Retry'}</ThemedText>
+            </Pressable>
+          </View>
+        )}
+        {loadState === 'loading' && (
+          <View style={[styles.card, styles.center]}>
+            <ActivityIndicator />
+          </View>
+        )}
+        {loadState === 'ready' && loadError && (
+          <View style={[styles.card, { backgroundColor: dangerColor }]}>
+            <ThemedText style={[styles.errorBannerText, { color: dangerForeground }]} accessibilityRole="alert">
+              Couldn&apos;t refresh. Showing previously loaded data.
+            </ThemedText>
+          </View>
+        )}
+        {loadState === 'ready' && entries.length === 0 ? (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText style={{ color: placeholder }}>No resting heart rate entries yet. Enter your resting BPM above to start tracking.</ThemedText>
           </View>
         ) : (
           entries.map((e) => (
@@ -224,6 +304,10 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  retryBtn: { marginTop: 12, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  errorBannerText: { fontSize: 13, lineHeight: 18 },
+  hintText: { fontSize: 11, marginBottom: 12, fontStyle: 'italic' },
   cardTitle: { marginBottom: 12 },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   statCol: { flex: 1, alignItems: 'center' },

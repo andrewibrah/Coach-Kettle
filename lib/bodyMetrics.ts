@@ -150,9 +150,6 @@ export async function fetchStrengthProgression(exercise: string, limit = 60): Pr
     p_exercise: exercise,
     p_limit: limit,
   });
-  if (error) {
-    console.warn('[bodyMetrics] strength_progression error', error.message);
-    return [];
-  }
+  if (error) throw new Error(error.message);
   return Array.isArray(data) ? data : [];
 }

@@ -18,6 +18,7 @@ import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useToast } from "@/hooks/useToast";
 import { api } from "@/lib/api";
+import { reflectionAfterCancel, reflectionAfterSaveResult, trimReflectionForSave } from "@/lib/historyReflection";
 import {
   deleteMedia,
   getMediaSignedUrls,
@@ -53,18 +54,9 @@ function ReviewCard({ review }: { review: SessionReview }) {
     return dangerColor;
   };
 
-  const getRatingEmoji = (rating: number) => {
-    if (rating >= 9) return "🔥";
-    if (rating >= 7) return "💪";
-    if (rating >= 5) return "👍";
-    if (rating >= 3) return "🙂";
-    return "😅";
-  };
-
   return (
     <View style={[styles.reviewCard, { backgroundColor: cardColor }]}>
       <View style={styles.reviewHeader}>
-        <Text style={styles.reviewEmoji}>{getRatingEmoji(review.rating)}</Text>
         <View style={styles.reviewRatingInfo}>
           <Text style={[styles.reviewRating, { color: getRatingColor(review.rating) }]}>
             {review.rating}/10
@@ -86,7 +78,10 @@ function ReviewCard({ review }: { review: SessionReview }) {
       </View>
 
       <View style={styles.reviewSection}>
-        <Text style={[styles.reviewSectionTitle, { color: tintColor }]}>📝 Next Session</Text>
+        <View style={styles.reviewSectionTitleRow}>
+          <IconSymbol name="pencil" size={14} color={tintColor} />
+          <Text style={[styles.reviewSectionTitle, { color: tintColor }]}>Next Session</Text>
+        </View>
         <Text style={[styles.reviewText, { color: textColor, fontStyle: 'italic' }]}>{review.nextSessionNote}</Text>
       </View>
     </View>
@@ -146,8 +141,17 @@ export default function WorkoutDetail() {
 
   // Reflection state
   const [reflection, setReflection] = useState("");
+  // Tracks the last text actually persisted (or freshly loaded), so Cancel
+  // reverts to what was really saved instead of the stale value read at
+  // mount time (F18: Cancel after a successful save reverted to old text).
+  const [savedReflection, setSavedReflection] = useState("");
   const [reflectionEditing, setReflectionEditing] = useState(false);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+  // Synchronous in-flight flag: blocks a same-tick double Save press before
+  // the `reflectionSaving` state update (async/batched) would take effect.
+  const reflectionSavingRef = useRef(false);
+  const currentRouteId = useRef(id);
+  useEffect(() => { currentRouteId.current = id; }, [id]);
 
   // Media state
   const [mediaThumbs, setMediaThumbs] = useState<(MediaThumb & { id?: string; storagePath?: string })[]>([]);
@@ -161,6 +165,7 @@ export default function WorkoutDetail() {
 
         if (found) {
           setReflection(found.reflection ?? "");
+          setSavedReflection(found.reflection ?? "");
 
           // Load media thumbnails with signed URLs
           if (found.media && found.media.length > 0) {
@@ -199,16 +204,35 @@ export default function WorkoutDetail() {
   }, [workout]);
 
   const handleSaveReflection = useCallback(async () => {
-    if (!id) return;
+    if (!id || reflectionSavingRef.current) return;
+    reflectionSavingRef.current = true;
+    const submittedId = id;
+    const submitted = trimReflectionForSave(reflection);
     setReflectionSaving(true);
     try {
-      await api.updateWorkoutMeta(id, { reflection: reflection.trim() });
-      setReflectionEditing(false);
+      const res = await api.updateWorkoutMeta(submittedId, { reflection: submitted });
+      // Ignore a stale response for a workout the user has since navigated
+      // away from — but `reflectionSaving` below is still always cleared so
+      // the UI never gets stuck, even after a route change mid-save.
+      if (!isMounted.current) return;
+      if (currentRouteId.current !== submittedId) return;
+      const result = reflectionAfterSaveResult(submitted, res?.ok === true);
+      if (!result) {
+        showToast('Could not save reflection. Please try again.', 'error');
+        return;
+      }
+      setSavedReflection(result.saved);
+      setReflection(result.draft);
+      setReflectionEditing(result.editing);
+      setWorkout((prev) => (prev ? { ...prev, reflection: result.saved } : prev));
     } catch (err) {
       console.error("[WorkoutDetail] Failed to save reflection:", err);
-      showToast('Could not save reflection. Please try again.', 'error');
+      if (isMounted.current && currentRouteId.current === submittedId) {
+        showToast('Could not save reflection. Please try again.', 'error');
+      }
     } finally {
-      setReflectionSaving(false);
+      reflectionSavingRef.current = false;
+      if (isMounted.current) setReflectionSaving(false);
     }
   }, [id, reflection, showToast]);
 
@@ -360,7 +384,7 @@ export default function WorkoutDetail() {
             <View key={`group_${gIdx}`} style={[styles.exerciseGroup, { backgroundColor: cardColor }]}>
               <View style={styles.exerciseHeader}>
                 <Text style={[styles.exerciseGroupName, { color: textColor }]}>{group.exercise}</Text>
-                <Text style={[styles.setCount, { color: secondaryTextColor }]}>{group.sets.length} sets</Text>
+                <Text style={[styles.setCount, { color: secondaryTextColor }]}>{group.sets.length} {group.sets.length === 1 ? 'set' : 'sets'}</Text>
               </View>
               <View style={styles.setsContainer}>
                 {group.sets.map(({ row, setNum }, sIdx) => (
@@ -405,7 +429,7 @@ export default function WorkoutDetail() {
         {/* ── Reflection Card ── */}
         <View style={[styles.reflectionCard, { backgroundColor: cardColor }]}>
           <View style={styles.reflectionHeader}>
-            <Text style={[styles.reflectionIcon, { color: mutedTextColor }]}>💭</Text>
+            <IconSymbol name="bubble.left.and.bubble.right.fill" size={16} color={mutedTextColor} />
             <Text style={[styles.reflectionTitle, { color: textColor }]}>Reflection</Text>
             {!reflectionEditing && (
               <Pressable
@@ -437,14 +461,16 @@ export default function WorkoutDetail() {
                 textAlignVertical="top"
                 maxLength={2000}
                 autoFocus
+                editable={!reflectionSaving}
               />
               <View style={styles.reflectionActions}>
                 <Pressable
                   onPress={() => {
-                    setReflection(workout.reflection ?? "");
+                    setReflection(reflectionAfterCancel(savedReflection));
                     setReflectionEditing(false);
                   }}
-                  style={({ pressed }) => [styles.reflectionActionBtn, pressed && { opacity: 0.6 }]}
+                  disabled={reflectionSaving}
+                  style={({ pressed }) => [styles.reflectionActionBtn, pressed && { opacity: 0.6 }, reflectionSaving && { opacity: 0.4 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Cancel editing reflection"
                 >
@@ -625,9 +651,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(128,128,128,0.2)',
   },
-  reviewEmoji: {
-    fontSize: 36,
-  },
   reviewRatingInfo: {
     flex: 1,
   },
@@ -640,6 +663,11 @@ const styles = StyleSheet.create({
   },
   reviewSection: {
     gap: 4,
+  },
+  reviewSectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   reviewSectionTitle: {
     fontSize: 13,
@@ -671,9 +699,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  reflectionIcon: {
-    fontSize: 14,
   },
   reflectionTitle: {
     fontSize: 15,
