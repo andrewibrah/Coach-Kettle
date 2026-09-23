@@ -104,6 +104,34 @@ export function buildImportSaveRequest(
   };
 }
 
+/** Explicit confirmation only; omitted weekdays preserve existing server overrides. */
+export function buildWeeklyImportSaveRequest(
+  goals: import('@/types/nutrition').WeeklyGoals,
+  saved: SavedNutritionTargetSet | null,
+  confirmed: boolean,
+): NutritionTargetSaveRequest {
+  if (!confirmed) throw new Error('Confirm importing device goals to your account.');
+  if (!saved || !(saved.base_target || saved.training_day_target || saved.rest_day_target)) {
+    throw new Error('Save and confirm your daily targets first, then import device goals. Device goals are retained.');
+  }
+  const overrides = new Map((saved.day_overrides ?? []).map(o => [o.day_of_week, o]));
+  for (const [key, target] of Object.entries(goals)) {
+    const day = Number(key);
+    if (!target || !Number.isInteger(day) || day < 0 || day > 6) continue;
+    if (![target.calories, target.protein_g, target.carbs_g, target.fat_g].every(n => Number.isFinite(n) && n > 0)) throw new Error('Complete all device goal macros before importing.');
+    overrides.set(day as import('@/types/nutritionTargets').DayOfWeek, {
+      day_of_week: day as import('@/types/nutritionTargets').DayOfWeek, target,
+      source: 'imported_existing', updated_at: new Date().toISOString(),
+    });
+  }
+  return { source: saved?.source ?? 'imported_existing', targets: {
+    ...(saved.base_target != null ? { base: saved.base_target } : {}),
+    ...(saved.training_day_target != null ? { training_day: saved.training_day_target } : {}),
+    ...(saved.rest_day_target != null ? { rest_day: saved.rest_day_target } : {}),
+    day_overrides: [...overrides.values()].sort((a, b) => a.day_of_week - b.day_of_week),
+  }, provenance: { user_confirmed: true, edited_after_suggestion: false, imported_from_existing: true } };
+}
+
 // ---------- Display bridge: SavedNutritionTargetSet -> legacy big row ----------
 
 // The existing dashboard + grading code consumes the legacy `NutritionTargets`

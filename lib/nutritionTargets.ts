@@ -3,6 +3,7 @@
 // This module intentionally imports ONLY types (erased at runtime) so it has no
 // runtime dependencies and can be unit-tested directly with `node --test`.
 
+import type { NutritionTargets, WeeklyGoals } from '@/types/nutrition';
 import type {
   DayOfWeek,
   DraftNutritionTargetSet,
@@ -76,6 +77,22 @@ export function isTargetSetStale(
   return now.getTime() > after;
 }
 
+// Authoritative selection is deliberately separate from the preview API below.
+// A selected incomplete row blocks lower layers; never invent approved macros.
+export function resolveApprovedClientTarget(args: ResolveTargetArgs): ResolvedNutritionTarget {
+  const saved = args.savedTargets?.source === 'local_draft' ? null : args.savedTargets;
+  const result = resolveTodayNutritionTarget({
+    date: args.date, now: args.now, isTrainingDay: args.isTrainingDay,
+    savedTargets: saved ? { ...saved, day_overrides: saved.day_overrides?.filter(o => o.source !== 'local_draft') } : null,
+    legacyTargets: args.legacyTargets,
+  });
+  const t = result.target;
+  if (!t || ![t.calories, t.protein_g, t.carbs_g, t.fat_g].every(n => typeof n === 'number' && Number.isFinite(n) && n > 0)) {
+    return { ...result, target: null, explanation: 'Complete and save your calorie and macro targets to enable grading and Coach nutrition guidance.' };
+  }
+  return result;
+}
+
 // ---------- Resolver ----------
 
 export interface ResolveTargetArgs {
@@ -85,6 +102,8 @@ export interface ResolveTargetArgs {
   suggestedTargets?: NutritionTargetSuggestResponse | null;
   draftTargets?: DraftNutritionTargetSet | null;
   now?: Date;
+  weeklyGoals?: WeeklyGoals;
+  legacyTargets?: NutritionTargets | null;
 }
 
 const EMPTY: ResolvedNutritionTarget = {
@@ -111,6 +130,21 @@ export function resolveTodayNutritionTarget(args: ResolveTargetArgs): ResolvedNu
   const dow = dayOfWeekFromIso(date);
   const saved = savedTargets ?? null;
   const stale = isTargetSetStale(saved, now);
+  const weekly = args.weeklyGoals?.[dow];
+  if (weekly) {
+    const base = resolveTodayNutritionTarget({ ...args, weeklyGoals: undefined });
+    return {
+      ...base,
+      target: {
+        calories: weekly.calories,
+        protein_g: weekly.protein_g ?? base.target?.protein_g,
+        carbs_g: weekly.carbs_g ?? base.target?.carbs_g,
+        fat_g: weekly.fat_g ?? base.target?.fat_g,
+      },
+      source: 'manual',
+      explanation: `Weekly override for ${dayLabel(dow)} — device preview only; excluded from grading and Coach until imported. ${base.target ? base.explanation : ''}`.trim(),
+    };
+  }
 
   if (saved) {
     // 1. Specific day override wins over everything within the saved set.
@@ -147,6 +181,23 @@ export function resolveTodayNutritionTarget(args: ResolveTargetArgs): ResolvedNu
         explanation: explain(saved.source, stale, 'base target'),
       };
     }
+  }
+
+  // Compatibility: durable legacy targets precede unsaved suggestions/drafts.
+  const legacy = args.legacyTargets;
+  if (legacy) {
+    return {
+      target: {
+        calories: isTrainingDay ? legacy.training_calories : legacy.rest_calories,
+        protein_g: isTrainingDay ? legacy.training_protein_g : legacy.rest_protein_g,
+        carbs_g: isTrainingDay ? legacy.training_carbs_g : legacy.rest_carbs_g,
+        fat_g: isTrainingDay ? legacy.training_fat_g : legacy.rest_fat_g,
+      },
+      source: null,
+      stale: false,
+      fallback: true,
+      explanation: `Existing ${isTrainingDay ? 'training-day' : 'rest-day'} target — saved before target provenance tracking.`,
+    };
   }
 
   // 4. Backend suggestion — only when present and not stale.

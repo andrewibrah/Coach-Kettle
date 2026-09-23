@@ -9,6 +9,8 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 import { useCoaching } from '@/contexts/CoachingContext';
+import { useNutrition } from '@/contexts/NutritionContext';
+import { getCoachPresentation } from '@/lib/coachingEvidence';
 import { todayISO } from '@/lib/workoutRules';
 import type { ColorGrade } from '@/types/nutrition';
 
@@ -41,10 +43,12 @@ export default function CoachScreen() {
 
   const dangerColor = useThemeColor({}, 'danger');
 
-  const { loading, error, today, refresh, regenerateToday } = useCoaching();
+  const { loading, error, needsNutritionSetup, today, refresh, regenerateToday } = useCoaching();
   const [regenerating, setRegenerating] = useState(false);
 
   const todayIso = todayISO();
+  const nutrition = useNutrition();
+  const presentation = today ? getCoachPresentation(today, nutrition) : null;
 
   const handleRegenerate = async () => {
     if (regenerating) return;
@@ -70,9 +74,15 @@ export default function CoachScreen() {
           {error && (
             <View style={[styles.errorBanner, { backgroundColor: dangerColor }]}>
               <ThemedText style={styles.errorText}>{error}</ThemedText>
-              <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Retry">
-                <ThemedText style={styles.retryBtnText}>Retry</ThemedText>
-              </Pressable>
+              {needsNutritionSetup ? (
+                <Pressable onPress={() => router.push('/(tabs)/nutrition/targets' as any)} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Set nutrition targets">
+                  <ThemedText style={styles.retryBtnText}>Set targets</ThemedText>
+                </Pressable>
+              ) : (
+                <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Retry">
+                  <ThemedText style={styles.retryBtnText}>Retry</ThemedText>
+                </Pressable>
+              )}
             </View>
           )}
           {!today ? (
@@ -106,7 +116,7 @@ export default function CoachScreen() {
                   <View
                     style={[
                       styles.bigDot,
-                      { backgroundColor: dotColor(today.overall_color, border) },
+                      { backgroundColor: dotColor(null, border) },
                     ]}
                   />
                 </View>
@@ -114,21 +124,21 @@ export default function CoachScreen() {
                 <View style={{ marginTop: 12 }}>
                   <ThemedText style={{ fontWeight: '700', marginBottom: 4 }}>What you did well</ThemedText>
                   <ThemedText style={{ color: placeholder }}>
-                    {today.did_well ?? '—'}
+                    {presentation?.did_well ?? '—'}
                   </ThemedText>
                 </View>
 
                 <View style={{ marginTop: 12 }}>
                   <ThemedText style={{ fontWeight: '700', marginBottom: 4 }}>What needs improvement</ThemedText>
                   <ThemedText style={{ color: placeholder }}>
-                    {today.needs_improvement ?? '—'}
+                    {presentation?.needs_improvement ?? '—'}
                   </ThemedText>
                 </View>
 
                 <View style={{ marginTop: 12 }}>
                   <ThemedText style={{ fontWeight: '700', marginBottom: 4 }}>Tomorrow&apos;s focus</ThemedText>
                   <ThemedText style={{ color: placeholder }}>
-                    {today.tomorrow_focus ?? '—'}
+                    {presentation?.tomorrow_focus ?? '—'}
                   </ThemedText>
                 </View>
 
@@ -137,36 +147,11 @@ export default function CoachScreen() {
                 </ThemedText>
               </View>
 
-              {/* Pill row */}
               <View style={[styles.card, { backgroundColor: cardBackground }]}>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  <View style={[styles.pill, { borderColor: border }]}>
-                    <ThemedText style={{ fontSize: 12, color: textColor }}>
-                      workout {today.workout_completed ? '✓' : '✗'}
-                    </ThemedText>
-                  </View>
-                  <View style={[styles.pill, { borderColor: border, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                    <View
-                      style={[
-                        styles.smallDot,
-                        { backgroundColor: dotColor(today.nutrition_color, border) },
-                      ]}
-                    />
-                    <ThemedText style={{ fontSize: 12, color: textColor }}>
-                      nutrition {today.nutrition_color ?? 'n/a'}
-                    </ThemedText>
-                  </View>
-                  <View style={[styles.pill, { borderColor: border }]}>
-                    <ThemedText style={{ fontSize: 12, color: textColor }}>
-                      score {today.nutrition_score == null ? '—' : Math.round(today.nutrition_score)}
-                    </ThemedText>
-                  </View>
-                  <View style={[styles.pill, { borderColor: border, backgroundColor: tint }]}>
-                    <ThemedText style={{ fontSize: 12, color: onTint, fontWeight: '700' }}>
-                      harshness {today.harshness_level}
-                    </ThemedText>
-                  </View>
-                </View>
+                <ThemedText style={{ color: placeholder }}>{presentation?.availability}</ThemedText>
+                <ThemedText style={{ color: textColor, marginTop: 8 }}>
+                  {today.workout_completed ? 'Workout recorded' : 'No workout recorded for this report date'}
+                </ThemedText>
               </View>
 
               {/* Actions */}

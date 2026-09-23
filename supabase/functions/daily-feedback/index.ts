@@ -15,6 +15,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { resolveApprovedNutritionTarget } from '../_shared/nutritionTargetResolution.ts';
+import { loadApprovedNutritionTargetInputs } from '../_shared/nutritionTargetLoading.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,37 +37,34 @@ function jsonRes(b: unknown, s = 200): Response {
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
 function isIsoDate(s: unknown): s is string {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s) || s.startsWith("0000")) return false;
+  const parsed = new Date(`${s}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === s;
 }
 
 interface NutritionTargets {
-  training_calories: number; training_protein_g: number; training_carbs_g: number; training_fat_g: number;
-  rest_calories: number; rest_protein_g: number; rest_carbs_g: number; rest_fat_g: number;
-  fiber_g_min: number; saturated_fat_g_max: number;
+  calories: number; protein_g: number; carbs_g: number; fat_g: number;
 }
 
 interface DayTotals {
+  log_count: number;
   calories: number; protein_g: number; carbs_g: number; fat_g: number; fiber_g: number; saturated_fat_g: number;
 }
 
-function gradeNutrition(t: DayTotals, tg: NutritionTargets, isTrainingDay: boolean): {
+function gradeNutrition(t: DayTotals, tg: NutritionTargets): {
   color: 'green' | 'yellow' | 'red'; score: number; gaps: Record<string, unknown>;
 } {
-  if (!tg) return { color: "yellow", score: 50, gaps: {} };
-  const cal = isTrainingDay ? tg.training_calories : tg.rest_calories;
-  const prot = isTrainingDay ? tg.training_protein_g : tg.rest_protein_g;
-  const carb = isTrainingDay ? tg.training_carbs_g : tg.rest_carbs_g;
-  const fat = isTrainingDay ? tg.training_fat_g : tg.rest_fat_g;
+  const { calories: cal, protein_g: prot, carbs_g: carb, fat_g: fat } = tg;
 
   // Score: 0–100 based on macro adherence (closer to target → higher)
   const calScore = scoreNear(t.calories, cal, 0.10);    // ±10% sweet spot
   const protScore = scoreOver(t.protein_g, prot, 0.85); // hitting protein matters most
   const carbScore = scoreNear(t.carbs_g, carb, 0.15);
   const fatScore = scoreNear(t.fat_g, fat, 0.15);
-  const fiberScore = t.fiber_g >= tg.fiber_g_min ? 100 : (t.fiber_g / tg.fiber_g_min) * 100;
-  const satScore = t.saturated_fat_g <= tg.saturated_fat_g_max ? 100 : Math.max(0, 100 - (t.saturated_fat_g - tg.saturated_fat_g_max) * 5);
-
-  const weighted = calScore * 0.25 + protScore * 0.30 + carbScore * 0.15 + fatScore * 0.15 + fiberScore * 0.10 + satScore * 0.05;
+  // Hybrid targets and historical summaries contain only these four approved
+  // goals. Normalize existing macro weights; never invent fiber/sat-fat goals
+  // or borrow them from a different (legacy/current) target set.
+  const weighted = (calScore * 0.25 + protScore * 0.30 + carbScore * 0.15 + fatScore * 0.15) / 0.85;
   const score = Math.round(weighted);
   const color: 'green' | 'yellow' | 'red' = score >= 80 ? "green" : score >= 60 ? "yellow" : "red";
 
@@ -74,8 +73,7 @@ function gradeNutrition(t: DayTotals, tg: NutritionTargets, isTrainingDay: boole
     protein_gap_g: Math.round(t.protein_g - prot),
     carb_gap_g: Math.round(t.carbs_g - carb),
     fat_gap_g: Math.round(t.fat_g - fat),
-    fiber_status: t.fiber_g < tg.fiber_g_min ? "low" : "ok",
-    saturated_fat_status: t.saturated_fat_g > tg.saturated_fat_g_max ? "high" : "ok",
+
   };
   return { color, score, gaps };
 }
@@ -103,67 +101,24 @@ function buildNarrative(args: {
   streak: number;
   badStreak: number;
 }): { did_well: string; needs_improvement: string; tomorrow_focus: string } {
-  const { tone, nutritionColor, workoutDone, wasWorkoutDay, gaps, streak, badStreak } = args;
-  const proteinGap = Number(gaps.protein_gap_g ?? 0);
-  const calorieGap = Number(gaps.calorie_gap ?? 0);
-  const fiberLow = gaps.fiber_status === "low";
-
-  // did_well: pick a genuine positive
-  let didWell: string;
-  if (nutritionColor === "green" && workoutDone) {
-    didWell = `Hit your macros and finished the workout. ${streak > 1 ? `${streak}-day streak.` : "Quality day."}`;
-  } else if (nutritionColor === "green") {
-    didWell = `Nutrition landed inside targets. Strong logging discipline.`;
-  } else if (workoutDone) {
-    didWell = `Got the training session done${wasWorkoutDay ? " on a scheduled day" : ""}. That part stayed locked in.`;
-  } else if (Math.abs(calorieGap) <= 200) {
-    didWell = `Calories were close to target — direction was right, even if macros wobbled.`;
-  } else {
-    didWell = `You logged. Tracking is the foundation; that part you owned today.`;
+  const { nutritionColor, workoutDone, gaps } = args;
+  if (nutritionColor == null || !Number.isFinite(gaps.calorie_gap) || !Number.isFinite(gaps.protein_gap_g)) {
+    return {
+      did_well: workoutDone ? "A completed workout is recorded for this date." : "No completed workout is recorded for this date.",
+      needs_improvement: "Not enough matching-date nutrition evidence to assess intake. Missing data is not a success or a failure.",
+      tomorrow_focus: "Review your food entries and saved targets before drawing conclusions about this day.",
+    };
   }
-
-  // needs_improvement: name the specific gap
-  let needsImprovement: string;
-  if (proteinGap < -20) {
-    needsImprovement = `Protein finished ${Math.abs(proteinGap)}g under target. That's the muscle-retention lever — non-negotiable when you're training hard.`;
-  } else if (calorieGap > 300) {
-    needsImprovement = `Calories ran ${calorieGap} over target. One overshoot is fine; pattern matters more than the day.`;
-  } else if (calorieGap < -400) {
-    needsImprovement = `Calories landed ${Math.abs(calorieGap)} under target. Under-fueling kills recovery and next-day performance.`;
-  } else if (fiberLow) {
-    needsImprovement = `Fiber under 25g. Trade refined carbs for vegetables / beans / oats tomorrow.`;
-  } else if (wasWorkoutDay && !workoutDone) {
-    needsImprovement = `Scheduled training day, no workout logged. The plan doesn't work if it doesn't get executed.`;
-  } else if (nutritionColor === "yellow") {
-    needsImprovement = `Macros were "close enough" — yellow is the trap zone. Tighten one number tomorrow.`;
-  } else {
-    needsImprovement = `Nothing flagged hard today — push for excellence, not just adequacy.`;
-  }
-
-  // Harshness modifier on tone
-  if (tone === "direct" || tone === "accountability") {
-    if (badStreak >= 2) {
-      needsImprovement = `${needsImprovement} This is ${badStreak} days in a row. Pick one habit tomorrow and execute it without negotiation.`;
-    }
-  }
-  if (tone === "accountability") {
-    needsImprovement = `${needsImprovement} You know what to do. Stop debating it.`;
-  }
-  if (tone === "supportive" && badStreak === 0 && streak >= 3) {
-    didWell = `${didWell} You've built momentum — protect it.`;
-  }
-
-  // tomorrow_focus: one clear directive
-  let focus: string;
-  if (proteinGap < -20) focus = `Front-load protein tomorrow: 40g at breakfast (eggs + Greek yogurt or shake).`;
-  else if (calorieGap > 300) focus = `Tomorrow: same calorie target, drop one snack or one fat-heavy side.`;
-  else if (calorieGap < -400) focus = `Eat the planned dinner. Add a 200-cal snack post-workout. Don't undereat.`;
-  else if (wasWorkoutDay && !workoutDone) focus = `Get tomorrow's session done within the first half of the day. Don't let it slide twice.`;
-  else if (fiberLow) focus = `Add one fiber source per meal tomorrow (oats / beans / a vegetable side).`;
-  else if (nutritionColor === "green" && workoutDone) focus = `Repeat today. Don't change a single variable.`;
-  else focus = `Lock in protein and the workout. The rest follows.`;
-
-  return { did_well: didWell, needs_improvement: needsImprovement, tomorrow_focus: focus };
+  // Logs are observations, not proof that the user recorded every meal.
+  const proteinGap = Number(gaps.protein_gap_g);
+  const calorieGap = Number(gaps.calorie_gap);
+  return {
+    did_well: workoutDone
+      ? "A completed workout and food entries are recorded for this date."
+      : "Food entries are recorded for this date.",
+    needs_improvement: `Recorded calories are ${Math.abs(calorieGap)} ${calorieGap < 0 ? "below" : "above"} the saved target; recorded protein is ${Math.abs(proteinGap)}g ${proteinGap < 0 ? "below" : "above"}. Entries may be incomplete — this is not a complete-day assessment.`,
+    tomorrow_focus: "Check portions and any missing meals before changing your intake. Use your saved targets as a planning guide.",
+  };
 }
 
 async function getWorkoutDoneForDate(userId: string, date: string): Promise<boolean> {
@@ -172,14 +127,24 @@ async function getWorkoutDoneForDate(userId: string, date: string): Promise<bool
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("dateISO", date);
-  if (error) return false;
-  return (count ?? 0) > 0;
+  // Failed/missing evidence is unknown, not a skipped workout. Abort before
+  // generating feedback or changing behavior state; retain existing reports.
+  if (error || count == null || !Number.isInteger(count) || count < 0) {
+    throw new Error("Workout evidence unavailable; please try again.");
+  }
+  return count > 0;
 }
 
-async function getNutritionTotals(userClient: ReturnType<typeof createClient>, userId: string, date: string): Promise<DayTotals> {
-  const { data } = await userClient.rpc("get_food_daily_totals", { p_user_id: userId, p_date: date });
+async function getNutritionTotals(userClient: typeof admin, userId: string, date: string): Promise<DayTotals> {
+  const { data, error } = await userClient.rpc("get_food_daily_totals", { p_user_id: userId, p_date: date });
+  if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
+  const keys = ["calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "saturated_fat_g", "log_count"];
+  if (!row || keys.some(key => row[key] == null || !Number.isFinite(Number(row[key])) || Number(row[key]) < 0)) {
+    throw new Error("Nutrition totals unavailable");
+  }
   return {
+    log_count: Number(row.log_count),
     calories: Number(row?.calories ?? 0),
     protein_g: Number(row?.protein_g ?? 0),
     carbs_g: Number(row?.carbs_g ?? 0),
@@ -225,61 +190,6 @@ function deriveStateFromEvents(events: { event_date: string; kind: BehaviorEvent
   return { level, goodStreak, badStreak, lastGoodDay, lastBadDay, lastEvaluatedDate };
 }
 
-async function updateBehaviorState(
-  userId: string,
-  dateIso: string,
-  isGood: boolean,
-  isBad: boolean,
-  payload: Record<string, unknown>
-) {
-  const kind: BehaviorEventKind = isGood ? "good_day" : isBad ? "bad_day" : "neutral_day";
-
-  const { error: eventError } = await admin
-    .from("behavior_events")
-    .upsert({
-      user_id: userId,
-      event_date: dateIso,
-      kind,
-      delta_harshness: 0,
-      payload,
-    }, { onConflict: "user_id,event_date" });
-  if (eventError) throw eventError;
-
-  const since = new Date(`${dateIso}T00:00:00Z`);
-  since.setUTCDate(since.getUTCDate() - 90);
-  const sinceIso = since.toISOString().slice(0, 10);
-
-  const { data: events, error: eventsError } = await admin
-    .from("behavior_events")
-    .select("event_date, kind")
-    .eq("user_id", userId)
-    .gte("event_date", sinceIso)
-    .lte("event_date", dateIso)
-    .order("event_date", { ascending: true });
-  if (eventsError) throw eventsError;
-
-  const { level, goodStreak, badStreak, lastGoodDay, lastBadDay, lastEvaluatedDate } = deriveStateFromEvents(
-    ((events ?? []) as { event_date: string; kind: BehaviorEventKind }[])
-      .filter((ev) => ["good_day", "bad_day", "plan_recalibrated", "neutral_day"].includes(ev.kind))
-  );
-
-  const row = {
-    user_id: userId,
-    harshness_level: level,
-    consecutive_good_days: goodStreak,
-    consecutive_bad_days: badStreak,
-    last_evaluated_date: lastEvaluatedDate ?? dateIso,
-    last_bad_day_date: lastBadDay,
-    last_good_day_date: lastGoodDay,
-  };
-
-  await admin
-    .from("behavior_state")
-    .upsert(row, { onConflict: "user_id" });
-
-  return { level, goodStreak, badStreak };
-}
-
 /** Calendar date (YYYY-MM-DD) in the given IANA timezone. */
 function todayInTz(timezone: string): string {
   try {
@@ -292,66 +202,80 @@ function todayInTz(timezone: string): string {
   }
 }
 
-async function generateFeedback(userClient: ReturnType<typeof createClient>, userId: string, requestedDate: string | null) {
-  const [{ data: targets }, { data: profile }, { data: notifPrefs }] = await Promise.all([
-    admin.from("nutrition_targets").select("*").eq("user_id", userId).maybeSingle(),
+async function generateFeedback(userClient: typeof admin, userId: string, requestedDate: string | null) {
+  const [profileResult, timezoneResult] = await Promise.all([
     admin.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
     admin.from("notification_preferences").select("timezone").eq("user_id", userId).maybeSingle(),
   ]);
 
-  const timezone = notifPrefs?.timezone ?? "America/New_York";
+  if (profileResult.error || timezoneResult.error) throw new Error("Profile or timezone evidence unavailable");
+  const profile = profileResult.data;
+  const timezone = timezoneResult.data?.timezone ?? "America/New_York";
   const localToday = todayInTz(timezone);
   const date = requestedDate ?? localToday;
   // An in-progress day must never be graded as failed — the user may still
   // train and eat. Only completed (past) days can be "bad".
   const isInProgressDay = date >= localToday;
 
+  const isHistorical = date < localToday;
+  if (isHistorical) {
+    const existing = await admin.from("daily_feedback").select("*")
+      .eq("user_id", userId).eq("feedback_date", date).maybeSingle();
+    if (existing.error) throw existing.error;
+    if (existing.data?.user_id === userId && existing.data?.feedback_date === date) return existing.data;
+  }
+  let historicalSnapshot: Record<string, unknown> | null = null;
   const totals = await getNutritionTotals(userClient, userId, date);
   const workoutDone = await getWorkoutDoneForDate(userId, date);
 
-  // Did the user log any food at all for this date? Zero logs must not be
-  // graded red — it just means "nothing logged yet".
-  const { count: foodLogCount } = await admin
-    .from("food_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("log_date", date);
-  const hasFoodLogs = (foodLogCount ?? 0) > 0;
-
-  // Determine if this was a workout day: explicit user-selected days win,
-  // otherwise fall back to the days-per-week heuristic.
-  const dpw = Number(profile?.training_days_per_week ?? 0);
-
-  const localDow = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    timeZone: timezone,
-  }).format(new Date(`${date}T12:00:00Z`));
-  const DOW_MAP: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  const dow = DOW_MAP[localDow] ?? new Date(`${date}T12:00:00Z`).getUTCDay();
-
-  const TRAINING_DAY_MAP_LOCAL: Record<number, number[]> = {
-    1: [3], 2: [1, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6],
-  };
-  const explicitDays: number[] | null = Array.isArray(profile?.training_days) && profile.training_days.length > 0
-    ? profile.training_days.map((d: unknown) => Number(d))
-    : null;
-  const wasWorkoutDay = explicitDays
-    ? explicitDays.includes(dow)
-    : (TRAINING_DAY_MAP_LOCAL[dpw] ?? []).includes(dow);
-  // Schedule-based only — spontaneous training on a rest day doesn't change calorie targets
+  // Count and totals come from the same matching-date aggregate snapshot.
+  const hasFoodLogs = totals.log_count > 0;
+  let targets: NutritionTargets | null;
+  let wasWorkoutDay: boolean;
+  if (isHistorical) {
+    // Historical reports are immutable through this endpoint. Do not reinterpret
+    // them using today's targets, schedule or behavior state.
+    const snapshot = await admin.from("daily_nutrition_summaries").select("*")
+      .eq("user_id", userId).eq("summary_date", date).maybeSingle();
+    if (snapshot.error) throw snapshot.error;
+    const row = snapshot.data;
+    if (!row || row.user_id !== userId || row.summary_date !== date
+      || typeof row.is_training_day !== 'boolean'
+      || [row.calorie_target, row.protein_target, row.carb_target, row.fat_target]
+        .some(value => typeof value !== 'number' || !Number.isFinite(value) || value <= 0)) {
+      throw new Error('HISTORICAL_TARGET_SNAPSHOT_UNAVAILABLE: Historical feedback cannot be regenerated without its complete saved target snapshot.');
+    }
+    targets = { calories: row.calorie_target, protein_g: row.protein_target,
+      carbs_g: row.carb_target, fat_g: row.fat_target };
+    wasWorkoutDay = row.is_training_day;
+    historicalSnapshot = row;
+  } else {
+    const inputs = await loadApprovedNutritionTargetInputs(userClient, userId);
+    const resolution = resolveApprovedNutritionTarget({
+      ...inputs, date, now: new Date(),
+      daysPerWeek: profile?.training_days_per_week,
+      trainingDays: profile?.training_days,
+    });
+    // No approved targets: still produce a workout-only report (skip nutrition
+    // grading, no fabricated targets/zeros) rather than failing the whole
+    // report. Only the historical path stays hard-blocked (it can never
+    // regrade against today's setup state).
+    targets = resolution.status === 'available' ? resolution.target : null;
+    wasWorkoutDay = resolution.isTrainingDay;
+  }
   const isTrainingDay = wasWorkoutDay;
 
   let nutritionColor: 'green'|'yellow'|'red'|null = null;
   let nutritionScore: number|null = null;
   let gaps: Record<string, unknown> = {};
   if (targets && hasFoodLogs) {
-    const g = gradeNutrition(totals, targets as NutritionTargets, isTrainingDay);
+    const g = gradeNutrition(totals, targets);
     nutritionColor = g.color; nutritionScore = g.score; gaps = g.gaps;
   }
 
-  // Snapshot daily_nutrition_summary
-  if (targets && hasFoodLogs) {
-    await admin.from("daily_nutrition_summaries").upsert({
+  // Never overwrite a historical target snapshot, even after log edits.
+  // No summary without targets — there's nothing to grade against.
+  const summary = !isHistorical && hasFoodLogs && targets ? {
       user_id: userId,
       summary_date: date,
       is_training_day: isTrainingDay,
@@ -361,15 +285,14 @@ async function generateFeedback(userClient: ReturnType<typeof createClient>, use
       fat_g: totals.fat_g,
       fiber_g: totals.fiber_g,
       saturated_fat_g: totals.saturated_fat_g,
-      calorie_target: isTrainingDay ? targets.training_calories : targets.rest_calories,
-      protein_target: isTrainingDay ? targets.training_protein_g : targets.rest_protein_g,
-      carb_target: isTrainingDay ? targets.training_carbs_g : targets.rest_carbs_g,
-      fat_target: isTrainingDay ? targets.training_fat_g : targets.rest_fat_g,
+      calorie_target: targets.calories,
+      protein_target: targets.protein_g,
+      carb_target: targets.carbs_g,
+      fat_target: targets.fat_g,
       color_grade: nutritionColor,
       score: nutritionScore,
       gap_summary: gaps,
-    }, { onConflict: "user_id,summary_date" });
-  }
+  } : null;
 
   // Determine good vs bad day.
   // In-progress days can earn "good" but never "bad" — grading a day as
@@ -379,15 +302,10 @@ async function generateFeedback(userClient: ReturnType<typeof createClient>, use
   const isBad = !isInProgressDay && !isGood
     && (nutritionColor === "red" || (wasWorkoutDay && !workoutDone));
 
-  const { level, goodStreak, badStreak } = await updateBehaviorState(userId, date, isGood, isBad, {
-    score: nutritionScore,
-    workoutDone,
-    wasWorkoutDay,
-    nutritionColor,
-  });
-
-  const tone: 'supportive' | 'firm' | 'direct' | 'accountability' =
-    level === 3 ? "accountability" : level === 2 ? "direct" : level === 1 ? "firm" : "supportive";
+  // Narrative uses evidence only, not mutable behavior state. The transaction
+  // derives committed tone/streaks from events under the per-user lock.
+  const level = 0, goodStreak = 0, badStreak = 0;
+  const tone = "supportive" as const;
 
   const narrative = buildNarrative({
     tone,
@@ -414,20 +332,17 @@ async function generateFeedback(userClient: ReturnType<typeof createClient>, use
     did_well: narrative.did_well,
     needs_improvement: narrative.needs_improvement,
     tomorrow_focus: narrative.tomorrow_focus,
-    harshness_level: level,
-    tone,
-    streak_days: goodStreak,
-    bad_days_streak: badStreak,
   };
 
-  const { data, error } = await admin
-    .from("daily_feedback")
-    .upsert(row, { onConflict: "user_id,feedback_date" })
-    .select()
-    .single();
-  if (error) throw error;
-
-  return data;
+  const { data, error } = await admin.rpc("persist_coach_feedback", {
+    p_user_id: userId, p_date: date, p_historical: isHistorical,
+    p_summary: summary, p_snapshot: historicalSnapshot, p_report: row,
+    p_event: { kind: isGood ? "good_day" : isBad ? "bad_day" : "neutral_day",
+      payload: { score: nutritionScore, workoutDone, wasWorkoutDay, nutritionColor } },
+  });
+  if (error) throw new Error("Feedback persistence unavailable; please try again.");
+  if (data) return data;
+  throw new Error('Feedback persistence unavailable; please try again.');
 }
 
 serve(async (req) => {
@@ -483,11 +398,12 @@ serve(async (req) => {
       }
 
       if (action === "state") {
-        const { data } = await admin
+        const { data, error } = await admin
           .from("behavior_state")
           .select("*")
           .eq("user_id", userId)
           .maybeSingle();
+        if (error) throw error;
         return jsonRes({ state: data });
       }
 
@@ -496,7 +412,9 @@ serve(async (req) => {
 
     return jsonRes({ error: "Method not allowed" }, 405);
   } catch (e) {
-    console.error("[daily-feedback] error:", e);
-    return jsonRes({ error: (e as Error).message || "Internal server error" }, 500);
+    console.error("[daily-feedback] request failed");
+    const message = (e as Error).message || "Internal server error";
+    const status = /^(HISTORICAL_TARGET_SNAPSHOT_UNAVAILABLE|NUTRITION_TARGET_SETUP_REQUIRED):/.test(message) ? 409 : 500;
+    return jsonRes({ error: status === 409 ? message : "Feedback unavailable; please try again." }, status);
   }
 });

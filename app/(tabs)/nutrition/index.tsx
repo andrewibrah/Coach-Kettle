@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { todayISO } from '@/lib/workoutRules';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
@@ -12,8 +13,6 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
-import { useProfile } from '@/contexts/ProfileContext';
-import { isTrainingDay as checkTrainingDay } from '@/lib/trainingSchedule';
 import type { MealSlot, FoodLogEntry } from '@/types/nutrition';
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -32,22 +31,17 @@ export default function NutritionHomeScreen() {
   const successColor = useThemeColor({}, 'success');
   const warningColor = useThemeColor({}, 'warning');
 
-  const { loading, error, date, entries, totals, targets, grade, refresh, deleteEntry, weeklyGoals, todayTarget } = useNutrition();
-  const { profile } = useProfile();
+  const { loading, error, date, entries, totals, grade, refresh, deleteEntry, todayTarget } = useNutrition();
   const { toast, hideToast } = useToast();
 
-  const isTrainingDay = useMemo(() => {
-    const dow = new Date().getDay();
-    return checkTrainingDay(dow, profile?.training_days_per_week);
-  }, [profile?.training_days_per_week]);
+  useFocusEffect(useCallback(() => {
+    if (date !== todayISO()) void refresh();
+  }, [date, refresh]));
 
-  // Per-day goal takes priority; falls back to training/rest targets
-  const todayDow = new Date().getDay();
-  const dayGoal = weeklyGoals[todayDow];
-  const calTarget  = dayGoal?.calories   ?? (isTrainingDay ? targets?.training_calories  : targets?.rest_calories);
-  const protTarget = dayGoal?.protein_g  ?? (isTrainingDay ? targets?.training_protein_g : targets?.rest_protein_g);
-  const carbTarget = dayGoal?.carbs_g    ?? (isTrainingDay ? targets?.training_carbs_g   : targets?.rest_carbs_g);
-  const fatTarget  = dayGoal?.fat_g      ?? (isTrainingDay ? targets?.training_fat_g     : targets?.rest_fat_g);
+  const calTarget = todayTarget.target?.calories;
+  const protTarget = todayTarget.target?.protein_g;
+  const carbTarget = todayTarget.target?.carbs_g;
+  const fatTarget = todayTarget.target?.fat_g;
 
   const calLogged  = totals?.calories  ?? 0;
   const protLogged = totals?.protein_g ?? 0;
@@ -114,6 +108,20 @@ export default function NutritionHomeScreen() {
               </Pressable>
             </View>
           )}
+          {/* Add food */}
+          <Pressable
+            onPress={() => router.push('/nutrition/log')}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              { backgroundColor: tint, marginBottom: 12 },
+              pressed && { opacity: 0.7 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Add food"
+          >
+            <ThemedText style={{ color: onTint, fontWeight: '700' }}>Add food</ThemedText>
+          </Pressable>
+
           {/* Daily budget — remaining calories & macros */}
           {calTarget != null && (
             <View style={[styles.card, { backgroundColor: cardBackground }]}>
@@ -146,7 +154,7 @@ export default function NutritionHomeScreen() {
                 ))}
               </View>
               <ThemedText style={{ fontSize: 11, color: placeholder, marginTop: 10, textAlign: 'center' }}>
-                {dayGoal ? 'Weekly goal for today.' : todayTarget.source ? todayTarget.explanation : ''}
+                {todayTarget.explanation}
               </ThemedText>
             </View>
           )}
@@ -154,7 +162,7 @@ export default function NutritionHomeScreen() {
           {/* Today's totals */}
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
             <ThemedText type="subtitle" style={{ marginBottom: 12 }}>Today&apos;s totals</ThemedText>
-            {!targets ? (
+            {!todayTarget.target ? (
               <Pressable
                 onPress={() => router.push('/(tabs)/nutrition/targets')}
                 style={({ pressed }) => [
@@ -176,7 +184,7 @@ export default function NutritionHomeScreen() {
                 {renderBar('Carbs', totals?.carbs_g ?? 0, carbTarget, 'g')}
                 {renderBar('Fat', totals?.fat_g ?? 0, fatTarget, 'g')}
                 <ThemedText style={{ fontSize: 12, color: placeholder, marginTop: 4 }}>
-                  {isTrainingDay ? 'Training day targets' : 'Rest day targets'}
+                  {todayTarget.explanation}
                 </ThemedText>
               </>
             )}
@@ -224,20 +232,6 @@ export default function NutritionHomeScreen() {
               })
             )}
           </View>
-
-          {/* Add food */}
-          <Pressable
-            onPress={() => router.push('/nutrition/log')}
-            style={({ pressed }) => [
-              styles.primaryBtn,
-              { backgroundColor: tint, marginBottom: 12 },
-              pressed && { opacity: 0.7 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Add food"
-          >
-            <ThemedText style={{ color: onTint, fontWeight: '700' }}>Add food</ThemedText>
-          </Pressable>
 
           {/* View weekly meal plan */}
           <Pressable

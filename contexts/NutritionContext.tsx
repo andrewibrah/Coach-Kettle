@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useProfile } from '@/contexts/ProfileContext';
 import {
+  isRetryableNutritionError,
   fetchFoodLogDay,
   fetchNutritionTargets,
   fetchNutritionTargetSet,
@@ -32,12 +33,13 @@ import {
 } from '@/lib/nutrition';
 import { isTrainingDay } from '@/lib/trainingSchedule';
 import { todayISO as localTodayISO } from '@/lib/workoutRules';
-import { resolveTodayNutritionTarget } from '@/lib/nutritionTargets';
+import { dayOfWeekFromIso, resolveApprovedClientTarget } from '@/lib/nutritionTargets';
+import { watchNutritionDay } from '@/lib/nutritionDay';
 import {
   targetStorageKey,
   parseJson,
   buildImportSaveRequest,
-  savedSetToLegacyTargets,
+  buildWeeklyImportSaveRequest,
   LEGACY_LOCAL_TARGETS_KEY,
 } from '@/lib/nutritionTargetStorage';
 import type { FoodLogEntry, DailyTotals, NutritionTargets, MealPlan, PlannedMeal, RecentFood, WeeklyGoals } from '@/types/nutrition';
@@ -76,25 +78,22 @@ function scoreOver(actual: number, target: number, floorPct: number): number {
 
 function computeGrade(
   totals: DailyTotals | null,
-  targets: NutritionTargets | null,
-  training: boolean,
+  targets: import('@/types/nutritionTargets').NutritionMacroTarget | null,
 ): 'green' | 'yellow' | 'red' | null {
   if (!targets || !totals || totals.log_count === 0) return null;
-  const cal  = training ? targets.training_calories  : targets.rest_calories;
-  const prot = training ? targets.training_protein_g : targets.rest_protein_g;
-  const carb = training ? targets.training_carbs_g   : targets.rest_carbs_g;
-  const fat  = training ? targets.training_fat_g     : targets.rest_fat_g;
+  const { calories: cal, protein_g: prot, carbs_g: carb, fat_g: fat } = targets;
+  if (prot == null || carb == null || fat == null) return null;
 
   const calScore   = scoreNear(totals.calories,        cal,  0.10) * 0.25;
   const protScore  = scoreOver(totals.protein_g,       prot, 0.85) * 0.30;
   const carbScore  = scoreNear(totals.carbs_g,         carb, 0.15) * 0.15;
   const fatScore   = scoreNear(totals.fat_g,           fat,  0.15) * 0.15;
-  const fiberScore = (totals.fiber_g >= targets.fiber_g_min
+  const fiberScore = (totals.fiber_g >= 25
     ? 100
-    : (totals.fiber_g / targets.fiber_g_min) * 100) * 0.10;
-  const satScore   = (totals.saturated_fat_g <= targets.saturated_fat_g_max
+    : (totals.fiber_g / 25) * 100) * 0.10;
+  const satScore   = (totals.saturated_fat_g <= 30
     ? 100
-    : Math.max(0, 100 - (totals.saturated_fat_g - targets.saturated_fat_g_max) * 5)) * 0.05;
+    : Math.max(0, 100 - (totals.saturated_fat_g - 30) * 5)) * 0.05;
 
   const score = calScore + protScore + carbScore + fatScore + fiberScore + satScore;
   return score >= 80 ? 'green' : score >= 60 ? 'yellow' : 'red';
@@ -120,6 +119,9 @@ interface NutritionContextValue {
   updateEntry: (id: string, patch: Partial<Pick<FoodLogEntry, 'servings' | 'meal_slot' | 'notes'>>) => Promise<FoodLogEntry>;
   recentFoods: RecentFood[];
   weeklyGoals: WeeklyGoals;
+  importWeeklyGoals: (confirmed: boolean) => Promise<void>;
+  mealPlanStatus: LoadStatus;
+  refreshMealPlan: (expectedId?: string) => Promise<void>;
   saveWeeklyGoals: (goals: WeeklyGoals) => Promise<void>;
 
   // Hybrid target system
@@ -148,7 +150,7 @@ const EMPTY_RESOLVED: ResolvedNutritionTarget = {
 const NutritionContext = createContext<NutritionContextValue>({
   loading: true,
   error: null,
-  date: new Date().toISOString().slice(0, 10),
+  date: localTodayISO(),
   entries: [],
   totals: null,
   targets: null,
@@ -160,6 +162,9 @@ const NutritionContext = createContext<NutritionContextValue>({
   updateEntry: async () => { throw new Error('Not ready'); },
   recentFoods: [],
   weeklyGoals: {},
+  importWeeklyGoals: async () => {},
+  mealPlanStatus: 'idle',
+  refreshMealPlan: async () => {},
   saveWeeklyGoals: async () => {},
   savedTargets: null,
   savedTargetsStatus: 'idle',
@@ -200,6 +205,8 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   const [recentFoods, setRecentFoods] = useState<RecentFood[]>([]);
   const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoals>({});
 
+  const [mealPlanStatus, setMealPlanStatus] = useState<LoadStatus>('idle');
+
   // Hybrid target state buckets
   const [savedTargets, setSavedTargets] = useState<SavedNutritionTargetSet | null>(null);
   const [savedTargetsStatus, setSavedTargetsStatus] = useState<LoadStatus>('idle');
@@ -209,6 +216,26 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
   const [legacyImport, setLegacyImport] = useState<NutritionTargetSaveRequest | null>(null);
 
+  const loadedDay = useRef(date);
+  const refreshSequence = useRef(0);
+  const planSequence = useRef(0);
+  // Target intents invalidate only target reads, not food/plan refreshes.
+  const targetRevision = useRef(0);
+  // One lane per owner covers network commits AND their storage cleanup.
+  // A rejected operation releases the lane but still rejects its own caller.
+  const targetMutations = useRef(new Map<string, Promise<void>>());
+  const enqueueTargetMutation = useCallback((owner: string, work: () => Promise<void>) => {
+    const previous = targetMutations.current.get(owner) ?? Promise.resolve();
+    const result = previous.then(work);
+    const tail = result.then(() => {}, () => {});
+    targetMutations.current.set(owner, tail);
+    void tail.then(() => {
+      if (targetMutations.current.get(owner) === tail) targetMutations.current.delete(owner);
+    });
+    return result;
+  }, []);
+  const activeUser = useRef(userId);
+  useEffect(() => { activeUser.current = userId; }, [userId]);
   const isMounted = useRef(true);
   useEffect(() => {
     isMounted.current = true;
@@ -237,29 +264,43 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   const pendingKey = useCallback(() => (userId ? targetStorageKey(userId, 'pending-save') : null), [userId]);
 
   const saveDraft = useCallback(async (draft: DraftNutritionTargetSet) => {
+    if (!isMounted.current || activeUser.current !== userId) return;
     setDraftTargets(draft);
     await AsyncStorage.setItem(draftKey(), JSON.stringify(draft));
-  }, [draftKey]);
+  }, [userId, draftKey]);
 
   const clearDraft = useCallback(async () => {
+    if (!isMounted.current || activeUser.current !== userId) return;
     setDraftTargets(null);
     await AsyncStorage.removeItem(draftKey());
-  }, [draftKey]);
+  }, [userId, draftKey]);
 
   // ---------- Migration: detect ant2 local targets ----------
   const detectLegacyImport = useCallback(async (hasSavedSet: boolean) => {
-    if (hasSavedSet) { setLegacyImport(null); return; }
+    const revision = targetRevision.current;
+    const isCurrent = () => isMounted.current && activeUser.current === userId
+      && revision === targetRevision.current;
+    if (hasSavedSet) { if (isCurrent()) setLegacyImport(null); return; }
     const dismissed = await AsyncStorage.getItem(LEGACY_IMPORT_DISMISSED_KEY);
+    if (!isCurrent()) return;
     if (dismissed === userId) { setLegacyImport(null); return; }
     const legacy = parseJson<Partial<NutritionTargets>>(await AsyncStorage.getItem(LEGACY_LOCAL_TARGETS_KEY));
     const req = buildImportSaveRequest(legacy);
-    if (isMounted.current) setLegacyImport(req);
+    if (isCurrent()) setLegacyImport(req);
   }, [userId]);
 
   // ---------- Core refresh ----------
   const refresh = useCallback(async () => {
+    const sequence = ++refreshSequence.current;
+    const planRequest = ++planSequence.current;
+    let targetRequest = targetRevision.current;
+    const targetReadBlocked = userId ? targetMutations.current.has(userId) : false;
+    const currentDate = todayIso();
+    const isCurrent = () => isMounted.current && sequence === refreshSequence.current
+      && activeUser.current === userId && currentDate === todayIso();
+    const isTargetCurrent = () => isCurrent() && !targetReadBlocked && targetRequest === targetRevision.current;
     if (!userId) {
-      if (isMounted.current) {
+      if (isCurrent()) {
         setError(null);
         setEntries([]); setTotals(null); setTargets(null); setMealPlan({ plan: null, meals: [] }); setRecentFoods([]);
         setSavedTargets(null); setSavedTargetsStatus('idle'); setSuggestedTargets(null); setLegacyImport(null);
@@ -267,12 +308,17 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
       }
       return;
     }
-    const currentDate = todayIso();
-    if (isMounted.current) {
+    if (isCurrent()) {
       setLoading(true);
       setError(null);
+      if (loadedDay.current !== currentDate) {
+        setEntries([]);
+        setTotals(null);
+        loadedDay.current = currentDate;
+      }
       setDate(currentDate);
-      setSavedTargetsStatus('loading');
+      if (!targetReadBlocked) setSavedTargetsStatus('loading');
+      setMealPlanStatus('loading');
     }
     try {
       const [dayRes, legacyTgtRes, setRes, planRes, recentRes] = await Promise.allSettled([
@@ -282,7 +328,7 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
         fetchMealPlan(),
         fetchRecentFoods(),
       ]);
-      if (!isMounted.current) return;
+      if (!isCurrent()) return;
 
       if (dayRes.status === 'fulfilled') {
         setEntries(dayRes.value.entries ?? []);
@@ -292,49 +338,70 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
         setTotals(null);
       }
 
-      // Resolve saved target set (Supabase source of truth) with offline cache fallback.
+      // Keep target cancellation local: an accepted save must not discard
+      // unrelated food, recent-food, or meal-plan results from this refresh.
       let resolvedSet: SavedNutritionTargetSet | null = null;
-      if (setRes.status === 'fulfilled') {
-        resolvedSet = setRes.value.target_set ?? null;
+      await (async () => {
+        if (!isTargetCurrent()) return;
+        if (setRes.status === 'fulfilled') {
+          resolvedSet = setRes.value.target_set ?? null;
 
-        // Flush any queued offline save now that the server is reachable.
-        const pk = pendingKey();
-        if (pk) {
-          const pending = parseJson<NutritionTargetSaveRequest>(await AsyncStorage.getItem(pk));
-          if (pending) {
-            try {
-              const flushed = await saveNutritionTargetSet(pending);
-              resolvedSet = flushed.targets;
-              await AsyncStorage.removeItem(pk);
-              if (isMounted.current) setSyncStatus('synced');
-            } catch {
-              if (isMounted.current) setSyncStatus('pending');
+          // Flush any queued offline save now that the server is reachable.
+          const pk = pendingKey();
+          if (pk) {
+            const pending = parseJson<NutritionTargetSaveRequest>(await AsyncStorage.getItem(pk));
+            if (!isTargetCurrent()) return;
+            if (pending) {
+              await enqueueTargetMutation(userId, async () => {
+                // Recheck at dispatch: a queued snapshot is not a new intent.
+                if (!isTargetCurrent()) return;
+                setSyncStatus('pending');
+                try {
+                  const flushed = await saveNutritionTargetSet(pending);
+                  if (!isTargetCurrent()) return;
+                  targetRequest = ++targetRevision.current;
+                  resolvedSet = flushed.targets;
+                  await AsyncStorage.removeItem(pk);
+                  if (isTargetCurrent()) setSyncStatus('synced');
+                } catch (e) {
+                  if (!isTargetCurrent()) return;
+                  const retry = isRetryableNutritionError(e);
+                  if (!retry) await AsyncStorage.removeItem(pk);
+                  if (isTargetCurrent()) setSyncStatus(retry ? 'pending' : 'failed');
+                }
+              });
             }
           }
-        }
 
-        setSavedTargetsStatus('ready');
-        const ck = cacheKey();
-        if (ck) {
-          if (resolvedSet) await AsyncStorage.setItem(ck, JSON.stringify(resolvedSet));
-          else await AsyncStorage.removeItem(ck);
+          if (!isTargetCurrent()) return;
+          setSavedTargetsStatus('ready');
+          const ck = cacheKey();
+          if (ck) {
+            if (resolvedSet) await AsyncStorage.setItem(ck, JSON.stringify(resolvedSet));
+            else await AsyncStorage.removeItem(ck);
+          }
+        } else {
+          // Offline hydration is also a read: never replace a newer save.
+          const ck = cacheKey();
+          resolvedSet = ck ? parseJson<SavedNutritionTargetSet>(await AsyncStorage.getItem(ck)) : null;
+          if (!isTargetCurrent()) return;
+          setSavedTargetsStatus(resolvedSet ? 'ready' : 'error');
         }
-      } else {
-        // Offline: load last-known cache for THIS user only.
-        const ck = cacheKey();
-        resolvedSet = ck ? parseJson<SavedNutritionTargetSet>(await AsyncStorage.getItem(ck)) : null;
-        setSavedTargetsStatus(resolvedSet ? 'ready' : 'error');
-      }
-      setSavedTargets(resolvedSet);
+        if (isTargetCurrent()) setSavedTargets(resolvedSet);
+      })();
+      if (!isCurrent()) return;
 
       // Legacy big-row targets for dashboard/grading: prefer hybrid set bridge.
       const legacyRow = legacyTgtRes.status === 'fulfilled' ? legacyTgtRes.value.targets : null;
-      setTargets(resolvedSet ? savedSetToLegacyTargets(resolvedSet) : legacyRow);
+      setTargets(legacyRow);
 
-      if (planRes.status === 'fulfilled') {
-        setMealPlan({ plan: planRes.value.plan, meals: planRes.value.meals });
-      } else {
-        setMealPlan({ plan: null, meals: [] });
+      if (planRequest === planSequence.current) {
+        if (planRes.status === 'fulfilled') {
+          setMealPlan({ plan: planRes.value.plan, meals: planRes.value.meals });
+          setMealPlanStatus('ready');
+        } else {
+          setMealPlanStatus('error');
+        }
       }
       if (recentRes.status === 'fulfilled') {
         setRecentFoods(recentRes.value.foods ?? []);
@@ -342,8 +409,9 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
         setRecentFoods([]);
       }
 
-      await detectLegacyImport(Boolean(resolvedSet));
+      if (isTargetCurrent()) await detectLegacyImport(Boolean(resolvedSet));
 
+      if (!isCurrent()) return;
       const failures = [dayRes, setRes, planRes, recentRes].filter((res) => res.status === 'rejected');
       if (failures.length > 0) {
         setError(failures.length === 1
@@ -352,20 +420,22 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.warn('[NutritionContext] refresh error', e);
-      if (isMounted.current) {
+      if (isCurrent()) {
         setEntries([]);
         setTotals(null);
         setTargets(null);
-        setSavedTargets(null);
-        setSavedTargetsStatus('error');
-        setMealPlan({ plan: null, meals: [] });
+        if (isTargetCurrent()) {
+          setSavedTargets(null);
+          setSavedTargetsStatus('error');
+        }
+        setMealPlanStatus('error');
         setRecentFoods([]);
         setError('Nutrition data could not be loaded. Please try again.');
       }
     } finally {
-      if (isMounted.current) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [userId, cacheKey, pendingKey, detectLegacyImport]);
+  }, [userId, cacheKey, pendingKey, detectLegacyImport, enqueueTargetMutation]);
 
   // Load draft for the current namespace whenever the user changes.
   useEffect(() => {
@@ -379,6 +449,8 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
 
   // Clear active suggestion state on user switch/logout (no cross-account leakage).
   useEffect(() => {
+    setTargets(null); setSavedTargets(null); setDraftTargets(null);
+    setMealPlan({ plan: null, meals: [] }); setMealPlanStatus('idle');
     setSuggestedTargets(null);
     setSuggestionStatus('idle');
     setSyncStatus('synced');
@@ -387,73 +459,99 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   // Initial load + on auth change
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Day-boundary refresh
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && todayIso() !== date) {
-        refresh();
-      }
-    });
-    return () => sub.remove();
-  }, [date, refresh]);
+  // Live-today provider: catch active midnight as well as foreground changes.
+  useEffect(() => watchNutritionDay({
+    readToday: todayIso,
+    onChange: () => { void refresh(); },
+    subscribeActive: (check) => {
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') check();
+      });
+      return () => sub.remove();
+    },
+  }), [refresh]);
 
   // ---------- Target actions ----------
   const requestSuggestion = useCallback(async (req: NutritionTargetSuggestRequest) => {
     setSuggestionStatus('loading');
     try {
       const res = await suggestNutritionTargets(req);
-      if (isMounted.current) { setSuggestedTargets(res); setSuggestionStatus('ready'); }
+      if (isMounted.current && activeUser.current === userId) { setSuggestedTargets(res); setSuggestionStatus('ready'); }
       return res;
     } catch (e) {
-      if (isMounted.current) setSuggestionStatus('error');
+      if (isMounted.current && activeUser.current === userId) setSuggestionStatus('error');
       throw e;
     }
-  }, []);
+  }, [userId]);
 
   const clearSuggestion = useCallback(() => {
     setSuggestedTargets(null);
     setSuggestionStatus('idle');
   }, []);
 
-  const saveTargets = useCallback(async (req: NutritionTargetSaveRequest) => {
+  const commitTargets = useCallback(async (request: NutritionTargetSaveRequest | (() => Promise<NutritionTargetSaveRequest>)) => {
     if (!userId) throw new Error('You must be signed in to save targets.');
-    try {
-      const res = await saveNutritionTargetSet(req);
-      const saved = res.targets;
-      if (isMounted.current) {
-        setSavedTargets(saved);
-        setSavedTargetsStatus('ready');
-        setTargets(savedSetToLegacyTargets(saved));
-        setSyncStatus('synced');
-        setSuggestedTargets(null);
-        setSuggestionStatus('idle');
-        setLegacyImport(null);
+    const isOwner = () => isMounted.current && activeUser.current === userId;
+    if (!isOwner()) throw new Error('Account changed; local goals retained.');
+    const revision = ++targetRevision.current;
+    const isCurrent = () => isOwner() && revision === targetRevision.current;
+    setSyncStatus('pending');
+    return enqueueTargetMutation(userId, async () => {
+      if (!isOwner()) throw new Error('Account changed; local goals retained.');
+      let req: NutritionTargetSaveRequest | undefined;
+      try {
+        req = typeof request === 'function' ? await request() : request;
+        if (!isOwner()) throw new Error('Account changed; local goals retained.');
+        const res = await saveNutritionTargetSet(req);
+        if (!isOwner()) throw new Error('Account changed; local goals retained.');
+        if (!isCurrent()) return; // Actual success, superseded locally by a newer intent.
+        const saved = res.targets;
+        if (isMounted.current) {
+          setSavedTargets(saved);
+          setSavedTargetsStatus('ready');
+          setSyncStatus('synced');
+          setSuggestedTargets(null);
+          setSuggestionStatus('idle');
+          setLegacyImport(null);
+        }
+        const ck = cacheKey();
+        if (ck) await AsyncStorage.setItem(ck, JSON.stringify(saved));
+        // These callbacks capture this save's owner namespace. Storage cleanup may
+        // finish after a switch, but must never call shared-state clearDraft then.
+        const pk = pendingKey();
+        if (pk) await AsyncStorage.removeItem(pk);
+        await AsyncStorage.removeItem(draftKey());
+        if (!isOwner()) throw new Error('Account changed; local goals retained.');
+        if (isCurrent()) setDraftTargets(null);
+      } catch (e) {
+        if (!isCurrent()) throw e;
+        // Preparation can fail before an import has a request to retry. Do not
+        // leave an older offline intent behind for a later refresh to commit.
+        const retry = req !== undefined && isRetryableNutritionError(e);
+        const pk = pendingKey();
+        if (pk && retry) await AsyncStorage.setItem(pk, JSON.stringify(req));
+        if (pk && !retry) await AsyncStorage.removeItem(pk);
+        if (isCurrent()) setSyncStatus(retry ? 'pending' : 'failed');
+        throw e;
       }
-      const ck = cacheKey();
-      if (ck) await AsyncStorage.setItem(ck, JSON.stringify(saved));
-      const pk = pendingKey();
-      if (pk) await AsyncStorage.removeItem(pk);
-      await clearDraft();
-    } catch (e) {
-      // Offline / failure: queue a pending save so it isn't lost.
-      const pk = pendingKey();
-      if (pk) await AsyncStorage.setItem(pk, JSON.stringify(req));
-      if (isMounted.current) setSyncStatus('pending');
-      throw e;
-    }
-  }, [userId, cacheKey, pendingKey, clearDraft]);
+    });
+  }, [userId, cacheKey, pendingKey, draftKey, enqueueTargetMutation]);
+
+  const saveTargets = useCallback((req: NutritionTargetSaveRequest) => commitTargets(req), [commitTargets]);
 
   const importLegacyTargets = useCallback(async () => {
     if (!legacyImport) return;
     await saveTargets(legacyImport);
+    if (!isMounted.current || activeUser.current !== userId) return;
     // On success, remove the old un-namespaced local key.
     await AsyncStorage.removeItem(LEGACY_LOCAL_TARGETS_KEY);
-    if (isMounted.current) setLegacyImport(null);
-  }, [legacyImport, saveTargets]);
+    if (isMounted.current && activeUser.current === userId) setLegacyImport(null);
+  }, [userId, legacyImport, saveTargets]);
 
   const dismissLegacyImport = useCallback(async () => {
+    if (!isMounted.current || activeUser.current !== userId) return;
     if (userId) await AsyncStorage.setItem(LEGACY_IMPORT_DISMISSED_KEY, userId);
-    if (isMounted.current) setLegacyImport(null);
+    if (isMounted.current && activeUser.current === userId) setLegacyImport(null);
   }, [userId]);
 
   // ---------- Mutations ----------
@@ -478,32 +576,60 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const trainingToday = isTrainingDay(
-    new Date().getDay(),
+    dayOfWeekFromIso(date),
     profile?.training_days_per_week,
     profile?.training_days,
   );
 
-  const grade = useMemo(
-    () => computeGrade(totals, targets, trainingToday),
-    [totals, targets, trainingToday],
-  );
-
   const todayTarget = useMemo<ResolvedNutritionTarget>(
-    () => resolveTodayNutritionTarget({
+    () => resolveApprovedClientTarget({
       date,
       savedTargets,
       isTrainingDay: trainingToday,
       suggestedTargets,
       draftTargets,
+      weeklyGoals,
+      legacyTargets: targets,
     }),
-    [date, savedTargets, trainingToday, suggestedTargets, draftTargets],
+    [date, savedTargets, trainingToday, suggestedTargets, draftTargets, weeklyGoals, targets],
   );
 
+  const grade = useMemo(() => computeGrade(totals, todayTarget.target), [totals, todayTarget]);
+  const importWeeklyGoals = useCallback(async (confirmed: boolean) => {
+    if (!confirmed) throw new Error('Confirm importing device goals first.');
+    // Reserve intent order before fetching the merge base, within the same lane.
+    await commitTargets(async () => {
+      const current = await fetchNutritionTargetSet();
+      if (!isMounted.current || activeUser.current !== userId) throw new Error('Account changed; local goals retained.');
+      return buildWeeklyImportSaveRequest(weeklyGoals, current.target_set ?? null, true);
+    });
+    // Retain device data, including edits made during upload.
+  }, [userId, weeklyGoals, commitTargets]);
+  const refreshMealPlan = useCallback(async (expectedId?: string) => {
+    const sequence = ++planSequence.current;
+    setMealPlanStatus('loading');
+    try {
+      const result = await fetchMealPlan();
+      if (activeUser.current !== userId || !isMounted.current) throw new Error('Account changed.');
+      if (sequence !== planSequence.current) {
+        if (expectedId) throw new Error('Plan refresh superseded. Retry loading the plan.');
+        return;
+      }
+      if (expectedId && (result.plan?.id !== expectedId || result.plan.status !== 'active' || !result.meals.length)) throw new Error('Plan readback is not ready. Retry loading the plan.');
+      setMealPlan(result); setMealPlanStatus('ready');
+    } catch (e) {
+      if (activeUser.current === userId && isMounted.current && sequence === planSequence.current) setMealPlanStatus('error');
+      throw e;
+    }
+  }, [userId]);
+
   const value = useMemo<NutritionContextValue>(() => ({
+    importWeeklyGoals, mealPlanStatus, refreshMealPlan,
     loading, error, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods, weeklyGoals, saveWeeklyGoals,
     savedTargets, savedTargetsStatus, draftTargets, suggestedTargets, suggestionStatus, syncStatus, todayTarget, legacyImport,
     requestSuggestion, clearSuggestion, saveTargets, saveDraft, clearDraft, importLegacyTargets, dismissLegacyImport,
   }), [
+    importWeeklyGoals, mealPlanStatus, refreshMealPlan,
     loading, error, date, entries, totals, targets, mealPlan, grade, refresh, logFood, deleteEntry, updateEntry, recentFoods, weeklyGoals, saveWeeklyGoals,
     savedTargets, savedTargetsStatus, draftTargets, suggestedTargets, suggestionStatus, syncStatus, todayTarget, legacyImport,
     requestSuggestion, clearSuggestion, saveTargets, saveDraft, clearDraft, importLegacyTargets, dismissLegacyImport,

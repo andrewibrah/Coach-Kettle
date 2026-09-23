@@ -41,6 +41,27 @@ function suggestion(partial?: Partial<NutritionTargetSuggestResponse>): Nutritio
   };
 }
 
+test('local weekly override merges provided fields with the resolved saved day', () => {
+  const set = savedSet({ rest_day_target: { calories: 2000, protein_g: 150 } });
+  const r = resolveTodayNutritionTarget({
+    date: DATE, savedTargets: set, isTrainingDay: false,
+    weeklyGoals: { [DOW]: { calories: 2300 } },
+  });
+  assert.equal(r.target?.calories, 2300);
+  assert.equal(r.target?.protein_g, 150);
+  assert.match(r.explanation, /weekly override/i);
+});
+
+test('legacy rest target remains available before an unsaved suggestion', () => {
+  const r = resolveTodayNutritionTarget({ date: DATE, isTrainingDay: false,
+    legacyTargets: { rest_calories: 2700, rest_protein_g: 203, rest_carbs_g: 270, rest_fat_g: 90 } as any,
+    suggestedTargets: suggestion(),
+  });
+  assert.equal(r.target?.calories, 2700);
+  assert.equal(r.target?.protein_g, 203);
+  assert.match(r.explanation, /rest-day/);
+});
+
 test('day override beats training/rest', () => {
   const set = savedSet({
     training_day_target: { calories: 3000 },

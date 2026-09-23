@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
@@ -10,6 +10,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useToast } from '@/hooks/useToast';
 
 import { useNutrition } from '@/contexts/NutritionContext';
+import { isRetryableNutritionError } from '@/lib/nutrition';
 import { macrosFromCalories } from '@/lib/nutritionTargets';
 import { buildManualSaveRequest } from '@/lib/nutritionTargetStorage';
 import type { DayGoal } from '@/types/nutrition';
@@ -71,11 +72,20 @@ export default function NutritionTargetsScreen() {
   const warning = useThemeColor({}, 'warning');
 
   const {
-    targets, weeklyGoals, saveWeeklyGoals,
+    targets: legacyTargets, weeklyGoals, saveWeeklyGoals, importWeeklyGoals,
     saveTargets, savedTargets, syncStatus, savedTargetsStatus, todayTarget,
     suggestedTargets, suggestionStatus, requestSuggestion, clearSuggestion,
     legacyImport, importLegacyTargets, dismissLegacyImport,
   } = useNutrition();
+  // Display accepted account values directly, never the macro-autofill bridge.
+  const training = savedTargets?.training_day_target ?? savedTargets?.base_target;
+  const rest = savedTargets?.rest_day_target ?? savedTargets?.base_target;
+  const targets = React.useMemo(() => savedTargets ? {
+    training_calories: training?.calories, training_protein_g: training?.protein_g,
+    training_carbs_g: training?.carbs_g, training_fat_g: training?.fat_g,
+    rest_calories: rest?.calories, rest_protein_g: rest?.protein_g,
+    rest_carbs_g: rest?.carbs_g, rest_fat_g: rest?.fat_g,
+  } : legacyTargets, [savedTargets, training, rest, legacyTargets]);
   const { toast, showToast, hideToast } = useToast();
 
   // Manual targets form state
@@ -104,10 +114,8 @@ export default function NutritionTargetsScreen() {
   const [weekDraft, setWeekDraft] = useState<DayDraft[]>(() => Array.from({ length: 7 }, emptyDay));
   const [weekSaving, setWeekSaving] = useState(false);
 
-  // Show form immediately if no targets exist
-  useEffect(() => {
-    if (!targets) setEditMode(true);
-  }, [targets]);
+  // The render branch already shows setup when targets are absent. Do not
+  // latch edit mode during loading: an arriving saved row must be displayed.
 
   // Populate draft from saved goals on mount
   useEffect(() => {
@@ -159,7 +167,7 @@ export default function NutritionTargetsScreen() {
         };
       });
       await saveWeeklyGoals(goals);
-      showToast('Weekly goals saved', 'success');
+      showToast('Device-only goals saved — not used by Coach.', 'success');
     } catch {
       showToast('Failed to save', 'error');
     } finally {
@@ -169,14 +177,14 @@ export default function NutritionTargetsScreen() {
 
   const handleOpenEdit = () => {
     if (!targets) return;
-    setTrainCal(String(Math.round(targets.training_calories)));
-    setTrainProt(String(Math.round(targets.training_protein_g)));
-    setTrainCarb(String(Math.round(targets.training_carbs_g)));
-    setTrainFat(String(Math.round(targets.training_fat_g)));
-    setRestCal(String(Math.round(targets.rest_calories)));
-    setRestProt(String(Math.round(targets.rest_protein_g)));
-    setRestCarb(String(Math.round(targets.rest_carbs_g)));
-    setRestFat(String(Math.round(targets.rest_fat_g)));
+    setTrainCal(targets.training_calories == null ? '' : String(Math.round(targets.training_calories)));
+    setTrainProt(targets.training_protein_g == null ? '' : String(Math.round(targets.training_protein_g)));
+    setTrainCarb(targets.training_carbs_g == null ? '' : String(Math.round(targets.training_carbs_g)));
+    setTrainFat(targets.training_fat_g == null ? '' : String(Math.round(targets.training_fat_g)));
+    setRestCal(targets.rest_calories == null ? '' : String(Math.round(targets.rest_calories)));
+    setRestProt(targets.rest_protein_g == null ? '' : String(Math.round(targets.rest_protein_g)));
+    setRestCarb(targets.rest_carbs_g == null ? '' : String(Math.round(targets.rest_carbs_g)));
+    setRestFat(targets.rest_fat_g == null ? '' : String(Math.round(targets.rest_fat_g)));
     setFromSuggestionId(undefined);
     setEditMode(true);
   };
@@ -214,11 +222,13 @@ export default function NutritionTargetsScreen() {
       setEditMode(false);
       setFromSuggestionId(undefined);
       showToast('Saved to your account', 'success');
-    } catch {
-      // saveTargets queues the payload for retry on failure, so the save isn't
-      // lost — tell the user that rather than surfacing the raw network error.
-      showToast('Saved on device — will sync when online.', 'info');
-      setEditMode(false);
+    } catch (e) {
+      if (isRetryableNutritionError(e)) {
+        showToast('Saved on device — will sync when online.', 'info');
+        setEditMode(false);
+      } else {
+        showToast(e instanceof Error ? e.message : 'Could not save targets. Check your inputs and retry.', 'error');
+      }
     } finally {
       setSaving(false);
     }
@@ -275,7 +285,7 @@ export default function NutritionTargetsScreen() {
       return `${base} Saved to your account.${stale}`;
     }
     if (savedTargetsStatus === 'error' && targets) return 'Using offline cache.';
-    if (targets) return 'Custom target — set on this device.';
+    if (targets) return 'Existing account targets — review and confirm daily defaults before importing device goals.';
     return 'Draft only — not saved yet.';
   };
 
@@ -411,7 +421,7 @@ export default function NutritionTargetsScreen() {
         <View style={[styles.card, { backgroundColor: cardBackground }]}>
           <ThemedText type="subtitle" style={{ marginBottom: 4 }}>Weekly calorie goals</ThemedText>
           <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 12 }}>
-            Set a daily calorie target for each day. Macros auto-fill at 30/40/30 (P/C/F) or enter manually.
+            Device-only goals — excluded from grades and Coach until you explicitly import them to your account. Save device edits before importing. Macros auto-fill at 30/40/30 (P/C/F) or enter manually.
           </ThemedText>
           {DAY_LABELS.map((label, dow) => {
             const d = weekDraft[dow];
@@ -458,8 +468,32 @@ export default function NutritionTargetsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Save weekly goals"
           >
-            {weekSaving ? <ActivityIndicator color={onTint} /> : <ThemedText style={{ color: onTint, fontWeight: '700' }}>Save weekly goals</ThemedText>}
+            {weekSaving ? <ActivityIndicator color={onTint} /> : <ThemedText style={{ color: onTint, fontWeight: '700' }}>Save device-only goals</ThemedText>}
           </Pressable>
+          {Object.keys(weeklyGoals).length > 0 && (
+            <Pressable accessibilityRole="button" accessibilityLabel="Import device goals to account"
+              disabled={weekSaving}
+              style={[styles.secondaryBtn, { borderColor: border, marginTop: 8 }]}
+              onPress={() => {
+                if (!savedTargets) {
+                  Alert.alert('Save daily targets first', 'Enter or review your daily defaults below and save them to your account. Then return here to import. Device goals are retained; no weekday is used as a default.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Set daily targets', onPress: () => { if (targets) handleOpenEdit(); else setEditMode(true); } },
+                  ]);
+                  return;
+                }
+                Alert.alert('Import device goals?', 'These saved device goals will replace account overrides for the same weekdays and be used by Coach. Other weekdays are preserved.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Import to account', onPress: async () => {
+                  setWeekSaving(true);
+                  try { await importWeeklyGoals(true); showToast('Imported to your account', 'success'); }
+                  catch (e) { showToast(isRetryableNutritionError(e) ? 'Import could not finish. Device goals retained; retry when online.' : e instanceof Error ? e.message : 'Import failed. Device goals retained.', 'error'); }
+                  finally { setWeekSaving(false); }
+                } },
+              ]); }}>
+              <ThemedText>Import saved device goals to account</ThemedText>
+            </Pressable>
+          )}
         </View>
 
         {/* ── Daily targets (training / rest day defaults) ── */}
@@ -496,7 +530,7 @@ export default function NutritionTargetsScreen() {
               {targets ? 'Edit daily targets' : 'Set your daily targets'}
             </ThemedText>
             <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 14 }}>
-              Enter your calorie and macro goals. Use &quot;Auto&quot; to calculate macros from calories (30/40/30 P/C/F).
+              Enter your calorie and macro goals. Saving confirms the training target (or rest target if training is blank) as your daily base for days without an override or matching day type. Use &quot;Auto&quot; to calculate macros from calories (30/40/30 P/C/F).
               {fromSuggestionId ? ' Pre-filled from a suggestion — edit anything before saving.' : ''}
             </ThemedText>
 

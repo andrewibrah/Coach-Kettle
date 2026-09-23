@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ui/themed-view';
@@ -20,7 +21,20 @@ import type { MealSlot, PlannedMeal } from '@/types/nutrition';
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+/** Pulls the Edge Function's `{code}` out of a `post()` rejection's `HTTP 409: {...}` message. */
+function extractErrorCode(message: string): string | null {
+  const match = message.match(/^HTTP \d+: (.*)$/s);
+  if (!match) return null;
+  try {
+    const body = JSON.parse(match[1]);
+    return typeof body?.code === 'string' ? body.code : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function MealPlanScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeColor({}, 'background');
   const cardBackground = useThemeColor({}, 'cardBackground');
@@ -30,11 +44,13 @@ export default function MealPlanScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
 
-  const { mealPlan, refresh } = useNutrition();
+  const { mealPlan, mealPlanStatus, refreshMealPlan } = useNutrition();
   const { can } = useEntitlement();
   const { toast, showToast, hideToast } = useToast();
+  const pending = useRef(false);
   const [generating, setGenerating] = useState(false);
   const [recal, setRecal] = useState(false);
+  const [targetsUnavailable, setTargetsUnavailable] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
 
   const mealsByDay = useMemo(() => {
@@ -49,46 +65,56 @@ export default function MealPlanScreen() {
     showUpgradeAlert('Pro Feature', 'AI meal plans are a Pro feature — upgrade to unlock weekly plans built for your goals.');
 
   const handleGenerate = async () => {
-    if (generating) return;
+    if (pending.current) return;
     if (!can('mealPlanGeneration')) {
       showMealPlanUpgrade();
       return;
     }
+    pending.current = true;
     setGenerating(true);
+    setTargetsUnavailable(false);
     try {
-      await generateMealPlan();
-      await refresh();
+      const result = await generateMealPlan();
+      await refreshMealPlan(result.plan.id);
       fireMealPlanReady().catch(() => undefined);
       showToast('Meal plan ready', 'success');
     } catch (e) {
       if (e instanceof FeatureGateError && e.code === 'PRO_REQUIRED') {
         showMealPlanUpgrade();
+      } else if (e instanceof Error && extractErrorCode(e.message) === 'NUTRITION_TARGETS_UNAVAILABLE') {
+        setTargetsUnavailable(true);
       } else {
         showToast(e instanceof Error ? e.message : 'Failed to generate meal plan. Try again.', 'error');
       }
     } finally {
+      pending.current = false;
       setGenerating(false);
     }
   };
 
   const handleRecalibrate = async () => {
-    if (recal) return;
+    if (pending.current) return;
     if (!can('mealPlanGeneration')) {
       showMealPlanUpgrade();
       return;
     }
+    pending.current = true;
     setRecal(true);
+    setTargetsUnavailable(false);
     try {
-      await recalibrateMealPlan();
-      await refresh();
+      const result = await recalibrateMealPlan();
+      await refreshMealPlan(result.plan.id);
       showToast('Meal plan updated', 'success');
     } catch (e) {
       if (e instanceof FeatureGateError && e.code === 'PRO_REQUIRED') {
         showMealPlanUpgrade();
+      } else if (e instanceof Error && extractErrorCode(e.message) === 'NUTRITION_TARGETS_UNAVAILABLE') {
+        setTargetsUnavailable(true);
       } else {
         showToast(e instanceof Error ? e.message : 'Failed to recalibrate. Try again.', 'error');
       }
     } finally {
+      pending.current = false;
       setRecal(false);
     }
   };
@@ -137,10 +163,41 @@ export default function MealPlanScreen() {
         subtitle={mealPlan.plan?.week_start_date ?? 'Not generated yet'}
       />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
-        {!mealPlan.plan ? (
+        {(mealPlanStatus === 'loading' || mealPlanStatus === 'idle') && (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ActivityIndicator />
+            <ThemedText>Loading meal plan…</ThemedText>
+          </View>
+        )}
+        {targetsUnavailable && (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText>Set complete nutrition targets before generating a meal plan.</ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Set nutrition targets"
+              onPress={() => router.push('/(tabs)/nutrition/targets' as any)}
+              style={[styles.secondaryBtn, { borderColor: border, marginTop: 10 }]}
+            >
+              <ThemedText style={{ color: textColor, fontWeight: '600' }}>Set nutrition targets</ThemedText>
+            </Pressable>
+          </View>
+        )}
+        {mealPlanStatus === 'error' && (
+          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+            <ThemedText>{mealPlan.plan ? 'Could not refresh. Your previous plan is still shown.' : 'Could not load your meal plan.'}</ThemedText>
+            <Pressable accessibilityRole="button" accessibilityLabel="Retry loading meal plan"
+              disabled={generating || recal}
+              onPress={() => { void refreshMealPlan().catch(() => showToast('Could not load meal plan. Try again.', 'error')); }}
+              style={[styles.secondaryBtn, { borderColor: border }]}>
+              <ThemedText>Retry loading</ThemedText>
+            </Pressable>
+          </View>
+        )}
+        {!mealPlan.plan ? (mealPlanStatus === 'ready' ? (
           <View style={[styles.card, { backgroundColor: cardBackground }]}>
             <ThemedText type="subtitle" style={{ marginBottom: 10 }}>Generate a meal plan</ThemedText>
             <Pressable
+              disabled={generating || recal}
               onPress={handleGenerate}
               style={({ pressed }) => [
                 styles.primaryBtn,
@@ -160,7 +217,7 @@ export default function MealPlanScreen() {
               Uses your targets + dietary preferences.
             </ThemedText>
           </View>
-        ) : (
+        ) : null) : (
           <>
             {/* Day tabs */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -196,6 +253,7 @@ export default function MealPlanScreen() {
             </View>
 
             <Pressable
+              disabled={generating || recal}
               onPress={handleRecalibrate}
               style={({ pressed }) => [
                 styles.secondaryBtn,

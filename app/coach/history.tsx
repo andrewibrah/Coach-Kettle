@@ -8,6 +8,7 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 import { useCoaching } from '@/contexts/CoachingContext';
+import { getCoachPresentation } from '@/lib/coachingEvidence';
 
 function useDotColors() {
   return {
@@ -36,7 +37,7 @@ export default function CoachHistoryScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
 
-  const dotColors = useDotColors();
+  useDotColors();
   const { loading, recent } = useCoaching();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -59,11 +60,12 @@ export default function CoachHistoryScreen() {
             </View>
           ) : (
             recent.map((item) => {
-              const isOpen = !!expanded[item.id];
+              const isOpen = !!expanded[item.feedback_date];
+              const presentation = getCoachPresentation(item);
               return (
                 <Pressable
-                  key={item.id}
-                  onPress={() => toggle(item.id)}
+                  key={item.feedback_date}
+                  onPress={() => toggle(item.feedback_date)}
                   style={({ pressed }) => [
                     styles.card,
                     { backgroundColor: cardBackground },
@@ -81,27 +83,28 @@ export default function CoachHistoryScreen() {
                       <View
                         style={[
                           styles.dot,
-                          { backgroundColor: item.overall_color ? dotColors[item.overall_color] : border },
+                          { backgroundColor: border },
                         ]}
                       />
                       <ThemedText style={{ fontSize: 12, color: placeholder }}>
-                        {item.workout_completed ? '✓' : '—'} · {item.nutrition_color ?? 'n/a'}
+                        {item.workout_completed ? 'Workout recorded' : 'No workout recorded'}
                       </ThemedText>
                     </View>
                   </View>
+                  <ThemedText style={{ color: placeholder, fontSize: 12 }}>{presentation.availability}</ThemedText>
                   {isOpen && (
                     <View style={{ marginTop: 12 }}>
                       <ThemedText style={{ fontWeight: '700', marginBottom: 4 }}>What you did well</ThemedText>
                       <ThemedText style={{ color: placeholder, marginBottom: 10 }}>
-                        {item.did_well ?? '—'}
+                        {presentation.did_well}
                       </ThemedText>
                       <ThemedText style={{ fontWeight: '700', marginBottom: 4 }}>What needs improvement</ThemedText>
                       <ThemedText style={{ color: placeholder, marginBottom: 10 }}>
-                        {item.needs_improvement ?? '—'}
+                        {presentation.needs_improvement}
                       </ThemedText>
                       <ThemedText style={{ fontWeight: '700', marginBottom: 4 }}>Tomorrow&apos;s focus</ThemedText>
                       <ThemedText style={{ color: placeholder }}>
-                        {item.tomorrow_focus ?? '—'}
+                        {presentation.tomorrow_focus}
                       </ThemedText>
                     </View>
                   )}

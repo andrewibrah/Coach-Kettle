@@ -17,6 +17,7 @@ const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100];
 interface CoachingContextValue {
   loading: boolean;
   error: string | null;
+  needsNutritionSetup: boolean;
   today: DailyFeedback | null;
   recent: DailyFeedback[];
   state: BehaviorState | null;
@@ -27,6 +28,7 @@ interface CoachingContextValue {
 const CoachingContext = createContext<CoachingContextValue>({
   loading: true,
   error: null,
+  needsNutritionSetup: false,
   today: null,
   recent: [],
   state: null,
@@ -42,6 +44,7 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [needsNutritionSetup, setNeedsNutritionSetup] = useState(false);
   const [today, setToday] = useState<DailyFeedback | null>(null);
   const [recent, setRecent] = useState<DailyFeedback[]>([]);
   const [state, setState] = useState<BehaviorState | null>(null);
@@ -61,10 +64,10 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!userId) {
-      if (isMounted.current) { setError(null); setToday(null); setRecent([]); setState(null); setLoading(false); }
+      if (isMounted.current) { setError(null); setNeedsNutritionSetup(false); setToday(null); setRecent([]); setState(null); setLoading(false); }
       return;
     }
-    if (isMounted.current) { setLoading(true); setError(null); }
+    if (isMounted.current) { setLoading(true); setError(null); setNeedsNutritionSetup(false); }
     try {
       const [t, r, s] = await Promise.allSettled([
         fetchTodayFeedback(),
@@ -77,7 +80,12 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
       if (s.status === 'fulfilled') setState(s.value);
       const failures = [t, r, s].filter(res => res.status === 'rejected');
       if (failures.length > 0) {
-        setError('Coach data could not be fully loaded. Pull to retry.');
+        const setupRequired = t.status === 'rejected'
+          && String((t.reason as any)?.message ?? '').includes('NUTRITION_TARGET_SETUP_REQUIRED');
+        setNeedsNutritionSetup(setupRequired);
+        setError(setupRequired
+          ? 'Set nutrition targets to unlock your daily Coach report.'
+          : 'Coach data could not be fully loaded. Pull to retry.');
       }
     } catch (e) {
       console.warn('[CoachingContext] refresh error', e);
@@ -94,17 +102,20 @@ export function CoachingProvider({ children }: { children: React.ReactNode }) {
 
   const regenerateToday = useCallback(async () => {
     if (!userId) return;
+    if (isMounted.current) setError(null);
     try {
       const fresh = await generateFeedbackForDate();
       if (isMounted.current) setToday(fresh);
     } catch (e) {
-      console.warn('[CoachingContext] regenerate error', e);
+      console.warn('[CoachingContext] regenerate failed');
+      if (isMounted.current) setError('Coach report could not be refreshed. The previous report has been kept; please retry.');
+      throw e;
     }
   }, [userId]);
 
   const value = useMemo<CoachingContextValue>(() => ({
-    loading, error, today, recent, state, refresh, regenerateToday,
-  }), [loading, error, today, recent, state, refresh, regenerateToday]);
+    loading, error, needsNutritionSetup, today, recent, state, refresh, regenerateToday,
+  }), [loading, error, needsNutritionSetup, today, recent, state, refresh, regenerateToday]);
 
   return <CoachingContext.Provider value={value}>{children}</CoachingContext.Provider>;
 }

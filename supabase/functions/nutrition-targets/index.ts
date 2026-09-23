@@ -12,6 +12,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
 
+import { readSavedNutritionTargetSet } from "../_shared/nutritionTargetLoading.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -158,16 +160,123 @@ function buildSuggestion(req: SuggestReq) {
 
 // ---------- Save (hybrid target set) ----------
 
-interface MacroTarget { calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number }
-interface DayOverride { day_of_week: number; target: MacroTarget; source?: string }
+const DURABLE_SOURCES = ["manual", "backend_suggested", "imported_existing"];
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+const onlyKeys = (v: Record<string, unknown>, keys: string[]) =>
+  Object.keys(v).every((key) => keys.includes(key));
+const finiteNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const durableSource = (v: unknown) => typeof v === "string" && DURABLE_SOURCES.includes(v);
 
-function sanitizeMacro(t: MacroTarget | undefined | null): MacroTarget | null {
-  if (!t || !(Number(t.calories) > 0)) return null;
-  const n = (v: unknown) => (Number(v) > 0 ? Math.round(Number(v)) : undefined);
-  return { calories: Math.round(Number(t.calories)), protein_g: n(t.protein_g), carbs_g: n(t.carbs_g), fat_g: n(t.fat_g) };
+function validMacro(v: unknown): boolean {
+  return isObject(v) && "calories" in v &&
+    onlyKeys(v, ["calories", "protein_g", "carbs_g", "fat_g"]) &&
+    Object.values(v).every((n) => finiteNumber(n) && n > 0);
 }
 
-const VALID_SOURCES = ["manual", "backend_suggested", "local_draft", "imported_existing"];
+function validOverrides(v: unknown): boolean {
+  if (!Array.isArray(v) || v.length > 7) return false;
+  const days = new Set<number>();
+  return v.every((o) => {
+    if (!isObject(o) || !onlyKeys(o, ["day_of_week", "target", "source", "updated_at"]) ||
+      !finiteNumber(o.day_of_week) || !Number.isInteger(o.day_of_week) ||
+      o.day_of_week < 0 || o.day_of_week > 6 || days.has(o.day_of_week) || !validMacro(o.target) ||
+      ("source" in o && !durableSource(o.source)) ||
+      ("updated_at" in o && typeof o.updated_at !== "string")) return false;
+    days.add(o.day_of_week);
+    return true;
+  });
+}
+
+// Mirror the SQL boundary; do not sanitize, coerce, default or filter a save.
+// SQL remains authoritative and validates again before any writes.
+function validSavePayload(v: unknown): boolean {
+  if (!isObject(v) || !onlyKeys(v, ["action", "source", "suggestion_id", "targets", "macro_preference", "provenance", "derivation_inputs", "explanation"]) ||
+    v.action !== "save_set" || !durableSource(v.source)) return false;
+  const p = v.provenance;
+  if (!isObject(p) || !onlyKeys(p, ["user_confirmed", "edited_after_suggestion", "imported_from_existing"]) ||
+    p.user_confirmed !== true || typeof p.edited_after_suggestion !== "boolean" ||
+    ("imported_from_existing" in p && typeof p.imported_from_existing !== "boolean") ||
+    (v.source === "imported_existing" && p.imported_from_existing !== true) ||
+    (v.source === "backend_suggested" && p.edited_after_suggestion !== false)) return false;
+  if (("suggestion_id" in v && (typeof v.suggestion_id !== "string" || v.suggestion_id.replace(/^ +| +$/g, "") === "")) ||
+    ("macro_preference" in v && typeof v.macro_preference !== "string")) return false;
+  const t = v.targets;
+  const parents = ["base", "training_day", "rest_day"];
+  if (!isObject(t) || !onlyKeys(t, [...parents, "day_overrides"]) ||
+    !parents.some((key) => key in t) || !parents.every((key) => !(key in t) || validMacro(t[key])) ||
+    ("day_overrides" in t && !validOverrides(t.day_overrides))) return false;
+  if ("derivation_inputs" in v) {
+    const d = v.derivation_inputs;
+    if (!isObject(d) || !onlyKeys(d, ["age_range", "sex", "height_cm_present", "weight_kg_present", "activity_level", "goal_type", "training_days_per_week", "user_entered_calorie_target", "macro_preference"]) ||
+      !Object.entries(d).every(([key, value]) =>
+        ["height_cm_present", "weight_kg_present"].includes(key) ? typeof value === "boolean" :
+        ["training_days_per_week", "user_entered_calorie_target"].includes(key) ? finiteNumber(value) : typeof value === "string")) return false;
+  }
+  if ("explanation" in v) {
+    const e = v.explanation;
+    if (!isObject(e) || !onlyKeys(e, ["summary", "assumptions", "missing_inputs", "calculation_basis", "safety_notes"]) ||
+      !["summary", "assumptions", "missing_inputs", "calculation_basis"].every((key) => key in e) ||
+      !Object.entries(e).every(([key, value]) => ["summary", "calculation_basis"].includes(key)
+        ? typeof value === "string" : Array.isArray(value) && value.every((item) => typeof item === "string"))) return false;
+  }
+  return true;
+}
+
+// Verify the receipt, then return it untouched: never refetch a newer snapshot.
+function validSaveReceipt(v: unknown, userId: string, preservesOverrides: boolean): boolean {
+  const uuid = (id: unknown) => typeof id === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const timestamp = (value: unknown) => typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    Number.isFinite(Date.parse(value));
+  if (!isObject(v) || !uuid(v.saved_target_set_id) || !uuid(v.user_id) ||
+    v.user_id !== userId || !durableSource(v.source) || !timestamp(v.updated_at) ||
+    !isObject(v.targets)) return false;
+  const t = v.targets;
+  // to_jsonb(saved) includes nullable columns as explicit nulls, never omits
+  // them. Unlike a legacy GET row, every save receipt has confirmed provenance.
+  const p = t.provenance;
+  if (!timestamp(t.created_at) ||
+    (t.macro_preference !== null && typeof t.macro_preference !== "string") ||
+    (t.suggestion_id !== null && (typeof t.suggestion_id !== "string" || t.suggestion_id.replace(/^ +| +$/g, "") === "")) ||
+    (v.source === "backend_suggested" ? !timestamp(t.stale_after) : t.stale_after !== null) ||
+    !isObject(p) || !onlyKeys(p, ["user_confirmed", "edited_after_suggestion", "imported_from_existing"]) ||
+    p.user_confirmed !== true || typeof p.edited_after_suggestion !== "boolean" ||
+    ("imported_from_existing" in p && typeof p.imported_from_existing !== "boolean") ||
+    (v.source === "imported_existing" && p.imported_from_existing !== true) ||
+    (v.source === "backend_suggested" && p.edited_after_suggestion !== false)) return false;
+  const d = t.derivation_inputs_snapshot;
+  if (d !== null && (!isObject(d) ||
+    !onlyKeys(d, ["age_range", "sex", "height_cm_present", "weight_kg_present", "activity_level", "goal_type", "training_days_per_week", "user_entered_calorie_target", "macro_preference"]) ||
+    !Object.entries(d).every(([key, value]) =>
+      ["height_cm_present", "weight_kg_present"].includes(key) ? typeof value === "boolean" :
+      ["training_days_per_week", "user_entered_calorie_target"].includes(key) ? finiteNumber(value) : typeof value === "string"))) return false;
+  const e = t.explanation;
+  if (e !== null && (!isObject(e) ||
+    !onlyKeys(e, ["summary", "assumptions", "missing_inputs", "calculation_basis", "safety_notes"]) ||
+    !["summary", "assumptions", "missing_inputs", "calculation_basis"].every((key) => key in e) ||
+    !Object.entries(e).every(([key, value]) => ["summary", "calculation_basis"].includes(key)
+      ? typeof value === "string" : Array.isArray(value) && value.every((item) => typeof item === "string")))) return false;
+  const parents = ["base_target", "training_day_target", "rest_day_target"];
+  return t.id === v.saved_target_set_id && t.user_id === userId && t.source === v.source &&
+    t.updated_at === v.updated_at && parents.some((key) => validMacro(t[key])) &&
+    parents.every((key) => t[key] === null || validMacro(t[key])) &&
+    Array.isArray(t.day_overrides) && t.day_overrides.length <= 7 &&
+    new Set(t.day_overrides.map((o) => isObject(o) ? o.day_of_week : null)).size === t.day_overrides.length &&
+    t.day_overrides.every((o) => isObject(o) && finiteNumber(o.day_of_week) &&
+      Number.isInteger(o.day_of_week) && o.day_of_week >= 0 && o.day_of_week <= 6 &&
+      // Old saves rounded positive fractions to zero. Omitted children are
+      // historical data, not newly approved targets; the resolver separately
+      // withholds incomplete targets. Validate without repairing the receipt.
+      (preservesOverrides
+        ? isObject(o.target) && "calories" in o.target &&
+          onlyKeys(o.target, ["calories", "protein_g", "carbs_g", "fat_g"]) &&
+          Object.values(o.target).every((n) => finiteNumber(n) && n >= 0)
+        : validMacro(o.target)) && typeof o.source === "string" &&
+      // Omitted overrides can retain historical local_draft rows.
+      [...DURABLE_SOURCES, "local_draft"].includes(o.source) && timestamp(o.updated_at));
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -187,18 +296,12 @@ serve(async (req) => {
       const action = url.searchParams.get("action");
 
       if (action === "get_set") {
-        const { data: set, error } = await admin
-          .from("nutrition_target_sets")
-          .select("*")
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (error) throw error;
+        const set = await readSavedNutritionTargetSet(admin, userId);
         if (!set) return jsonRes({ has_saved_targets: false });
-
-        const { data: overrides } = await admin
-          .from("nutrition_target_day_overrides")
-          .select("day_of_week, target, source, updated_at")
-          .eq("target_set_id", set.id);
+        // Keep the existing public child projection; ownership/IDs were checked
+        // against the same snapshot in the shared read boundary.
+        const overrides = set.day_overrides.map(({ day_of_week, target, source, updated_at }) =>
+          ({ day_of_week, target, source, updated_at }));
 
         return jsonRes({
           has_saved_targets: true,
@@ -229,79 +332,16 @@ serve(async (req) => {
 
       // -- Save hybrid target set --
       if (action === "save_set") {
-        const source = String(body?.source ?? "manual");
-        if (!VALID_SOURCES.includes(source)) return jsonRes({ error: "invalid source" }, 400);
-        if (body?.provenance?.user_confirmed !== true) {
-          return jsonRes({ error: "save requires explicit user confirmation" }, 400);
-        }
-
-        const t = body?.targets ?? {};
-        const base = sanitizeMacro(t.base);
-        const training = sanitizeMacro(t.training_day);
-        const rest = sanitizeMacro(t.rest_day);
-        if (!base && !training && !rest) return jsonRes({ error: "no targets provided" }, 400);
-
-        // Suggestions go stale after 60 days; manual/imported targets do not.
-        const staleAfter = source === "backend_suggested"
-          ? new Date(Date.now() + 60 * 86400_000).toISOString()
-          : null;
-
-        const row = {
-          user_id: userId,
-          source,
-          base_target: base,
-          training_day_target: training,
-          rest_day_target: rest,
-          macro_preference: body?.macro_preference ?? null,
-          explanation: body?.explanation ?? null,
-          derivation_inputs_snapshot: body?.derivation_inputs ?? null,
-          stale_after: staleAfter,
-          updated_at: new Date().toISOString(),
-        };
-
-        const { data: saved, error: upErr } = await admin
-          .from("nutrition_target_sets")
-          .upsert(row, { onConflict: "user_id" })
-          .select()
-          .single();
-        if (upErr) throw upErr;
-
-        // Replace day overrides for this set.
-        await admin.from("nutrition_target_day_overrides").delete().eq("target_set_id", saved.id);
-        const overrides: DayOverride[] = Array.isArray(t.day_overrides) ? t.day_overrides : [];
-        let savedOverrides: unknown[] = [];
-        if (overrides.length > 0) {
-          const rows = overrides
-            .map((o) => {
-              const target = sanitizeMacro(o.target);
-              const dow = Number(o.day_of_week);
-              if (!target || !(dow >= 0 && dow <= 6)) return null;
-              return {
-                target_set_id: saved.id,
-                user_id: userId,
-                day_of_week: dow,
-                target,
-                source: VALID_SOURCES.includes(String(o.source)) ? o.source : source,
-              };
-            })
-            .filter((r): r is NonNullable<typeof r> => r !== null);
-          if (rows.length > 0) {
-            const { data: ins, error: ovErr } = await admin
-              .from("nutrition_target_day_overrides")
-              .insert(rows)
-              .select("day_of_week, target, source, updated_at");
-            if (ovErr) throw ovErr;
-            savedOverrides = ins ?? [];
-          }
-        }
-
-        return jsonRes({
-          saved_target_set_id: saved.id,
-          user_id: userId,
-          source: saved.source,
-          updated_at: saved.updated_at,
-          targets: { ...saved, day_overrides: savedOverrides },
+        if (!validSavePayload(body)) return jsonRes({ error: "Invalid target set" }, 400);
+        const { data, error } = await admin.rpc("save_nutrition_target_set_atomic", {
+          p_user_id: userId,
+          p_payload: body,
         });
+        if (error) {
+          return jsonRes({ error: error.code === "22023" ? "Invalid target set" : "Internal server error" }, error.code === "22023" ? 400 : 500);
+        }
+        if (!validSaveReceipt(data, userId, !("day_overrides" in body.targets))) return jsonRes({ error: "Internal server error" }, 500);
+        return jsonRes(data);
       }
 
       // -- Legacy save/override (unchanged) --
@@ -335,8 +375,8 @@ serve(async (req) => {
     }
 
     return jsonRes({ error: "Method not allowed" }, 405);
-  } catch (e) {
-    console.error("[nutrition-targets] error:", e);
+  } catch {
+    // Never log private request, auth or provider error contents.
     return jsonRes({ error: "Internal server error" }, 500);
   }
 });
