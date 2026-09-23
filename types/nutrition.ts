@@ -218,3 +218,39 @@ export interface ConfirmedNutritionLog {
   analysis_id: string;
   entries: FoodLogEntry[];
 }
+
+// ---------- Barcode lookup (food-barcode Edge Function) ----------
+
+/**
+ * A product resolved from a scanned barcode. NOT a `foods` row — it has no DB
+ * id, so logging it must pass `food_id: null` (a synthetic id would violate the
+ * food_logs.food_id foreign key).
+ *
+ * All macro values are per ONE serving, i.e. per `serving_size_g` grams.
+ * `serving_size_g` is never 0.
+ */
+export interface BarcodeFood {
+  barcode: string;
+  name: string;
+  brand: string | null;
+  serving_size_g: number;
+  serving_label: string | null;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  saturated_fat_g: number;
+  sugar_g: number;
+  sodium_mg: number;
+  /** What the source data was expressed per, for UI disclosure. */
+  basis: '100g' | '100ml' | 'serving';
+}
+
+export type BarcodeLookupResult =
+  /** Complete, loggable nutrition. */
+  | { status: 'found'; barcode: string; source: 'cache' | 'openfoodfacts'; food: BarcodeFood }
+  /** Product exists upstream but lacks a name or any energy value. */
+  | { status: 'incomplete'; barcode: string; source: 'cache' | 'openfoodfacts'; name: string | null; brand: string | null }
+  /** No such product upstream — a common outcome, not an error. */
+  | { status: 'not_found'; barcode: string; source: 'cache' | 'openfoodfacts' };

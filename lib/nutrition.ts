@@ -18,6 +18,7 @@ import type {
   ConfirmNutritionAnalysisRequest,
   ConfirmedNutritionLog,
   NutritionAnalysisItem,
+  BarcodeLookupResult,
 } from '@/types/nutrition';
 import type {
   NutritionTargetsGetResponse,
@@ -28,6 +29,11 @@ import type {
 } from '@/types/nutritionTargets';
 
 const API = `${supabaseUrl}/functions/v1`;
+
+/** Queue only recognizable fetch transport failures, not HTTP rejection or bugs. */
+export function isRetryableNutritionError(error: unknown): boolean {
+  return error instanceof TypeError && /network request failed|failed to fetch|fetch failed|load failed/i.test(error.message);
+}
 
 async function get<T>(url: string): Promise<T> {
   const res = await fetchWithAuth(url, { method: 'GET' });
@@ -144,6 +150,74 @@ export async function recalibrateMealPlan(): Promise<{ plan: MealPlan; meals_ins
 
 export async function fetchRecentFoods(): Promise<{ foods: RecentFood[] }> {
   return get(`${API}/food-log?action=recent`);
+}
+
+// ---------- Barcode lookup ----------
+
+/**
+ * Resolve a scanned barcode to a loggable food.
+ *
+ * `barcode` must already be normalized by `normalizeBarcode()`; this re-checks
+ * the shape because the value reaches a URL. `signal` lets the caller cancel an
+ * in-flight lookup on unmount.
+ *
+ * Not-found and incomplete are ordinary results, not thrown errors — roughly
+ * half of scanned retail barcodes are absent from the upstream database, so the
+ * caller must route those to manual entry rather than showing a failure.
+ */
+export type BarcodeErrorCode =
+  | 'BARCODE_LIMIT_REACHED'
+  | 'BARCODE_UPSTREAM_UNAVAILABLE'
+  | 'BARCODE_GATE_UNAVAILABLE';
+
+/**
+ * A lookup failure the server explained. Distinguished from a transport error
+ * so the UI never tells a rate-limited user to "check your connection" — the
+ * daily gate is increment-first, so every pointless retry pushes them further
+ * past the cap.
+ */
+export class BarcodeLookupError extends Error {
+  readonly code: BarcodeErrorCode | null;
+  readonly status: number;
+  constructor(message: string, code: BarcodeErrorCode | null, status: number) {
+    super(message);
+    this.name = 'BarcodeLookupError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+const BARCODE_ERROR_CODES: BarcodeErrorCode[] = [
+  'BARCODE_LIMIT_REACHED',
+  'BARCODE_UPSTREAM_UNAVAILABLE',
+  'BARCODE_GATE_UNAVAILABLE',
+];
+
+export async function lookupBarcode(
+  barcode: string,
+  signal?: AbortSignal,
+): Promise<BarcodeLookupResult> {
+  if (!/^\d{8,14}$/.test(barcode)) throw new Error('A valid barcode is required');
+  const res = await fetchWithAuth(`${API}/food-barcode?barcode=${encodeURIComponent(barcode)}`, {
+    method: 'GET',
+    signal,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let code: BarcodeErrorCode | null = null;
+    let message = '';
+    try {
+      const body = JSON.parse(text) as { code?: string; error?: string };
+      if (typeof body.code === 'string' && (BARCODE_ERROR_CODES as string[]).includes(body.code)) {
+        code = body.code as BarcodeErrorCode;
+      }
+      if (typeof body.error === 'string') message = body.error;
+    } catch {
+      // Non-JSON body (gateway error page) — fall through to a generic message.
+    }
+    throw new BarcodeLookupError(message || `HTTP ${res.status}`, code, res.status);
+  }
+  return (await res.json()) as BarcodeLookupResult;
 }
 
 // ---------- Transient text/photo nutrition analysis ----------

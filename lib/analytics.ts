@@ -24,7 +24,7 @@ type RecommendationType =
   | 'deload_set';
 type PaywallSource = 'onboarding' | 'feature_gate' | 'settings' | 'expired_access';
 type CheckoutProduct = 'monthly' | 'yearly';
-type NutritionCaptureMode = 'text' | 'photo';
+type NutritionCaptureMode = 'text' | 'photo' | 'barcode';
 
 export type ProductEvent =
   | { name: 'app_opened'; properties: { platform: AppPlatform } }
@@ -84,7 +84,7 @@ const RECOMMENDATION_TYPES = [
 ] as const;
 const PAYWALL_SOURCES = ['onboarding', 'feature_gate', 'settings', 'expired_access'] as const;
 const CHECKOUT_PRODUCTS = ['monthly', 'yearly'] as const;
-const NUTRITION_CAPTURE_MODES = ['text', 'photo'] as const;
+const NUTRITION_CAPTURE_MODES = ['text', 'photo', 'barcode'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;

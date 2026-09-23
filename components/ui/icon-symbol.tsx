@@ -52,6 +52,10 @@ const MAPPING = {
   'bell.fill': 'notifications',
   'camera.fill': 'photo-camera',
   'timer': 'timer',
+  'magnifyingglass': 'search',
+  'barcode.viewfinder': 'qr-code-scanner',
+  'bolt.fill': 'flash-on',
+  'bolt.slash': 'flash-off',
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;

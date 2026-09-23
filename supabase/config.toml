@@ -57,3 +57,8 @@ file_size_limit = "50MB"
   verify_jwt = false
   [functions.iap]
   verify_jwt = false
+  # food-barcode verifies the bearer token itself via admin.auth.getUser() and
+  # returns its own 401. Declared explicitly so the CORS preflight (OPTIONS,
+  # which carries no Authorization header) is never rejected by the gateway.
+  [functions.food-barcode]
+  verify_jwt = false
