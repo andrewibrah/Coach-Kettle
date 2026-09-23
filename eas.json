@@ -12,10 +12,7 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "env": {
-        "SENTRY_ALLOW_FAILURE": "true"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {

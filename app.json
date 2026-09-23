@@ -2,7 +2,7 @@
   "expo": {
     "name": "Coach Kettle",
     "slug": "CoachKettle",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "coachkettle",
@@ -15,7 +15,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Coach Kettle uses Face ID to keep your workout session secure",
         "NSPhotoLibraryUsageDescription": "Coach Kettle needs access to your photo library to attach gym photos and videos to workouts.",
-        "NSCameraUsageDescription": "Coach Kettle needs camera access to take gym photos for your workouts."
+        "NSCameraUsageDescription": "Coach Kettle uses the camera to scan food barcodes and to take gym photos for your workouts."
       }
     },
     "android": {
@@ -53,7 +53,15 @@
         "expo-image-picker",
         {
           "photosPermission": "Coach Kettle needs access to your photo library to attach gym photos and videos to workouts.",
-          "cameraPermission": "Coach Kettle needs camera access to take gym photos for your workouts."
+          "cameraPermission": "Coach Kettle uses the camera to scan food barcodes and to take gym photos for your workouts."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Coach Kettle uses the camera to scan food barcodes and to take gym photos for your workouts.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [
@@ -67,12 +75,13 @@
       ],
       "expo-web-browser",
       "expo-video",
+      "./plugins/withPodfileMinDeploymentTarget",
       [
-        "@sentry/react-native/expo",
+        "expo-build-properties",
         {
-          "organization": "coach-kettle",
-          "project": "apple-ios",
-          "url": "https://sentry.io/"
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
         }
       ]
     ],

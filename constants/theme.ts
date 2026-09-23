@@ -27,8 +27,15 @@ export const Colors = {
     cardBackground: '#ffffff',
     secondaryBackground: '#F9FAFB',
     danger: '#EF4444',
+    // Text/icon color to place on top of a `danger`-filled surface (error banners).
+    dangerForeground: '#ffffff',
     success: '#10B981',
     warning: '#F59E0B',
+    // Camera viewfinder surface (barcode scanner) is always dark, by intent,
+    // in both light and dark mode — same value in both palettes.
+    cameraOverlay: '#000000',
+    cameraOverlayText: '#ffffff',
+    cameraScrim: 'rgba(0,0,0,0.55)',
   },
   dark: {
     text: '#ECEDEE',
@@ -46,8 +53,14 @@ export const Colors = {
     cardBackground: '#1F2937',
     secondaryBackground: '#1F2937',
     danger: '#EF4444',
+    // Same red as light mode, so white stays high-contrast on top of it.
+    dangerForeground: '#ffffff',
     success: '#10B981',
     warning: '#F59E0B',
+    // Same value as light mode — the camera viewfinder is always dark.
+    cameraOverlay: '#000000',
+    cameraOverlayText: '#ffffff',
+    cameraScrim: 'rgba(0,0,0,0.55)',
   },
 };
 

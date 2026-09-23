@@ -1,5 +1,4 @@
 import 'react-native-reanimated';
-import * as Sentry from '@sentry/react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -20,12 +19,6 @@ import { NotificationsProvider } from '@/contexts/NotificationsProvider';
 import { RestTimerProvider } from '@/contexts/RestTimerContext';
 import { RestTimerToast } from '@/components/workout/RestTimerToast';
 import { useColorScheme } from '@/hooks/useColorScheme';
-
-Sentry.init({
-  dsn: 'https://0527c4ce48b437b40754ec1849c7b7af@o4511464992538624.ingest.us.sentry.io/4511464995225600',
-  tracesSampleRate: 0.2,   // 20% of sessions — enough signal without volume cost
-  debug: false,
-});
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -64,7 +57,7 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default RootLayout;
 
 // Build the navigation theme from our own design tokens so the navigator's
 // surfaces (screen background, header card, borders) match the app exactly.
