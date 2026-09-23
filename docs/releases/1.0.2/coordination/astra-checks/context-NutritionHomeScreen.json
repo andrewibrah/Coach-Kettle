@@ -1,0 +1,80 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:app/(tabs)/nutrition/index.tsx:NutritionHomeScreen",
+    "name": "NutritionHomeScreen",
+    "kind": "Function",
+    "filePath": "app/(tabs)/nutrition/index.tsx",
+    "startLine": 20,
+    "endLine": 271
+  },
+  "epistemic": "exact",
+  "incoming": {},
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:app/(tabs)/nutrition/index.tsx:handleDelete",
+        "name": "handleDelete",
+        "filePath": "app/(tabs)/nutrition/index.tsx"
+      },
+      {
+        "uid": "Function:app/(tabs)/nutrition/index.tsx:renderBar",
+        "name": "renderBar",
+        "filePath": "app/(tabs)/nutrition/index.tsx"
+      },
+      {
+        "uid": "Function:hooks/useThemeColor.ts:useThemeColor",
+        "name": "useThemeColor",
+        "filePath": "hooks/useThemeColor.ts"
+      },
+      {
+        "uid": "Function:hooks/useToast.ts:useToast",
+        "name": "useToast",
+        "filePath": "hooks/useToast.ts"
+      },
+      {
+        "uid": "Function:components/ui/Toast.tsx:Toast",
+        "name": "Toast",
+        "filePath": "components/ui/Toast.tsx"
+      },
+      {
+        "uid": "Function:components/ui/icon-symbol.tsx:IconSymbol",
+        "name": "IconSymbol",
+        "filePath": "components/ui/icon-symbol.tsx"
+      },
+      {
+        "uid": "Function:components/ui/screen-header.tsx:ScreenHeader",
+        "name": "ScreenHeader",
+        "filePath": "components/ui/screen-header.tsx"
+      },
+      {
+        "uid": "Function:components/ui/themed-text.tsx:ThemedText",
+        "name": "ThemedText",
+        "filePath": "components/ui/themed-text.tsx"
+      },
+      {
+        "uid": "Function:components/ui/themed-view.tsx:ThemedView",
+        "name": "ThemedView",
+        "filePath": "components/ui/themed-view.tsx"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:useNutrition",
+        "name": "useNutrition",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Function:contexts/ProfileContext.tsx:useProfile",
+        "name": "useProfile",
+        "filePath": "contexts/ProfileContext.tsx"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_139_nutritionhomescreen",
+      "name": "NutritionHomeScreen → UseTheme",
+      "step_index": 1,
+      "step_count": 4
+    }
+  ]
+}

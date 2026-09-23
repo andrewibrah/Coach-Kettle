@@ -1,0 +1,71 @@
+ M .claude/CLAUDE.md
+ M app.json
+ M app/(tabs)/history.tsx
+ M app/(tabs)/index.tsx
+ M app/_layout.tsx
+ M app/exercise-library/index.tsx
+ M app/history/[id].tsx
+ M app/program/create.tsx
+ M app/program/day.tsx
+ M app/program/week.tsx
+ M app/settings/notifications.tsx
+ M components/celebration/PRCelebration.tsx
+ M components/media/ImageViewerModal.tsx
+ M components/media/MediaPickerBubble.tsx
+ M components/media/ReflectionInput.tsx
+ M components/modals/SessionReviewModal.tsx
+ M components/tutorial/TutorialModal.tsx
+ D components/ui/hello-wave.tsx
+ M components/ui/icon-symbol.tsx
+ M components/ui/screen-header.tsx
+ D components/workout/RestTimerBar.tsx
+ M components/workout/RestTimerToast.tsx
+ M constants/subscription.ts
+ M contexts/AuthProvider.tsx
+ M contexts/NotificationsProvider.tsx
+ M contexts/RestTimerContext.tsx
+ D docs/plans/2026-07-14-product-ui-ai-analytics-audit.md
+ D docs/plans/2026-07-14-six-part-product-roadmap.md
+ D docs/superpowers/plans/2026-06-17-coach-kettle-6-features.md
+ M eas.json
+ M hooks/useRestTimer.ts
+ M lib/exerciseLibrary.ts
+ M lib/programming.ts
+ M lib/restTimer.ts
+ M lib/trainingSchedule.ts
+ M lib/workoutStorage.ts
+ M package-lock.json
+ M package.json
+ M supabase/functions/coach/index.ts
+ M supabase/functions/exercise-library/index.ts
+ M supabase/functions/notifications/index.ts
+ M supabase/functions/programming/index.ts
+ M types/notifications.ts
+?? .asc-metadata/
+?? ".claude/attachments/image copy 13.png"
+?? ".claude/attachments/image copy 13.png 23-05-33-200.png"
+?? ".claude/attachments/image copy 14.png"
+?? c_debug.md
+?? components/workout/StartRestPrompt.tsx
+?? docs/ai/
+?? docs/plans/pr_tracking_enhancements_implementation.md
+?? docs/qa/
+?? docs/superpowers/plans/2026-05-27-phase2-audit-fixes.md
+?? docs/superpowers/specs/
+?? h_debug.md
+?? implementation_prompt.md
+?? lib/__tests__/exerciseFormat.test.ts
+?? lib/__tests__/programFormat.test.ts
+?? lib/__tests__/programSchedule.test.ts
+?? lib/__tests__/programTemplates.test.ts
+?? lib/__tests__/restTimer.test.ts
+?? lib/__tests__/trainingSchedule.test.ts
+?? lib/__tests__/workoutSource.test.ts
+?? lib/exerciseFormat.ts
+?? lib/programFormat.ts
+?? lib/programSchedule.ts
+?? lib/programTemplates.ts
+?? plugins/
+?? supabase/migrations/20260904000000_full_body_upper_lower_templates.sql
+?? supabase/migrations/20260904000100_auto_start_rest_timer_pref.sql
+?? supabase/migrations/20260904000200_workout_program_source.sql

@@ -1,0 +1,41 @@
+{
+  "target": {
+    "id": "Function:lib/nutritionTargets.ts:resolveTodayNutritionTarget",
+    "name": "resolveTodayNutritionTarget",
+    "type": "Function",
+    "filePath": "lib/nutritionTargets.ts"
+  },
+  "direction": "upstream",
+  "impactedCount": 1,
+  "risk": "LOW",
+  "epistemic": "exact",
+  "summary": {
+    "direct": 1,
+    "processes_affected": 0,
+    "modules_affected": 1
+  },
+  "byDepthCounts": {
+    "1": 1
+  },
+  "affected_processes": [],
+  "affected_modules": [
+    {
+      "name": "Contexts",
+      "hits": 1,
+      "impact": "direct"
+    }
+  ],
+  "byDepth": {
+    "1": [
+      {
+        "depth": 1,
+        "id": "Function:contexts/NutritionContext.tsx:todayTarget",
+        "name": "todayTarget",
+        "filePath": "contexts/NutritionContext.tsx",
+        "relationType": "CALLS",
+        "confidence": 0.85,
+        "processes": []
+      }
+    ]
+  }
+}

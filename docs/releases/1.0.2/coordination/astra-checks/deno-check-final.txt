@@ -1,0 +1,2 @@
+[0m[32mCheck[0m supabase/functions/body-metrics/index.ts
+[0m[32mCheck[0m supabase/functions/daily-feedback/index.ts

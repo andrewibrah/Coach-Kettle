@@ -1,0 +1,22 @@
+[
+  {
+    "command": [
+      "./node_modules/.bin/eslint",
+      "contexts/NutritionContext.tsx",
+      "contexts/CoachingContext.tsx",
+      "components/home/HomeDashboard.tsx",
+      "app/(tabs)/nutrition",
+      "app/coach",
+      "lib/nutrition.ts",
+      "lib/coaching.ts"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "./node_modules/.bin/tsc",
+      "--noEmit"
+    ],
+    "exit_code": 0
+  }
+]

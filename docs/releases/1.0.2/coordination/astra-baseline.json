@@ -1,0 +1,18 @@
+{
+  "contexts/NutritionContext.tsx": "14628566dad55b1471228e8b258c9775f0e0ab64ded648390b38ab4974e54efe",
+  "contexts/CoachingContext.tsx": "1dcddcf54fdd2eae42431fbdbf5cce3537d3d5f1ca55a84684b55ddc6dcbb0ab",
+  "components/home/HomeDashboard.tsx": "f0153a8ceeb21e0746abbbdd240a24c69b0ffcd313492bb81f55db9fb279d222",
+  "app/(tabs)/nutrition/index.tsx": "280609337d05c5daa119b52ac250d587371f0a3dd81d78b4a31887a5e885bf68",
+  "app/(tabs)/nutrition/targets.tsx": "4cc31364afaf06bf4c3acc6fd753ae3e9a75b20ac3b4edaf0cf86afd41b9aa39",
+  "app/(tabs)/nutrition/_layout.tsx": "2aa0128d806b6d56fddaf8a944cb97930a4ff2cbfc8b389ef14ff68c6c610be0",
+  "app/(tabs)/nutrition/plan.tsx": "164ae927412409c932f9eca0354a687228b3ff6fcb12aa5caa5565de3082d9dc",
+  "app/(tabs)/nutrition/log.tsx": "5d61e1bf08c19251ccd3869c65e447ee1ecba1e72f3b453dd66da02e19b189a9",
+  "app/coach/index.tsx": "471a2f13168898435201a980404e565b6484c8ea27cfc9f440abbe66e9f5c0be",
+  "app/coach/history.tsx": "e2a8e10ffd27d09989b88ffa2e755ecb90c8f61dc1ac5b2aa5d8d3476d6e471f",
+  "app/coach/_layout.tsx": "87349d9b525a250a85f587ede0440a0b6f9e0892d7ada577aa831ba118980c37",
+  "lib/nutrition.ts": "1a10729191c46bf0fb5ad548da44225fb3eabca1b9d115fb9974f8fb0beb09a1",
+  "lib/coaching.ts": "12f0d078b305fe22ac810a0c1582bc1c9d836d4351f40ee064012bd788cd3390",
+  "supabase/functions/daily-feedback/index.ts": "bea20e5a9da019d87f9a5f7978e24c4a3339596d61900ccce4402967c5693e04",
+  "lib/nutritionTargets.ts": "c3a3e241a7e6795fd410c3a42e689b0f14a947ffd8fd1ce492375aefd883dfff",
+  "lib/__tests__/nutritionTargets.test.ts": "c7c5475cf701f86d27f9fd86027d17a5fb21620599aee2c78145e183073e2de6"
+}

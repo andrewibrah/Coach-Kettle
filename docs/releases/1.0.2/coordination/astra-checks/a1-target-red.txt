@@ -1,0 +1,46 @@
+(node:46849) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/nutritionTargets.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ local weekly override merges provided fields with the resolved saved day (1.037958ms)
+✔ day override beats training/rest (0.107792ms)
+✔ training target wins on training day (0.047625ms)
+✔ rest target wins on rest day (0.044375ms)
+✔ saved base target beats suggestion (0.472625ms)
+✔ non-stale suggestion is used as fallback when nothing saved (0.051833ms)
+✔ stale suggestion is NOT applied -> empty prompt (0.052292ms)
+✔ empty prompt when no data (0.037083ms)
+✔ draft used only as labeled last resort (0.058167ms)
+✔ stale_after marks saved target stale (0.143625ms)
+✔ macro math: 30/40/30 default (0.070541ms)
+✔ withAutoMacros fills only missing macros (0.049458ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 11
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 78.150333
+
+✖ failing tests:
+
+test at lib/__tests__/nutritionTargets.test.ts:44:1
+✖ local weekly override merges provided fields with the resolved saved day (1.037958ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2000 !== 2300
+  
+      at TestContext.<anonymous> (file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/nutritionTargets.test.ts:50:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2000,
+    expected: 2300,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

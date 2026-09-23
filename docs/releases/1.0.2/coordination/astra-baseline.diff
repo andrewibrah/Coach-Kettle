@@ -1,0 +1,455 @@
+diff --git a/app/(tabs)/nutrition/log.tsx b/app/(tabs)/nutrition/log.tsx
+index 5d778e3..03c4150 100644
+--- a/app/(tabs)/nutrition/log.tsx
++++ b/app/(tabs)/nutrition/log.tsx
+@@ -1,4 +1,4 @@
+-import React, { useEffect, useState } from 'react';
++import React, { useCallback, useEffect, useRef, useState } from 'react';
+ import {
+   ActivityIndicator,
+   KeyboardAvoidingView,
+@@ -18,6 +18,8 @@ import { File as ExpoFile } from 'expo-file-system';
+ import { ThemedView } from '@/components/ui/themed-view';
+ import { ThemedText } from '@/components/ui/themed-text';
+ import { ScreenHeader } from '@/components/ui/screen-header';
++import { IconSymbol } from '@/components/ui/icon-symbol';
++import { BarcodeScannerModal } from '@/components/nutrition/BarcodeScannerModal';
+ import { useThemeColor } from '@/hooks/useThemeColor';
+ 
+ import { useNutrition } from '@/contexts/NutritionContext';
+@@ -25,11 +27,15 @@ import { trackProductEvent } from '@/lib/analytics';
+ import {
+   analyzeNutritionPhoto,
+   analyzeNutritionText,
++  BarcodeLookupError,
+   confirmNutritionAnalysis,
++  lookupBarcode,
+   searchFoods,
+ } from '@/lib/nutrition';
++import { formatBrandedFoodName } from '@/lib/barcode';
+ import { todayISO } from '@/lib/workoutRules';
+ import type {
++  BarcodeFood,
+   FoodItem,
+   MealSlot,
+   NutritionAnalysisItem,
+@@ -139,6 +145,41 @@ function bytesToBase64(bytes: Uint8Array): string {
+   return globalThis.btoa(binary);
+ }
+ 
++/**
++ * Present a barcode-resolved product through the same "selected food" card the
++ * catalog search uses.
++ *
++ * The synthetic `id` is for React keys and display only — it is NOT a
++ * `public.foods` primary key, so logging must pass `food_id: null` or the
++ * food_logs.food_id foreign key rejects the insert. `selectedBarcode` tracks
++ * that distinction.
++ */
++function barcodeFoodToItem(food: BarcodeFood): FoodItem {
++  const now = new Date().toISOString();
++  return {
++    id: `barcode:${food.barcode}`,
++    user_id: null,
++    is_global: false,
++    name: formatBrandedFoodName(food.name, food.brand),
++    brand: food.brand,
++    // Guaranteed > 0 by the mapper; a 0 here would make toServings() silently
++    // treat every gram/oz amount as exactly one serving.
++    serving_size_g: food.serving_size_g,
++    serving_label: food.serving_label,
++    calories: food.calories,
++    protein_g: food.protein_g,
++    carbs_g: food.carbs_g,
++    fat_g: food.fat_g,
++    fiber_g: food.fiber_g,
++    saturated_fat_g: food.saturated_fat_g,
++    sugar_g: food.sugar_g,
++    sodium_mg: food.sodium_mg,
++    tags: [],
++    created_at: now,
++    updated_at: now,
++  };
++}
++
+ export default function LogFoodScreen() {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+@@ -174,6 +215,24 @@ export default function LogFoodScreen() {
+   const [submitting, setSubmitting] = useState(false);
+   const [logError, setLogError] = useState<string | null>(null);
+ 
++  // Barcode scanning. `selectedBarcode` is non-null only while `selected` came
++  // from a scan, which is what keeps food_id NULL on the resulting log row.
++  const [scannerOpen, setScannerOpen] = useState(false);
++  const [lookingUp, setLookingUp] = useState(false);
++  const [selectedBarcode, setSelectedBarcode] = useState<string | null>(null);
++  const [scanNotice, setScanNotice] = useState<string | null>(null);
++  const lookupAbortRef = useRef<AbortController | null>(null);
++
++  // Roughly half of retail barcodes are missing upstream, so the manual-entry
++  // fallback is a primary path — jump the user to it instead of leaving the
++  // prefilled form below the fold.
++  const scrollRef = useRef<ScrollView | null>(null);
++  const quickLogYRef = useRef(0);
++
++  // Cancel any in-flight lookup on unmount so it can't set state on a dead
++  // component (and so a backgrounded request doesn't linger).
++  useEffect(() => () => lookupAbortRef.current?.abort(), []);
++
+   // Quick log fields
+   const [quickName, setQuickName] = useState('');
+   const [quickCal, setQuickCal] = useState('');
+@@ -360,6 +419,127 @@ export default function LogFoodScreen() {
+     };
+   }, [query]);
+ 
++  // ---------- Barcode scanning ----------
++
++  const openScanner = useCallback(() => {
++    setScanNotice(null);
++    setLogError(null);
++    setScannerOpen(true);
++    void trackProductEvent({ name: 'nutrition_capture_opened', properties: { mode: 'barcode' } });
++  }, []);
++
++  const handleBarcodeScanned = useCallback(async (barcode: string) => {
++    if (lookingUp) return;
++
++    lookupAbortRef.current?.abort();
++    const controller = new AbortController();
++    lookupAbortRef.current = controller;
++
++    setLookingUp(true);
++    setScanNotice(null);
++    try {
++      const result = await lookupBarcode(barcode, controller.signal);
++      if (controller.signal.aborted) return;
++
++      if (result.status === 'found') {
++        // Reset the amount controls so a previous selection's grams/oz entry
++        // can't carry over onto a product with a different serving size.
++        setSelected(barcodeFoodToItem(result.food));
++        setSelectedBarcode(result.barcode);
++        setServings('1');
++        setUnit('serving');
++        setResults([]);
++        setQuery('');
++        setLogError(null);
++        setScannerOpen(false);
++        setScanNotice(
++          result.food.basis === 'serving'
++            ? `Found "${result.food.name}". Check the amount, then log it.`
++            : `Found "${result.food.name}". Values are per ${result.food.basis === '100ml' ? '100 ml' : '100 g'} — set the amount you ate.`,
++        );
++        void trackProductEvent({
++          name: 'nutrition_analysis_completed',
++          properties: { mode: 'barcode', cache_hit: result.source === 'cache' },
++        });
++        return;
++      }
++
++      // Not found / incomplete are ordinary outcomes: roughly half of retail
++      // barcodes are absent upstream. Prefill quick log instead of erroring.
++      const knownName = result.status === 'incomplete'
++        ? [result.brand, result.name].filter(Boolean).join(' ').trim()
++        : '';
++      setScannerOpen(false);
++      setSelected(null);
++      setSelectedBarcode(null);
++      // Reset EVERY quick-log field, not just the name. Leaving macros from a
++      // previously typed food next to a freshly prefilled name is one tap away
++      // from logging the new food with the old food's calories.
++      setQuickName(knownName);
++      setQuickCal('');
++      setQuickProt('');
++      setQuickCarb('');
++      setQuickFat('');
++      setQuickFiber('');
++      setQuickSatFat('');
++      setQuickError(null);
++      setScanNotice(
++        knownName
++          ? `Found "${knownName}", but it has no nutrition info. Add the numbers below from the label.`
++          : `Barcode ${barcode} isn't in the food database yet. Add it below from the label — it only takes a moment.`,
++      );
++      // Let the modal finish dismissing before scrolling, or the offset is
++      // measured against a screen that is still covered.
++      setTimeout(() => {
++        scrollRef.current?.scrollTo({ y: Math.max(0, quickLogYRef.current - 12), animated: true });
++      }, 350);
++      void trackProductEvent({
++        name: 'nutrition_analysis_completed',
++        properties: { mode: 'barcode', cache_hit: result.source === 'cache' },
++      });
++    } catch (error) {
++      if (controller.signal.aborted) return;
++      console.warn('[nutrition] barcode lookup failed', error);
++      setScannerOpen(false);
++      // A server-explained failure must not read as a network fault: the daily
++      // gate is increment-first, so telling a rate-limited user to "check your
++      // connection" invites retries that push them further past the cap.
++      const code = error instanceof BarcodeLookupError ? error.code : null;
++      setScanNotice(
++        code === 'BARCODE_LIMIT_REACHED'
++          ? "You've hit today's barcode lookup limit. Add this food below, or scan again tomorrow."
++          : code === 'BARCODE_UPSTREAM_UNAVAILABLE' || code === 'BARCODE_GATE_UNAVAILABLE'
++            ? 'The food database is unavailable right now. Add the food below from the label.'
++            : 'Could not look up that barcode. Check your connection, or add the food below.',
++      );
++    } finally {
++      if (lookupAbortRef.current === controller) lookupAbortRef.current = null;
++      // Always clear, even when aborted. Setting state after unmount is a no-op
++      // in React 18+, whereas skipping this would strand `lookingUp` at true and
++      // permanently disable the scan button (it is disabled while looking up).
++      setLookingUp(false);
++    }
++  }, [lookingUp]);
++
++  /**
++   * Closing must ALWAYS work, including mid-lookup. `lookupBarcode` has no
++   * client-side timeout (React Native `fetch` has none, and the function's 8s
++   * budget only bounds its own upstream call), so gating close on `lookingUp`
++   * left a stalled connection showing an uncloseable sheet with no cancel.
++   */
++  const closeScanner = useCallback(() => {
++    lookupAbortRef.current?.abort();
++    lookupAbortRef.current = null;
++    setLookingUp(false);
++    setScannerOpen(false);
++  }, []);
++
++  // Stable identity: an inline arrow would re-set the native scanner's callback
++  // prop on every render of this fairly large screen.
++  const handleScannedBarcode = useCallback((barcode: string) => {
++    void handleBarcodeScanned(barcode);
++  }, [handleBarcodeScanned]);
++
+   const handleLogSelected = async () => {
+     const today = todayISO();
+     if (!selected || submitting) return;
+@@ -370,7 +550,11 @@ export default function LogFoodScreen() {
+       await logFood({
+         date: today,
+         meal_slot: mealSlot,
+-        food_id: selected.id,
++        // A barcode result is not a public.foods row — passing its synthetic id
++        // would violate the food_logs.food_id foreign key. A "recently logged"
++        // pill built from a quick-log entry has no food_id either and carries
++        // '' as its id, which Postgres rejects as a UUID.
++        food_id: selectedBarcode || !selected.id ? null : selected.id,
+         food_name: selected.name,
+         servings: s,
+         calories: selected.calories * s,
+@@ -496,6 +680,7 @@ export default function LogFoodScreen() {
+     <ThemedView style={[styles.container, { backgroundColor }]}>
+       <ScreenHeader title="Log food" subtitle="Analyze, search, or quick add" />
+       <ScrollView
++        ref={scrollRef}
+         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
+         keyboardShouldPersistTaps="handled"
+       >
+@@ -634,6 +819,8 @@ export default function LogFoodScreen() {
+                         created_at: '',
+                         updated_at: '',
+                       });
++                      setSelectedBarcode(null);
++                      setScanNotice(null);
+                       setServings(String(food.servings));
+                       setUnit('serving');
+                       setMealSlot(food.meal_slot);
+@@ -663,6 +850,38 @@ export default function LogFoodScreen() {
+         {/* Search */}
+         <View style={[styles.card, { backgroundColor: cardBackground }]}>
+           <ThemedText type="subtitle" style={{ marginBottom: 10 }}>Search foods</ThemedText>
++
++          {/* Barcode scanning needs a native camera; hidden on web. */}
++          {Platform.OS !== 'web' && (
++            <Pressable
++              onPress={openScanner}
++              disabled={lookingUp}
++              accessibilityRole="button"
++              accessibilityLabel="Scan a barcode"
++              accessibilityHint="Opens the camera to scan a product barcode"
++              style={({ pressed }) => [
++                styles.scanBtn,
++                { borderColor: tint, opacity: lookingUp ? 0.6 : 1 },
++                pressed && { opacity: 0.7 },
++              ]}
++            >
++              {lookingUp ? (
++                <ActivityIndicator color={tint} />
++              ) : (
++                <>
++                  <IconSymbol name="barcode.viewfinder" size={20} color={tint} />
++                  <ThemedText style={{ fontWeight: '700', color: tint }}>Scan barcode</ThemedText>
++                </>
++              )}
++            </Pressable>
++          )}
++
++          {scanNotice && (
++            <ThemedText style={{ color: placeholder, fontSize: 13, marginBottom: 10 }}>
++              {scanNotice}
++            </ThemedText>
++          )}
++
+           <TextInput
+             value={query}
+             onChangeText={setQuery}
+@@ -684,7 +903,7 @@ export default function LogFoodScreen() {
+               {results.map((item) => (
+                 <Pressable
+                   key={item.id}
+-                  onPress={() => { setSelected(item); setServings('1'); setUnit('serving'); setResults([]); setQuery(''); setLogError(null); }}
++                  onPress={() => { setSelected(item); setSelectedBarcode(null); setScanNotice(null); setServings('1'); setUnit('serving'); setResults([]); setQuery(''); setLogError(null); }}
+                   accessibilityRole="button"
+                   accessibilityLabel={`${item.name}, ${Math.round(item.calories)} cal, ${Math.round(item.protein_g)}g protein`}
+                   style={({ pressed }) => [
+@@ -757,7 +976,13 @@ export default function LogFoodScreen() {
+                 );
+               })}
+             </ScrollView>
+-            {unit !== 'serving' && selected.serving_size_g > 0 && (
++            {/* Always disclose what "1 serving" actually weighs — including in
++                the `serving` unit, which is the state a barcode scan lands in.
++                Hiding it there let a product with a bogus upstream serving size
++                (real example: an Oreo listing whose serving_quantity is 3 g)
++                render "Per serving: 14 cal" with nothing on screen to reveal
++                why. Silent under-reporting is the worst failure a food log has. */}
++            {selected.serving_size_g > 0 && (
+               <ThemedText style={{ fontSize: 12, color: placeholder, marginBottom: 4 }}>
+                 1 serving = {selected.serving_size_g}g
+                 {selected.serving_label ? ` (${selected.serving_label})` : ''}
+@@ -794,7 +1019,10 @@ export default function LogFoodScreen() {
+         )}
+ 
+         {/* Separator */}
+-        <View style={styles.separator}>
++        <View
++          onLayout={(e) => { quickLogYRef.current = e.nativeEvent.layout.y; }}
++          style={styles.separator}
++        >
+           <View style={[styles.separatorLine, { backgroundColor: border }]} />
+           <ThemedText style={{ color: placeholder, paddingHorizontal: 8, fontSize: 13 }}>
+             or log quickly
+@@ -1037,6 +1265,15 @@ export default function LogFoodScreen() {
+           </KeyboardAvoidingView>
+         </ThemedView>
+       </Modal>
++
++      {Platform.OS !== 'web' && (
++        <BarcodeScannerModal
++          visible={scannerOpen}
++          busy={lookingUp}
++          onClose={closeScanner}
++          onScanned={handleScannedBarcode}
++        />
++      )}
+     </ThemedView>
+   );
+ }
+@@ -1067,6 +1304,16 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     justifyContent: 'center',
+   },
++  scanBtn: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    gap: 8,
++    paddingVertical: 13,
++    borderRadius: 12,
++    borderWidth: 1.5,
++    marginBottom: 10,
++  },
+   slotBtn: {
+     paddingVertical: 8,
+     paddingHorizontal: 14,
+diff --git a/lib/nutrition.ts b/lib/nutrition.ts
+index 75e4c3d..f1c741d 100644
+--- a/lib/nutrition.ts
++++ b/lib/nutrition.ts
+@@ -18,6 +18,7 @@ import type {
+   ConfirmNutritionAnalysisRequest,
+   ConfirmedNutritionLog,
+   NutritionAnalysisItem,
++  BarcodeLookupResult,
+ } from '@/types/nutrition';
+ import type {
+   NutritionTargetsGetResponse,
+@@ -146,6 +147,74 @@ export async function fetchRecentFoods(): Promise<{ foods: RecentFood[] }> {
+   return get(`${API}/food-log?action=recent`);
+ }
+ 
++// ---------- Barcode lookup ----------
++
++/**
++ * Resolve a scanned barcode to a loggable food.
++ *
++ * `barcode` must already be normalized by `normalizeBarcode()`; this re-checks
++ * the shape because the value reaches a URL. `signal` lets the caller cancel an
++ * in-flight lookup on unmount.
++ *
++ * Not-found and incomplete are ordinary results, not thrown errors — roughly
++ * half of scanned retail barcodes are absent from the upstream database, so the
++ * caller must route those to manual entry rather than showing a failure.
++ */
++export type BarcodeErrorCode =
++  | 'BARCODE_LIMIT_REACHED'
++  | 'BARCODE_UPSTREAM_UNAVAILABLE'
++  | 'BARCODE_GATE_UNAVAILABLE';
++
++/**
++ * A lookup failure the server explained. Distinguished from a transport error
++ * so the UI never tells a rate-limited user to "check your connection" — the
++ * daily gate is increment-first, so every pointless retry pushes them further
++ * past the cap.
++ */
++export class BarcodeLookupError extends Error {
++  readonly code: BarcodeErrorCode | null;
++  readonly status: number;
++  constructor(message: string, code: BarcodeErrorCode | null, status: number) {
++    super(message);
++    this.name = 'BarcodeLookupError';
++    this.code = code;
++    this.status = status;
++  }
++}
++
++const BARCODE_ERROR_CODES: BarcodeErrorCode[] = [
++  'BARCODE_LIMIT_REACHED',
++  'BARCODE_UPSTREAM_UNAVAILABLE',
++  'BARCODE_GATE_UNAVAILABLE',
++];
++
++export async function lookupBarcode(
++  barcode: string,
++  signal?: AbortSignal,
++): Promise<BarcodeLookupResult> {
++  if (!/^\d{8,14}$/.test(barcode)) throw new Error('A valid barcode is required');
++  const res = await fetchWithAuth(`${API}/food-barcode?barcode=${encodeURIComponent(barcode)}`, {
++    method: 'GET',
++    signal,
++  });
++  if (!res.ok) {
++    const text = await res.text();
++    let code: BarcodeErrorCode | null = null;
++    let message = '';
++    try {
++      const body = JSON.parse(text) as { code?: string; error?: string };
++      if (typeof body.code === 'string' && (BARCODE_ERROR_CODES as string[]).includes(body.code)) {
++        code = body.code as BarcodeErrorCode;
++      }
++      if (typeof body.error === 'string') message = body.error;
++    } catch {
++      // Non-JSON body (gateway error page) — fall through to a generic message.
++    }
++    throw new BarcodeLookupError(message || `HTTP ${res.status}`, code, res.status);
++  }
++  return (await res.json()) as BarcodeLookupResult;
++}
++
+ // ---------- Transient text/photo nutrition analysis ----------
+ const NUTRITION_ANALYZE_URL = `${API}/nutrition-analyze`;
+ const SUPPORTED_PHOTO_DATA_URL = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;

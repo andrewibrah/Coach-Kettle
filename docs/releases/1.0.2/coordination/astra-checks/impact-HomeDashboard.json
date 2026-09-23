@@ -1,0 +1,63 @@
+{
+  "target": {
+    "id": "Function:components/home/HomeDashboard.tsx:HomeDashboard",
+    "name": "HomeDashboard",
+    "type": "Function",
+    "filePath": "components/home/HomeDashboard.tsx"
+  },
+  "direction": "upstream",
+  "impactedCount": 1,
+  "risk": "LOW",
+  "epistemic": "exact",
+  "summary": {
+    "direct": 1,
+    "processes_affected": 1,
+    "modules_affected": 1
+  },
+  "byDepthCounts": {
+    "1": 1
+  },
+  "affected_processes": [
+    {
+      "name": "HomeScreen",
+      "type": "Function",
+      "filePath": "app/(tabs)/index.tsx",
+      "affected_process_count": 2,
+      "total_hits": 2,
+      "earliest_broken_step": 1
+    }
+  ],
+  "affected_modules": [
+    {
+      "name": "Settings",
+      "hits": 1,
+      "impact": "direct"
+    }
+  ],
+  "byDepth": {
+    "1": [
+      {
+        "depth": 1,
+        "id": "Function:app/(tabs)/index.tsx:HomeScreen",
+        "name": "HomeScreen",
+        "filePath": "app/(tabs)/index.tsx",
+        "relationType": "CALLS",
+        "confidence": 0.85,
+        "processes": [
+          {
+            "id": "proc_138_homescreen",
+            "label": "HomeScreen → UseTheme",
+            "processType": "intra_community",
+            "step": 1
+          },
+          {
+            "id": "proc_187_homescreen",
+            "label": "HomeScreen → GetTodayMMDD",
+            "processType": "cross_community",
+            "step": 1
+          }
+        ]
+      }
+    ]
+  }
+}

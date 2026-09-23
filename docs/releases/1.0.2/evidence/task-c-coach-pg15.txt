@@ -1,0 +1,159 @@
+CREATE ROLE
+CREATE ROLE
+CREATE ROLE
+CREATE SCHEMA
+CREATE TABLE
+CREATE FUNCTION
+GRANT
+CREATE FUNCTION
+ALTER DEFAULT PRIVILEGES
+DO
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE TRIGGER
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE TRIGGER
+CREATE TABLE
+COMMENT
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE TRIGGER
+CREATE TABLE
+COMMENT
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE TRIGGER
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE TABLE
+COMMENT
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+GRANT
+INSERT 0 28
+CREATE TABLE
+COMMENT
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE TRIGGER
+CREATE TABLE
+COMMENT
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE TRIGGER
+CREATE TABLE
+COMMENT
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+GRANT
+DELETE 0
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+INSERT 0 2
+INSERT 0 2
+CREATE FUNCTION
+                                                                                                                                                                                                                                                                     coach_fixture                                                                                                                                                                                                                                                                     
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"id": "3a1acc49-09af-4798-adfb-fbb4d044a4d4", "tone": "supportive", "user_id": "00000000-0000-0000-0000-000000000001", "did_well": "A", "created_at": "2026-09-19T17:33:39.268717-04:00", "updated_at": "2026-09-19T17:33:39.268717-04:00", "streak_days": 1, "feedback_date": "2026-09-19", "overall_color": "green", "workout_grade": null, "tomorrow_focus": null, "bad_days_streak": 0, "harshness_level": 0, "nutrition_color": "green", "nutrition_grade": null, "nutrition_score": 100, "needs_improvement": null, "workout_completed": true}
+(1 row)
+
+SELECT 1
+CREATE FUNCTION
+CREATE TRIGGER
+DO
+INSERT 0 1
+DO
+                                              ?column?                                               
+-----------------------------------------------------------------------------------------------------
+ coach rollback, trusted ownership, state derivation, ACL, historical immutability and rollover PASS
+(1 row)
+
+SET
+DO
+RESET
+SET
+                                                                                                                                                                                                                                                                          coach_fixture                                                                                                                                                                                                                                                                          
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"id": "197981af-4f30-407b-a90b-984ae0eb6752", "tone": "supportive", "user_id": "00000000-0000-0000-0000-000000000002", "did_well": "other-owner", "created_at": "2026-09-19T17:33:39.366331-04:00", "updated_at": "2026-09-19T17:33:39.366331-04:00", "streak_days": 1, "feedback_date": "2026-09-19", "overall_color": "green", "workout_grade": null, "tomorrow_focus": null, "bad_days_streak": 0, "harshness_level": 0, "nutrition_color": "green", "nutrition_grade": null, "nutrition_score": 100, "needs_improvement": null, "workout_completed": true}
+(1 row)
+
+RESET
+DO
+INSERT 0 8
+                                                                                                                                                                                                                                                                      coach_fixture                                                                                                                                                                                                                                                                      
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"id": "197981af-4f30-407b-a90b-984ae0eb6752", "tone": "firm", "user_id": "00000000-0000-0000-0000-000000000002", "did_well": "algorithm", "created_at": "2026-09-19T17:33:39.366331-04:00", "updated_at": "2026-09-19T17:33:39.382095-04:00", "streak_days": 2, "feedback_date": "2026-09-19", "overall_color": "green", "workout_grade": null, "tomorrow_focus": null, "bad_days_streak": 0, "harshness_level": 1, "nutrition_color": "green", "nutrition_grade": null, "nutrition_score": 100, "needs_improvement": null, "workout_completed": true}
+(1 row)
+
+DO
+                                      ?column?                                       
+-------------------------------------------------------------------------------------
+ Actual role execution/denial, cross-user isolation and legacy algorithm parity PASS
+(1 row)
+
+DO
+                                          ?column?                                          
+--------------------------------------------------------------------------------------------
+ Concurrent generations blocked on per-user lock; final four-table generation coherent PASS
+(1 row)
+
+DO
+                                    ?column?                                    
+--------------------------------------------------------------------------------
+ Concurrent historical creators insert once; cross-date user lock observed PASS
+(1 row)
+
+Disposable cluster stopped; PID/socket absent; owned directory removed

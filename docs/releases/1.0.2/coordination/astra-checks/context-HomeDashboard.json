@@ -1,0 +1,36 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:components/home/HomeDashboard.tsx:HomeDashboard",
+    "name": "HomeDashboard",
+    "kind": "Function",
+    "filePath": "components/home/HomeDashboard.tsx",
+    "startLine": 32,
+    "endLine": 221
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Function:app/(tabs)/index.tsx:HomeScreen",
+        "name": "HomeScreen",
+        "filePath": "app/(tabs)/index.tsx"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:hooks/useThemeColor.ts:useThemeColor",
+        "name": "useThemeColor",
+        "filePath": "hooks/useThemeColor.ts"
+      },
+      {
+        "uid": "Function:components/ui/themed-text.tsx:ThemedText",
+        "name": "ThemedText",
+        "filePath": "components/ui/themed-text.tsx"
+      }
+    ]
+  },
+  "processes": []
+}

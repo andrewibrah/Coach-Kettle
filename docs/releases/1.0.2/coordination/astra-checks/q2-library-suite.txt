@@ -1,0 +1,262 @@
+(node:63384) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/barcode.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ gtinCheckDigit matches known-good GTINs (0.592667ms)
+✔ gtinCheckDigit rejects non-numeric and empty input (0.059583ms)
+✔ hasValidCheckDigit accepts valid and rejects corrupted codes (0.098375ms)
+✔ expandUpcE applies the correct rule per trailing digit (0.149666ms)
+✔ expandUpcE rejects a UPC-E whose own check digit contradicts the expansion (0.053083ms)
+✔ expandUpcE only accepts number system 0 and 1 (0.041792ms)
+✔ expandUpcE handles 6- and 7-digit forms by computing the check digit (0.07575ms)
+✔ expandUpcE rejects wrong lengths (0.040834ms)
+✔ normalizeBarcode pads UPC-A to GTIN-13 (0.15675ms)
+✔ normalizeBarcode passes EAN-13 through unchanged (0.395209ms)
+✔ normalizeBarcode zero-extends EAN-8 (0.071375ms)
+✔ normalizeBarcode expands an explicitly-typed UPC-E (0.05225ms)
+✔ normalizeBarcode strips separators and whitespace (0.0415ms)
+✔ normalizeBarcode rejects codes that fail their check digit (0.042291ms)
+✔ normalizeBarcode rejects impossible lengths (0.0405ms)
+✔ normalizeBarcode unwraps a leading-zero ITF-14 to its GTIN-13 (0.035917ms)
+✔ normalizeBarcode rejects a case-level ITF-14 (non-zero indicator) (0.04175ms)
+✔ normalizeBarcode handles an 8-digit code with no type hint (0.052625ms)
+✔ normalizeBarcode never returns a value that is not 13 digits (0.187083ms)
+✔ isLookupSafeBarcode blocks anything that could alter a URL (0.047708ms)
+✔ formatBrandedFoodName drops a brand the name already implies (0.314292ms)
+✔ formatBrandedFoodName prefixes a genuinely distinct brand (0.147875ms)
+✔ formatBrandedFoodName is case-insensitive when comparing (0.069958ms)
+✔ formatBrandedFoodName handles missing pieces and whitespace (0.182ms)
+✔ formatBrandedFoodName stays within the food_name column budget (0.072917ms)
+✔ normalizeBarcode accepts the symbology strings each platform actually emits (0.073458ms)
+✔ an already-expanded UPC-E payload is accepted, not rejected (0.030959ms)
+✔ the compressed and expanded forms of one UPC-E agree (0.027416ms)
+(node:63385) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/coachingEvidence.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ matching-day partial logs show observed totals and the current resolved target, not adherence praise (0.525416ms)
+✔ legacy report without matching-day evidence cannot repeat calorie praise (0.124542ms)
+(node:63386) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/coachingRelease.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ regeneration failure is exposed to the screen instead of swallowed (58.440167ms)
+✔ today fetch uses the explicit client date rather than a server timezone default (17.948416ms)
+✔ regeneration sends the client local date and rejects a wrong-date report (8.32525ms)
+✔ Coach screen suppresses unsupported saved praise and internal diagnostics (12.755167ms)
+✔ history keys use the report date supplied by the RPC without relying on missing ids (16.907583ms)
+(node:63387) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/entitlements.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ deriveEntitlementFlags(trial_active, dismissed=false) (2.722292ms)
+✔ deriveEntitlementFlags(trial_active, dismissed=true) (0.061166ms)
+✔ deriveEntitlementFlags(trial_expired, dismissed=false) (0.047958ms)
+✔ deriveEntitlementFlags(trial_expired, dismissed=true) (0.041375ms)
+✔ deriveEntitlementFlags(sub_active, dismissed=false) (0.047833ms)
+✔ deriveEntitlementFlags(sub_active, dismissed=true) (0.037709ms)
+✔ deriveEntitlementFlags(sub_expired, dismissed=false) (0.044542ms)
+✔ deriveEntitlementFlags(sub_expired, dismissed=true) (0.034625ms)
+✔ deriveEntitlementFlags(unknown, dismissed=false) (0.0475ms)
+✔ deriveEntitlementFlags(unknown, dismissed=true) (0.080084ms)
+✔ free tier gets no pro features (0.082833ms)
+✔ trial tier gets full pro features (trial = full pro) (0.0465ms)
+✔ pro tier gets full pro features (trial = full pro) (0.027833ms)
+✔ parses 429 AI_LIMIT_REACHED (0.110458ms)
+✔ parses 403 PRO_REQUIRED and TEMPLATE_LIMIT_REACHED (0.043959ms)
+✔ ignores non-gate statuses and malformed bodies (0.05025ms)
+(node:63388) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/exerciseFormat.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ simple underscore terms are split and title-cased (0.722625ms)
+✔ override table wins for terms whose canonical casing is not simple title-case (0.105375ms)
+✔ naive title-casing would look as unpolished as the underscores -- overrides prevent that (0.069708ms)
+✔ already-capitalized or mixed-case input normalizes the same as lowercase (0.056917ms)
+✔ surrounding whitespace is trimmed (1.365792ms)
+✔ single-word category values are title-cased (0.125208ms)
+✔ already-clean Title Case values pass through unchanged (0.125375ms)
+✔ null, undefined, and empty string all fall back to an em dash (0.261833ms)
+✔ formatTermList formats and joins every entry (0.18675ms)
+✔ formatTermList falls back to an em dash for null/undefined/empty arrays (0.178042ms)
+(node:63389) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/formRelease.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ capture cannot fabricate a score, even when arbitrary landmarks are supplied (45.907375ms)
+✔ saving while analysis is unavailable performs no authentication or database access (4.732583ms)
+✔ Form Check announces unavailable analysis and offers no capture action (29.110334ms)
+✔ historical records remain identifiable without displaying unverified metrics or cues (20.511792ms)
+✔ historical read returns stored rows unchanged and never writes them (4.058959ms)
+(node:63390) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/largeTextLayout.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ default Dynamic Type size does not trigger stacked layouts (0.515792ms)
+✔ iOS large-but-not-accessibility sizes stay on the compact row layout (0.088ms)
+✔ accessibility sizes AX1..AX5 all trigger the stacked layout (0.067041ms)
+✔ huge threshold separates AX3+ from AX1/AX2 (0.04825ms)
+✔ thresholds are inclusive at the boundary (0.051458ms)
+✔ scaleSpace grows hit targets with text but is capped so padding cannot run away (0.051ms)
+✔ a missing or nonsense fontScale degrades to the default layout, never to zero-size chrome (0.251167ms)
+(node:63391) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/nutritionDay.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ foreground catches a timezone/day change immediately and unsubscribes (0.475291ms)
+✔ active midnight advances once and cleanup stops the clock (0.742834ms)
+(node:63392) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/nutritionRelease.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ rollover clears yesterday totals before the new request resolves (59.799083ms)
+✔ late old-day refresh cannot replace the new-day food log (18.496041ms)
+✔ Nutrition focus refreshes a stale day without refreshing an unchanged day (25.667209ms)
+✔ Home coaching focus does not repeat old unsupported dietary directives (19.160334ms)
+✔ Add food appears before the budget and totals (8.138667ms)
+✔ Home and Nutrition render the same resolved target rather than legacy training/rest values (13.625ms)
+(node:63393) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/nutritionTargetStorage.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ keys are namespaced per user (4.18625ms)
+✔ anonymous namespace only supports drafts (0.166209ms)
+✔ User A cache key does not belong to User B (0.601917ms)
+✔ legacy ant2 targets convert to imported_existing save request (0.13775ms)
+✔ no legacy targets -> null import request (0.048958ms)
+✔ savedSetToLegacyTargets projects onto big-row shape with base fallback (0.11225ms)
+✔ manual save request uses manual source by default (0.064333ms)
+✔ edited suggestion is saved as manual (and keeps suggestion_id) (0.043583ms)
+✔ unedited accepted suggestion keeps backend_suggested source (0.059125ms)
+(node:63394) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/nutritionTargets.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ local weekly override merges provided fields with the resolved saved day (2.289417ms)
+✔ legacy rest target remains available before an unsaved suggestion (0.262667ms)
+✔ day override beats training/rest (0.285042ms)
+✔ training target wins on training day (0.099542ms)
+✔ rest target wins on rest day (0.070125ms)
+✔ saved base target beats suggestion (0.059959ms)
+✔ non-stale suggestion is used as fallback when nothing saved (0.048291ms)
+✔ stale suggestion is NOT applied -> empty prompt (0.065792ms)
+✔ empty prompt when no data (0.329625ms)
+✔ draft used only as labeled last resort (0.121416ms)
+✔ stale_after marks saved target stale (0.304834ms)
+✔ macro math: 30/40/30 default (0.068541ms)
+✔ withAutoMacros fills only missing macros (0.064416ms)
+(node:63395) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/openFoodFacts.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ sodium is converted from grams to milligrams (0.691042ms)
+✔ sodium falls back to salt / 2.5 when sodium is absent (0.106666ms)
+✔ sodium scales with serving size (0.109209ms)
+✔ a genuinely zero-calorie product maps as found, not incomplete (0.077583ms)
+✔ missing serving data falls back to a 100 g basis, never 0 (0.065625ms)
+✔ serving_size_g is never zero or negative for any fixture (0.097584ms)
+✔ an unusable serving unit falls back to the 100 g basis (0.061292ms)
+✔ an absurd serving quantity falls back to the 100 g basis (0.063209ms)
+✔ macros scale onto the declared serving (0.072209ms)
+✔ a 330 ml serving scales the whole container (0.094583ms)
+✔ absent fiber defaults to 0 rather than NaN (0.066ms)
+✔ every numeric field is finite and non-negative for every fixture (0.105209ms)
+✔ kJ is converted when kcal is absent (0.052125ms)
+✔ numeric strings are accepted (0.059292ms)
+✔ a product with no energy data is incomplete but still surfaces its name (0.046166ms)
+✔ a product with no name is incomplete even with full nutrition (0.039959ms)
+✔ a blank product name is treated as missing (0.059084ms)
+✔ product_name_en and generic_name are used as fallbacks (0.04575ms)
+✔ malformed input never throws (0.050791ms)
+✔ only the primary brand is kept from a comma-separated list (0.037875ms)
+✔ a missing brand is null, not an empty string (0.038292ms)
+✔ absurd source values are clamped inside the foods CHECK constraints (0.060333ms)
+✔ negative source values are floored at 0 (0.042333ms)
+✔ an implausibly small serving size falls back to the declared 100 g basis (0.058916ms)
+✔ serving sizes at or above the plausibility floor are still trusted (0.044959ms)
+✔ energy_100g is treated as kJ even when energy_unit claims kcal (0.040834ms)
+✔ un-suffixed nutriment keys are ignored (they are in the declared basis) (0.048667ms)
+(node:63396) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/programFormat.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 6-day template: body_part is a prefix of title on every day -> title alone (0.478083ms)
+✔ 3-day template: identical body_part and title collapse to one copy (0.06325ms)
+✔ 5-day template: complementary body_part and title are both shown (0.060708ms)
+✔ Full Body template (#7): title alone, not "Full Body — Full Body A" (0.046333ms)
+✔ Upper/Lower template (#7): title alone (0.052125ms)
+✔ null/empty title falls back to body_part (0.744916ms)
+✔ empty body_part falls back to title (0.233459ms)
+✔ both empty falls back to "Workout" (0.151542ms)
+✔ case differences between body_part and title are still recognized as duplicate (0.178958ms)
+✔ surrounding whitespace on body_part/title is trimmed before comparison (0.133417ms)
+✔ underscore-formatted body_part values are treated literally (formatting is a separate concern) (0.054833ms)
+✔ title that mentions the body part mid-string (not as a prefix) keeps both (0.036625ms)
+(node:63397) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/programSchedule.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ training day: today is a scheduled weekday, not yet completed, program still running (0.712208ms)
+✔ rest day: today is not one of the training weekdays (0.076291ms)
+✔ completed: today is a training day already marked done (0.05925ms)
+✔ program_complete: current week has passed the program's total weeks (0.056584ms)
+✔ program_complete takes precedence over a training-day weekday match (0.057417ms)
+✔ empty trainingWeekdays (no schedule resolved) is always a rest day, every day of the week (0.996042ms)
+✔ currentWeek === weeksTotal on the final week is still active, not complete (0.196709ms)
+✔ can start only on a training day with no active session (0.16725ms)
+✔ cannot start when a workout session is already active, even on a training day (0.150666ms)
+✔ cannot start on rest_day, completed, or program_complete, regardless of active session (0.202167ms)
+(node:63398) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/programTemplates.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ resolveTemplate returns the exact (split, days) match when present (0.682417ms)
+✔ resolveTemplate falls back to the closest days_per_week for the split (0.078375ms)
+✔ resolveTemplate returns null when the split has no seeded template at all (0.060375ms)
+✔ every requestable split has at least one seeded program_templates row (16.735167ms)
+✔ resolveTemplate resolves a template for every requestable split at every day count the UI offers (7.605292ms)
+(node:63399) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/restTimer.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ decideRestTimerAction: off -> "prompt", never "start" (no timer start path fires) (0.380417ms)
+✔ decideRestTimerAction: on -> "start" (preserves today's exact behavior) (0.057625ms)
+✔ isGenuineRestCompletion: running -> done is the only transition that counts (0.052458ms)
+✔ isGenuineRestCompletion: rehydrating already-done from storage does not re-fire (0.045792ms)
+✔ isGenuineRestCompletion: paused -> done, idle -> idle, and other transitions do not count (0.053458ms)
+(node:63400) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/trainingSchedule.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ suggestTrainingDays returns the seeded weekday pattern for a known (split, days) pair (0.77925ms)
+✔ suggestTrainingDays returns null -> UI treats as Custom for an unmapped (split, days) pair (0.072875ms)
+✔ suggestTrainingDays returns null for an unknown split (0.0525ms)
+✔ every SPLIT_DAY_SUGGESTIONS entry is internally consistent with its day count (0.720625ms)
+✔ resolveTrainingDays prefers explicit days over the days-per-week heuristic (0.090042ms)
+✔ resolveTrainingDays falls back to TRAINING_DAY_MAP when no explicit days are set (0.050667ms)
+✔ resolveTrainingDays returns [] when neither explicit days nor a days-per-week value exist (0.06225ms)
+✔ isTrainingDay and resolveTrainingDays agree on the same precedence for every weekday (0.074167ms)
+✔ unchanged selector (matches existing profile schedule exactly) -> no-change, no write (0.090916ms)
+✔ unchanged selector is order-independent (0.084125ms)
+✔ both empty (no selection, no existing schedule) -> no-change, no write (0.051333ms)
+✔ a genuinely new selection (no prior schedule) is written (0.0415ms)
+✔ a genuine edit away from the existing schedule is written (0.038625ms)
+✔ clearing all days when a schedule previously existed writes an explicit null (0.028583ms)
+✔ the written value is always sorted regardless of selection order (0.031917ms)
+(node:63401) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/workoutSource.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ freestyle session (no source field) survives the round trip with source still absent (1.114916ms)
+✔ template source survives the round trip intact (0.44475ms)
+✔ program source (programId, programDayId, programWeek) survives the round trip intact (0.072792ms)
+✔ a double round trip (local save, then a simulated API save+fetch) preserves source (0.059459ms)
+✔ an old session shape (recorded before `source` existed) still parses -- optional field, not required (0.058209ms)
+ℹ tests 182
+ℹ suites 0
+ℹ pass 182
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 622.687208

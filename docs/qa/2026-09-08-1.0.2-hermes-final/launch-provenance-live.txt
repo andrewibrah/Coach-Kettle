@@ -1,0 +1,13 @@
+installed_path=/Users/me/Library/Developer/CoreSimulator/Devices/F0340485-E7C5-418D-9989-8AEC53F14E34/data/Containers/Bundle/Application/A0BCE1E7-F0C9-4595-B0B3-01BCBF10CFCC/CoachKettle.app
+main_jsbundle=absent
+debug_dylib=present
+expo_dev_launcher=absent
+port_8081_listeners:
+COMMAND   PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+node    14031   me   32u  IPv6 0x543783b8aa64dcf3      0t0  TCP *:8081 (LISTEN)
+
+warm_launch:
+com.coachkettle.coachkettle: 17182
+
+cold_launch:
+com.coachkettle.coachkettle: 27695

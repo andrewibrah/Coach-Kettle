@@ -1,0 +1,9 @@
+{
+  "exit": 0,
+  "build_succeeded_marker": true,
+  "manifest_entries": 240,
+  "changed_during_build": [],
+  "artifact": "/tmp/coach-kettle-astra-release/Build/Products/Release-iphonesimulator/CoachKettle.app",
+  "installed": false,
+  "launched": false
+}

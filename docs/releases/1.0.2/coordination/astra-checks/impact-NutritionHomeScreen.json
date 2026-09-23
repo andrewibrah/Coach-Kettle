@@ -1,0 +1,21 @@
+{
+  "target": {
+    "id": "Function:app/(tabs)/nutrition/index.tsx:NutritionHomeScreen",
+    "name": "NutritionHomeScreen",
+    "type": "Function",
+    "filePath": "app/(tabs)/nutrition/index.tsx"
+  },
+  "direction": "upstream",
+  "impactedCount": 0,
+  "risk": "LOW",
+  "epistemic": "exact",
+  "summary": {
+    "direct": 0,
+    "processes_affected": 0,
+    "modules_affected": 0
+  },
+  "byDepthCounts": {},
+  "affected_processes": [],
+  "affected_modules": [],
+  "byDepth": {}
+}

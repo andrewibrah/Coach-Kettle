@@ -1,0 +1,231 @@
+=== pwd ===
+/Users/me/Desktop/partner/11_Codebases/Coach-Kettle
+
+=== date ===
+2026-09-09 17:24:27 EDT -0400
+
+=== git branch --show-current ===
+1.0.2
+
+=== git rev-parse HEAD ===
+9931ce36a00f022dd0fd57c914ee529c6cb1c4ea
+
+=== git status --short ===
+ M .claude/CLAUDE.md
+ M AGENTS.md
+ M CLAUDE.md
+ M app.json
+ M app/(tabs)/_layout.tsx
+ M app/(tabs)/history.tsx
+ M app/(tabs)/index.tsx
+ M app/(tabs)/more.tsx
+ M app/(tabs)/nutrition/index.tsx
+ M app/(tabs)/nutrition/log.tsx
+ M app/(tabs)/progress/body.tsx
+ M app/(tabs)/progress/strength.tsx
+ M app/(tabs)/timer.tsx
+ M app/_layout.tsx
+ M app/coach/history.tsx
+ M app/coach/index.tsx
+ M app/exercise-library/[slug].tsx
+ M app/exercise-library/index.tsx
+ M app/form/index.tsx
+ M app/history/[id].tsx
+ M app/onboarding/age.tsx
+ M app/onboarding/current-weight.tsx
+ M app/onboarding/focus.tsx
+ M app/onboarding/goal-weight.tsx
+ M app/onboarding/height.tsx
+ M app/onboarding/index.tsx
+ M app/onboarding/pr-lifts.tsx
+ M app/onboarding/workout-setup.tsx
+ M app/paywall.tsx
+ M app/program/create.tsx
+ M app/program/day.tsx
+ M app/program/week.tsx
+ M app/settings/index.tsx
+ M app/settings/notifications.tsx
+ M app/settings/subscription.tsx
+ M app/terms-of-service.tsx
+ M components/TermsOfServiceScreen.tsx
+ M components/celebration/PRCelebration.tsx
+ M components/home/HomeDashboard.tsx
+ M components/media/ImageViewerModal.tsx
+ M components/media/MediaPickerBubble.tsx
+ M components/media/ReflectionInput.tsx
+ M components/modals/SessionReviewModal.tsx
+ M components/tutorial/TutorialModal.tsx
+ M components/ui/Header.tsx
+ D components/ui/hello-wave.tsx
+ M components/ui/icon-symbol.tsx
+ M components/ui/screen-header.tsx
+ D components/workout/RestTimerBar.tsx
+ M components/workout/RestTimerToast.tsx
+ M components/workout/WorkoutBottomBar.tsx
+ M components/workout/WorkoutCard.tsx
+ M components/workout/WorkoutTable.tsx
+ M constants/subscription.ts
+ M contexts/AuthProvider.tsx
+ M contexts/CoachingContext.tsx
+ M contexts/NotificationsProvider.tsx
+ M contexts/NutritionContext.tsx
+ M contexts/OnboardingContext.tsx
+ M contexts/RestTimerContext.tsx
+ D docs/plans/2026-07-14-product-ui-ai-analytics-audit.md
+ D docs/plans/2026-07-14-six-part-product-roadmap.md
+ D docs/superpowers/plans/2026-06-17-coach-kettle-6-features.md
+ M eas.json
+ M hooks/useRestTimer.ts
+ M lib/__tests__/nutritionTargets.test.ts
+ M lib/analytics.ts
+ M lib/coaching.ts
+ M lib/exerciseLibrary.ts
+ M lib/formAnalysis.ts
+ M lib/nutrition.ts
+ M lib/nutritionTargets.ts
+ M lib/onboardingDraft.ts
+ M lib/programming.ts
+ M lib/restTimer.ts
+ M lib/timerDial.ts
+ M lib/trainingSchedule.ts
+ M lib/workoutStorage.ts
+ M package-lock.json
+ M package.json
+ M supabase/config.toml
+ M supabase/functions/body-metrics/index.ts
+ M supabase/functions/coach/index.ts
+ M supabase/functions/daily-feedback/index.ts
+ M supabase/functions/exercise-library/index.ts
+ M supabase/functions/notifications/index.ts
+ M supabase/functions/programming/index.ts
+ M types/notifications.ts
+ M types/nutrition.ts
+?? .asc-metadata/
+?? ".claude/attachments/image copy 13.png"
+?? ".claude/attachments/image copy 13.png 23-05-33-200.png"
+?? ".claude/attachments/image copy 14.png"
+?? c_debug.md
+?? components/nutrition/
+?? components/workout/StartRestPrompt.tsx
+?? docs/ai/
+?? docs/audits/
+?? docs/plans/2026-09-06-barcode-scanner-nutrition.md
+?? docs/plans/pr_tracking_enhancements_implementation.md
+?? docs/qa/
+?? docs/releases/
+?? docs/superpowers/plans/2026-05-27-phase2-audit-fixes.md
+?? docs/superpowers/specs/
+?? h_debug.md
+?? hooks/useLargeTextLayout.ts
+?? implementation_prompt.md
+?? lib/__tests__/barcode.test.ts
+?? lib/__tests__/coachingEvidence.test.ts
+?? lib/__tests__/coachingRelease.test.ts
+?? lib/__tests__/exerciseFormat.test.ts
+?? lib/__tests__/formRelease.test.ts
+?? lib/__tests__/largeTextLayout.test.ts
+?? lib/__tests__/nutritionDay.test.ts
+?? lib/__tests__/nutritionRelease.test.ts
+?? lib/__tests__/onboardingNavigation.test.ts
+?? lib/__tests__/onboardingPersistence.test.ts
+?? lib/__tests__/openFoodFacts.test.ts
+?? lib/__tests__/programFormat.test.ts
+?? lib/__tests__/programSchedule.test.ts
+?? lib/__tests__/programTemplates.test.ts
+?? lib/__tests__/restTimer.test.ts
+?? lib/__tests__/subscriptionRelease.test.ts
+?? lib/__tests__/timerDial.test.ts
+?? lib/__tests__/trainingSchedule.test.ts
+?? lib/__tests__/workoutSource.test.ts
+?? lib/barcode.ts
+?? lib/coachingEvidence.ts
+?? lib/exerciseFormat.ts
+?? lib/largeTextLayout.ts
+?? lib/nutritionDay.ts
+?? lib/onboardingNavigation.ts
+?? lib/programFormat.ts
+?? lib/programSchedule.ts
+?? lib/programTemplates.ts
+?? plugins/
+?? supabase/functions/_shared/openFoodFacts.ts
+?? supabase/functions/body-metrics/handler.test.ts
+?? supabase/functions/daily-feedback/narrative.test.ts
+?? supabase/functions/food-barcode/
+?? supabase/migrations/20260904000000_full_body_upper_lower_templates.sql
+?? supabase/migrations/20260904000100_auto_start_rest_timer_pref.sql
+?? supabase/migrations/20260904000200_workout_program_source.sql
+?? supabase/migrations/20260906010000_barcode_food_cache.sql
+
+=== booted devices ===
+== Devices ==
+-- iOS 18.0 --
+-- iOS 18.3 --
+-- iOS 26.0 --
+    iPhone 17 Pro (F0340485-E7C5-418D-9989-8AEC53F14E34) (Booted) 
+-- iOS 26.2 --
+
+=== appinfo ===
+{
+    ApplicationType = User;
+    Bundle = "file:///Users/me/Library/Developer/CoreSimulator/Devices/F0340485-E7C5-418D-9989-8AEC53F14E34/data/Containers/Bundle/Application/AFC154E0-0089-4F80-B094-8811830C8B52/CoachKettle.app/";
+    BundleContainer = "file:///Users/me/Library/Developer/CoreSimulator/Devices/F0340485-E7C5-418D-9989-8AEC53F14E34/data/Containers/Bundle/Application/AFC154E0-0089-4F80-B094-8811830C8B52/";
+    CFBundleDisplayName = "Coach Kettle";
+    CFBundleExecutable = CoachKettle;
+    CFBundleIdentifier = "com.coachkettle.coachkettle";
+    CFBundleName = CoachKettle;
+    CFBundleShortVersionString = "1.0.2";
+    CFBundleVersion = 1;
+    DataContainer = "file:///Users/me/Library/Developer/CoreSimulator/Devices/F0340485-E7C5-418D-9989-8AEC53F14E34/data/Containers/Data/Application/8B3BA21B-1944-44D5-86B3-8998E550FAB3/";
+    GroupContainers =     {
+    };
+    IsAppClip = 0;
+    IsDeveloperApp = 1;
+    IsFirstParty = 0;
+    IsHidden = 0;
+    IsRemovable = 1;
+    Path = "/Users/me/Library/Developer/CoreSimulator/Devices/F0340485-E7C5-418D-9989-8AEC53F14E34/data/Containers/Bundle/Application/AFC154E0-0089-4F80-B094-8811830C8B52/CoachKettle.app";
+    SBAppTags =     (
+    );
+}
+
+=== content size ===
+large
+
+=== increase contrast ===
+disabled
+
+=== app provenance probe ===
+installed_path=/Users/me/Library/Developer/CoreSimulator/Devices/F0340485-E7C5-418D-9989-8AEC53F14E34/data/Containers/Bundle/Application/A0BCE1E7-F0C9-4595-B0B3-01BCBF10CFCC/CoachKettle.app
+main_jsbundle=absent
+debug_dylib=present
+expo_dev_launcher=absent
+port_8081_listeners:
+COMMAND   PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+node    14031   me   32u  IPv6 0x543783b8aa64dcf3      0t0  TCP *:8081 (LISTEN)
+
+warm_launch:
+com.coachkettle.coachkettle: 17182
+
+cold_launch:
+com.coachkettle.coachkettle: 27695
+
+=== final release receipt ===
+{
+  "exit": 0,
+  "build_succeeded": true,
+  "source_manifest": "release-final-source-manifest.json",
+  "manifest_entries": 240,
+  "source_drift": [],
+  "artifact": "/tmp/coach-kettle-astra-release/Build/Products/Release-iphonesimulator/CoachKettle.app",
+  "bundle_id": "com.coachkettle.coachkettle",
+  "version": "1.0.2",
+  "local_build": "1",
+  "embedded_js": true,
+  "installed": false,
+  "launched": false
+}
+=== local Release build exit ===
+0
+
+=== QA boundaries honored ===
+no simulator erase/uninstall; no purchase/restore/sign-out/account deletion/permission acceptance/deployment/upload; no product-source edit by Hermes

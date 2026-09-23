@@ -18,11 +18,19 @@ AI coding agents optimize for fluent output, not system truth:
 ```bash
 npx expo start                                          # Dev server
 npx expo run:ios                                        # iOS simulator
-npx expo lint                                           # Lint
+npx expo lint                                           # Lint (same as `npm run lint`)
+npx tsc --noEmit                                        # Typecheck
+node --test "lib/__tests__/*.test.ts"                   # All tests
+node --test lib/__tests__/entitlements.test.ts          # Single test file
 supabase db push                                        # Apply migrations (user runs manually)
 supabase functions deploy <name>                        # Deploy function (user runs manually)
 supabase functions serve <name> --env-file .env.local   # Local function testing
 ```
+
+Tests use the Node built-in runner (`node:test` + native TS type-stripping) — no jest/vitest is
+installed, so a bare `node --test` directory path fails; pass the glob. `tsconfig.json` excludes
+`supabase/functions/**` (Deno) and `**/__tests__/**`, so `tsc` covers neither — run the test
+command separately.
 
 ## Architecture
 

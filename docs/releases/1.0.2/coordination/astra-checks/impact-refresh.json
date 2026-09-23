@@ -1,0 +1,162 @@
+{
+  "target": {
+    "id": "Function:contexts/NutritionContext.tsx:refresh",
+    "name": "refresh",
+    "type": "Function",
+    "filePath": "contexts/NutritionContext.tsx"
+  },
+  "direction": "upstream",
+  "impactedCount": 6,
+  "risk": "MEDIUM",
+  "epistemic": "exact",
+  "summary": {
+    "direct": 5,
+    "processes_affected": 2,
+    "modules_affected": 1
+  },
+  "byDepthCounts": {
+    "1": 5,
+    "2": 1
+  },
+  "affected_processes": [
+    {
+      "name": "RootLayout",
+      "type": "Function",
+      "filePath": "app/_layout.tsx",
+      "affected_process_count": 7,
+      "total_hits": 7,
+      "earliest_broken_step": 1
+    },
+    {
+      "name": "sub",
+      "type": "Function",
+      "filePath": "contexts/NutritionContext.tsx",
+      "affected_process_count": 2,
+      "total_hits": 2,
+      "earliest_broken_step": 1
+    }
+  ],
+  "affected_modules": [
+    {
+      "name": "Contexts",
+      "hits": 6,
+      "impact": "direct"
+    }
+  ],
+  "byDepth": {
+    "1": [
+      {
+        "depth": 1,
+        "id": "Function:contexts/NutritionContext.tsx:logFood",
+        "name": "logFood",
+        "filePath": "contexts/NutritionContext.tsx",
+        "relationType": "CALLS",
+        "confidence": 0.85,
+        "processes": []
+      },
+      {
+        "depth": 1,
+        "id": "Function:contexts/NutritionContext.tsx:deleteEntry",
+        "name": "deleteEntry",
+        "filePath": "contexts/NutritionContext.tsx",
+        "relationType": "CALLS",
+        "confidence": 0.85,
+        "processes": []
+      },
+      {
+        "depth": 1,
+        "id": "Function:contexts/NutritionContext.tsx:updateEntry",
+        "name": "updateEntry",
+        "filePath": "contexts/NutritionContext.tsx",
+        "relationType": "CALLS",
+        "confidence": 0.85,
+        "processes": []
+      },
+      {
+        "depth": 1,
+        "id": "Function:contexts/NutritionContext.tsx:NutritionProvider",
+        "name": "NutritionProvider",
+        "filePath": "contexts/NutritionContext.tsx",
+        "relationType": "CALLS",
+        "confidence": 0.85,
+        "processes": []
+      },
+      {
+        "depth": 1,
+        "id": "Function:contexts/NutritionContext.tsx:sub",
+        "name": "sub",
+        "filePath": "contexts/NutritionContext.tsx",
+        "relationType": "CALLS",
+        "confidence": 0.85,
+        "processes": [
+          {
+            "id": "proc_182_sub",
+            "label": "Sub → TodayISO",
+            "processType": "cross_community",
+            "step": 1
+          },
+          {
+            "id": "proc_13_sub",
+            "label": "Sub → GetAuthHeaders",
+            "processType": "cross_community",
+            "step": 1
+          }
+        ]
+      }
+    ],
+    "2": [
+      {
+        "depth": 2,
+        "id": "Function:app/_layout.tsx:RootLayout",
+        "name": "RootLayout",
+        "filePath": "app/_layout.tsx",
+        "relationType": "CALLS",
+        "confidence": 0.85,
+        "processes": [
+          {
+            "id": "proc_35_rootlayout",
+            "label": "RootLayout → CacheProfile",
+            "processType": "cross_community",
+            "step": 1
+          },
+          {
+            "id": "proc_205_rootlayout",
+            "label": "RootLayout → UseAuth",
+            "processType": "cross_community",
+            "step": 1
+          },
+          {
+            "id": "proc_0_rootlayout",
+            "label": "RootLayout → GetAuthHeaders",
+            "processType": "cross_community",
+            "step": 1
+          },
+          {
+            "id": "proc_204_rootlayout",
+            "label": "RootLayout → NormalizeColorScheme",
+            "processType": "intra_community",
+            "step": 1
+          },
+          {
+            "id": "proc_206_rootlayout",
+            "label": "RootLayout → GetActiveCoachKettleEntitlement",
+            "processType": "cross_community",
+            "step": 1
+          },
+          {
+            "id": "proc_34_rootlayout",
+            "label": "RootLayout → GetCachedProfile",
+            "processType": "cross_community",
+            "step": 1
+          },
+          {
+            "id": "proc_36_rootlayout",
+            "label": "RootLayout → ConfigureRevenueCat",
+            "processType": "cross_community",
+            "step": 1
+          }
+        ]
+      }
+    ]
+  }
+}

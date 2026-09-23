@@ -1,0 +1,17 @@
+(node:63293) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/lib/__tests__/formRelease.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ capture cannot fabricate a score, even when arbitrary landmarks are supplied (27.963917ms)
+✔ saving while analysis is unavailable performs no authentication or database access (3.601667ms)
+✔ Form Check announces unavailable analysis and offers no capture action (12.214125ms)
+✔ historical records remain identifiable without displaying unverified metrics or cues (29.731333ms)
+✔ historical read returns stored rows unchanged and never writes them (2.828833ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 280.284583

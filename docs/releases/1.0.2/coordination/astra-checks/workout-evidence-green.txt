@@ -1,0 +1,19 @@
+(node:80736) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/me/Desktop/partner/11_Codebases/Coach-Kettle/supabase/functions/daily-feedback/narrative.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/me/Desktop/partner/11_Codebases/Coach-Kettle/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ totals RPC failure is not fabricated as zero intake (3.072125ms)
+✔ totals require a real aggregate row and retain its atomic log count (2.03ms)
+✔ partial logs describe recorded gaps without calling the whole day a success or prescribing extra food (0.195541ms)
+✔ absent nutrition evidence never becomes a zero-gap calorie success (0.079083ms)
+✔ workout query errors and missing counts are not absence evidence (3.034125ms)
+✔ a successful workout count distinguishes absent from completed (2.242292ms)
+✔ unavailable workout evidence aborts regeneration before any writes or behavior changes (10.695417ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 232.97375

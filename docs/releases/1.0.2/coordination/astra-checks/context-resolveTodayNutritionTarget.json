@@ -1,0 +1,53 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:lib/nutritionTargets.ts:resolveTodayNutritionTarget",
+    "name": "resolveTodayNutritionTarget",
+    "kind": "Function",
+    "filePath": "lib/nutritionTargets.ts",
+    "startLine": 108,
+    "endLine": 183
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:todayTarget",
+        "name": "todayTarget",
+        "filePath": "contexts/NutritionContext.tsx"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:lib/nutritionTargets.ts:dayOfWeekFromIso",
+        "name": "dayOfWeekFromIso",
+        "filePath": "lib/nutritionTargets.ts"
+      },
+      {
+        "uid": "Function:lib/nutritionTargets.ts:isTargetSetStale",
+        "name": "isTargetSetStale",
+        "filePath": "lib/nutritionTargets.ts"
+      },
+      {
+        "uid": "Function:lib/nutritionTargets.ts:dayLabel",
+        "name": "dayLabel",
+        "filePath": "lib/nutritionTargets.ts"
+      },
+      {
+        "uid": "Function:lib/nutritionTargets.ts:explain",
+        "name": "explain",
+        "filePath": "lib/nutritionTargets.ts"
+      }
+    ],
+    "accesses": [
+      {
+        "uid": "Const:lib/nutritionTargets.ts:stale",
+        "name": "stale",
+        "filePath": "lib/nutritionTargets.ts"
+      }
+    ]
+  },
+  "processes": []
+}

@@ -1,0 +1,1519 @@
+diff --git a/app/(tabs)/_layout.tsx b/app/(tabs)/_layout.tsx
+index bd61604..2f6eec4 100644
+--- a/app/(tabs)/_layout.tsx
++++ b/app/(tabs)/_layout.tsx
+@@ -49,6 +49,15 @@ export default function TabLayout() {
+     return <Redirect href="/paywall" />;
+   }
+ 
++  // VoiceOver derives "N of M" from the number of routes in the navigator, not the
++  // number of rendered buttons. `history` below is intentionally kept as a route
++  // (reachable from More) but hidden from the bar with `href: null`, so the default
++  // announcement was "1 of 6" .. "5 of 6" for five visible tabs. Supplying explicit
++  // labels corrects the announcement WITHOUT removing a working route.
++  const visibleTabs = ['Home', 'Timer', 'Nutrition', 'Progress', 'More'];
++  const tabA11yLabel = (title: string) =>
++    `${title}, tab, ${visibleTabs.indexOf(title) + 1} of ${visibleTabs.length}`;
++
+   return (
+     <Tabs
+       screenOptions={{
+@@ -61,6 +70,7 @@ export default function TabLayout() {
+         name="index"
+         options={{
+           title: 'Home',
++          tabBarAccessibilityLabel: tabA11yLabel('Home'),
+           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+         }}
+       />
+@@ -68,6 +78,7 @@ export default function TabLayout() {
+         name="timer"
+         options={{
+           title: 'Timer',
++          tabBarAccessibilityLabel: tabA11yLabel('Timer'),
+           tabBarIcon: ({ color }) => <IconSymbol size={28} name="timer" color={color} />,
+         }}
+       />
+@@ -75,6 +86,7 @@ export default function TabLayout() {
+         name="nutrition"
+         options={{
+           title: 'Nutrition',
++          tabBarAccessibilityLabel: tabA11yLabel('Nutrition'),
+           tabBarIcon: ({ color }) => <IconSymbol size={28} name="fork.knife" color={color} />,
+         }}
+       />
+@@ -82,6 +94,7 @@ export default function TabLayout() {
+         name="progress"
+         options={{
+           title: 'Progress',
++          tabBarAccessibilityLabel: tabA11yLabel('Progress'),
+           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.line.uptrend.xyaxis" color={color} />,
+         }}
+       />
+@@ -89,6 +102,7 @@ export default function TabLayout() {
+         name="more"
+         options={{
+           title: 'More',
++          tabBarAccessibilityLabel: tabA11yLabel('More'),
+           tabBarIcon: ({ color }) => <IconSymbol size={28} name="line.3.horizontal" color={color} />,
+         }}
+       />
+diff --git a/app/(tabs)/history.tsx b/app/(tabs)/history.tsx
+index 18f2d8c..6612c84 100644
+--- a/app/(tabs)/history.tsx
++++ b/app/(tabs)/history.tsx
+@@ -4,13 +4,20 @@ import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } fro
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ 
+ import { DeleteWorkoutModal } from "@/components/modals/DeleteWorkoutModal";
++import { IconSymbol } from "@/components/ui/icon-symbol";
+ import { ScreenHeader } from "@/components/ui/screen-header";
+ import { ThemedView } from "@/components/ui/themed-view";
+ import { Toast } from "@/components/ui/Toast";
+ import { useThemeColor } from "@/hooks/useThemeColor";
+ import { useToast } from "@/hooks/useToast";
+ import { api } from "@/lib/api";
+-import { listWorkouts as listLocalWorkouts, syncPendingWorkouts, WORKOUT_HISTORY_KEY, type WorkoutSession } from "@/lib/workoutStorage";
++import {
++  deleteWorkout as deleteWorkoutLocal,
++  listWorkouts as listLocalWorkouts,
++  syncPendingWorkouts,
++  WORKOUT_HISTORY_KEY,
++  type WorkoutSession,
++} from "@/lib/workoutStorage";
+ import AsyncStorage from "@react-native-async-storage/async-storage";
+ 
+ function formatDateHeader(dateISO: string) {
+@@ -125,12 +132,10 @@ export default function HistoryScreen() {
+ 
+     try {
+       await api.deleteWorkout(deleteId);
+-      // Keep the offline cache consistent so the workout can't resurrect.
+-      const local = await listLocalWorkouts().catch(() => [] as WorkoutSession[]);
+-      AsyncStorage.setItem(
+-        WORKOUT_HISTORY_KEY,
+-        JSON.stringify(local.filter((w) => w.id !== deleteId))
+-      ).catch(() => undefined);
++      // Keep the offline cache consistent so the workout can't resurrect on
++      // next sync — via the existing helper rather than hand-rolling the
++      // AsyncStorage read/filter/write here.
++      await deleteWorkoutLocal(deleteId).catch(() => undefined);
+     } catch (e) {
+       console.warn('[history] delete failed', e);
+       setItems(previousItems);
+@@ -196,7 +201,14 @@ export default function HistoryScreen() {
+           pressed && styles.cardPressed,
+         ]}
+         accessibilityRole="button"
+-        accessibilityLabel={`${item.part?.trim() || 'Workout'} — long press to delete`}
++        accessibilityLabel={item.part?.trim() || 'Workout'}
++        accessibilityActions={[{ name: 'delete', label: 'Delete workout' }]}
++        onAccessibilityAction={(event) => {
++          if (event.nativeEvent.actionName === 'delete') {
++            setSelectedId(item.id);
++            setDeleteModalVisible(true);
++          }
++        }}
+       >
+         <View style={styles.cardRow}>
+           <View style={styles.cardMain}>
+@@ -206,21 +218,33 @@ export default function HistoryScreen() {
+               </Text>
+               {review && (
+                 <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(review.rating) + '20', borderColor: getRatingColor(review.rating) }]}>
+-                  <Text style={[styles.ratingBadgeText, { color: getRatingColor(review.rating) }]}>{review.rating}/10</Text>
++                  <Text style={[styles.ratingBadgeText, { color: getRatingColor(review.rating) }]} accessibilityLabel={`Session review score ${review.rating} out of 10`}>Review {review.rating}/10</Text>
+                 </View>
+               )}
+             </View>
+ 
+             <View style={styles.metaRow}>
+               <View style={[styles.metaChip, { backgroundColor: cardBg, borderColor }]}>
+-                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.exercises} Exercises</Text>
++                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.exercises} {stats.exercises === 1 ? 'Exercise' : 'Exercises'}</Text>
+               </View>
+               <View style={[styles.metaChip, { backgroundColor: cardBg, borderColor }]}>
+-                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.sets} Sets</Text>
++                <Text style={[styles.metaChipText, { color: textColor }]}>{stats.sets} {stats.sets === 1 ? 'Set' : 'Sets'}</Text>
+               </View>
+             </View>
+           </View>
+ 
++          <Pressable
++            onPress={() => {
++              setSelectedId(item.id);
++              setDeleteModalVisible(true);
++            }}
++            hitSlop={8}
++            style={styles.deleteBtn}
++            accessibilityRole="button"
++            accessibilityLabel={`Delete ${item.part?.trim() || 'workout'}`}
++          >
++            <IconSymbol name="trash" size={18} color={dangerColor} />
++          </Pressable>
+           <Text style={[styles.chevron, { color: chevronColor }]}>›</Text>
+         </View>
+       </Pressable>
+@@ -243,7 +267,7 @@ export default function HistoryScreen() {
+       {toast && <Toast message={toast.message} type={toast.type} onDismiss={hideToast} />}
+       <ScreenHeader
+         title="History"
+-        subtitle={`${headerStats.totalWorkouts} workouts • ${headerStats.totalSets} sets`}
++        subtitle={`${headerStats.totalWorkouts} ${headerStats.totalWorkouts === 1 ? 'workout' : 'workouts'} • ${headerStats.totalSets} ${headerStats.totalSets === 1 ? 'set' : 'sets'}`}
+         skipSafeArea
+       />
+ 
+@@ -360,6 +384,13 @@ const styles = StyleSheet.create({
+     marginLeft: 2,
+   },
+ 
++  deleteBtn: {
++    width: 44,
++    height: 44,
++    alignItems: "center",
++    justifyContent: "center",
++  },
++
+   sectionHeader: {
+     paddingVertical: 8,
+     marginTop: 8,
+diff --git a/app/(tabs)/index.tsx b/app/(tabs)/index.tsx
+index b281bb5..6858a7e 100644
+--- a/app/(tabs)/index.tsx
++++ b/app/(tabs)/index.tsx
+@@ -1,4 +1,4 @@
+-import { useCallback, useEffect, useRef, useState } from "react";
++import { useCallback, useContext, useEffect, useRef, useState } from "react";
+ import {
+   Alert,
+   AppState,
+@@ -27,11 +27,13 @@ import { SessionReviewModal } from "@/components/modals/SessionReviewModal";
+ import { WorkoutNameModal } from "@/components/modals/WorkoutNameModal";
+ import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
+ import { Header } from "@/components/ui/Header";
++import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
+ import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
+ import { WorkoutTable } from "@/components/workout/WorkoutTable";
+-import { RestTimerBar } from "@/components/workout/RestTimerBar";
+ import { useSharedRestTimer } from "@/contexts/RestTimerContext";
+-import { isCompoundExercise } from "@/lib/restTimer";
++import { useNotifications } from "@/contexts/NotificationsProvider";
++import { decideRestTimerAction, isCompoundExercise, suggestRestSeconds } from "@/lib/restTimer";
++import { StartRestPrompt, type RestPromptInfo } from "@/components/workout/StartRestPrompt";
+ import { useThemeColor } from "@/hooks/useThemeColor";
+ import { useWorkoutSession } from "@/hooks/useWorkoutSession";
+ import { api, type ApiWorkoutRow, type LogSetPR } from "@/lib/api";
+@@ -88,6 +90,9 @@ export default function HomeScreen() {
+ 
+   const { width } = useWindowDimensions();
+   const compact = width < 380;
++  // Height of the bottom tab bar this screen sits above (undefined outside a tab
++  // navigator). Used as the keyboard-avoidance offset.
++  const tabBarHeight = useContext(BottomTabBarHeightContext);
+   const backgroundColor = useThemeColor({}, 'background');
+   const successColor = useThemeColor({}, 'success');
+   const onTint = useThemeColor({}, 'tintForeground');
+@@ -295,7 +300,27 @@ export default function HomeScreen() {
+   const { session } = useAuth();
+   const { showCelebration } = usePRCelebration();
+   const lastCelebratedRef = useRef<string>('');
+-  const { start: startRestTimer, registerRestEntrySink } = useSharedRestTimer();
++  const { state: restTimerState, start: startRestTimer, registerRestEntrySink } = useSharedRestTimer();
++  const { prefs: notificationPrefs } = useNotifications();
++  const [restPrompt, setRestPrompt] = useState<RestPromptInfo | null>(null);
++
++  // Gate for both "set logged" call sites (#3): auto-start immediately when
++  // the user has opted in, otherwise surface a dismissible prompt instead of
++  // silently starting a timer for them. Suppressed entirely while a timer is
++  // already running/paused/done so the prompt and the live indicator never
++  // compete (#8).
++  const triggerRestTimer = useCallback((hints: { exercise: string; repsLastSet?: number; isCompound: boolean }) => {
++    if (decideRestTimerAction(notificationPrefs?.auto_start_rest_timer === true) === 'start') {
++      startRestTimer(hints).catch((err) => console.warn('[restTimer] start failed', err));
++      return;
++    }
++    if (restTimerState.kind !== 'idle') return;
++    setRestPrompt({
++      exercise: hints.exercise,
++      suggestedSec: suggestRestSeconds(hints),
++      at: Date.now(),
++    });
++  }, [notificationPrefs?.auto_start_rest_timer, restTimerState.kind, startRestTimer]);
+ 
+   // Primary celebration path: the log-set response tells us deterministically
+   // whether the set was a PR (server-computed, no realtime/race dependency).
+@@ -1092,11 +1117,11 @@ export default function HomeScreen() {
+       const lastWorking = [...parsedRows].reverse().find((r) => !r.isCardio);
+       if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
+         const reps = parseInt(lastWorking.reps, 10);
+-        startRestTimer({
++        triggerRestTimer({
+           exercise: lastWorking.exercise,
+           repsLastSet: Number.isFinite(reps) ? reps : undefined,
+           isCompound: isCompoundExercise(lastWorking.exercise),
+-        }).catch(err => console.warn('[restTimer] start failed', err));
++        });
+       }
+ 
+       scrollToBottom();
+@@ -1183,11 +1208,11 @@ export default function HomeScreen() {
+           const lastWorking = [...newRows].reverse().find((r) => !r.isCardio);
+           if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
+             const reps = parseInt(lastWorking.reps, 10);
+-            startRestTimer({
++            triggerRestTimer({
+               exercise: lastWorking.exercise,
+               repsLastSet: Number.isFinite(reps) ? reps : undefined,
+               isCompound: isCompoundExercise(lastWorking.exercise),
+-            }).catch(err => console.warn('[restTimer] start failed', err));
++            });
+           }
+           scrollToBottom();
+         } else {
+@@ -1210,6 +1235,10 @@ export default function HomeScreen() {
+     <GestureDetector gesture={swipeRight}>
+       <KeyboardAvoidingView
+         behavior={Platform.OS === "ios" ? "padding" : undefined}
++        // The screen sits above the tab bar, so the keyboard overlap is smaller
++        // than the raw keyboard height by exactly the tab bar's height. Without
++        // this offset the composer is pushed up by that much dead space.
++        keyboardVerticalOffset={tabBarHeight ?? 0}
+         style={[styles.screen, { backgroundColor }]}
+       >
+         {/* Green dot on tab icon while a workout is in progress */}
+@@ -1254,7 +1283,7 @@ export default function HomeScreen() {
+               coachToday={coachToday}
+               totals={nutritionTotals}
+               targets={nutritionTargets}
+-              onStartWorkout={() => setNameModalVisible(true)}
++              onStartWorkout={onStartWorkout}
+               onNavigateProgram={() => router.push('/program')}
+               onNavigateCoach={() => router.push('/coach')}
+               onNavigateNutrition={() => router.push('/nutrition')}
+@@ -1279,6 +1308,20 @@ export default function HomeScreen() {
+ 
+         {inlineToast && <Toast message={inlineToast.message} type={inlineToast.type} onDismiss={hideToast} />}
+ 
++        {restPrompt && restTimerState.kind === 'idle' && (
++          <StartRestPrompt
++            prompt={restPrompt}
++            onStart={() => {
++              startRestTimer({
++                exercise: restPrompt.exercise,
++                prescribedRestSec: restPrompt.suggestedSec,
++              }).catch((err: unknown) => console.warn('[restTimer] start failed', err));
++              setRestPrompt(null);
++            }}
++            onDismiss={() => setRestPrompt(null)}
++          />
++        )}
++
+         {draftRestoredToast && (
+           <View style={styles.draftRestoredToast} pointerEvents="none">
+             <View style={[styles.draftRestoredBadge, { backgroundColor: successColor }]}>
+@@ -1369,8 +1412,6 @@ export default function HomeScreen() {
+             }
+           }}
+         />
+-
+-        <RestTimerBar />
+       </KeyboardAvoidingView>
+     </GestureDetector>
+   );
+diff --git a/app/exercise-library/[slug].tsx b/app/exercise-library/[slug].tsx
+index 84d3006..c80d0ec 100644
+--- a/app/exercise-library/[slug].tsx
++++ b/app/exercise-library/[slug].tsx
+@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/ui/themed-text';
+ import { ScreenHeader } from '@/components/ui/screen-header';
+ import { useThemeColor } from '@/hooks/useThemeColor';
+ import { getExerciseBySlug } from '@/lib/exerciseLibrary';
++import { formatTerm, formatTermList } from '@/lib/exerciseFormat';
+ import type { Exercise } from '@/types/exercise';
+ 
+ // Media licensing is contested — ship text-only until a licensed media set exists.
+@@ -77,6 +78,13 @@ export default function ExerciseDetailScreen() {
+   const rawEn = exercise.instructions?.en;
+   const instructionsEn = Array.isArray(rawEn) ? rawEn.join('\n') : (rawEn ?? null);
+ 
++  // The dataset lists some muscles as both primary and secondary. Repeating them
++  // reads as a data error, so a muscle already shown as primary is dropped here.
++  const primaryKeys = new Set(exercise.primary_muscles.map((m) => m.toLowerCase().trim()));
++  const secondaryMuscles = exercise.secondary_muscles.filter(
++    (m) => !primaryKeys.has(m.toLowerCase().trim())
++  );
++
+   // Media (GIF) is licensing-contested — default OFF, only media_id is stored.
+   const gifUrl = SHOW_EXERCISE_MEDIA && exercise.media_id
+     ? `https://static.exercisedb.dev/media/${exercise.media_id}.gif`
+@@ -97,16 +105,16 @@ export default function ExerciseDetailScreen() {
+         <View style={[styles.card, { backgroundColor: cardBackground }]}>
+           <ThemedText style={styles.cardTitle}>Overview</ThemedText>
+           <ThemedText style={[styles.row, { color: textColor }]}>
+-            Body part: {exercise.body_part}
++            Body part: {formatTerm(exercise.body_part)}
+           </ThemedText>
+           <ThemedText style={[styles.row, { color: textColor }]}>
+-            Category: {exercise.category}
++            Category: {formatTerm(exercise.category)}
+           </ThemedText>
+           <ThemedText style={[styles.row, { color: textColor }]}>
+-            Difficulty: {exercise.difficulty}
++            Difficulty: {formatTerm(exercise.difficulty)}
+           </ThemedText>
+           <ThemedText style={[styles.row, { color: textColor }]}>
+-            Equipment: {exercise.equipment.length > 0 ? exercise.equipment.join(', ') : '—'}
++            Equipment: {formatTermList(exercise.equipment)}
+           </ThemedText>
+         </View>
+ 
+@@ -117,45 +125,37 @@ export default function ExerciseDetailScreen() {
+           </ThemedText>
+         </View>
+ 
+-        <View style={[styles.card, { backgroundColor: cardBackground }]}>
+-          <ThemedText style={styles.cardTitle}>Cues</ThemedText>
+-          {exercise.cues.length === 0 ? (
+-            <ThemedText style={[styles.muted, { color: placeholder }]}>
+-              No cues available.
+-            </ThemedText>
+-          ) : (
+-            exercise.cues.map((c, i) => (
++        {exercise.cues.length > 0 && (
++          <View style={[styles.card, { backgroundColor: cardBackground }]}>
++            <ThemedText style={styles.cardTitle}>Cues</ThemedText>
++            {exercise.cues.map((c, i) => (
+               <View key={i} style={styles.bulletRow}>
+                 <ThemedText style={[styles.bullet, { color: textColor }]}>•</ThemedText>
+                 <ThemedText style={[styles.bulletText, { color: textColor }]}>{c}</ThemedText>
+               </View>
+-            ))
+-          )}
+-        </View>
++            ))}
++          </View>
++        )}
+ 
+-        <View style={[styles.card, { backgroundColor: cardBackground }]}>
+-          <ThemedText style={styles.cardTitle}>Common mistakes</ThemedText>
+-          {exercise.common_mistakes.length === 0 ? (
+-            <ThemedText style={[styles.muted, { color: placeholder }]}>
+-              No common mistakes listed.
+-            </ThemedText>
+-          ) : (
+-            exercise.common_mistakes.map((m, i) => (
++        {exercise.common_mistakes.length > 0 && (
++          <View style={[styles.card, { backgroundColor: cardBackground }]}>
++            <ThemedText style={styles.cardTitle}>Common mistakes</ThemedText>
++            {exercise.common_mistakes.map((m, i) => (
+               <View key={i} style={styles.bulletRow}>
+                 <ThemedText style={[styles.bullet, { color: textColor }]}>•</ThemedText>
+                 <ThemedText style={[styles.bulletText, { color: textColor }]}>{m}</ThemedText>
+               </View>
+-            ))
+-          )}
+-        </View>
++            ))}
++          </View>
++        )}
+ 
+         <View style={[styles.card, { backgroundColor: cardBackground }]}>
+           <ThemedText style={styles.cardTitle}>Muscles worked</ThemedText>
+           <ThemedText style={[styles.row, { color: textColor }]}>
+-            Primary: {exercise.primary_muscles.length > 0 ? exercise.primary_muscles.join(', ') : '—'}
++            Primary: {formatTermList(exercise.primary_muscles)}
+           </ThemedText>
+           <ThemedText style={[styles.row, { color: textColor }]}>
+-            Secondary: {exercise.secondary_muscles.length > 0 ? exercise.secondary_muscles.join(', ') : '—'}
++            Secondary: {formatTermList(secondaryMuscles)}
+           </ThemedText>
+         </View>
+ 
+diff --git a/app/exercise-library/index.tsx b/app/exercise-library/index.tsx
+index 6ec39eb..12a64d5 100644
+--- a/app/exercise-library/index.tsx
++++ b/app/exercise-library/index.tsx
+@@ -1,17 +1,17 @@
+-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
++import React, { useEffect, useMemo, useState } from 'react';
++import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+ import { useRouter } from 'expo-router';
+ import { useSafeAreaInsets } from 'react-native-safe-area-context';
+ 
+ import { ThemedView } from '@/components/ui/themed-view';
+ import { ThemedText } from '@/components/ui/themed-text';
+ import { ScreenHeader } from '@/components/ui/screen-header';
++import { IconSymbol } from '@/components/ui/icon-symbol';
+ import { useThemeColor } from '@/hooks/useThemeColor';
+-import { fetchExerciseLibrary, searchExercises } from '@/lib/exerciseLibrary';
++import { fetchExerciseLibrary } from '@/lib/exerciseLibrary';
++import { formatTerm } from '@/lib/exerciseFormat';
+ import type { Exercise } from '@/types/exercise';
+ 
+-const BODY_PARTS = ['Push', 'Pull', 'Legs', 'Shoulders', 'Chest', 'Back', 'Bis', 'Tris', 'Abs', 'Cardio'];
+-
+ export default function ExerciseLibraryScreen() {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+@@ -23,170 +23,194 @@ export default function ExerciseLibraryScreen() {
+   const inputBackground = useThemeColor({}, 'inputBackground');
+   const tint = useThemeColor({}, 'tint');
+   const onTint = useThemeColor({}, 'tintForeground');
++  const dangerColor = useThemeColor({}, 'danger');
+ 
+-  const [query, setQuery] = useState<string>('');
++  const [query, setQuery] = useState('');
+   const [exercises, setExercises] = useState<Exercise[]>([]);
+   const [bodyPartFilter, setBodyPartFilter] = useState<string | null>(null);
+-  const [loading, setLoading] = useState<boolean>(true);
+-
+-  useEffect(() => {
+-    let cancelled = false;
+-    (async () => {
+-      setLoading(true);
+-      try {
+-        const list = await fetchExerciseLibrary();
+-        if (!cancelled) setExercises(list);
+-      } catch (e) {
+-        console.warn('[exercise-library] load failed', e);
+-        if (!cancelled) setExercises([]);
+-      } finally {
+-        if (!cancelled) setLoading(false);
+-      }
+-    })();
+-    return () => {
+-      cancelled = true;
+-    };
+-  }, []);
++  const [loading, setLoading] = useState(true);
++  const [loadError, setLoadError] = useState(false);
+ 
+-  const handleSearchSubmit = useCallback(async (q: string) => {
+-    if (!q.trim()) {
+-      try {
+-        const list = await fetchExerciseLibrary();
+-        setExercises(list);
+-      } catch (e) {
+-        console.warn('[exercise-library] reset failed', e);
+-      }
+-      return;
+-    }
++  const load = async (forceRefresh = false) => {
+     setLoading(true);
++    setLoadError(false);
+     try {
+-      const results = await searchExercises(q);
+-      setExercises(results);
++      const list = await fetchExerciseLibrary(forceRefresh);
++      setExercises(list);
+     } catch (e) {
+-      console.warn('[exercise-library] search failed', e);
+-      setExercises([]);
++      console.warn('[exercise-library] load failed', e);
++      setLoadError(true);
+     } finally {
+       setLoading(false);
+     }
+-  }, []);
++  };
+ 
+-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   useEffect(() => {
+-    if (debounceRef.current) clearTimeout(debounceRef.current);
+-    debounceRef.current = setTimeout(() => {
+-      handleSearchSubmit(query);
+-    }, 400);
+-    return () => {
+-      if (debounceRef.current) clearTimeout(debounceRef.current);
+-    };
+-  }, [query, handleSearchSubmit]);
++    load();
++  }, []);
++
++  // Filter pills derived from the actual dataset — never hardcoded, so a
++  // future data import can't silently add unreachable values or leave dead
++  // pills that match nothing (#11 Defect 2).
++  const bodyParts = useMemo(
++    () => [...new Set(exercises.map((e) => e.body_part).filter(Boolean))].sort(),
++    [exercises]
++  );
+ 
++  // Local search + filter over the fully-paginated, already-cached list
++  // (#11 Defect 3): one code path, so search and the body-part pill always
++  // compose instead of a server-capped search result silently overriding
++  // the filter's context.
+   const filtered = useMemo(() => {
+-    if (!bodyPartFilter) return exercises;
+-    return exercises.filter((e) => e.body_part === bodyPartFilter);
+-  }, [exercises, bodyPartFilter]);
++    const q = query.trim().toLowerCase();
++    return exercises.filter((e) => {
++      if (bodyPartFilter && e.body_part !== bodyPartFilter) return false;
++      if (q && !e.name.toLowerCase().includes(q)) return false;
++      return true;
++    });
++  }, [exercises, bodyPartFilter, query]);
++
++  const renderExerciseCard = ({ item }: { item: Exercise }) => (
++    <Pressable
++      onPress={() => router.push(`/exercise-library/${item.slug}`)}
++      style={({ pressed }) => [
++        styles.card,
++        { backgroundColor: cardBackground },
++        pressed && { opacity: 0.7 },
++      ]}
++      accessibilityRole="button"
++      accessibilityLabel={`${item.name}, ${formatTerm(item.category)}, ${item.body_part}`}
++    >
++      <View style={styles.cardMain}>
++        <ThemedText style={[styles.itemName, { color: textColor }]} numberOfLines={1}>
++          {item.name}
++        </ThemedText>
++        <View style={styles.metaRow}>
++          <ThemedText style={[styles.metaTag, { color: placeholder, borderColor: border }]}>
++            {formatTerm(item.category)}
++          </ThemedText>
++          <ThemedText style={[styles.metaTag, { color: placeholder, borderColor: border }]}>
++            {item.body_part}
++          </ThemedText>
++        </View>
++      </View>
++      <IconSymbol name="chevron.right" size={18} color={placeholder} />
++    </Pressable>
++  );
++
++  const resultCountLabel = loading
++    ? null
++    : query.trim() || bodyPartFilter
++      ? `${filtered.length}${bodyPartFilter ? ` in ${bodyPartFilter}` : ''}`
++      : `${exercises.length} exercises`;
++
++  const ListHeader = (
++    <View style={[styles.headerCard, { backgroundColor: cardBackground }]}>
++      <View style={[styles.searchRow, { backgroundColor: inputBackground, borderColor: border }]}>
++        <IconSymbol name="magnifyingglass" size={16} color={placeholder} />
++        <TextInput
++          value={query}
++          onChangeText={setQuery}
++          placeholder="Search exercises…"
++          placeholderTextColor={placeholder}
++          returnKeyType="search"
++          keyboardAppearance="default"
++          clearButtonMode="while-editing"
++          style={[styles.input, { color: textColor }]}
++        />
++      </View>
++
++      <FlatList
++        horizontal
++        data={bodyParts}
++        keyExtractor={(bp) => bp}
++        showsHorizontalScrollIndicator={false}
++        contentContainerStyle={styles.pillRow}
++        style={{ marginTop: 12 }}
++        renderItem={({ item: bp }) => {
++          const selected = bodyPartFilter === bp;
++          return (
++            <Pressable
++              onPress={() => setBodyPartFilter(selected ? null : bp)}
++              style={({ pressed }) => [
++                styles.pill,
++                {
++                  backgroundColor: selected ? tint : 'transparent',
++                  borderColor: selected ? tint : border,
++                },
++                pressed && { opacity: 0.7 },
++              ]}
++              accessibilityRole="radio"
++              accessibilityLabel={bp}
++              accessibilityState={{ selected }}
++            >
++              <ThemedText style={[styles.pillText, { color: selected ? onTint : textColor }]}>
++                {bp}
++              </ThemedText>
++            </Pressable>
++          );
++        }}
++      />
++
++      {resultCountLabel && (
++        <ThemedText style={[styles.resultCount, { color: placeholder }]}>{resultCountLabel}</ThemedText>
++      )}
++    </View>
++  );
+ 
+   return (
+     <ThemedView style={[styles.container, { backgroundColor }]}>
+       <ScreenHeader title="Exercise Library" />
+-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
+-        <View style={[styles.card, { backgroundColor: cardBackground }]}>
+-          <TextInput
+-            value={query}
+-            onChangeText={setQuery}
+-            onSubmitEditing={() => handleSearchSubmit(query)}
+-            placeholder="Search exercises…"
+-            placeholderTextColor={placeholder}
+-            returnKeyType="search"
+-            style={[
+-              styles.input,
+-              {
+-                backgroundColor: inputBackground,
+-                color: textColor,
+-                borderColor: border,
+-              },
+-            ]}
+-          />
+-          <ScrollView
+-            horizontal
+-            showsHorizontalScrollIndicator={false}
+-            contentContainerStyle={styles.pillRow}
+-            style={{ marginTop: 12 }}
++
++      {loading ? (
++        <View style={styles.centered}>
++          <ActivityIndicator color={tint} />
++        </View>
++      ) : loadError ? (
++        <View style={styles.centered}>
++          <ThemedText style={[styles.muted, { color: dangerColor }]}>Failed to load exercises.</ThemedText>
++          <Pressable
++            onPress={() => load(true)}
++            style={({ pressed }) => [styles.retryBtn, { borderColor: border }, pressed && { opacity: 0.7 }]}
++            accessibilityRole="button"
++            accessibilityLabel="Retry"
+           >
+-            {BODY_PARTS.map((bp) => {
+-              const selected = bodyPartFilter === bp;
+-              return (
++            <ThemedText style={{ color: tint, fontWeight: '600' }}>Retry</ThemedText>
++          </Pressable>
++        </View>
++      ) : (
++        <FlatList
++          data={filtered}
++          keyExtractor={(ex) => ex.id}
++          renderItem={renderExerciseCard}
++          ListHeaderComponent={ListHeader}
++          ListEmptyComponent={
++            <View style={[styles.card, { backgroundColor: cardBackground }]}>
++              <ThemedText style={[styles.muted, { color: placeholder }]}>
++                {query || bodyPartFilter
++                  ? `No exercises match ${query ? `"${query}"` : bodyPartFilter}.`
++                  : 'No exercises found.'}
++              </ThemedText>
++              {(query || bodyPartFilter) && (
+                 <Pressable
+-                  key={bp}
+-                  onPress={() => setBodyPartFilter(selected ? null : bp)}
+-                  style={({ pressed }) => [
+-                    styles.pill,
+-                    {
+-                      backgroundColor: selected ? tint : 'transparent',
+-                      borderColor: selected ? tint : border,
+-                    },
+-                    pressed && { opacity: 0.7 },
+-                  ]}
+-                  accessibilityRole="radio"
+-                  accessibilityLabel={bp}
+-                  accessibilityState={{ selected }}
++                  onPress={() => { setQuery(''); setBodyPartFilter(null); }}
++                  style={({ pressed }) => [styles.retryBtn, { borderColor: border, marginTop: 12 }, pressed && { opacity: 0.7 }]}
++                  accessibilityRole="button"
++                  accessibilityLabel="Clear filters"
+                 >
+-                  <ThemedText
+-                    style={[styles.pillText, { color: selected ? onTint : textColor }]}
+-                  >
+-                    {bp}
+-                  </ThemedText>
++                  <ThemedText style={{ color: tint, fontWeight: '600' }}>Clear filters</ThemedText>
+                 </Pressable>
+-              );
+-            })}
+-          </ScrollView>
+-        </View>
+-
+-        {loading ? (
+-          <ActivityIndicator color={tint} style={{ marginTop: 16 }} />
+-        ) : filtered.length === 0 ? (
+-          <View style={[styles.card, { backgroundColor: cardBackground }]}>
+-            <ThemedText style={[styles.muted, { color: placeholder }]}>
+-              No exercises found.
+-            </ThemedText>
+-          </View>
+-        ) : (
+-          filtered.map((ex) => {
+-            const firstCue = ex.cues && ex.cues.length > 0 ? ex.cues[0] : null;
+-            return (
+-              <Pressable
+-                key={ex.id}
+-                onPress={() => router.push(`/exercise-library/${ex.slug}`)}
+-                style={({ pressed }) => [
+-                  styles.card,
+-                  { backgroundColor: cardBackground },
+-                  pressed && { opacity: 0.7 },
+-                ]}
+-                accessibilityRole="button"
+-                accessibilityLabel={`${ex.name}, ${ex.category}, ${ex.body_part}`}
+-              >
+-                <ThemedText style={[styles.itemName, { color: textColor }]}>{ex.name}</ThemedText>
+-                <View style={styles.metaRow}>
+-                  <ThemedText style={[styles.metaTag, { color: placeholder, borderColor: border }]}>
+-                    {ex.category}
+-                  </ThemedText>
+-                  <ThemedText style={[styles.metaTag, { color: placeholder, borderColor: border }]}>
+-                    {ex.body_part}
+-                  </ThemedText>
+-                </View>
+-                {firstCue && (
+-                  <ThemedText
+-                    numberOfLines={1}
+-                    style={[styles.cueLine, { color: textColor, opacity: 0.7 }]}
+-                  >
+-                    {firstCue}
+-                  </ThemedText>
+-                )}
+-              </Pressable>
+-            );
+-          })
+-        )}
+-      </ScrollView>
++              )}
++            </View>
++          }
++          keyboardShouldPersistTaps="handled"
++          initialNumToRender={12}
++          maxToRenderPerBatch={10}
++          windowSize={7}
++          removeClippedSubviews
++          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
++        />
++      )}
+     </ThemedView>
+   );
+ }
+@@ -194,12 +218,19 @@ export default function ExerciseLibraryScreen() {
+ const styles = StyleSheet.create({
+   container: { flex: 1 },
+   scroll: { paddingHorizontal: 16 },
+-  card: { borderRadius: 14, padding: 16, marginBottom: 12 },
+-  input: {
++  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 16 },
++  headerCard: { borderRadius: 14, padding: 16, marginBottom: 12 },
++  searchRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
+     borderRadius: 10,
+     borderWidth: 1,
+-    paddingVertical: 10,
+     paddingHorizontal: 12,
++  },
++  input: {
++    flex: 1,
++    paddingVertical: 10,
+     fontSize: 15,
+   },
+   pillRow: { flexDirection: 'row', gap: 8, paddingRight: 8 },
+@@ -210,6 +241,18 @@ const styles = StyleSheet.create({
+     borderWidth: 1,
+   },
+   pillText: { fontSize: 12, fontWeight: '600' },
++  resultCount: { fontSize: 12, marginTop: 10 },
++  card: {
++    borderRadius: 14,
++    padding: 16,
++    marginBottom: 12,
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    gap: 8,
++    minHeight: 68,
++  },
++  cardMain: { flex: 1 },
+   itemName: { fontSize: 16, fontWeight: '700' },
+   metaRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
+   metaTag: {
+@@ -220,6 +263,12 @@ const styles = StyleSheet.create({
+     paddingVertical: 2,
+     paddingHorizontal: 8,
+   },
+-  cueLine: { fontSize: 13, marginTop: 8 },
+   muted: { fontSize: 13 },
++  retryBtn: {
++    borderRadius: 10,
++    borderWidth: 1,
++    paddingVertical: 8,
++    paddingHorizontal: 16,
++    alignSelf: 'flex-start',
++  },
+ });
+diff --git a/app/history/[id].tsx b/app/history/[id].tsx
+index dd4c454..d7e486b 100644
+--- a/app/history/[id].tsx
++++ b/app/history/[id].tsx
+@@ -53,18 +53,9 @@ function ReviewCard({ review }: { review: SessionReview }) {
+     return dangerColor;
+   };
+ 
+-  const getRatingEmoji = (rating: number) => {
+-    if (rating >= 9) return "🔥";
+-    if (rating >= 7) return "💪";
+-    if (rating >= 5) return "👍";
+-    if (rating >= 3) return "🙂";
+-    return "😅";
+-  };
+-
+   return (
+     <View style={[styles.reviewCard, { backgroundColor: cardColor }]}>
+       <View style={styles.reviewHeader}>
+-        <Text style={styles.reviewEmoji}>{getRatingEmoji(review.rating)}</Text>
+         <View style={styles.reviewRatingInfo}>
+           <Text style={[styles.reviewRating, { color: getRatingColor(review.rating) }]}>
+             {review.rating}/10
+@@ -86,7 +77,10 @@ function ReviewCard({ review }: { review: SessionReview }) {
+       </View>
+ 
+       <View style={styles.reviewSection}>
+-        <Text style={[styles.reviewSectionTitle, { color: tintColor }]}>📝 Next Session</Text>
++        <View style={styles.reviewSectionTitleRow}>
++          <IconSymbol name="pencil" size={14} color={tintColor} />
++          <Text style={[styles.reviewSectionTitle, { color: tintColor }]}>Next Session</Text>
++        </View>
+         <Text style={[styles.reviewText, { color: textColor, fontStyle: 'italic' }]}>{review.nextSessionNote}</Text>
+       </View>
+     </View>
+@@ -405,7 +399,7 @@ export default function WorkoutDetail() {
+         {/* ── Reflection Card ── */}
+         <View style={[styles.reflectionCard, { backgroundColor: cardColor }]}>
+           <View style={styles.reflectionHeader}>
+-            <Text style={[styles.reflectionIcon, { color: mutedTextColor }]}>💭</Text>
++            <IconSymbol name="bubble.left.and.bubble.right.fill" size={16} color={mutedTextColor} />
+             <Text style={[styles.reflectionTitle, { color: textColor }]}>Reflection</Text>
+             {!reflectionEditing && (
+               <Pressable
+@@ -625,9 +619,6 @@ const styles = StyleSheet.create({
+     borderBottomWidth: 1,
+     borderBottomColor: 'rgba(128,128,128,0.2)',
+   },
+-  reviewEmoji: {
+-    fontSize: 36,
+-  },
+   reviewRatingInfo: {
+     flex: 1,
+   },
+@@ -641,6 +632,11 @@ const styles = StyleSheet.create({
+   reviewSection: {
+     gap: 4,
+   },
++  reviewSectionTitleRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 6,
++  },
+   reviewSectionTitle: {
+     fontSize: 13,
+     fontWeight: '700',
+@@ -672,9 +668,6 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     gap: 6,
+   },
+-  reflectionIcon: {
+-    fontSize: 14,
+-  },
+   reflectionTitle: {
+     fontSize: 15,
+     fontWeight: '600',
+diff --git a/app/settings/notifications.tsx b/app/settings/notifications.tsx
+index 5c0b39c..797d8ab 100644
+--- a/app/settings/notifications.tsx
++++ b/app/settings/notifications.tsx
+@@ -121,15 +121,15 @@ export default function NotificationsSettingsScreen() {
+             <ThemedText type="subtitle">Reminder times</ThemedText>
+             <View style={styles.row}>
+               <ThemedText style={{ flex: 1 }}>Workout reminder</ThemedText>
+-              <Stepper value={prefs.workout_reminder_hour} onDec={() => adjustHour('workout_reminder_hour', -1)} onInc={() => adjustHour('workout_reminder_hour', 1)} suffix=":00" tint={tint} />
++              <Stepper value={prefs.workout_reminder_hour} onDec={() => adjustHour('workout_reminder_hour', -1)} onInc={() => adjustHour('workout_reminder_hour', 1)} suffix=":00" tint={tint} label="workout reminder hour" />
+             </View>
+             <View style={styles.row}>
+               <ThemedText style={{ flex: 1 }}>Mid-day check</ThemedText>
+-              <Stepper value={prefs.nutrition_midday_hour} onDec={() => adjustHour('nutrition_midday_hour', -1)} onInc={() => adjustHour('nutrition_midday_hour', 1)} suffix=":00" tint={tint} />
++              <Stepper value={prefs.nutrition_midday_hour} onDec={() => adjustHour('nutrition_midday_hour', -1)} onInc={() => adjustHour('nutrition_midday_hour', 1)} suffix=":00" tint={tint} label="midday nutrition reminder hour" />
+             </View>
+             <View style={styles.row}>
+               <ThemedText style={{ flex: 1 }}>Daily coach report</ThemedText>
+-              <Stepper value={prefs.daily_feedback_hour} onDec={() => adjustHour('daily_feedback_hour', -1)} onInc={() => adjustHour('daily_feedback_hour', 1)} suffix=":00" tint={tint} />
++              <Stepper value={prefs.daily_feedback_hour} onDec={() => adjustHour('daily_feedback_hour', -1)} onInc={() => adjustHour('daily_feedback_hour', 1)} suffix=":00" tint={tint} label="daily feedback hour" />
+             </View>
+           </View>
+         )}
+@@ -155,20 +155,56 @@ export default function NotificationsSettingsScreen() {
+           </View>
+         )}
+ 
++        {/* Rest timer behavior — not a push toggle, so not gated on notification permission. */}
++        {prefs && (
++          <View style={[styles.card, { backgroundColor: cardBg }]}>
++            <View style={styles.row}>
++              <View style={{ flex: 1, paddingRight: 12 }}>
++                <ThemedText style={{ fontWeight: '600' }}>Auto-start rest timer</ThemedText>
++                <ThemedText style={{ color: subtle, fontSize: 12, marginTop: 2 }}>
++                  Start resting the moment you log a set. When off, you get a &ldquo;Start Rest&rdquo; prompt instead.
++                </ThemedText>
++              </View>
++              <Switch
++                value={Boolean(prefs.auto_start_rest_timer)}
++                onValueChange={setToggle('auto_start_rest_timer')}
++                trackColor={{ true: tint, false: undefined }}
++              />
++            </View>
++          </View>
++        )}
++
+         {loading && <ActivityIndicator color={tint} />}
+       </ScrollView>
+     </ThemedView>
+   );
+ }
+ 
+-function Stepper({ value, onDec, onInc, suffix, tint }: { value: number; onDec: () => void; onInc: () => void; suffix?: string; tint: string }) {
++function Stepper({ value, onDec, onInc, suffix, tint, label }: { value: number; onDec: () => void; onInc: () => void; suffix?: string; tint: string; label: string }) {
++  const display = `${value.toString().padStart(2, '0')}${suffix ?? ''}`;
+   return (
+     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+-      <Pressable onPress={onDec} style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Decrease">
++      {/* Labels name the setting being changed: three identical "Decrease"/"Increase"
++          pairs are indistinguishable to VoiceOver on this screen. */}
++      <Pressable
++        onPress={onDec}
++        hitSlop={8}
++        style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]}
++        accessibilityRole="button"
++        accessibilityLabel={`Decrease ${label}`}
++        accessibilityValue={{ text: display }}
++      >
+         <ThemedText style={{ color: tint, fontSize: 18, fontWeight: '700' }}>−</ThemedText>
+       </Pressable>
+-      <ThemedText style={{ minWidth: 50, textAlign: 'center', fontWeight: '600' }}>{value.toString().padStart(2, '0')}{suffix ?? ''}</ThemedText>
+-      <Pressable onPress={onInc} style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Increase">
++      <ThemedText style={{ minWidth: 50, textAlign: 'center', fontWeight: '600' }} accessibilityLabel={`${label} is ${display}`}>{display}</ThemedText>
++      <Pressable
++        onPress={onInc}
++        hitSlop={8}
++        style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]}
++        accessibilityRole="button"
++        accessibilityLabel={`Increase ${label}`}
++        accessibilityValue={{ text: display }}
++      >
+         <ThemedText style={{ color: tint, fontSize: 18, fontWeight: '700' }}>+</ThemedText>
+       </Pressable>
+     </View>
+@@ -183,5 +219,6 @@ const styles = StyleSheet.create({
+   btn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
+   btnGhost: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
+   btnText: { fontWeight: '700' },
+-  stepBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
++  // 44x44 is this release's practical minimum target (was 32x32).
++  stepBtn: { width: 44, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+ });
+diff --git a/components/workout/RestTimerBar.tsx b/components/workout/RestTimerBar.tsx
+deleted file mode 100644
+index dbb0736..0000000
+--- a/components/workout/RestTimerBar.tsx
++++ /dev/null
+@@ -1,103 +0,0 @@
+-// In-session rest timer bar. Floating chip at the bottom of the workout screen.
+-// Visible when timer is running, paused, or done. Hidden when idle.
+-
+-import React, { useEffect } from 'react';
+-import { Pressable, StyleSheet, View } from 'react-native';
+-import * as Haptics from 'expo-haptics';
+-
+-import { ThemedText } from '@/components/ui/themed-text';
+-import { useThemeColor } from '@/hooks/useThemeColor';
+-import { useSharedRestTimer } from '@/contexts/RestTimerContext';
+-import { formatTime } from '@/lib/restTimer';
+-
+-type Props = {
+-  onSkip?: () => void;
+-  bottom?: number;
+-};
+-
+-export function RestTimerBar({ onSkip, bottom = 96 }: Props) {
+-  const { state, remainingSec, pause, resume, cancel, skip } = useSharedRestTimer();
+-  const cardBg = useThemeColor({}, 'cardBackground');
+-  const textColor = useThemeColor({}, 'text');
+-  const tint = useThemeColor({}, 'tint');
+-
+-  // Haptic when the timer hits 0
+-  useEffect(() => {
+-    if (state.kind === 'done') {
+-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+-    }
+-  }, [state.kind]);
+-
+-  if (state.kind === 'idle') return null;
+-
+-  const label =
+-    state.kind === 'done' ? 'Rest complete'
+-    : state.kind === 'paused' ? `Paused · ${formatTime(remainingSec)}`
+-    : `Rest · ${formatTime(remainingSec)}`;
+-
+-  const subtitle = state.exercise
+-    ? `${state.exercise}${state.setNumber ? ` · set ${state.setNumber + 1}` : ''}`
+-    : null;
+-
+-  const handleSkip = async () => {
+-    await skip();
+-    onSkip?.();
+-  };
+-
+-  return (
+-    <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>
+-      <View style={[styles.bar, { backgroundColor: cardBg }]}>
+-        <View style={{ flex: 1 }}>
+-          <ThemedText style={[styles.label, { color: textColor }]}>{label}</ThemedText>
+-          {subtitle ? <ThemedText style={[styles.sub, { color: textColor }]}>{subtitle}</ThemedText> : null}
+-        </View>
+-        {state.kind === 'running' && (
+-          <Pressable onPress={pause} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Pause rest timer">
+-            <ThemedText style={[styles.btnText, { color: tint }]}>Pause</ThemedText>
+-          </Pressable>
+-        )}
+-        {state.kind === 'paused' && (
+-          <Pressable onPress={resume} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Resume rest timer">
+-            <ThemedText style={[styles.btnText, { color: tint }]}>Resume</ThemedText>
+-          </Pressable>
+-        )}
+-        {state.kind !== 'done' && (
+-          <Pressable onPress={handleSkip} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Skip rest">
+-            <ThemedText style={[styles.btnText, { color: tint }]}>Skip</ThemedText>
+-          </Pressable>
+-        )}
+-        {state.kind === 'done' && (
+-          <Pressable onPress={cancel} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Dismiss">
+-            <ThemedText style={[styles.btnText, { color: tint }]}>Dismiss</ThemedText>
+-          </Pressable>
+-        )}
+-      </View>
+-    </View>
+-  );
+-}
+-
+-const styles = StyleSheet.create({
+-  wrap: {
+-    position: 'absolute',
+-    left: 12,
+-    right: 12,
+-  },
+-  bar: {
+-    flexDirection: 'row',
+-    alignItems: 'center',
+-    paddingHorizontal: 14,
+-    paddingVertical: 10,
+-    borderRadius: 14,
+-    shadowColor: '#000',
+-    shadowOpacity: 0.18,
+-    shadowOffset: { width: 0, height: 4 },
+-    shadowRadius: 8,
+-    elevation: 4,
+-    gap: 8,
+-  },
+-  label: { fontSize: 16, fontWeight: '600' },
+-  sub: { fontSize: 12, opacity: 0.7, marginTop: 2 },
+-  btn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+-  btnText: { fontWeight: '600' },
+-  pressed: { opacity: 0.6 },
+-});
+diff --git a/components/workout/RestTimerToast.tsx b/components/workout/RestTimerToast.tsx
+index 0e6c15e..9b19ea1 100644
+--- a/components/workout/RestTimerToast.tsx
++++ b/components/workout/RestTimerToast.tsx
+@@ -7,7 +7,6 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
+ import { Platform, Pressable, StyleSheet, View } from 'react-native';
+ import { useRouter, usePathname, type Href } from 'expo-router';
+ import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+-import * as Haptics from 'expo-haptics';
+ 
+ import { ThemedText } from '@/components/ui/themed-text';
+ import { useThemeColor } from '@/hooks/useThemeColor';
+@@ -40,20 +39,25 @@ export function RestTimerToast() {
+   useEffect(() => {
+     if (state.kind === 'done') {
+       setDoneVisible(true);
+-      if (Platform.OS !== 'web') {
+-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+-          () => undefined,
+-        );
+-      }
++      // Completion haptic now fires once, from useRestTimer's guarded
++      // running -> done transition (#8) — not from every render that
++      // observes a 'done' state (which would also fire on hydration).
+       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+-      dismissTimerRef.current = setTimeout(() => setDoneVisible(false), AUTO_DISMISS_MS);
++      dismissTimerRef.current = setTimeout(() => {
++        setDoneVisible(false);
++        // Return the shared state machine to idle, not just hide the card —
++        // otherwise it's stuck in 'done' for the rest of the session, and
++        // the #3 "Start Rest" prompt (gated on state.kind === 'idle') never
++        // shows again after the first completed timer.
++        cancel();
++      }, AUTO_DISMISS_MS);
+     } else {
+       setDoneVisible(false);
+     }
+     return () => {
+       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+     };
+-  }, [state.kind]);
++  }, [state.kind, cancel]);
+ 
+   // Hide the overlay entirely while the user is already on the Timer tab.
+   const onTimerScreen = pathname?.endsWith('/timer');
+diff --git a/components/workout/WorkoutBottomBar.tsx b/components/workout/WorkoutBottomBar.tsx
+index 357be40..66762a3 100644
+--- a/components/workout/WorkoutBottomBar.tsx
++++ b/components/workout/WorkoutBottomBar.tsx
+@@ -1,9 +1,11 @@
+-import { Dispatch, SetStateAction } from "react";
++import { Dispatch, SetStateAction, useContext } from "react";
+ import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
++import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
+ 
+ import * as Haptics from "expo-haptics";
+ import { useThemeColor } from "@/hooks/useThemeColor";
++import { useLargeTextLayout } from "@/hooks/useLargeTextLayout";
+ 
+ 
+ 
+@@ -70,9 +72,18 @@ export function WorkoutBottomBar({
+   };
+ 
+   const insets = useSafeAreaInsets();
++  // When a bottom tab bar is present it already covers the home-indicator inset.
++  // Adding insets.bottom again double-counts it and squeezes the content area.
++  const tabBarHeight = useContext(BottomTabBarHeightContext);
++  const bottomPadding = (tabBarHeight && tabBarHeight > 0 ? 0 : insets.bottom) + 10;
++
++  // Layout adapts to Dynamic Type; the field stays single-line so the keyboard
++  // keeps its "send" return key (multiline would swap it for a newline key and
++  // break the primary logging flow at accessibility sizes).
++  const { isHugeText, scaleSpace } = useLargeTextLayout();
+ 
+   return (
+-    <View style={[styles.bottomWrap, { paddingBottom: insets.bottom + 10 }]}>
++    <View style={[styles.bottomWrap, { paddingBottom: bottomPadding }]}>
+       {/* Clear Button - Top Right */}
+ 
+ 
+@@ -93,7 +104,9 @@ export function WorkoutBottomBar({
+           style={[
+             styles.input,
+             styles.messageInput,
+-            { color: textColor, backgroundColor: inputBg, borderColor: borderColor }
++            { color: textColor, backgroundColor: inputBg, borderColor: borderColor },
++            // Grow the field with Dynamic Type so large text is not clipped.
++            { minHeight: scaleSpace(44) },
+           ]}
+           returnKeyType="send"
+           onSubmitEditing={handleSend}
+@@ -101,14 +114,16 @@ export function WorkoutBottomBar({
+         />
+       </View>
+ 
+-      <View style={styles.bottomButtons}>
++      <View style={[styles.bottomButtons, isHugeText && styles.bottomButtonsStacked]}>
+         <Pressable
+           onPress={workoutActive ? handleEndWorkout : handleStartWorkout}
+           accessibilityRole="button"
+           accessibilityLabel={workoutActive ? "End workout" : "Start workout"}
++          accessibilityHint={workoutActive ? "Finishes and saves this session" : "Begins a new workout session"}
+           style={({ pressed }) => [
+             styles.pillButton,
+-            { backgroundColor: textColor, borderColor: textColor },
++            { backgroundColor: textColor, borderColor: textColor, minHeight: scaleSpace(44) },
++            isHugeText && styles.pillButtonStacked,
+             workoutActive && { backgroundColor: dangerColor, borderColor: dangerColor },
+             pressed && styles.pillPressed,
+           ]}
+@@ -123,9 +138,11 @@ export function WorkoutBottomBar({
+           accessibilityRole="button"
+           accessibilityLabel="Send set"
+           accessibilityState={{ disabled: disabledSend }}
++          accessibilityHint="Logs the set you typed above"
+           style={({ pressed }) => [
+             styles.pillButton,
+-            { backgroundColor: textColor, borderColor: textColor },
++            { backgroundColor: textColor, borderColor: textColor, minHeight: scaleSpace(44) },
++            isHugeText && styles.pillButtonStacked,
+             disabledSend && styles.pillDisabled,
+             pressed && !disabledSend && styles.pillPressed,
+           ]}
+@@ -196,6 +213,7 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 12,
+     paddingVertical: 12,
+     fontSize: 14,
++    // No fixed height: the field must grow with Dynamic Type.
+   },
+   messageInput: {
+     flex: 1,
+@@ -212,12 +230,21 @@ const styles = StyleSheet.create({
+     justifyContent: "space-between",
+     alignItems: "center",
+   },
++  bottomButtonsStacked: {
++    flexDirection: "column",
++    alignItems: "stretch",
++  },
++  pillButtonStacked: {
++    flex: 0,
++    width: "100%",
++  },
+   pillButton: {
+     flex: 1,
+     borderWidth: 1,
+     borderRadius: 14,
+     paddingVertical: 10,
+     alignItems: "center",
++    justifyContent: "center",
+     // backgroundColor and borderColor set dynamically via isDark inline styles
+   },
+   pillPrimary: {
+diff --git a/components/workout/WorkoutCard.tsx b/components/workout/WorkoutCard.tsx
+index 3b078bf..e2b4685 100644
+--- a/components/workout/WorkoutCard.tsx
++++ b/components/workout/WorkoutCard.tsx
+@@ -1,5 +1,6 @@
+ import { ThemedText } from "@/components/ui/themed-text";
+ import { useThemeColor } from "@/hooks/useThemeColor";
++import { useLargeTextLayout } from "@/hooks/useLargeTextLayout";
+ import { LogRow } from "@/types/workout";
+ import { useCallback, useEffect, useRef } from "react";
+ import { LayoutChangeEvent, StyleSheet, TextInput, View, Keyboard, Pressable } from "react-native";
+@@ -54,6 +55,7 @@ export function WorkoutCard({
+     onCommitEditCell
+ }: Props) {
+     const isSyncing = row.status === 'syncing';
++    const { isLargeText, scaleSpace } = useLargeTextLayout();
+     const inputRef = useRef<TextInput>(null);
+     const cardBg = useThemeColor({}, 'cardBackground');
+     const borderColor = useThemeColor({}, 'border');
+@@ -210,7 +212,8 @@ export function WorkoutCard({
+                 {
+                     color: inputTextColor,
+                     backgroundColor: inputBg,
+-                    minWidth: 40,
++                    minWidth: scaleSpace(40),
++                    minHeight: scaleSpace(40),
+                     paddingHorizontal: 6,
+                     paddingVertical: 2,
+                     borderRadius: 6,
+@@ -238,14 +241,15 @@ export function WorkoutCard({
+                     animatedStyle,
+                 ]}
+             >
+-            <View style={styles.header}>
+-                <ThemedText type="defaultSemiBold" style={[styles.exercise, isSyncing && { color: labelColor }]}>
++            <View style={[styles.header, isLargeText && styles.headerStacked]}>
++                <ThemedText type="defaultSemiBold" style={[styles.exercise, isLargeText && styles.exerciseStacked, isSyncing && { color: labelColor }]}>
+                     {row.exercise}
+                 </ThemedText>
+                 <Pressable
+                     onPress={() => !isSyncing && onIncrementSet(row.id)}
+                     onLongPress={() => !isSyncing && onBeginEditCell?.(row.id, "set", row.set.toString())}
+                     hitSlop={10}
++                    style={{ minHeight: scaleSpace(44), justifyContent: "center" }}
+                     disabled={isSyncing}
+                     accessibilityRole="button"
+                     accessibilityLabel={`Set ${row.set} — tap to increment, long press to edit`}
+@@ -256,7 +260,7 @@ export function WorkoutCard({
+                 </Pressable>
+             </View>
+ 
+-            <View style={[styles.details, { marginBottom: (row.notes || editingField === "notes") ? 12 : 0 }]}>
++            <View style={[styles.details, isLargeText && styles.detailsStacked, { marginBottom: (row.notes || editingField === "notes") ? 12 : 0 }]}>
+                 {row.isCardio ? (
+                     // Cardio display: duration, distance, calories, heart rate, level
+                     <View style={styles.cardioDetails}>
+@@ -308,7 +312,7 @@ export function WorkoutCard({
+                             {editingField === "weightLbs" ? (
+                                 renderInput("Lbs", "numeric")
+                             ) : (
+-                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)} accessibilityRole="button" accessibilityLabel={`Weight: ${row.weightLbs && row.weightLbs !== "0" ? `${row.weightLbs} lbs` : 'not set'}, tap to edit`}>
++                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)} hitSlop={10} style={{ minHeight: scaleSpace(44), justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Weight: ${row.weightLbs && row.weightLbs !== "0" ? `${row.weightLbs} lbs` : 'not set'}, tap to edit`}>
+                                     <ThemedText style={styles.detailValue}>
+                                         {row.weightLbs && row.weightLbs !== "0" ? row.weightLbs : "—"}
+                                         <ThemedText style={[styles.detailLabel, { color: labelColor }]}> lbs</ThemedText>
+@@ -317,14 +321,16 @@ export function WorkoutCard({
+                             )}
+                         </View>
+ 
+-                        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
++                        {/* Decorative separator only — it has no meaning once the
++                            values are stacked, and it would clip at large sizes. */}
++                        {isLargeText ? null : <View style={[styles.divider, { backgroundColor: dividerColor }]} />}
+ 
+                         {/* Reps */}
+                         <View style={styles.detailItem}>
+                             {editingField === "reps" ? (
+                                 renderInput("Reps", "numeric")
+                             ) : (
+-                                <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)} accessibilityRole="button" accessibilityLabel={`Reps: ${row.reps || 'not set'}, tap to edit`}>
++                                <Pressable onPress={() => onBeginEditCell?.(row.id, "reps", row.reps)} hitSlop={10} style={{ minHeight: scaleSpace(44), justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Reps: ${row.reps || 'not set'}, tap to edit`}>
+                                     <ThemedText style={styles.detailValue}>
+                                         {row.reps || "—"}
+                                         <ThemedText style={[styles.detailLabel, { color: labelColor }]}> reps</ThemedText>
+@@ -342,7 +348,7 @@ export function WorkoutCard({
+                     {editingField === "notes" ? (
+                         renderInput("Add a note...")
+                     ) : (
+-                        <Pressable onPress={() => onBeginEditCell?.(row.id, "notes", row.notes)} accessibilityRole="button" accessibilityLabel={`Note: ${row.notes}, tap to edit`}>
++                        <Pressable onPress={() => onBeginEditCell?.(row.id, "notes", row.notes)} hitSlop={10} style={{ minHeight: scaleSpace(44), justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Note: ${row.notes}, tap to edit`}>
+                             <ThemedText style={[styles.noteText, { color: noteColor }]}>{row.notes}</ThemedText>
+                         </Pressable>
+                     )}
+@@ -377,6 +383,22 @@ const styles = StyleSheet.create({
+         flex: 1,
+         marginRight: 8,
+     },
++    headerStacked: {
++        flexDirection: "column",
++        alignItems: "flex-start",
++        gap: 8,
++    },
++    exerciseStacked: {
++        // Full width once stacked, so long names wrap instead of truncating.
++        flex: 0,
++        width: "100%",
++        marginRight: 0,
++    },
++    detailsStacked: {
++        flexDirection: "column",
++        alignItems: "flex-start",
++        gap: 4,
++    },
+     set: {
+         fontSize: 13,
+         fontWeight: "600",
+diff --git a/components/workout/WorkoutTable.tsx b/components/workout/WorkoutTable.tsx
+index ee8b211..58bbdf8 100644
+--- a/components/workout/WorkoutTable.tsx
++++ b/components/workout/WorkoutTable.tsx
+@@ -6,6 +6,7 @@ import { ThemedText } from "@/components/ui/themed-text";
+ import { ThemedView } from "@/components/ui/themed-view";
+ import { WorkoutCard } from "@/components/workout/WorkoutCard";
+ import { useThemeColor } from "@/hooks/useThemeColor";
++import { useLargeTextLayout } from "@/hooks/useLargeTextLayout";
+ import type { LogRow } from "@/types/workout";
+ import Animated, { useSharedValue, useAnimatedStyle } from "react-native-reanimated";
+ 
+@@ -81,6 +82,7 @@ export function WorkoutTable({
+ }: Props) {
+   const successColor = useThemeColor({}, 'success');
+   const dangerColor = useThemeColor({}, 'danger');
++  const { isLargeText, scaleSpace } = useLargeTextLayout();
+ 
+   const openRowMenu = useCallback(
+     (rowId: string) => {
+@@ -123,10 +125,13 @@ export function WorkoutTable({
+   );
+ 
+   // ── Drag shared values ──
++  // Fallback height used only until the first onLayout measurement lands. A card
++  // is roughly 100pt at the default text size and grows with Dynamic Type, so
++  // the fallback has to scale too or the first drag mis-computes its target slot.
++  const fallbackRowHeight = scaleSpace(100);
+   const activeDragIndex = useSharedValue(-1);
+   const dragTranslationY = useSharedValue(0);
+-  // Dynamic row height — measured via onLayout in WorkoutCard, default ~100px
+-  const measuredRowHeight = useSharedValue(100);
++  const measuredRowHeight = useSharedValue(fallbackRowHeight);
+ 
+   // ── Scroll lock during drag ──
+   const [scrollEnabled, setScrollEnabled] = useState(true);
+@@ -160,10 +165,10 @@ export function WorkoutTable({
+       const renderRightActions = () => {
+         if (isSyncing) return null;
+         return (
+-          <View style={styles.swipeActions}>
++          <View style={[styles.swipeActions, isLargeText && styles.swipeActionsStacked]}>
+             <Pressable
+               onPress={() => onDuplicateRow(item.id)}
+-              style={({ pressed }) => [styles.swipeButton, { backgroundColor: successColor }, pressed && styles.swipePressed]}
++              style={({ pressed }) => [styles.swipeButton, { backgroundColor: successColor, minWidth: scaleSpace(80), minHeight: scaleSpace(44) }, isLargeText && styles.swipeButtonStacked, pressed && styles.swipePressed]}
+               accessibilityRole="button"
+               accessibilityLabel="Duplicate set"
+             >
+@@ -171,7 +176,7 @@ export function WorkoutTable({
+             </Pressable>
+             <Pressable
+               onPress={() => onDeleteRow(item.id)}
+-              style={({ pressed }) => [styles.swipeButton, { backgroundColor: dangerColor }, pressed && styles.swipePressed]}
++              style={({ pressed }) => [styles.swipeButton, { backgroundColor: dangerColor, minWidth: scaleSpace(80), minHeight: scaleSpace(44) }, isLargeText && styles.swipeButtonStacked, pressed && styles.swipePressed]}
+               accessibilityRole="button"
+               accessibilityLabel="Delete set"
+             >
+@@ -191,7 +196,7 @@ export function WorkoutTable({
+           <WorkoutCard
+             row={item}
+             rowIndex={index}
+-            rowHeight={100}
++            rowHeight={fallbackRowHeight}
+             activeDragIndex={activeDragIndex}
+             dragTranslationY={dragTranslationY}
+             measuredRowHeight={measuredRowHeight}
+@@ -209,7 +214,7 @@ export function WorkoutTable({
+         </Swipeable>
+       );
+     },
+-    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle, successColor, dangerColor]
++    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle, successColor, dangerColor, isLargeText, scaleSpace, fallbackRowHeight]
+   );
+ 
+   const handleScrollToIndexFailed = useCallback(
+@@ -244,11 +249,16 @@ export function WorkoutTable({
+ const styles = StyleSheet.create({
+   tableWrap: {
+     flex: 1,
+-    overflow: 'visible',
++    // The list MUST clip to its own bounds. With overflow:'visible' (the previous
++    // value) FlatList rows render outside the list frame and paint on top of the
++    // bottom composer and the header — reproduced at the default text size with a
++    // 4-set session. Row-level overflow stays visible via CellWrapper, which is
++    // what the drag-reorder shadow actually needs.
++    overflow: 'hidden',
+   },
+   tableBody: {
+     flex: 1,
+-    overflow: 'visible',
++    overflow: 'hidden',
+   },
+   tableBodyContent: {
+     paddingBottom: 6,
+@@ -270,13 +280,23 @@ const styles = StyleSheet.create({
+     marginBottom: 12,
+     marginLeft: 8,
+   },
++  swipeActionsStacked: {
++    flexDirection: "column",
++    alignItems: "stretch",
++    gap: 8,
++  },
+   swipeButton: {
+     justifyContent: "center",
++    alignItems: "center",
+     paddingHorizontal: 14,
+-    minWidth: 80,
++    paddingVertical: 8,
+     borderRadius: 16,
+     marginLeft: 8,
+   },
++  swipeButtonStacked: {
++    flex: 1,
++    marginLeft: 8,
++  },
+   swipeText: {
+     color: "#FFFFFF",
+     fontWeight: "700",

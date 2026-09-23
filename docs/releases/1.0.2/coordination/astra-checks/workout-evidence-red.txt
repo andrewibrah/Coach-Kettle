@@ -1,0 +1,45 @@
+✔ totals RPC failure is not fabricated as zero intake (3.012291ms)
+✔ totals require a real aggregate row and retain its atomic log count (2.056708ms)
+✔ partial logs describe recorded gaps without calling the whole day a success or prescribing extra food (0.200583ms)
+✔ absent nutrition evidence never becomes a zero-gap calorie success (0.083584ms)
+✖ workout query errors and missing counts are not absence evidence (2.540875ms)
+✔ a successful workout count distinguishes absent from completed (1.999625ms)
+✖ unavailable workout evidence aborts regeneration before any writes or behavior changes (31.525541ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 256.187916
+
+✖ failing tests:
+
+test at ../../../../../../private/tmp/coach-kettle-astra-tools/workout-evidence-red.test.ts:64:1
+✖ workout query errors and missing counts are not absence evidence (2.540875ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///private/tmp/coach-kettle-astra-tools/workout-evidence-red.test.ts:67:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /workout evidence/i,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at ../../../../../../private/tmp/coach-kettle-astra-tools/workout-evidence-red.test.ts:76:1
+✖ unavailable workout evidence aborts regeneration before any writes or behavior changes (31.525541ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///private/tmp/coach-kettle-astra-tools/workout-evidence-red.test.ts:90:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /workout evidence/i,
+    operator: 'rejects',
+    diff: 'simple'
+  }

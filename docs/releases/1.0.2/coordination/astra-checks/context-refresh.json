@@ -1,0 +1,156 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:contexts/NutritionContext.tsx:refresh",
+    "name": "refresh",
+    "kind": "Function",
+    "filePath": "contexts/NutritionContext.tsx",
+    "startLine": 156,
+    "endLine": 156
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:logFood",
+        "name": "logFood",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:deleteEntry",
+        "name": "deleteEntry",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:updateEntry",
+        "name": "updateEntry",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:NutritionProvider",
+        "name": "NutritionProvider",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:sub",
+        "name": "sub",
+        "filePath": "contexts/NutritionContext.tsx"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:lib/nutrition.ts:fetchFoodLogDay",
+        "name": "fetchFoodLogDay",
+        "filePath": "lib/nutrition.ts"
+      },
+      {
+        "uid": "Function:lib/nutrition.ts:fetchNutritionTargets",
+        "name": "fetchNutritionTargets",
+        "filePath": "lib/nutrition.ts"
+      },
+      {
+        "uid": "Function:lib/nutrition.ts:fetchNutritionTargetSet",
+        "name": "fetchNutritionTargetSet",
+        "filePath": "lib/nutrition.ts"
+      },
+      {
+        "uid": "Function:lib/nutrition.ts:saveNutritionTargetSet",
+        "name": "saveNutritionTargetSet",
+        "filePath": "lib/nutrition.ts"
+      },
+      {
+        "uid": "Function:lib/nutrition.ts:fetchMealPlan",
+        "name": "fetchMealPlan",
+        "filePath": "lib/nutrition.ts"
+      },
+      {
+        "uid": "Function:lib/nutrition.ts:fetchRecentFoods",
+        "name": "fetchRecentFoods",
+        "filePath": "lib/nutrition.ts"
+      },
+      {
+        "uid": "Function:lib/nutritionTargetStorage.ts:parseJson",
+        "name": "parseJson",
+        "filePath": "lib/nutritionTargetStorage.ts"
+      },
+      {
+        "uid": "Function:lib/nutritionTargetStorage.ts:savedSetToLegacyTargets",
+        "name": "savedSetToLegacyTargets",
+        "filePath": "lib/nutritionTargetStorage.ts"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:todayIso",
+        "name": "todayIso",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:cacheKey",
+        "name": "cacheKey",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:pendingKey",
+        "name": "pendingKey",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Function:contexts/NutritionContext.tsx:detectLegacyImport",
+        "name": "detectLegacyImport",
+        "filePath": "contexts/NutritionContext.tsx"
+      }
+    ],
+    "accesses": [
+      {
+        "uid": "Const:contexts/NutritionContext.tsx:value",
+        "name": "value",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Const:contexts/NutritionContext.tsx:value",
+        "name": "value",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Const:contexts/NutritionContext.tsx:value",
+        "name": "value",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Const:contexts/NutritionContext.tsx:value",
+        "name": "value",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Const:contexts/NutritionContext.tsx:value",
+        "name": "value",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Const:contexts/NutritionContext.tsx:value",
+        "name": "value",
+        "filePath": "contexts/NutritionContext.tsx"
+      },
+      {
+        "uid": "Const:contexts/NutritionContext.tsx:value",
+        "name": "value",
+        "filePath": "contexts/NutritionContext.tsx"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_182_sub",
+      "name": "Sub → TodayISO",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_13_sub",
+      "name": "Sub → GetAuthHeaders",
+      "step_index": 2,
+      "step_count": 7
+    }
+  ]
+}

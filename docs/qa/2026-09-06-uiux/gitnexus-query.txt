@@ -1,0 +1,203 @@
+{
+  "processes": [
+    {
+      "id": "proc_160_coachmodal",
+      "summary": "CoachModal → UseTheme",
+      "priority": 0.101,
+      "symbol_count": 1,
+      "process_type": "intra_community",
+      "step_count": 4
+    },
+    {
+      "id": "proc_161_coachmodal",
+      "summary": "CoachModal → GetAuthHeaders",
+      "priority": 0.101,
+      "symbol_count": 1,
+      "process_type": "cross_community",
+      "step_count": 4
+    },
+    {
+      "id": "proc_18_morescreen",
+      "summary": "MoreScreen → UseTheme",
+      "priority": 0.1,
+      "symbol_count": 1,
+      "process_type": "intra_community",
+      "step_count": 6
+    },
+    {
+      "id": "proc_193_morescreen",
+      "summary": "MoreScreen → IconSymbol",
+      "priority": 0.1,
+      "symbol_count": 1,
+      "process_type": "intra_community",
+      "step_count": 3
+    }
+  ],
+  "process_symbols": [
+    {
+      "id": "Function:components/modals/CoachModal.tsx:CoachModal",
+      "name": "CoachModal",
+      "filePath": "components/modals/CoachModal.tsx",
+      "startLine": 36,
+      "endLine": 277,
+      "module": "Settings",
+      "process_id": "proc_160_coachmodal",
+      "step_index": 1
+    },
+    {
+      "id": "Function:app/(tabs)/more.tsx:MoreScreen",
+      "name": "MoreScreen",
+      "filePath": "app/(tabs)/more.tsx",
+      "startLine": 52,
+      "endLine": 145,
+      "module": "Settings",
+      "process_id": "proc_18_morescreen",
+      "step_index": 1
+    }
+  ],
+  "definitions": [
+    {
+      "id": "File:app/settings/notifications.tsx",
+      "name": "notifications.tsx",
+      "filePath": "app/settings/notifications.tsx"
+    },
+    {
+      "id": "Function:app/settings/notifications.tsx:setToggle",
+      "name": "setToggle",
+      "filePath": "app/settings/notifications.tsx",
+      "startLine": 66,
+      "endLine": 68,
+      "module": "Settings"
+    },
+    {
+      "id": "Function:app/settings/notifications.tsx:adjustHour",
+      "name": "adjustHour",
+      "filePath": "app/settings/notifications.tsx",
+      "startLine": 70,
+      "endLine": 75,
+      "module": "Settings"
+    },
+    {
+      "id": "File:lib/notifications.ts",
+      "name": "notifications.ts",
+      "filePath": "lib/notifications.ts"
+    },
+    {
+      "id": "Const:lib/notifications.ts:trigger",
+      "name": "trigger",
+      "filePath": "lib/notifications.ts",
+      "startLine": 143,
+      "endLine": 143
+    },
+    {
+      "id": "Function:lib/coaching.ts:fetchTodayFeedback",
+      "name": "fetchTodayFeedback",
+      "filePath": "lib/coaching.ts",
+      "startLine": 8,
+      "endLine": 13,
+      "module": "Contexts"
+    },
+    {
+      "id": "Function:lib/coaching.ts:fetchRecentFeedback",
+      "name": "fetchRecentFeedback",
+      "filePath": "lib/coaching.ts",
+      "startLine": 15,
+      "endLine": 20,
+      "module": "Contexts"
+    },
+    {
+      "id": "File:lib/coaching.ts",
+      "name": "coaching.ts",
+      "filePath": "lib/coaching.ts"
+    },
+    {
+      "id": "Function:supabase/functions/notifications/index.ts:getPrefs",
+      "name": "getPrefs",
+      "filePath": "supabase/functions/notifications/index.ts",
+      "startLine": 42,
+      "endLine": 73
+    },
+    {
+      "id": "File:supabase/functions/notifications/index.ts",
+      "name": "index.ts",
+      "filePath": "supabase/functions/notifications/index.ts"
+    },
+    {
+      "id": "Const:supabase/functions/notifications/index.ts:kind",
+      "name": "kind",
+      "filePath": "supabase/functions/notifications/index.ts",
+      "startLine": 207,
+      "endLine": 207
+    },
+    {
+      "id": "Function:app/_layout.tsx:navThemeFor",
+      "name": "navThemeFor",
+      "filePath": "app/_layout.tsx",
+      "startLine": 72,
+      "endLine": 86,
+      "module": "Contexts"
+    },
+    {
+      "id": "Function:app/_layout.tsx:RootLayoutNav",
+      "name": "RootLayoutNav",
+      "filePath": "app/_layout.tsx",
+      "startLine": 88,
+      "endLine": 121,
+      "module": "Contexts"
+    },
+    {
+      "id": "File:app/_layout.tsx",
+      "name": "_layout.tsx",
+      "filePath": "app/_layout.tsx"
+    },
+    {
+      "id": "File:lib/analytics.ts",
+      "name": "analytics.ts",
+      "filePath": "lib/analytics.ts"
+    },
+    {
+      "id": "Const:lib/analytics.ts:CHECKOUT_PRODUCTS",
+      "name": "CHECKOUT_PRODUCTS",
+      "filePath": "lib/analytics.ts",
+      "startLine": 85,
+      "endLine": 85
+    },
+    {
+      "id": "Const:lib/analytics.ts:NUTRITION_CAPTURE_MODES",
+      "name": "NUTRITION_CAPTURE_MODES",
+      "filePath": "lib/analytics.ts",
+      "startLine": 86,
+      "endLine": 86
+    },
+    {
+      "id": "Function:components/modals/CoachModal.tsx:handleSend",
+      "name": "handleSend",
+      "filePath": "components/modals/CoachModal.tsx",
+      "startLine": 118,
+      "endLine": 135
+    },
+    {
+      "id": "Function:components/modals/CoachModal.tsx:handleClear",
+      "name": "handleClear",
+      "filePath": "components/modals/CoachModal.tsx",
+      "startLine": 137,
+      "endLine": 159
+    },
+    {
+      "id": "Function:app/onboarding/pr-lifts.tsx:handleContinue",
+      "name": "handleContinue",
+      "filePath": "app/onboarding/pr-lifts.tsx",
+      "startLine": 68,
+      "endLine": 83
+    }
+  ],
+  "timing": {
+    "vector": 2.8,
+    "bm25": 74.2,
+    "merge": 0.1,
+    "symbol_lookup": 8.4,
+    "ranking": 0,
+    "formatting": 0,
+    "wall": 83.7
+  }
+}

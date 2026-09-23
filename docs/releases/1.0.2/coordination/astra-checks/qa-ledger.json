@@ -1,0 +1,86 @@
+[
+  [
+    "QA-01",
+    "FABLE",
+    "BLOCKED",
+    "List-overflow fix has peer Simulator A/B evidence. R2 title fix now peer-reported measured; R1 diagnosis withdrawn. Full keyboard/drag/AX flow still unverified."
+  ],
+  [
+    "QA-02",
+    "ASTRA",
+    "BLOCKED",
+    "Rollover, foreground cleanup, clear-old-day and late-response regressions pass locally; live midnight/timezone and explicit historical browsing acceptance not complete."
+  ],
+  [
+    "QA-03",
+    "ASTRA",
+    "BLOCKED",
+    "Evidence-gated Coach changes and tests pass; Deno check/tests pass. Stored/live production reports and full end-to-end verification pending."
+  ],
+  [
+    "QA-04",
+    "ASTRA",
+    "PASS",
+    "Shared resolver consumed by Home/Nutrition; matching target, weekly and legacy regressions pass. Local source only."
+  ],
+  [
+    "QA-05",
+    "FABLE",
+    "BLOCKED",
+    "Detail formatter, empty-section and muscle-dedupe changes reported; actual catalog navigation/device verification pending."
+  ],
+  [
+    "QA-06",
+    "BOTH",
+    "FAIL",
+    "Guarded Home start fixed; redundant planned-start naming modal remains."
+  ],
+  [
+    "QA-07",
+    "ASTRA",
+    "PASS",
+    "Add Food moved to initial hierarchy; component-function regression passes; not a device-layout certification."
+  ],
+  [
+    "QA-08",
+    "FABLE",
+    "NOT RUN",
+    "Full Continue validation and Back/Skip/resume onboarding pass not completed; additional navigation/partial-PR/unit-switch risks reported."
+  ],
+  [
+    "QA-09",
+    "BOTH",
+    "BLOCKED",
+    "R4 sparse-write and validation local fix added; actual same-day persistence/concurrency and arm/thigh guidance not verified."
+  ],
+  [
+    "QA-10",
+    "ASTRA",
+    "PASS",
+    "History uses per-user feedback_date identity; client date/failure regressions pass."
+  ],
+  [
+    "QA-11",
+    "FABLE",
+    "BLOCKED",
+    "Visible-tab labels changed; actual VoiceOver count/traversal untested."
+  ],
+  [
+    "QA-12",
+    "FABLE",
+    "BLOCKED",
+    "Notification targets/labels changed; real accessibility interaction pending."
+  ],
+  [
+    "QA-13",
+    "FABLE",
+    "PASS",
+    "Pluralization and review-score labels fixed per peer handoff; compile tested."
+  ],
+  [
+    "QA-14",
+    "FABLE",
+    "FAIL",
+    "Empty-state copy remains; strength Pro gate was already present and should not be falsely counted as a new fix."
+  ]
+]

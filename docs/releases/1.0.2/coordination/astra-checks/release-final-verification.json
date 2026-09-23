@@ -1,0 +1,14 @@
+{
+  "exit": 0,
+  "build_succeeded": true,
+  "source_manifest": "release-final-source-manifest.json",
+  "manifest_entries": 240,
+  "source_drift": [],
+  "artifact": "/tmp/coach-kettle-astra-release/Build/Products/Release-iphonesimulator/CoachKettle.app",
+  "bundle_id": "com.coachkettle.coachkettle",
+  "version": "1.0.2",
+  "local_build": "1",
+  "embedded_js": true,
+  "installed": false,
+  "launched": false
+}

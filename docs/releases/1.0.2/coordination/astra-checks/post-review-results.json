@@ -1,0 +1,45 @@
+{
+  "post-review-library": {
+    "exit": 0,
+    "command": [
+      "node",
+      "--test",
+      "lib/__tests__/barcode.test.ts",
+      "lib/__tests__/coachingEvidence.test.ts",
+      "lib/__tests__/coachingRelease.test.ts",
+      "lib/__tests__/entitlements.test.ts",
+      "lib/__tests__/exerciseFormat.test.ts",
+      "lib/__tests__/formRelease.test.ts",
+      "lib/__tests__/largeTextLayout.test.ts",
+      "lib/__tests__/nutritionDay.test.ts",
+      "lib/__tests__/nutritionRelease.test.ts",
+      "lib/__tests__/nutritionTargetStorage.test.ts",
+      "lib/__tests__/nutritionTargets.test.ts",
+      "lib/__tests__/openFoodFacts.test.ts",
+      "lib/__tests__/programFormat.test.ts",
+      "lib/__tests__/programSchedule.test.ts",
+      "lib/__tests__/programTemplates.test.ts",
+      "lib/__tests__/restTimer.test.ts",
+      "lib/__tests__/subscriptionRelease.test.ts",
+      "lib/__tests__/trainingSchedule.test.ts",
+      "lib/__tests__/workoutSource.test.ts"
+    ]
+  },
+  "post-review-types": {
+    "exit": 0,
+    "command": [
+      "npx",
+      "--no-install",
+      "tsc",
+      "--noEmit"
+    ]
+  },
+  "post-review-lint": {
+    "exit": 0,
+    "command": [
+      "npm",
+      "run",
+      "lint"
+    ]
+  }
+}

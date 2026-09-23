@@ -1,0 +1,7 @@
+role: FABLE
+session: claude-code session_015maweSYy2UpwAe1xGiWTW2
+host: Andrews-Laptop.local
+pid: 46373
+acquired_utc: 2026-09-08T02:29:10Z
+baseline_rev: 7efd492ce4fa9379add765504e5c22c5abd2de4e
+branch: b65/66
