@@ -45,15 +45,24 @@ function jsonRes(body: unknown, status = 200): Response {
 }
 
 function isIsoDate(s: unknown): s is string {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s) || s.startsWith("0000")) return false;
+  const date = new Date(`${s}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === s;
 }
 
 function clampNum(v: unknown, lo: number, hi: number): number | null {
   if (v === null || v === undefined || v === "") return null;
+  if (typeof v !== "number" && typeof v !== "string") return null;
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
   if (n < lo || n > hi) return null;
   return Math.round(n * 100) / 100;
+}
+
+// Keep in parity with lib/bodyMetricValidation.ts and migration 0036 bounds.
+function measurementNum(v: unknown, lo: number, hi: number): number | null {
+  if (typeof v === "string" && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v.trim())) return null;
+  return clampNum(v, lo, hi);
 }
 
 serve(async (req) => {
@@ -128,26 +137,44 @@ serve(async (req) => {
       const action = body?.action;
 
       if (action === "upsert") {
-        if (!isIsoDate(body.measured_date)) {
-          return jsonRes({ error: "measured_date required (YYYY-MM-DD)" }, 400);
-        }
+        const errors: Record<string, string> = {};
+        if (!isIsoDate(body.measured_date)) errors.measured_date = "Enter a real date (YYYY-MM-DD).";
         const row = {
           user_id: userId,
           measured_date: body.measured_date,
           measured_at: new Date().toISOString(),
-          weight_lbs: clampNum(body.weight_lbs, 50, 800),
-          body_fat_pct: clampNum(body.body_fat_pct, 2, 60),
-          waist_in: clampNum(body.waist_in, 15, 80),
-          chest_in: clampNum(body.chest_in, 20, 80),
-          hips_in: clampNum(body.hips_in, 20, 80),
-          arm_in: clampNum(body.arm_in, 5, 30),
-          thigh_in: clampNum(body.thigh_in, 10, 50),
-          neck_in: clampNum(body.neck_in, 8, 25),
+          weight_lbs: measurementNum(body.weight_lbs, 50, 800),
+          body_fat_pct: measurementNum(body.body_fat_pct, 2, 60),
+          waist_in: measurementNum(body.waist_in, 15, 80),
+          chest_in: measurementNum(body.chest_in, 20, 80),
+          hips_in: measurementNum(body.hips_in, 20, 80),
+          arm_in: measurementNum(body.arm_in, 5, 30),
+          thigh_in: measurementNum(body.thigh_in, 10, 50),
+          neck_in: measurementNum(body.neck_in, 8, 25),
+          // notes contract: omitted/null leaves stored notes unchanged; a string
+          // (including "") sets/clears notes; notes-only writes are rejected below.
           notes: typeof body.notes === "string" ? body.notes.slice(0, 1000) : null,
         };
+        const metricKeys = ["weight_lbs", "body_fat_pct", "waist_in", "chest_in", "hips_in", "arm_in", "thigh_in", "neck_in"] as const;
+        for (const key of metricKeys) {
+          const supplied = body[key] !== null && body[key] !== undefined &&
+            !(typeof body[key] === "string" && body[key].trim() === "");
+          if (supplied && row[key] === null) {
+            errors[key] = `Invalid ${key}: enter a number within the supported range.`;
+          }
+        }
+        if (!metricKeys.some((key) => row[key] !== null)) {
+          errors.form = "Enter at least one valid measurement.";
+        }
+        if (Object.keys(errors).length) return jsonRes({ error: Object.values(errors).join(" "), errors }, 400);
         const { data, error } = await supabaseAdmin
           .from("body_metrics")
-          .upsert(row, { onConflict: "user_id,measured_date" })
+          .upsert(
+            // A single sparse object makes PostgREST update only supplied columns
+            // on conflict. Blank/null fields mean "leave unchanged", not "erase".
+            Object.fromEntries(Object.entries(row).filter(([, value]) => value !== null)),
+            { onConflict: "user_id,measured_date" },
+          )
           .select()
           .single();
         if (error) throw error;
