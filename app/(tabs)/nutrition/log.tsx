@@ -30,6 +30,8 @@ import {
   BarcodeLookupError,
   confirmNutritionAnalysis,
   lookupBarcode,
+  nutritionAnalysisErrorMessage,
+  nutritionConfirmErrorMessage,
   searchFoods,
 } from '@/lib/nutrition';
 import { formatBrandedFoodName } from '@/lib/barcode';
@@ -275,7 +277,7 @@ export default function LogFoodScreen() {
       openAnalysisReview(await analyzeNutritionText(captureText));
     } catch (error) {
       console.warn('[nutrition] text analysis failed', error);
-      setCaptureError('Could not analyze that description. Please try again.');
+      setCaptureError(nutritionAnalysisErrorMessage(error, 'text'));
     } finally {
       setAnalyzing(false);
     }
@@ -315,7 +317,7 @@ export default function LogFoodScreen() {
       const message = error instanceof Error && (
         error.message === 'Photo must be 6 MB or smaller' ||
         error.message === 'Choose a JPEG, PNG, or WebP photo'
-      ) ? error.message : 'Could not analyze that photo. Please try again.';
+      ) ? error.message : nutritionAnalysisErrorMessage(error, 'photo');
       setCaptureError(message);
     } finally {
       setAnalyzing(false);
@@ -387,7 +389,7 @@ export default function LogFoodScreen() {
       router.back();
     } catch (error) {
       console.warn('[nutrition] analysis confirmation failed', error);
-      setReviewError('Could not add this food log. The analysis may have expired; please try again.');
+      setReviewError(nutritionConfirmErrorMessage(error));
     } finally {
       setConfirmingAnalysis(false);
     }

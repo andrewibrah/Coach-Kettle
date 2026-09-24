@@ -15,7 +15,7 @@ function fixture() {
 }
 function host(options: any = {}) {
   let handler: any;
-  const calls: any[] = [], replacements: any[] = [];
+  const calls: any[] = [], replacements: any[] = [], logs: unknown[][] = [];
   const rows: any = { profiles: { training_days: [], dietary_allergies: [] }, notification_preferences: { timezone: 'UTC' }, nutrition_target_sets: { id: 'set', user_id: owner, source: 'manual', base_target: macro }, nutrition_target_day_overrides: [], nutrition_targets: null, meal_plans: null, planned_meals: [], food_logs: [], ...options.rows };
   const client = { auth: { getUser: async () => ({ data: { user: options.unauthorized ? null : { id: owner } } }) },
     rpc: async (name: string, args: any) => {
@@ -30,7 +30,9 @@ function host(options: any = {}) {
         if (options.interleave) { rows.meal_plans = options.interleave.plan; rows.planned_meals = options.interleave.meals; }
         return { data: options.readMalformed ? null : data, error: options.rpcError || ['meal_plans', 'planned_meals'].includes(options.fail) ? {} : null };
       }
-      replacements.push({ name, args }); return { data: { plan: { id: 'committed', user_id: owner }, meals_inserted: 28 }, error: options.rpcError ? {} : null }; },
+      replacements.push({ name, args });
+      if (options.commitError || 'commit' in options) return { data: options.commitError ? null : options.commit, error: options.commitError ? { message: 'secret SQL internal detail' } : null };
+      return { data: { plan: { id: 'committed', user_id: owner }, meals_inserted: 28 }, error: options.rpcError ? {} : null }; },
     from(table: string) {
       const call: any = { table, filters: [] }; calls.push(call);
       const result = () => {
@@ -42,7 +44,10 @@ function host(options: any = {}) {
         }
         return { data, error: options.fail === table ? {} : null };
       };
-      const q: any = { select: () => q, eq: (k: any, v: any) => { call.filters.push([k, v]); return q; }, order: () => q, limit: () => q, gte: () => q, maybeSingle: async () => result(), then: (yes: any, no: any) => Promise.resolve(result()).then(yes, no) };
+      // Direct table writes are recorded and applied, so any write outside the RPC is visible to a later GET.
+      const write = (row: any) => { call.write = true; rows[table] = Array.isArray(rows[table]) ? [] : row; return q; };
+      const q: any = { select: () => q, eq: (k: any, v: any) => { call.filters.push([k, v]); return q; }, order: () => q, limit: () => q, gte: () => q, maybeSingle: async () => result(), then: (yes: any, no: any) => Promise.resolve(result()).then(yes, no),
+        insert: write, upsert: write, update: write, delete: () => write(null) };
       return q;
     } };
   class Clock extends Date { constructor(value?: any) { super(value ?? '2026-09-16T12:00:00Z'); } static now() { return new Date('2026-09-16T12:00:00Z').getTime(); } }
@@ -52,11 +57,11 @@ function host(options: any = {}) {
     const code = ts.transpileModule(readFileSync(url, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const globals = {
       exports, Request, Response, URL, Date: Clock, TextEncoder, TextDecoder, AbortController, setTimeout: (fn: any, ms: number) => setTimeout(fn, options.timeout ? 1 : ms), clearTimeout,
-      console: { error() {} }, Deno: { env: { get: (key: string) => key === 'OPENAI_API_KEY' && options.missingKey ? undefined : 'fixture' } },
+      console: { error: (...a: unknown[]) => logs.push(a), warn: (...a: unknown[]) => logs.push(a), log: (...a: unknown[]) => logs.push(a) }, Deno: { env: { get: (key: string) => key === 'OPENAI_API_KEY' && options.missingKey ? undefined : 'fixture' } },
       fetch: async (_url: string, init: any) => {
         if (options.networkError) throw new Error('private provider transport failure');
         if (options.timeout) return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted'))));
-        if (options.providerStatus) return new Response('private provider error', { status: options.providerStatus });
+        if (options.providerStatus) return new Response(options.providerBody ?? 'private provider error', { status: options.providerStatus });
         if (options.oversize) return new Response('x'.repeat(270000));
         return new Response(JSON.stringify({ choices: [{ finish_reason: options.finishReason ?? 'stop', message: { content: options.content ?? JSON.stringify(options.plan ?? fixture()) } }] }));
       }, require(name: string) {
@@ -71,7 +76,7 @@ function host(options: any = {}) {
     return exports;
   }
   load(new URL('./index.ts', import.meta.url));
-  return { calls, replacements, request: (body: any = { action: 'generate' }, method = 'POST', url = 'https://fixture.invalid') => handler(new Request(url, { method, headers: { Authorization: 'Bearer fixture' }, ...(method === 'POST' ? { body: typeof body === 'string' ? body : JSON.stringify(body) } : {}) })) };
+  return { calls, replacements, logs, request: (body: any = { action: 'generate' }, method = 'POST', url = 'https://fixture.invalid') => handler(new Request(url, { method, headers: { Authorization: 'Bearer fixture' }, ...(method === 'POST' ? { body: typeof body === 'string' ? body : JSON.stringify(body) } : {}) })) };
 }
 test('GET empty is success, failure is unavailable, and owner is auth-pinned', async () => {
   const api = host();
@@ -148,3 +153,38 @@ for (const [label, options, body, method, status] of [
   ['recalibrate log error', { fail: 'food_logs' }, { action: 'recalibrate' }, 'POST', 503],
   ['missing targets', { rows: { nutrition_target_sets: null } }, undefined, 'POST', 409],
 ] as any[]) test(label, async () => { const api = host(options); assert.equal((await api.request(body, method)).status, status); assert.equal(api.replacements.length, 0); });
+
+// I2 fault injection: replace_meal_plan is the only write. A failed or partial
+// commit is never a success claim, leaks nothing, and leaves the prior plan readable.
+const prior = { plan: { id: 'prior', user_id: owner, notes: 'prior plan' }, meals: fixture().meals.map(m => ({ ...m, plan_id: 'prior', user_id: owner })) };
+for (const [label, options] of Object.entries({
+  commitError: { commitError: true }, nullCommit: { commit: null }, missingPlan: { commit: { meals_inserted: 28 } },
+  partialCommit: { commit: { plan: { id: 'committed', user_id: owner }, meals_inserted: 27 } },
+})) for (const action of ['generate', 'recalibrate']) test(`${action}: ${label} is unavailable, leaks nothing, and the prior plan stays readable`, async () => {
+  const api = host({ ...options, rows: { meal_plans: prior.plan, planned_meals: prior.meals } });
+  const res = await api.request({ action });
+  assert.equal(res.status, 503);
+  const body = await res.json();
+  assert.equal(body.code, 'MEAL_PLAN_UNAVAILABLE');
+  assert.equal('plan' in body, false);
+  assert.doesNotMatch(JSON.stringify(body), /secret|SQL|internal detail/);
+  assert.equal(api.replacements.length, 1);
+  assert.equal(api.calls.some(c => c.write || ['meal_plans', 'planned_meals'].includes(c.table)), false);
+  const after = await api.request(undefined, 'GET');
+  assert.equal(after.status, 200);
+  assert.deepEqual(await after.json(), JSON.parse(JSON.stringify(prior)));
+});
+
+test('provider 401 body never reaches the client or the logs', async () => {
+  const api = host({ providerStatus: 401, providerBody: JSON.stringify({ error: { message: 'Incorrect API key provided: sk-test-SECRET' } }) });
+  const res = await api.request();
+  assert.equal(res.status, 503);
+  const body = await res.text();
+  assert.equal(JSON.parse(body).code, 'MEAL_PLAN_UNAVAILABLE');
+  const logged = api.logs.flat().map(a => a instanceof Error ? `${a.message} ${a.stack}` : String(a)).join('\n');
+  for (const s of ['sk-test-SECRET', 'Incorrect API key provided']) {
+    assert.equal(body.includes(s), false, `response leaked ${s}`);
+    assert.equal(logged.includes(s), false, `console leaked ${s}`);
+  }
+  assert.equal(api.replacements.length, 0);
+});

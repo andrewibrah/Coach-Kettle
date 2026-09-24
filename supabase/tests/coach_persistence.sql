@@ -86,3 +86,43 @@ DO $$ BEGIN
 END $$;
 SELECT 'Actual role execution/denial, cross-user isolation and legacy algorithm parity PASS';
 
+
+-- I2: a fault in ANY intermediate write (summary, event, state) rolls back the
+-- whole commit; no report claims writes that did not happen, and the prior
+-- good report for the day survives. Also covers the null-summary fallback.
+CREATE FUNCTION public.coach_mid_fault() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN IF current_setting('coach_test.fail', true)=TG_TABLE_NAME THEN RAISE EXCEPTION 'mid fault'; END IF; RETURN NEW; END $$;
+CREATE TRIGGER coach_mid_fault BEFORE INSERT OR UPDATE ON daily_nutrition_summaries FOR EACH ROW EXECUTE FUNCTION coach_mid_fault();
+CREATE TRIGGER coach_mid_fault BEFORE INSERT OR UPDATE ON behavior_events FOR EACH ROW EXECUTE FUNCTION coach_mid_fault();
+CREATE TRIGGER coach_mid_fault BEFORE INSERT OR UPDATE ON behavior_state FOR EACH ROW EXECUTE FUNCTION coach_mid_fault();
+DO $$ DECLARE t text; s0 jsonb; e0 jsonb; b0 jsonb; f0 jsonb; BEGIN
+ SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id,x.summary_date) INTO s0 FROM daily_nutrition_summaries x;
+ SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id,x.event_date) INTO e0 FROM behavior_events x;
+ SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id) INTO b0 FROM behavior_state x;
+ SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id,x.feedback_date) INTO f0 FROM daily_feedback x;
+ ASSERT (SELECT did_well='A' FROM daily_feedback WHERE user_id='00000000-0000-0000-0000-000000000001' AND feedback_date=current_date);
+ FOREACH t IN ARRAY ARRAY['daily_nutrition_summaries','behavior_events','behavior_state'] LOOP
+  PERFORM set_config('coach_test.fail',t,true);
+  BEGIN
+   PERFORM coach_fixture('00000000-0000-0000-0000-000000000001','mid-'||t);
+   RAISE EXCEPTION 'mid fault did not fire for %', t;
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'mid fault' THEN RAISE; END IF; END;
+  -- Null-summary (workout-only) commit: a state/event fault still rolls back.
+  IF t <> 'daily_nutrition_summaries' THEN
+   BEGIN
+    PERFORM public.persist_coach_feedback('00000000-0000-0000-0000-000000000001',current_date,false,NULL,NULL,
+     jsonb_build_object('did_well','mid-null-'||t),jsonb_build_object('kind','neutral_day','payload','{}'::jsonb));
+    RAISE EXCEPTION 'null-summary mid fault did not fire for %', t;
+   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'mid fault' THEN RAISE; END IF; END;
+  END IF;
+  ASSERT s0=(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id,x.summary_date) FROM daily_nutrition_summaries x), 'summary changed after '||t||' fault';
+  ASSERT e0=(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id,x.event_date) FROM behavior_events x), 'event changed after '||t||' fault';
+  ASSERT b0=(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id) FROM behavior_state x), 'state changed after '||t||' fault';
+  ASSERT f0=(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id,x.feedback_date) FROM daily_feedback x), 'report changed after '||t||' fault';
+ END LOOP;
+ PERFORM set_config('coach_test.fail','',true);
+END $$;
+DROP TRIGGER coach_mid_fault ON daily_nutrition_summaries;
+DROP TRIGGER coach_mid_fault ON behavior_events;
+DROP TRIGGER coach_mid_fault ON behavior_state;
+SELECT 'Intermediate summary/event/state faults roll back the report; prior report preserved (incl. null summary) PASS';

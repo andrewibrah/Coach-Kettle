@@ -159,9 +159,8 @@ END $$;
 DO $$
 DECLARE role_name text; table_name text; privilege_name text; command text; denied boolean;
 BEGIN
- -- service_role keeps table DML until the deferred revocation (plan §I) ships alongside the
- -- new nutrition-targets function that no longer needs direct table access.
- FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+ -- service_role table DML is revoked by 20260924000100 (plan §I); the RPC is its only writer.
+ FOREACH role_name IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
   FOREACH table_name IN ARRAY ARRAY['nutrition_target_sets','nutrition_target_day_overrides'] LOOP
    FOREACH privilege_name IN ARRAY ARRAY['INSERT','UPDATE','DELETE','TRUNCATE'] LOOP
     ASSERT NOT has_table_privilege(role_name,'public.'||table_name,privilege_name), 'DML ACL remains';
@@ -181,9 +180,9 @@ BEGIN
     'UPDATE public.nutrition_target_day_overrides SET source=''manual''',
     'DELETE FROM public.nutrition_target_day_overrides',
     'TRUNCATE public.nutrition_target_day_overrides'] LOOP
-    -- service_role still has table DML (deferred revocation, plan §I) and RPC EXECUTE, so
-    -- neither the direct-table commands nor the RPC call are expected to be denied here.
-    IF role_name='service_role' THEN CONTINUE; END IF;
+    -- service_role keeps RPC EXECUTE (a null payload raises invalid_parameter_value, not a
+    -- privilege error); every direct-table command must still be denied.
+    IF role_name='service_role' AND command LIKE 'SELECT %' THEN CONTINUE; END IF;
     denied:=false;
     BEGIN EXECUTE command; EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
     ASSERT denied, 'ACL bypass: '||command;

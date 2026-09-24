@@ -317,10 +317,11 @@ serve(async (req) => {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[coach] OpenAI error:", errorText);
+            // Never log or return the provider body: it can echo keys/org ids.
+            await response.body?.cancel();
+            console.error("[coach] openai_error status=", response.status);
             return new Response(
-                JSON.stringify({ error: "OpenAI request failed", upstream_error: errorText }),
+                JSON.stringify({ error: "Coach is temporarily unavailable", code: "COACH_UNAVAILABLE" }),
                 { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
@@ -357,13 +358,13 @@ serve(async (req) => {
                                         controller.enqueue(encoder.encode(content));
                                     }
                                 } catch (e) {
-                                    console.warn("Failed to parse SSE line:", trimmed);
+                                    console.warn("[coach] openai_stream_parse_error");
                                 }
                             }
                         }
                     }
                 } catch (err) {
-                    console.error("Stream error:", err);
+                    console.error("[coach] openai_stream_error");
                     controller.error(err);
                 } finally {
                     controller.close();
@@ -375,10 +376,10 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "text/plain" },
         });
 
-    } catch (error) {
-        console.error("[coach] Error:", error);
+    } catch {
+        console.error("[coach] openai_request_error");
         return new Response(
-            JSON.stringify({ error: "OpenAI request failed", details: String(error) }),
+            JSON.stringify({ error: "Coach is temporarily unavailable", code: "COACH_UNAVAILABLE" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

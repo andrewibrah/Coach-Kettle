@@ -27,6 +27,7 @@ supabase db push && for fn in nutrition-targets meal-plan daily-feedback profile
 | 20260920000100_coherent_meal_plan_read | additive | `read_meal_plan` RPC |
 | 20260920000200_coherent_nutrition_target_read | additive | `read_nutrition_target_set` RPC |
 | 20260921000100_body_metrics_merge_comment | comment only | `COMMENT ON TABLE body_metrics` |
+| 20260924000100_revoke_service_role_target_writes | **privilege narrowing** | revokes INSERT/UPDATE/DELETE/TRUNCATE on nutrition_target_sets / nutrition_target_day_overrides from service_role (SELECT kept). Requires nutrition-targets v6 (atomic RPC only) live, as it is; saves go through the SECURITY DEFINER `save_nutrition_target_set_atomic` |
 
 No DROP / DELETE / TRUNCATE of user data. No destructive schema change.
 

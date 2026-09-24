@@ -165,8 +165,9 @@ serve(async (req) => {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[chat] OpenAI error:", errorText);
+            // Never log the provider body: it can echo keys/org ids.
+            await response.body?.cancel();
+            console.error("[chat] openai_error status=", response.status);
             return new Response(
                 JSON.stringify({ error: "OpenAI request failed" }),
                 { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -187,7 +188,7 @@ serve(async (req) => {
         try {
             parsed = JSON.parse(content);
         } catch {
-            console.error('[chat] Failed to parse OpenAI response:', content);
+            console.error("[chat] openai_response_parse_error");
             return new Response(
                 JSON.stringify({ answer: "I couldn't understand that. Try: Exercise Weight Reps." }),
                 { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -196,7 +197,7 @@ serve(async (req) => {
 
         // Validate: must have rows OR answer
         if (!parsed.rows && !parsed.answer) {
-            console.error("[chat] Model returned neither rows nor answer:", content);
+            console.error("[chat] openai_response_shape_error");
             return new Response(
                 JSON.stringify({ answer: "I couldn't understand that. Try: Exercise Weight Reps." }),
                 { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -220,8 +221,8 @@ serve(async (req) => {
             JSON.stringify(parsed),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-    } catch (error) {
-        console.error("[chat] Error:", error);
+    } catch {
+        console.error("[chat] openai_request_error");
         return new Response(
             JSON.stringify({ error: "Internal server error" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

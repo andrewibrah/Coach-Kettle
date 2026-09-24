@@ -35,6 +35,108 @@ export function isRetryableNutritionError(error: unknown): boolean {
   return error instanceof TypeError && /network request failed|failed to fetch|fetch failed|load failed/i.test(error.message);
 }
 
+/**
+ * The three classes a text/photo nutrition-analysis failure can honestly be
+ * put into, so "couldn't analyze" doesn't conflate them:
+ * - `unavailable`: the provider is down (OpenAI non-2xx/timeout -> the
+ *   function's 502/503).
+ * - `unreadable`: the input or the model's own output didn't validate (the
+ *   function's 400/413/422).
+ * - `not_deployed`: the function can't be reached at all (404, or no
+ *   network).
+ * - `other`: anything else (e.g. 401), left to existing generic handling.
+ */
+export type NutritionAnalysisErrorClass = 'unavailable' | 'unreadable' | 'not_deployed' | 'other';
+
+const HTTP_STATUS = /^HTTP (\d+):/;
+
+export function classifyNutritionAnalysisError(error: unknown): NutritionAnalysisErrorClass {
+  if (isRetryableNutritionError(error)) return 'not_deployed';
+  if (error instanceof Error) {
+    const match = HTTP_STATUS.exec(error.message);
+    if (match) {
+      const status = Number(match[1]);
+      if (status === 404) return 'not_deployed';
+      if (status === 502 || status === 503) return 'unavailable';
+      if (status === 400 || status === 413 || status === 422) return 'unreadable';
+    }
+  }
+  return 'other';
+}
+
+export function nutritionAnalysisErrorMessage(error: unknown, mode: 'text' | 'photo'): string {
+  switch (classifyNutritionAnalysisError(error)) {
+    case 'unavailable':
+      return 'Nutrition analysis is temporarily unavailable. Please try again.';
+    case 'unreadable':
+      return "We couldn't read that — try a clearer photo or more detail.";
+    case 'not_deployed':
+      return "This feature isn't available yet. Please update the app or try later.";
+    default:
+      return mode === 'photo'
+        ? 'Could not analyze that photo. Please try again.'
+        : 'Could not analyze that description. Please try again.';
+  }
+}
+
+/**
+ * The confirm step (`confirmNutritionAnalysis()` for the analysis-ID branch,
+ * `logFood()` for the catalog-exact branch) has its own failure shape,
+ * distinct from analyze's:
+ * - `expired`: the analysis session is gone by confirm time — expired,
+ *   already confirmed (the session row is deleted on success, so a retry
+ *   reads as "not found"), or genuinely never existed. The function can't
+ *   tell these apart from each other, but it does mark them with the same
+ *   "Analysis not found" body, which this distinguishes from a platform
+ *   404 (missing deployment) that never contains that text.
+ * - `conflict`: the RPC (`confirm_nutrition_analysis`) rejected the request
+ *   for a reason other than not-found/expired/invalid-shape — most likely a
+ *   race with another confirm of the same session.
+ * - `invalid`: the function's own 400 (shape it rejects up front).
+ * - `unavailable`: infra trouble (500/502/503) — not the user's fault.
+ * - `not_deployed`: 404 without the "Analysis not found" marker, or no
+ *   network.
+ * - `other`: anything else (e.g. 401), left to existing generic handling.
+ */
+export type NutritionConfirmErrorClass = 'expired' | 'conflict' | 'invalid' | 'unavailable' | 'not_deployed' | 'other';
+
+const CONFIRM_NOT_FOUND_MARKER = 'Analysis not found';
+
+export function classifyNutritionConfirmError(error: unknown): NutritionConfirmErrorClass {
+  if (isRetryableNutritionError(error)) return 'not_deployed';
+  if (error instanceof Error) {
+    const match = HTTP_STATUS.exec(error.message);
+    if (match) {
+      const status = Number(match[1]);
+      if (status === 404) {
+        return error.message.includes(CONFIRM_NOT_FOUND_MARKER) ? 'expired' : 'not_deployed';
+      }
+      if (status === 410) return 'expired';
+      if (status === 409) return 'conflict';
+      if (status === 400) return 'invalid';
+      if (status === 500 || status === 502 || status === 503) return 'unavailable';
+    }
+  }
+  return 'other';
+}
+
+export function nutritionConfirmErrorMessage(error: unknown): string {
+  switch (classifyNutritionConfirmError(error)) {
+    case 'expired':
+      return 'This analysis expired. Please analyze again.';
+    case 'conflict':
+      return "Could not confirm this log — check today's log before retrying, it may already be saved.";
+    case 'invalid':
+      return 'Check every food name, weight, calorie, and macro value.';
+    case 'unavailable':
+      return 'Could not save. Please try again.';
+    case 'not_deployed':
+      return "This feature isn't available yet. Please update the app or try later.";
+    default:
+      return 'Could not add this food log. The analysis may have expired; please try again.';
+  }
+}
+
 async function get<T>(url: string): Promise<T> {
   const res = await fetchWithAuth(url, { method: 'GET' });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);

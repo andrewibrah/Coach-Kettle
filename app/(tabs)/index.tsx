@@ -55,6 +55,10 @@ import { HomeDashboard } from "@/components/home/HomeDashboard";
 import { useCoaching } from "@/contexts/CoachingContext";
 import { useNutrition } from "@/contexts/NutritionContext";
 import { useProgram } from "@/contexts/ProgramContext";
+import { useProfile } from "@/contexts/ProfileContext";
+import { resolveTrainingDays } from "@/lib/trainingSchedule";
+import { resolveProgramDayStatus, resolveScheduledDayIndex, resolveHomeStartDecision, resolveProgramDayItems } from "@/lib/programSchedule";
+import { formatProgramDayLabel } from "@/lib/programFormat";
 
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
@@ -214,6 +218,7 @@ export default function HomeScreen() {
   const { program, currentWeek, loading: programLoading } = useProgram();
   const { today: coachToday } = useCoaching();
   const { totals: nutritionTotals, targets: nutritionTargets } = useNutrition();
+  const { profile } = useProfile();
 
   const showStartToast = useCallback(() => {
     setStartToastOpen(true);
@@ -476,6 +481,68 @@ export default function HomeScreen() {
       showToast('End the current workout before starting a new one.', 'info');
       return;
     }
+    setNameModalVisible(true);
+  };
+
+  // QA-06: Home program-card "Start" — on a scheduled training day, resolve
+  // and start that day's assigned rows directly instead of the generic
+  // blank-naming flow. Same draftChecked/active-session guards as
+  // onStartWorkout; falls back to it for rest days, no program, or when the
+  // scheduled day can't be resolved.
+  const handleStartFromHome = () => {
+    if (!draftChecked) return;
+    if (workoutActive) {
+      showToast('End the current workout before starting a new one.', 'info');
+      return;
+    }
+    // Inline-edit guard (no-op here since no session is active yet, but
+    // kept for parity with every other mutation entry point).
+    commitPendingAndGet();
+
+    if (program && currentWeek && 'days' in currentWeek && currentWeek.days) {
+      const trainingWeekdays = resolveTrainingDays(program.days_per_week, profile?.training_days);
+      const dow = new Date().getDay();
+      const status = resolveProgramDayStatus({
+        dow,
+        trainingWeekdays,
+        currentWeek: program.current_week,
+        weeksTotal: program.weeks_total,
+        isTodayCompleted: false,
+      });
+      const dayIndex = resolveScheduledDayIndex(dow, trainingWeekdays, currentWeek.days.length);
+      const decision = resolveHomeStartDecision({
+        hasProgram: true,
+        status,
+        hasActiveWorkoutSession: workoutActive,
+        dayIndex,
+      });
+
+      if (decision.kind === 'start_program_day') {
+        const day = currentWeek.days.find((d) => d.day_index === decision.dayIndex);
+        const items = resolveProgramDayItems(currentWeek.days, decision.dayIndex);
+        if (day && items) {
+          startWorkoutSession([formatProgramDayLabel(day)]);
+          const skeletonRows = expandTemplateToRows(
+            items.map((item) => ({
+              lift_name: item.liftName,
+              target_sets: item.targetSets,
+              target_reps: item.targetReps,
+            }))
+          );
+          setRows(skeletonRows);
+          setMessageInput("");
+          setEditingCell(null);
+          setEditValue("");
+
+          if (Platform.OS === "ios") {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }
+          return;
+        }
+      }
+    }
+
+    // Rest day / no program / unresolvable day -> generic blank-naming flow.
     setNameModalVisible(true);
   };
 
@@ -1283,7 +1350,7 @@ export default function HomeScreen() {
               coachToday={coachToday}
               totals={nutritionTotals}
               targets={nutritionTargets}
-              onStartWorkout={onStartWorkout}
+              onStartWorkout={handleStartFromHome}
               onNavigateProgram={() => router.push('/program')}
               onNavigateCoach={() => router.push('/coach')}
               onNavigateNutrition={() => router.push('/nutrition')}

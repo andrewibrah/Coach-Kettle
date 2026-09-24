@@ -27,6 +27,12 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const EXACT_LOOKUP_TEXT = /^[A-Za-z]+(?:[ -][A-Za-z]+){0,4}$/;
 const EXACT_LOOKUP_CONJUNCTION = /(?:^| )(?:and|with|plus|or)(?: |$)/i;
 
+// Thrown when the provider responded but its content couldn't be turned into
+// usable items (bad JSON, missing/failed schema fields) — distinct from the
+// provider being unreachable, so the client can tell "try a clearer photo or
+// more detail" apart from "try again later" without seeing provider text.
+class UnreadableAnalysisError extends Error {}
+
 interface AnalysisItem {
   food_type: string;
   estimated_weight_g: number;
@@ -254,8 +260,12 @@ async function requestAnalysis(
   if (!response.ok) throw new Error("openai unavailable");
   const payload = await response.json().catch(() => null);
   const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("invalid model result");
-  return sanitizeModelItems(JSON.parse(content));
+  if (typeof content !== "string") throw new UnreadableAnalysisError("invalid model result");
+  try {
+    return sanitizeModelItems(JSON.parse(content));
+  } catch {
+    throw new UnreadableAnalysisError("invalid model item");
+  }
 }
 
 serve(async (req) => {
@@ -345,7 +355,10 @@ serve(async (req) => {
       if (error || !data) throw new Error("session write failed");
 
       return jsonResponse({ analysis_id: data.id, mode, items });
-    } catch {
+    } catch (err) {
+      if (err instanceof UnreadableAnalysisError) {
+        return jsonResponse({ error: "Could not read that meal" }, 422);
+      }
       return jsonResponse({ error: "Nutrition analysis failed" }, 502);
     }
   }
@@ -383,7 +396,22 @@ serve(async (req) => {
       p_meal_slot: mealSlot,
       p_items: items,
     });
-    if (error || !data) return jsonResponse({ error: "Confirmation failed" }, 409);
+    if (error || !data) {
+      // The RPC's own re-check (it re-verifies existence/expiry/item-count under
+      // a row lock, closing the race window between the read above and here)
+      // collapses several distinct causes into one PL/pgSQL exception message.
+      // Map the ones we can tell apart from that static, non-user-derived text
+      // back onto the same status/body this endpoint already uses for them,
+      // rather than leaving every RPC rejection as one ambiguous 409.
+      const reason = typeof error?.message === "string" ? error.message : "";
+      if (reason.includes("analysis not found") || reason.includes("analysis expired")) {
+        return jsonResponse({ error: "Analysis not found" }, 404);
+      }
+      if (reason.includes("item count mismatch") || reason.includes("invalid analysis confirmation")) {
+        return jsonResponse({ error: "Invalid confirmation" }, 400);
+      }
+      return jsonResponse({ error: "Confirmation failed" }, 409);
+    }
     return jsonResponse(data);
   }
 

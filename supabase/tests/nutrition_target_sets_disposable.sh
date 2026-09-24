@@ -54,6 +54,7 @@ SQL
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/0047_nutrition_target_sets.sql"
 if [[ ${1:-} != --red ]]; then
  "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260914000100_atomic_nutrition_target_sets.sql"
+ "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260924000100_revoke_service_role_target_writes.sql"
 fi
 if [[ ${1:-} != --red ]]; then
  if [[ ${1:-} != --read-red ]]; then
@@ -62,6 +63,9 @@ if [[ ${1:-} != --red ]]; then
  "${PSQL[@]}" -f "$ROOT/supabase/tests/nutrition_target_read.sql"
 fi
 "${PSQL[@]}" -f "$ROOT/supabase/tests/nutrition_target_sets.sql"
+if [[ ${1:-} != --red ]]; then
+ "${PSQL[@]}" -f "$ROOT/supabase/tests/nutrition_target_service_role_revoke.sql"
+fi
 if [[ ${1:-} != --red ]]; then
  NUTRITION_DISPOSABLE_TEST=YES NUTRITION_TEST_SOCKET="$PGHOST" NUTRITION_TEST_DATABASE=postgres NUTRITION_TEST_USER=postgres NUTRITION_TEST_PORT=5432 bash "$ROOT/supabase/tests/nutrition_target_sets_concurrency.sh"
 fi

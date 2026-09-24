@@ -31,9 +31,8 @@ DO $$ DECLARE r jsonb; BEGIN
  ASSERT r->>'user_id' = 'bbbbbbbb-1111-4111-8111-111111111111';
  ASSERT r->'day_overrides' = '[]'::jsonb;
  ASSERT public.read_nutrition_target_set('cccccccc-1111-4111-8111-111111111111') IS NULL;
- -- service_role table INSERT is deferred (plan §I) until the nutrition-targets function
- -- stops writing these tables directly, so this is intentionally not revoked yet.
- ASSERT has_table_privilege(current_user,'public.nutrition_target_day_overrides','INSERT');
+ -- service_role table DML is revoked by 20260924000100 (plan §I); the read needs SELECT only.
+ ASSERT NOT has_table_privilege(current_user,'public.nutrition_target_day_overrides','INSERT');
 END $$;
 RESET ROLE;
 SET LOCAL ROLE anon;

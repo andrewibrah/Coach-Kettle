@@ -22,7 +22,7 @@ function host(options: any = {}) {
         data: rows.nutrition_target_sets === null ? null : { ...rows.nutrition_target_sets, day_overrides: rows.nutrition_target_day_overrides },
         error: ['nutrition_target_sets:read', 'nutrition_target_day_overrides:read'].includes(options.fail) ? { message: 'read failure' } : null,
       };
-      if (name === 'persist_coach_feedback') return { data: args.p_report,
+      if (name === 'persist_coach_feedback') return { data: 'commitData' in options ? options.commitData : args.p_report,
         error: options.fail === 'commit' ? { message: 'secret SQL internal detail' } : null };
       return { data: options.totals === undefined ? { ...macro(), fiber_g: 25, saturated_fat_g: 10, log_count: 1 } : options.totals, error: options.fail === 'totals' ? { message: 'read failure' } : null };
     },
@@ -31,6 +31,7 @@ function host(options: any = {}) {
       const result = () => ({ data: call.op === 'write' ? call.row : rows[table], count: options.workoutCount === undefined ? 1 : options.workoutCount, error: options.fail === `${table}:${call.op}` ? { message: 'fixture failure' } : null });
       const q: any = { select: () => q, eq: (key: string, value: any) => { call.filters.push([key, value]); return q; }, gte: () => q, lte: () => q, order: () => q,
         upsert: (row: any) => { call.op = 'write'; call.row = JSON.parse(JSON.stringify(row)); writes.push(call); return q; },
+        insert: (row: any) => q.upsert(row), update: (row: any) => q.upsert(row), delete: () => q.upsert(null),
         maybeSingle: async () => result(), single: async () => result(), then: (resolve: any, reject: any) => Promise.resolve(result()).then(resolve, reject) };
       return q;
     },
@@ -160,4 +161,39 @@ test('actual persisted weekday override wins over split, base and legacy', async
   const read = api.calls.find(c => c.name === 'read_nutrition_target_set');
   assert.equal(read.args.p_user_id, owner);
   assert.equal(api.calls.some(c => c.table === 'nutrition_target_day_overrides'), false);
+});
+
+// I2 fault injection: the single persist RPC is the only write; a failed or
+// empty commit is never a success claim and never touches prior report rows.
+const derived = ['daily_feedback', 'daily_nutrition_summaries', 'behavior_events', 'behavior_state'];
+for (const [label, options] of [
+  ['commit error', { fail: 'commit' }],
+  ['empty commit result', { commitData: null }],
+] as any[]) for (const [route, args] of [
+  ['POST generate', [{ action: 'generate' }]],
+  ['GET today', [undefined, 'GET', 'Bearer fixture', '?action=today']],
+] as any[]) test(`${route}: ${label} is an error with no feedback and no separate derived-state access`, async () => {
+  const api = host(options);
+  const res = await (api.request as any)(...args);
+  assert.equal(res.status, 500);
+  const body = await res.json();
+  assert.equal('feedback' in body, false);
+  assert.doesNotMatch(JSON.stringify(body), /secret|SQL|internal detail/);
+  assert.equal(api.calls.filter(c => c.name === 'persist_coach_feedback').length, 1);
+  assert.equal(api.writes.length, 0);
+  assert.equal(api.calls.some(c => derived.includes(c.table)), false);
+});
+
+test('no-target workout-only fallback still commits through one RPC with a null summary, and its failure is an error', async () => {
+  const rows = { nutrition_target_sets: null, nutrition_targets: null };
+  const ok = host({ rows });
+  assert.equal((await ok.request()).status, 200);
+  const commit = ok.calls.filter(c => c.name === 'persist_coach_feedback');
+  assert.equal(commit.length, 1);
+  assert.equal(commit[0].args.p_summary, null);
+  const failed = host({ rows, fail: 'commit' });
+  const res = await failed.request();
+  assert.equal(res.status, 500);
+  assert.equal('feedback' in await res.json(), false);
+  assert.equal(failed.writes.length, 0);
 });
