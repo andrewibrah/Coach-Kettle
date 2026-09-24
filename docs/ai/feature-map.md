@@ -43,6 +43,7 @@ Implemented core:
 - Client: `contexts/NutritionContext.tsx`, `lib/nutrition.ts`
 - Backend: `supabase/functions/food-log`, `nutrition-targets`, `meal-plan`, `daily-feedback`, `nutrition-analyze`, `food-barcode`
 - Schema: `supabase/migrations/0033_nutrition_system.sql`
+- Calorie-only targets (1.0.2): `save_set` still accepts them so the live 1.0.1 app keeps working, but the resolver (`_shared/nutritionTargetResolution.ts`) treats them as incomplete, so Coach gives a workout-only report and meal plans ask the user to set targets. The 1.0.2 targets screen blocks calorie-only saves before sending (`hasCompleteMacros` in `lib/nutritionTargetStorage.ts`).
 - Transactional contracts (1.0.2): `complete_onboarding_atomic`, `save_nutrition_target_set_atomic`, `replace_meal_plan`, `persist_coach_feedback`, `read_meal_plan`, `read_nutrition_target_set` — these RPCs make the corresponding multi-row writes/reads atomic and consistent; call them instead of writing the underlying tables directly.
 
 Capabilities:

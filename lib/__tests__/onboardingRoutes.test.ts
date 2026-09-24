@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import ts from 'typescript';
 import * as validation from '../onboardingValidation.ts';
 import * as navigation from '../onboardingNavigation.ts';
+import * as submitGuard from '../submitGuard.ts';
 
 const require = createRequire(import.meta.url);
 const React = require('react');
@@ -53,7 +54,11 @@ async function mount(route: string, initial: any = {}, loading = false, strict =
     'react/jsx-runtime': require('react/jsx-runtime'),
     '@/components/onboarding': {
       QuizContainer: container, QuizInput: 'Input', QuizProgress: 'Progress', QuizQuestion: 'Question', QuizButtonGroup: 'Buttons',
+      QuizUnitPicker: 'UnitPicker', QuizNumberInputWithUnit: 'NumberInput', QuizOptionList: 'OptionList', QuizLiftAdder: 'LiftAdder', QuizLiftList: 'LiftList',
     },
+    '@/contexts/ProfileContext': { useProfile: () => ({ profile: null }) },
+    '@/contexts/AuthProvider': { useAuth: () => ({ session: null }) },
+    '@/lib/profile': { fetchTrackedLifts: async () => [] },
     '@/components/ui/themed-text': { ThemedText: 'Text' },
     '@/components/ui/themed-view': { ThemedView: 'View' },
     '@/components/ui/icon-symbol': { IconSymbol: 'Icon' },
@@ -61,19 +66,25 @@ async function mount(route: string, initial: any = {}, loading = false, strict =
     '@/hooks/useThemeColor': { useThemeColor: () => 'black' },
     '@/lib/onboardingValidation': validation,
     '@/lib/onboardingNavigation': navigation,
-    'expo-haptics': { impactAsync() { haptics.push('impact'); }, notificationAsync() { haptics.push('notification'); }, ImpactFeedbackStyle: { Light: 'light' }, NotificationFeedbackType: { Success: 'success' } },
+    'expo-haptics': { impactAsync() { haptics.push('impact'); return Promise.resolve(); }, notificationAsync() { haptics.push('notification'); }, ImpactFeedbackStyle: { Light: 'light' }, NotificationFeedbackType: { Success: 'success' } },
     'expo-router': { router: Object.fromEntries(['push', 'replace', 'dismissTo'].map((method) => [method, (path: string) => navigations.push([method, path])])) },
-    'react-native': { View: 'View', ScrollView: 'ScrollView', TouchableOpacity: 'Touch', StyleSheet: { create: (x: any) => x }, Alert: { alert: (...args: any[]) => alerts.push(args) } },
+    'react-native': { View: 'View', ScrollView: 'ScrollView', TouchableOpacity: 'Touch', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios' }, StyleSheet: { create: (x: any) => x }, Alert: { alert: (...args: any[]) => alerts.push(args) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView' }, FadeIn: {}, FadeOut: {}, Layout: { springify: () => ({}) } },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0 }) },
   };
-  const source = readFileSync(new URL(`../../app/onboarding/${route}.tsx`, import.meta.url), 'utf8');
-  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  const module = { exports: {} as any };
-  new Function('require', 'module', 'exports', compiled)((name: string) => {
-    assert.ok(name in mocks, `Unexpected dependency: ${name}`);
-    return mocks[name];
-  }, module, module.exports);
+  const load = (url: URL) => {
+    const compiled = ts.transpileModule(readFileSync(url, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+    const module = { exports: {} as any };
+    new Function('require', 'module', 'exports', compiled)((name: string) => {
+      assert.ok(name in mocks, `Unexpected dependency: ${name}`);
+      return mocks[name];
+    }, module, module.exports);
+    return module;
+  };
+  // The real shared hook, wired to the same mocked context and react-native.
+  mocks['@/lib/submitGuard'] = submitGuard;
+  mocks['@/hooks/useOnboardingSubmit'] = load(new URL('../../hooks/useOnboardingSubmit.ts', import.meta.url)).exports;
+  const module = load(new URL(`../../app/onboarding/${route}.tsx`, import.meta.url));
   const element = () => strict
     ? React.createElement(React.StrictMode, null, React.createElement(module.exports.default))
     : React.createElement(module.exports.default);
@@ -439,3 +450,66 @@ for (const listChange of ['append', 'identity', 'mutate']) {
     });
   }
 }
+
+for (const route of ['age', 'height', 'current-weight', 'goal-weight', 'focus']) {
+  test(`${route} guards double submit, disables both buttons and reports busy while the draft saves`, async () => {
+    const h = await mount(route, {});
+    try {
+      const props = () => h.find('Buttons').props;
+      assert.equal(props().continueDisabled, false); assert.equal(props().skipDisabled, false);
+      let release!: () => void;
+      h.pending(new Promise<void>((resolve) => { release = resolve; }));
+      let first: Promise<void>;
+      await act(async () => { first = props().onSkip(); void props().onSkip(); void props().onContinue(); });
+      assert.equal(h.calls.length, 1);
+      assert.equal(props().continueDisabled, true); assert.equal(props().skipDisabled, true); assert.equal(props().continueLoading, true);
+      await act(async () => { release(); await first; });
+      assert.equal(h.navigations.length, 1);
+      h.pending(undefined);
+      // External saves and hydration block both actions too.
+      for (const patch of [{ draftSaving: true }, { draftLoading: true }]) {
+        await h.setContext(patch);
+        await h.button('onContinue'); await h.button('onSkip');
+        assert.equal(h.calls.length, 1); assert.equal(props().continueDisabled, true); assert.equal(props().skipDisabled, true);
+        await h.setContext({ draftSaving: false, draftLoading: false });
+      }
+      // A failed write alerts, stays on the screen and re-enables the buttons.
+      h.reject(true);
+      await h.button('onSkip');
+      assert.equal(h.calls.length, 2); assert.equal(h.navigations.length, 1); assert.equal(h.alerts.length, 1);
+      assert.equal(props().continueDisabled, false); assert.equal(props().skipDisabled, false);
+    } finally { await h.close(); }
+  });
+}
+
+test('Continue announces busy to assistive tech while loading', () => {
+  const source = readFileSync(new URL('../../components/onboarding/QuizButtons.tsx', import.meta.url), 'utf8');
+  assert.match(source, /accessibilityState=\{\{ disabled: disabled \|\| loading, busy: !!loading \}\}/);
+});
+
+test('pr-lifts relies on the owner-scoped draft queue and still blocks navigation on a failed write', async () => {
+  const source = readFileSync(new URL('../../app/onboarding/pr-lifts.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /writeQueue|enqueueWrite/);
+  const h = await mount('pr-lifts', { tracked_lifts: [] });
+  try {
+    await act(async () => h.find('LiftAdder').props.onAdd('Squat'));
+    await act(async () => h.find('LiftAdder').props.onAdd('Bench'));
+    assert.deepEqual(h.calls.map((c) => c.tracked_lifts), [['Squat'], ['Squat', 'Bench']]);
+    h.reject(true);
+    await h.button('onContinue');
+    assert.equal(h.navigations.length, 0);
+    assert.match(JSON.stringify(h.alerts.at(-1)), /Unable to save lifts/);
+    h.reject(false);
+    await h.button('onContinue');
+    assert.deepEqual(h.calls.at(-1), { tracked_lifts: ['Squat', 'Bench'], pr_values: [], current_step: 6 });
+    assert.deepEqual(h.navigations, [['push', navigation.ONBOARDING_ROUTES[6]]]);
+  } finally { await h.close(); }
+});
+
+test('the five guarded steps share useOnboardingSubmit instead of a copied guard', () => {
+  for (const route of ['age', 'height', 'current-weight', 'goal-weight', 'focus']) {
+    const source = readFileSync(new URL(`../../app/onboarding/${route}.tsx`, import.meta.url), 'utf8');
+    assert.match(source, /= useOnboardingSubmit\(\);/, route);
+    assert.doesNotMatch(source, /submitGuard|setSubmitting|Alert\.alert/, route);
+  }
+});

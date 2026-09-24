@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/useToast';
 import { useNutrition } from '@/contexts/NutritionContext';
 import { isRetryableNutritionError } from '@/lib/nutrition';
 import { macrosFromCalories } from '@/lib/nutritionTargets';
-import { buildManualSaveRequest } from '@/lib/nutritionTargetStorage';
+import { buildManualSaveRequest, hasCompleteMacros, INCOMPLETE_MACROS_MESSAGE } from '@/lib/nutritionTargetStorage';
 import type { DayGoal } from '@/types/nutrition';
 import type {
   NutritionMacroTarget,
@@ -70,6 +70,7 @@ export default function NutritionTargetsScreen() {
   const border = useThemeColor({}, 'border');
   const inputBg = useThemeColor({}, 'inputBackground');
   const warning = useThemeColor({}, 'warning');
+  const danger = useThemeColor({}, 'danger');
 
   const {
     targets: legacyTargets, weeklyGoals, saveWeeklyGoals, importWeeklyGoals,
@@ -99,6 +100,8 @@ export default function NutritionTargetsScreen() {
   const [restCarb, setRestCarb] = useState('');
   const [restFat, setRestFat] = useState('');
   const [saving, setSaving] = useState(false);
+  const [macroError, setMacroError] = useState('');
+  const [importError, setImportError] = useState('');
   const [fromSuggestionId, setFromSuggestionId] = useState<string | undefined>(undefined);
 
   // Suggestion form state
@@ -186,6 +189,7 @@ export default function NutritionTargetsScreen() {
     setRestCarb(targets.rest_carbs_g == null ? '' : String(Math.round(targets.rest_carbs_g)));
     setRestFat(targets.rest_fat_g == null ? '' : String(Math.round(targets.rest_fat_g)));
     setFromSuggestionId(undefined);
+    setMacroError('');
     setEditMode(true);
   };
 
@@ -216,6 +220,8 @@ export default function NutritionTargetsScreen() {
       editedAfterSuggestion: Boolean(fromSuggestionId),
     });
     if (!req) { showToast('Enter at least a training- or rest-day calorie target.', 'error'); return; }
+    if (!hasCompleteMacros(req)) { setMacroError(INCOMPLETE_MACROS_MESSAGE); return; }
+    setMacroError('');
     setSaving(true);
     try {
       await saveTargets(req);
@@ -326,7 +332,10 @@ export default function NutritionTargetsScreen() {
             </ThemedText>
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
               <Pressable
-                onPress={async () => { try { await importLegacyTargets(); showToast('Saved to your account', 'success'); } catch { showToast('Could not save. Try again.', 'error'); } }}
+                onPress={async () => {
+                  if (!hasCompleteMacros(legacyImport)) { setImportError('These device targets are missing protein, carbs and fat, so Coach can\'t use them. Keep them on device and enter complete targets below.'); return; }
+                  try { await importLegacyTargets(); showToast('Saved to your account', 'success'); } catch { showToast('Could not save. Try again.', 'error'); }
+                }}
                 style={({ pressed }) => [styles.primaryBtn, { backgroundColor: tint, flexGrow: 1 }, pressed && { opacity: 0.7 }]}
                 accessibilityRole="button" accessibilityLabel="Save targets to account"
               >
@@ -340,6 +349,7 @@ export default function NutritionTargetsScreen() {
                 <ThemedText style={{ fontWeight: '600' }}>Keep on device</ThemedText>
               </Pressable>
             </View>
+            {importError ? <ThemedText style={{ fontSize: 12, color: danger, marginTop: 8 }} accessibilityLiveRegion="polite">{importError}</ThemedText> : null}
           </View>
         )}
 
@@ -580,6 +590,7 @@ export default function NutritionTargetsScreen() {
               <TextInput value={restFat}  onChangeText={setRestFat}  placeholder="Fat g"     placeholderTextColor={placeholder} keyboardType="decimal-pad" style={[styles.input, { flex: 1, backgroundColor: inputBg, color: textColor, borderColor: border }]} />
             </View>
 
+            {macroError ? <ThemedText style={{ fontSize: 12, color: danger, marginBottom: 8 }} accessibilityLiveRegion="polite">{macroError}</ThemedText> : null}
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable
                 onPress={handleSave}

@@ -9,6 +9,7 @@ import {
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
+import { useOnboardingSubmit } from '@/hooks/useOnboardingSubmit';
 import { ONBOARDING_ROUTES, resolvePreviousOnboardingRoute } from '@/lib/onboardingNavigation';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -49,7 +50,9 @@ const FOCUS_OPTIONS = [
 export default function FocusScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
-  const { draft, updateDraft } = useOnboarding();
+  const { draft } = useOnboarding();
+  // One draft write at a time; a failed write keeps the user on this step.
+  const { busy, loading, save } = useOnboardingSubmit();
 
   // Prioritize draft over profile
   const initialFocus = draft.focus ?? profile?.focus ?? null;
@@ -65,18 +68,18 @@ export default function FocusScreen() {
 
   const handleContinue = async () => {
     // Save to draft (local) - no API call, instant navigation
-    await updateDraft({
+    if (!(await save({
       focus: selected ? (selected as 'strength' | 'lean_muscle' | 'fat_loss' | 'other') : null,
       focus_other: selected === 'other' ? otherText : null,
       current_step: CURRENT_STEP,
-    });
+    }))) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(ONBOARDING_ROUTES[5]);
   };
 
   const handleSkip = async () => {
-    await updateDraft({ current_step: CURRENT_STEP });
+    if (!(await save({ current_step: CURRENT_STEP }))) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(ONBOARDING_ROUTES[5]);
   };
@@ -95,6 +98,9 @@ export default function FocusScreen() {
           <QuizButtonGroup
             onSkip={handleSkip}
             onContinue={handleContinue}
+            continueDisabled={busy}
+            skipDisabled={busy}
+            continueLoading={loading}
           />
         }
       >

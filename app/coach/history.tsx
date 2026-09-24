@@ -10,14 +10,6 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useCoaching } from '@/contexts/CoachingContext';
 import { getCoachPresentation } from '@/lib/coachingEvidence';
 
-function useDotColors() {
-  return {
-    green: useThemeColor({}, 'success'),
-    yellow: useThemeColor({}, 'warning'),
-    red: useThemeColor({}, 'danger'),
-  };
-}
-
 function formatDate(iso: string): string {
   try {
     return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
@@ -37,7 +29,6 @@ export default function CoachHistoryScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const border = useThemeColor({}, 'border');
 
-  useDotColors();
   const { loading, recent } = useCoaching();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 

@@ -69,6 +69,8 @@ test('first import guides daily setup, explicit save displays accepted state, th
     await act(async () => h.alerts[0][2].find((x: any) => x.text === 'Set daily targets').onPress());
     const dailyCalories = h.inputs().filter((x: any) => x.props.placeholder === 'Calories').slice(-2);
     await act(async () => dailyCalories[0].props.onChangeText('2300'));
+    const [protein, carbs, fat] = ['Protein g', 'Carbs g', 'Fat g'].map((p) => h.inputs().filter((x: any) => x.props.placeholder === p).slice(-2)[0]);
+    await act(async () => { protein.props.onChangeText('150'); carbs.props.onChangeText('250'); fat.props.onChangeText('70'); });
     await h.press('Save nutrition targets');
     assert.match(h.text(), /2300 cal/); assert.match(h.text(), /Saved to your account/);
     assert.equal(h.request.targets.base.calories, 2300);
@@ -77,5 +79,24 @@ test('first import guides daily setup, explicit save displays accepted state, th
     assert.equal(h.request.targets.base.calories, 2300);
     assert.deepEqual(h.request.targets.day_overrides.map((x: any) => x.day_of_week), [1]);
     assert.equal(h.state.weeklyGoals[1].calories, 2100);
+  } finally { await h.close(); }
+});
+test('calorie-only manual save and legacy import are blocked inline before any request', async () => {
+  let imported = 0;
+  const h = await harness({ legacyImport: storage.buildImportSaveRequest({ training_calories: 2400 }), importLegacyTargets: async () => { imported++; } });
+  try {
+    await h.press('Save targets to account');
+    assert.equal(imported, 0);
+    assert.match(h.text(), /protein, carbs and fat/i);
+    const calories = h.inputs().filter((x: any) => x.props.placeholder === 'Calories').slice(-2);
+    await act(async () => calories[0].props.onChangeText('2300'));
+    await h.press('Save nutrition targets');
+    assert.equal(h.request, undefined);
+    assert.equal(h.toasts.length, 0);
+    assert.match(h.text(), /protein, carbs and fat for each target/i);
+    const [protein, carbs, fat] = ['Protein g', 'Carbs g', 'Fat g'].map((p) => h.inputs().filter((x: any) => x.props.placeholder === p).slice(-2)[0]);
+    await act(async () => { protein.props.onChangeText('150'); carbs.props.onChangeText('250'); fat.props.onChangeText('70'); });
+    await h.press('Save nutrition targets');
+    assert.deepEqual(JSON.parse(JSON.stringify(h.request.targets.base)), { calories: 2300, protein_g: 150, carbs_g: 250, fat_g: 70 });
   } finally { await h.close(); }
 });

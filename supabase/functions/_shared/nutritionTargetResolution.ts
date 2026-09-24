@@ -152,6 +152,10 @@ export function resolveApprovedNutritionTarget(
   if (target == null) {
     return { ...metadata, status: 'unavailable', target: null, reason: 'incomplete_or_invalid_target' };
   }
+  // Deliberate: save_set still accepts calorie-only targets so the live 1.0.1
+  // app keeps working, but they stay "incomplete" here. Coach then takes the
+  // workout-only fallback and meal plans return NUTRITION_TARGETS_UNAVAILABLE
+  // (Set targets CTA). The 1.0.2 client blocks calorie-only saves itself.
   const { calories, protein_g, carbs_g, fat_g } = target;
   const positive = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0;
   if (!positive(calories) || !positive(protein_g) || !positive(carbs_g) || !positive(fat_g)) {

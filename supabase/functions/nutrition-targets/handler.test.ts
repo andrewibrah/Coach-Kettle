@@ -385,3 +385,21 @@ test('legacy save/override/get, suggestion and preflight retain their envelopes'
   assert.equal((await preflight.request(null, 'OPTIONS', null)).status, 200);
   assert.equal(preflight.tokens.length, 0);
 });
+
+test('1.0.1-shaped calorie-only saves stay accepted (live-client compatibility)', async () => {
+  // The 1.0.1 targets screen, legacy import and offline queue can all send
+  // calorie-only targets; the backend must keep committing them unchanged.
+  const provenance = { user_confirmed: true, edited_after_suggestion: false };
+  for (const body of [
+    { action: 'save_set', source: 'manual', targets: { training_day: { calories: 2400 }, base: { calories: 2400 } }, provenance },
+    { action: 'save_set', source: 'manual', targets: { training_day: { calories: 2400, protein_g: 180 }, rest_day: { calories: 2000 }, base: { calories: 2400, protein_g: 180 } }, provenance },
+    { action: 'save_set', source: 'imported_existing', targets: { training_day: { calories: 2400 }, base: { calories: 2400 } }, provenance: { ...provenance, imported_from_existing: true } },
+    { action: 'save_set', source: 'manual', targets: { base: { calories: 2400 }, day_overrides: [{ day_of_week: 2, target: { calories: 1800 } }] }, provenance },
+  ]) {
+    const api = host();
+    const response = await api.request(body);
+    assert.equal(response.status, 200, JSON.stringify(body));
+    assert.deepEqual(api.calls, [{ name: 'save_nutrition_target_set_atomic', args: { p_user_id: user, p_payload: body } }]);
+    assert.equal(api.direct.length, 0);
+  }
+});

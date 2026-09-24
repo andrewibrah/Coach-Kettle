@@ -86,3 +86,31 @@ test('unedited accepted suggestion keeps backend_suggested source', () => {
   assert.equal(accepted!.source, 'backend_suggested');
   assert.equal(accepted!.suggestion_id, 'sug-9');
 });
+
+test('save requests are complete only when every target carries four positive macros', async () => {
+  const storage: any = await import('../nutritionTargetStorage.ts');
+  const full = { calories: 2000, protein_g: 150, carbs_g: 200, fat_g: 70 };
+  assert.equal(typeof storage.hasCompleteMacros, 'function');
+  assert.equal(storage.hasCompleteMacros(buildManualSaveRequest(full, full)!), true);
+  assert.equal(storage.hasCompleteMacros(buildManualSaveRequest(undefined, full)!), true);
+  assert.equal(storage.hasCompleteMacros(buildManualSaveRequest({ calories: 2000 }, undefined)!), false);
+  for (const key of ['protein_g', 'carbs_g', 'fat_g']) {
+    const partial: any = { ...full }; delete partial[key];
+    assert.equal(storage.hasCompleteMacros(buildManualSaveRequest(full, partial)!), false, key);
+    assert.equal(storage.hasCompleteMacros({ ...buildManualSaveRequest(full, full)!, targets: { base: full, day_overrides: [{ day_of_week: 2, target: partial, source: 'manual', updated_at: '' }] } }), false, key);
+  }
+  assert.equal(storage.hasCompleteMacros(buildManualSaveRequest(full, { ...full, fat_g: 0 })!), false);
+  assert.equal(storage.hasCompleteMacros(buildImportSaveRequest({ training_calories: 2400 })!), false);
+  assert.equal(typeof storage.INCOMPLETE_MACROS_MESSAGE, 'string');
+});
+
+test('weekly import refuses to resend a saved calorie-only target', async () => {
+  const storage: any = await import('../nutritionTargetStorage.ts');
+  const full = { calories: 2000, protein_g: 150, carbs_g: 200, fat_g: 70 };
+  const saved: any = { id: 's', user_id: 'u', source: 'manual', base_target: { calories: 2000 }, updated_at: '', created_at: '' };
+  assert.throws(() => storage.buildWeeklyImportSaveRequest({ 1: full }, saved, true), /add protein, carbs and fat/i);
+  const historicOverride = { ...saved, base_target: full, day_overrides: [{ day_of_week: 3, target: { calories: 1800 }, source: 'manual', updated_at: '' }] };
+  assert.throws(() => storage.buildWeeklyImportSaveRequest({ 1: full }, historicOverride, true), /add protein, carbs and fat/i);
+  // Importing that same weekday replaces the incomplete override, so it is allowed.
+  assert.deepEqual(storage.buildWeeklyImportSaveRequest({ 3: full }, historicOverride, true).targets.day_overrides.map((o: any) => o.day_of_week), [3]);
+});

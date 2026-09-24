@@ -28,7 +28,6 @@ export default function PRLiftsScreen() {
   const [lifts, setLifts] = useState<string[]>(draft.tracked_lifts || []);
   const liftsRef = useRef(lifts);
   const prValuesRef = useRef(draft.pr_values ?? []);
-  const writeQueue = useRef(Promise.resolve());
   const finishing = useRef(false);
   const fallbackGeneration = useRef(0);
 
@@ -65,13 +64,6 @@ export default function PRLiftsScreen() {
     return () => { active = false; };
   }, [draftLoading, session?.user?.id, draft.tracked_lifts, draft.pr_values]);
 
-  // Keep the queue usable after failures, while returning rejection to callers.
-  const enqueueWrite = (write: () => Promise<void>) => {
-    const pending = writeQueue.current.then(write);
-    writeQueue.current = pending.catch(() => {});
-    return pending;
-  };
-
   const reportWriteError = (error: unknown) => {
     console.error('Error saving lifts:', error);
     Alert.alert('Unable to save lifts', 'Please try again before continuing.');
@@ -80,7 +72,8 @@ export default function PRLiftsScreen() {
   const persistSelection = () => {
     const tracked_lifts = liftsRef.current;
     const pr_values = prValuesRef.current;
-    void enqueueWrite(() => updateDraft({ tracked_lifts, pr_values })).catch(reportWriteError);
+    // lib/onboardingDraft serializes writes per owner in call order.
+    void updateDraft({ tracked_lifts, pr_values }).catch(reportWriteError);
   };
 
   const handleAddLift = (liftName: string) => {
@@ -115,11 +108,11 @@ export default function PRLiftsScreen() {
     setLifts(liftsRef.current);
     try {
       // This final authoritative snapshot is persisted after all earlier edits.
-      await enqueueWrite(() => updateDraft({
+      await updateDraft({
         tracked_lifts: liftsRef.current,
         pr_values: prValuesRef.current,
         current_step: CURRENT_STEP,
-      }));
+      });
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       router.push(liftsRef.current.length > 0 ? ONBOARDING_ROUTES[6] : ONBOARDING_ROUTES[7]);
     } catch (error) {

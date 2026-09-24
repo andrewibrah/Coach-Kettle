@@ -8,6 +8,7 @@ import {
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
+import { useOnboardingSubmit } from '@/hooks/useOnboardingSubmit';
 import { ONBOARDING_ROUTES, resolvePreviousOnboardingRoute } from '@/lib/onboardingNavigation';
 import {
   formatWeight,
@@ -29,6 +30,8 @@ export default function CurrentWeightScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
   const { draft, updateDraft } = useOnboarding();
+  // One draft write at a time; a failed write keeps the user on this step.
+  const { busy, loading, save, isBusy } = useOnboardingSubmit();
 
   // Draft first (explicit null stays cleared), then profile, in the shared weight unit
   const stored = resolveWeightState(draft, profile);
@@ -39,6 +42,7 @@ export default function CurrentWeightScreen() {
 
   // Switching units converts both stored weights and the shared unit together
   const handleUnitChange = async (next: string) => {
+    if (isBusy()) return;
     const newUnit = next as WeightUnit;
     if (newUnit === unit) return;
     const result = switchWeightUnit({ ...stored, weight_unit: unit }, 'current_weight', value, newUnit);
@@ -68,18 +72,18 @@ export default function CurrentWeightScreen() {
 
     // Save to draft (local) - no API call, instant navigation. The shared unit is always
     // written so a stored weight is never left without a unit.
-    await updateDraft({
+    if (!(await save({
       current_weight: result.value,
       weight_unit: unit,
       current_step: CURRENT_STEP,
-    });
+    }))) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(ONBOARDING_ROUTES[3]);
   };
 
   const handleSkip = async () => {
-    await updateDraft({ current_step: CURRENT_STEP });
+    if (!(await save({ current_step: CURRENT_STEP }))) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(ONBOARDING_ROUTES[3]);
   };
@@ -98,7 +102,9 @@ export default function CurrentWeightScreen() {
           <QuizButtonGroup
             onSkip={handleSkip}
             onContinue={handleContinue}
-            continueDisabled={!!error}
+            continueDisabled={busy || !!error}
+            skipDisabled={busy}
+            continueLoading={loading}
           />
         }
       >

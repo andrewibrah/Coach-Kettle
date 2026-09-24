@@ -197,3 +197,16 @@ test('no-target workout-only fallback still commits through one RPC with a null 
   assert.equal('feedback' in await res.json(), false);
   assert.equal(failed.writes.length, 0);
 });
+
+test('calorie-only saved targets (accepted for 1.0.1) take the workout-only fallback, not a 409/500', async () => {
+  for (const nutrition_targets of [null, legacy]) {
+    const api = host({ rows: { nutrition_target_sets: saved({ base_target: { calories: 2200 } }), nutrition_targets } });
+    const res = await api.request();
+    assert.equal(res.status, 200);
+    const commit = api.calls.filter(c => c.name === 'persist_coach_feedback');
+    assert.equal(commit.length, 1);
+    assert.equal(commit[0].args.p_summary, null);
+    assert.equal(commit[0].args.p_report.nutrition_color ?? null, null);
+    assert.equal(api.writes.length, 0);
+  }
+});

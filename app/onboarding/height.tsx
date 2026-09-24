@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useProfile } from '@/contexts/ProfileContext';
+import { useOnboardingSubmit } from '@/hooks/useOnboardingSubmit';
 import { ONBOARDING_ROUTES, resolvePreviousOnboardingRoute } from '@/lib/onboardingNavigation';
 import {
   displayHeight,
@@ -31,7 +32,9 @@ const CURRENT_STEP = 1;
 export default function HeightScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
-  const { draft, updateDraft } = useOnboarding();
+  const { draft } = useOnboarding();
+  // One draft write at a time; a failed write keeps the user on this step.
+  const { busy, loading, save } = useOnboardingSubmit();
 
   // Prioritize draft (including an explicit null), then profile
   const fromDraft = draft.height_value !== undefined;
@@ -95,10 +98,10 @@ export default function HeightScreen() {
     }
 
     // Save to draft (local) - no API call, instant navigation
-    await updateDraft({
+    if (!(await save({
       ...heightForStorage(result.value, unit),
       current_step: CURRENT_STEP,
-    });
+    }))) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(ONBOARDING_ROUTES[1]);
@@ -106,7 +109,7 @@ export default function HeightScreen() {
 
   const handleSkip = async () => {
     // Just update step tracking in draft
-    await updateDraft({ current_step: CURRENT_STEP });
+    if (!(await save({ current_step: CURRENT_STEP }))) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(ONBOARDING_ROUTES[1]);
   };
@@ -125,7 +128,9 @@ export default function HeightScreen() {
           <QuizButtonGroup
             onSkip={handleSkip}
             onContinue={handleContinue}
-            continueDisabled={!!error}
+            continueDisabled={busy || !!error}
+            skipDisabled={busy}
+            continueLoading={loading}
           />
         }
       >

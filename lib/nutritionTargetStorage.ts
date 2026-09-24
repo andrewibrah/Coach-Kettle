@@ -104,6 +104,16 @@ export function buildImportSaveRequest(
   };
 }
 
+// The resolver only uses targets with all four positive macros. save_set still
+// accepts calorie-only for the live 1.0.1 app, so 1.0.2 checks before sending.
+export const INCOMPLETE_MACROS_MESSAGE = 'Enter protein, carbs and fat for each target, or tap Auto to fill them from calories.';
+
+export function hasCompleteMacros(req: NutritionTargetSaveRequest): boolean {
+  const t = req.targets;
+  return [t.base, t.training_day, t.rest_day, ...(t.day_overrides ?? []).map(o => o.target)].every(m =>
+    m == null || [m.calories, m.protein_g, m.carbs_g, m.fat_g].every(n => Number.isFinite(n) && Number(n) > 0));
+}
+
 /** Explicit confirmation only; omitted weekdays preserve existing server overrides. */
 export function buildWeeklyImportSaveRequest(
   goals: import('@/types/nutrition').WeeklyGoals,
@@ -124,12 +134,15 @@ export function buildWeeklyImportSaveRequest(
       source: 'imported_existing', updated_at: new Date().toISOString(),
     });
   }
-  return { source: saved?.source ?? 'imported_existing', targets: {
+  const req: NutritionTargetSaveRequest = { source: saved?.source ?? 'imported_existing', targets: {
     ...(saved.base_target != null ? { base: saved.base_target } : {}),
     ...(saved.training_day_target != null ? { training_day: saved.training_day_target } : {}),
     ...(saved.rest_day_target != null ? { rest_day: saved.rest_day_target } : {}),
     day_overrides: [...overrides.values()].sort((a, b) => a.day_of_week - b.day_of_week),
   }, provenance: { user_confirmed: true, edited_after_suggestion: false, imported_from_existing: true } };
+  // Saved targets and preserved weekdays are re-sent; older saves may be calorie-only.
+  if (!hasCompleteMacros(req)) throw new Error('A saved account target is missing protein, carbs or fat. Add protein, carbs and fat to your daily targets (Edit daily targets) and set device goals for any affected weekday, then import again. Device goals are retained.');
+  return req;
 }
 
 // ---------- Display bridge: SavedNutritionTargetSet -> legacy big row ----------
