@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/ui/themed-text';
 import { useEntitlement } from '@/contexts/EntitlementContext';
+import { PRO_FEATURES } from '@/constants/subscription';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useIAP } from '@/lib/iap';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,13 +22,6 @@ type PaywallPlan = {
   period: string;
   badge: string | null;
 };
-
-const FEATURES = [
-  { icon: 'bubble.left.and.bubble.right.fill', label: 'Unlimited AI Coach Messages' },
-  { icon: 'chart.bar.fill', label: 'Advanced Workout Analytics' },
-  { icon: 'doc.text.fill', label: 'Unlimited Custom Templates' },
-  { icon: 'fork.knife', label: 'AI Meal Plans' },
-] as const;
 
 export default function PaywallScreen() {
   const router = useRouter();
@@ -148,10 +142,13 @@ export default function PaywallScreen() {
         </ThemedText>
 
         <View style={styles.featuresContainer}>
-          {FEATURES.map((feature) => (
-            <View key={feature.label} style={[styles.featureRow, { backgroundColor: colors.cardBackground }]}>
+          {PRO_FEATURES.map((feature) => (
+            <View key={feature.title} style={[styles.featureRow, { backgroundColor: colors.cardBackground }]}>
               <IconSymbol name={feature.icon} size={20} color={colors.tint} />
-              <ThemedText style={styles.featureLabel}>{feature.label}</ThemedText>
+              <View style={styles.featureText}>
+                <ThemedText style={styles.featureLabel}>{feature.title}</ThemedText>
+                <ThemedText style={[styles.featureDescription, { color: colors.placeholder }]}>{feature.description}</ThemedText>
+              </View>
             </View>
           ))}
         </View>
@@ -346,10 +343,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 12,
   },
+  featureText: {
+    flex: 1,
+  },
   featureLabel: {
     fontSize: 15,
     fontWeight: '500',
-    flex: 1,
+  },
+  featureDescription: {
+    fontSize: 12,
+    marginTop: 2,
   },
   pricingContainer: {
     flexDirection: 'row',

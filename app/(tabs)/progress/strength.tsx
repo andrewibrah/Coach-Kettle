@@ -94,7 +94,7 @@ export default function StrengthProgressionScreen() {
               Advanced Analytics is a Pro feature
             </ThemedText>
             <ThemedText style={[styles.tipText, { color: placeholder }]}>
-              Unlock strength trends, fatigue monitoring, and 1RM projections with Pro.
+              Pro unlocks strength progression with e1RM and volume per session.
             </ThemedText>
             <Pressable
               onPress={() => router.push('/paywall' as any)}

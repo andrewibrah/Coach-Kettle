@@ -31,7 +31,7 @@ test('saving while analysis is unavailable performs no authentication or databas
   assert.equal(accesses, 0);
 });
 
-function renderForm(recent: any[]) {
+function renderForm(recent: any[], { isPro = false, pushes = [] as string[] } = {}) {
   const react = {
     createElement: (type: any, props: any, ...children: any[]) => ({ type, props, children }),
     useState: (value: any) => [Array.isArray(value) ? recent : value, () => {}],
@@ -42,6 +42,8 @@ function renderForm(recent: any[]) {
     react: { ...react, default: react },
     'react-native': { View: 'View', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', StyleSheet: { create: (s: any) => s } },
     'expo-image-picker': {},
+    'expo-router': { useRouter: () => ({ push: (href: string) => pushes.push(href) }) },
+    '@/contexts/EntitlementContext': { useEntitlement: () => ({ isPro }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0 }) },
     '@/components/ui/screen-header': { ScreenHeader: 'ScreenHeader' },
     '@/components/ui/themed-text': { ThemedText: 'Text' },
@@ -54,12 +56,17 @@ function renderForm(recent: any[]) {
 }
 
 test('Form Check announces unavailable analysis and offers no capture action', () => {
-  const tree = renderForm([]);
+  const pushes: string[] = [];
+  const tree = renderForm([], { pushes });
   assert.match(JSON.stringify(tree), /analysis is unavailable/i);
   function inspect(node: any) {
     if (!node || typeof node !== 'object') return;
     assert.notEqual(node.type, 'TextInput');
-    if (node.type === 'Pressable') assert.equal(node.props?.disabled, true);
+    // The only enabled control allowed is the upgrade CTA, and it may only open the paywall.
+    if (node.type === 'Pressable' && node.props?.disabled !== true) {
+      node.props.onPress();
+      assert.deepEqual(pushes.splice(0), ['/paywall']);
+    }
     for (const child of node.children ?? []) {
       if (Array.isArray(child)) child.forEach(inspect); else inspect(child);
     }
@@ -88,4 +95,41 @@ test('historical read returns stored rows unchanged and never writes them', asyn
   const api = load('lib/formAnalysis.ts', { './supabase': { supabase: { from(table: string) { calls.push(['from', table]); return query; } } } });
   assert.equal(await api.fetchRecentFormAnalyses(8), rows);
   assert.deepEqual(calls, [['from', 'form_analyses'], ['select', '*'], ['order', 'captured_at', false], ['limit', 8]]);
+});
+
+test('Form Check says video analysis is coming soon and never claims it works today', () => {
+  const rendered = JSON.stringify(renderForm([]));
+  assert.match(rendered, /Video analysis is coming soon/);
+  assert.doesNotMatch(rendered, /analy[sz]e your form|record your (set|lift)|upload a video|get (a )?form score/i);
+});
+
+test('free users get an upgrade CTA to the paywall; Pro users do not', () => {
+  const upgradeCtas = (tree: any) => {
+    const out: any[] = [];
+    const walk = (node: any) => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'Pressable' && node.props?.accessibilityLabel === 'Upgrade to Pro') out.push(node);
+      walk(node.children);
+    };
+    walk(tree);
+    return out;
+  };
+  const pushes: string[] = [];
+  const free = upgradeCtas(renderForm([], { isPro: false, pushes }));
+  assert.equal(free.length, 1);
+  free[0].props.onPress();
+  assert.deepEqual(pushes, ['/paywall']);
+  assert.equal(upgradeCtas(renderForm([], { isPro: true })).length, 0);
+});
+
+test('Settings keeps the Form check entry visible with coming-soon copy and the guarded /form route', () => {
+  const settings = readFileSync(new URL('../../app/settings/index.tsx', import.meta.url), 'utf8');
+  const start = settings.indexOf("router.push('/form'");
+  assert.ok(start > 0);
+  const row = settings.slice(start, settings.indexOf('</Pressable>', start));
+  assert.match(row, />Form check</);
+  assert.match(row, /Video analysis coming soon · view previous records/);
+  assert.match(row, /accessibilityLabel="Form check — video analysis coming soon; view previous records"/);
+  assert.doesNotMatch(settings, /isPro[^\n]*\/form|\/form[^\n]*isPro/);
 });

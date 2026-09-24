@@ -167,14 +167,14 @@ export default function SettingsScreen() {
                         style={({ pressed }) => [styles.navRow, { backgroundColor: cardBg }, pressed && styles.buttonPressed]}
                         onPress={() => router.push('/form' as any)}
                         accessibilityRole="button"
-                        accessibilityLabel="Form check — video analysis unavailable; view previous records"
+                        accessibilityLabel="Form check — video analysis coming soon; view previous records"
                     >
                         <View style={styles.navRowContent}>
                             <IconSymbol name="camera.fill" size={20} color={activeColor} />
                             <View style={styles.navRowText}>
                                 <ThemedText style={styles.navRowLabel}>Form check</ThemedText>
                                 <ThemedText style={styles.navRowDescription}>
-                                    Video analysis unavailable; view previous records
+                                    Video analysis coming soon · view previous records
                                 </ThemedText>
                             </View>
                         </View>

@@ -64,7 +64,7 @@ export const PRO_FEATURES: { icon: IconSymbolName; title: string; description: s
   {
     icon: 'chart.line.uptrend.xyaxis',
     title: 'Advanced Analytics',
-    description: 'Performance trends, fatigue monitoring, 1RM projections',
+    description: 'Strength progression with e1RM and volume per session',
   },
   {
     icon: 'doc.text.fill',

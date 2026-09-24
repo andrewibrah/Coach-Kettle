@@ -62,7 +62,20 @@ export default function MoreScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title="More" showBack={false} />
+      <ScreenHeader
+        title="More"
+        showBack={false}
+        rightElement={
+          <Pressable
+            onPress={go('/settings')}
+            style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+          >
+            <IconSymbol name="gear" size={24} color={iconColor} />
+          </Pressable>
+        }
+      />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -147,6 +160,12 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scroll: { paddingHorizontal: 16 },
   sectionHeader: {
     fontSize: 12,

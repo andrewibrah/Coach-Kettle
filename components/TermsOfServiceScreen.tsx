@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,8 +9,9 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '@/constants/legal';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { legalDocTitle, type LegalDoc } from '@/lib/legalMode';
 
-type DocType = 'terms' | 'privacy';
+type DocType = LegalDoc;
 
 export type TermsOfServiceScreenProps = {
     /** Which document to show first. Defaults to 'terms' so every existing call site is unchanged. */
@@ -35,6 +36,8 @@ export function TermsOfServiceScreen({ initialDoc = 'terms', readOnly = false }:
     const shadowColor = useThemeColor({}, 'shadow');
 
     const handleAccept = async () => {
+        // Reader mode must never record acceptance, even if a control leaks through.
+        if (readOnly) return;
         setIsAccepting(true);
         try {
             const success = await acceptTerms();
@@ -72,6 +75,7 @@ export function TermsOfServiceScreen({ initialDoc = 'terms', readOnly = false }:
     };
 
     const handleDecline = () => {
+        if (readOnly) return;
         Alert.alert(
             'Decline Terms',
             'You must accept the terms to use Coach Kettle. Declining will sign you out.',
@@ -86,6 +90,8 @@ export function TermsOfServiceScreen({ initialDoc = 'terms', readOnly = false }:
 
     return (
         <ThemedView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+            {/* Native title tracks the tab so it never contradicts the document shown. */}
+            <Stack.Screen options={{ title: legalDocTitle(activeDoc) }} />
             <ThemedView style={styles.header}>
                 <ThemedText type="title">Terms & Privacy</ThemedText>
                 <ThemedText style={styles.subtitle}>
