@@ -137,7 +137,9 @@ BEGIN
     END LOOP;
     obj := p_payload->'profile';
     IF obj ? 'dob' AND obj->'dob' <> 'null'::jsonb THEN
-        IF obj->>'dob' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN
+        -- Length check instead of an end-of-string anchor: the Supabase CLI statement
+        -- splitter misreads a dollar sign inside this function body as a quote tag.
+        IF length(obj->>'dob') <> 10 OR obj->>'dob' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
             RAISE EXCEPTION 'dob must be ISO date' USING ERRCODE = '22023';
         END IF;
         BEGIN
