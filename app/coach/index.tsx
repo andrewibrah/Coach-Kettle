@@ -41,7 +41,7 @@ export default function CoachScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
 
-  const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
 
   const { loading, error, needsNutritionSetup, today, refresh, regenerateToday } = useCoaching();
   const [regenerating, setRegenerating] = useState(false);
@@ -72,7 +72,7 @@ export default function CoachScreen() {
       ) : (
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
           {error && (
-            <View style={[styles.errorBanner, { backgroundColor: dangerColor }]}>
+            <View style={[styles.errorBanner, { backgroundColor: dangerFill }]}>
               <ThemedText style={styles.errorText}>{error}</ThemedText>
               {needsNutritionSetup ? (
                 <Pressable onPress={() => router.push('/(tabs)/nutrition/targets' as any)} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Set nutrition targets">

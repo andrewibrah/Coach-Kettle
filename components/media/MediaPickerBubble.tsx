@@ -44,7 +44,7 @@ export function MediaPickerBubble({
   const cardBg = useThemeColor({}, "cardBackground");
   const borderColor = useThemeColor({}, "border");
   const mutedColor = useThemeColor({}, "placeholder");
-  const dangerColor = useThemeColor({}, "danger");
+  const dangerFill = useThemeColor({}, "dangerFill");
 
   const canAdd = items.length < maxItems && !disabled;
 
@@ -121,7 +121,7 @@ export function MediaPickerBubble({
                   </View>
                 )}
                 {item.error && (
-                  <View style={[styles.errorBadge, { backgroundColor: dangerColor }]}>
+                  <View style={[styles.errorBadge, { backgroundColor: dangerFill }]}>
                     <Text style={styles.errorBadgeText}>!</Text>
                   </View>
                 )}
@@ -131,7 +131,7 @@ export function MediaPickerBubble({
                   onPress={() => onRemove(idx)}
                   style={({ pressed }) => [
                     styles.removeBtn,
-                    pressed && { backgroundColor: dangerColor },
+                    pressed && { backgroundColor: dangerFill },
                   ]}
                   hitSlop={8}
                   accessibilityRole="button"

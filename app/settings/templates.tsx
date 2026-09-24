@@ -45,6 +45,7 @@ export default function TemplatesScreen() {
     const activeColor = useThemeColor({}, 'tint');
     const onTint = useThemeColor({}, 'tintForeground');
     const dangerColor = useThemeColor({}, 'danger');
+    const dangerFill = useThemeColor({}, 'dangerFill');
 
     const { session } = useAuth();
     const { can } = useEntitlement();
@@ -707,7 +708,7 @@ export default function TemplatesScreen() {
                                                                         </View>
                                                                         <View style={styles.editActions}>
                                                                             <Pressable
-                                                                                style={[styles.editActionButton, { backgroundColor: dangerColor }]}
+                                                                                style={[styles.editActionButton, { backgroundColor: dangerFill }]}
                                                                                 onPress={() => handleRemoveExercise(item.id, template.id)}
                                                                                 accessibilityRole="button"
                                                                                 accessibilityLabel={`Delete ${item.lift_name}`}

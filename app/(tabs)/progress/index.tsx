@@ -45,6 +45,7 @@ export default function ProgressHomeScreen() {
   const placeholder = useThemeColor({}, 'placeholder');
   const iconColor = useThemeColor({}, 'icon');
   const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
   const dangerForeground = useThemeColor({}, 'dangerForeground');
   const successColor = useThemeColor({}, 'success');
   const tint = useThemeColor({}, 'tint');
@@ -169,7 +170,7 @@ export default function ProgressHomeScreen() {
         ) : (
           <>
             {loadError && (
-              <View style={[styles.card, { backgroundColor: dangerColor }]}>
+              <View style={[styles.card, { backgroundColor: dangerFill }]}>
                 <ThemedText style={[styles.errorBannerText, { color: dangerForeground }]} accessibilityRole="alert">
                   Couldn&apos;t refresh. Showing previously loaded data.
                 </ThemedText>

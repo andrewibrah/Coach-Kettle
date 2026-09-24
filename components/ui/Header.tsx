@@ -16,6 +16,7 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: Hea
     const insets = useSafeAreaInsets();
     const iconColor = useThemeColor({}, 'icon');
     const textColor = useThemeColor({}, 'text');
+    const pressedSurface = useThemeColor({}, 'pressedSurface');
 
     return (
         <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
@@ -23,7 +24,7 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: Hea
                 <View style={styles.headerLeft}>
                     <Pressable
                         onPress={onMenuPress}
-                        style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+                        style={({ pressed }) => [styles.iconBtn, pressed && { backgroundColor: pressedSurface }]}
                         accessibilityRole="button"
                         accessibilityLabel="Open menu"
                     >
@@ -48,7 +49,7 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: Hea
                     {onRoutinePress && (
                         <Pressable
                             onPress={onRoutinePress}
-                            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+                            style={({ pressed }) => [styles.iconBtn, pressed && { backgroundColor: pressedSurface }]}
                             accessibilityRole="button"
                             accessibilityLabel="Load routine"
                         >
@@ -57,7 +58,7 @@ export function Header({ title, onMenuPress, onClearPress, onRoutinePress }: Hea
                     )}
                     <Pressable
                         onPress={onClearPress}
-                        style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+                        style={({ pressed }) => [styles.iconBtn, pressed && { backgroundColor: pressedSurface }]}
                         accessibilityRole="button"
                         accessibilityLabel="Clear workout"
                     >
@@ -105,10 +106,11 @@ const styles = StyleSheet.create({
         lineHeight: 32,
     },
     iconBtn: {
-        padding: 8,
+        minWidth: 44,
+        minHeight: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
         borderRadius: 999,
-    },
-    iconBtnPressed: {
-        backgroundColor: 'rgba(0,0,0,0.05)',
+        flexShrink: 0,
     },
 });

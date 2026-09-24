@@ -43,7 +43,7 @@ export function WorkoutBottomBar({
   const placeholder = useThemeColor({}, 'placeholder');
   const inputBg = useThemeColor({}, 'inputBackground');
   const borderColor = useThemeColor({}, 'border');
-  const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
 
   const disabledSend = !workoutActive || loading || !messageInput.trim();
 
@@ -124,7 +124,7 @@ export function WorkoutBottomBar({
             styles.pillButton,
             { backgroundColor: textColor, borderColor: textColor, minHeight: scaleSpace(44) },
             isHugeText && styles.pillButtonStacked,
-            workoutActive && { backgroundColor: dangerColor, borderColor: dangerColor },
+            workoutActive && { backgroundColor: dangerFill, borderColor: dangerFill },
             pressed && styles.pillPressed,
           ]}
         >

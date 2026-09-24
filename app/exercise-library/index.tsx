@@ -235,6 +235,8 @@ const styles = StyleSheet.create({
   },
   pillRow: { flexDirection: 'row', gap: 8, paddingRight: 8 },
   pill: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 999,
@@ -265,6 +267,8 @@ const styles = StyleSheet.create({
   },
   muted: { fontSize: 13 },
   retryBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: 10,
     borderWidth: 1,
     paddingVertical: 8,

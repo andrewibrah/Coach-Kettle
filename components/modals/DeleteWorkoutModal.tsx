@@ -17,7 +17,7 @@ export function DeleteWorkoutModal({ visible, onClose, onConfirm }: Props) {
     const textColor = useThemeColor({}, 'text');
     const secondaryText = useThemeColor({}, 'placeholder');
     const buttonBg = useThemeColor({}, 'inputBackground');
-    const danger = useThemeColor({}, 'danger');
+    const dangerFill = useThemeColor({}, 'dangerFill');
 
     return (
         <Modal
@@ -39,7 +39,7 @@ export function DeleteWorkoutModal({ visible, onClose, onConfirm }: Props) {
                                 <Text style={[styles.cancelText, { color: textColor }]}>Cancel</Text>
                             </Pressable>
 
-                            <Pressable onPress={onConfirm} accessibilityRole="button" accessibilityLabel="Confirm delete" style={[styles.deleteButton, { backgroundColor: danger }]}>
+                            <Pressable onPress={onConfirm} accessibilityRole="button" accessibilityLabel="Confirm delete" style={[styles.deleteButton, { backgroundColor: dangerFill }]}>
                                 <Text style={styles.deleteText}>Delete</Text>
                             </Pressable>
                         </View>

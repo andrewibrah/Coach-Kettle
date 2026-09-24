@@ -24,6 +24,7 @@ export default function StrengthProgressionScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
   const dangerForeground = useThemeColor({}, 'dangerForeground');
 
   const { can } = useEntitlement();
@@ -189,7 +190,7 @@ export default function StrengthProgressionScreen() {
         ) : (
           <>
             {error && points.length > 0 && (
-              <View style={[styles.card, { backgroundColor: dangerColor }]}>
+              <View style={[styles.card, { backgroundColor: dangerFill }]}>
                 <ThemedText style={[styles.errorBannerText, { color: dangerForeground }]} accessibilityRole="alert">
                   Couldn&apos;t refresh. Showing the last loaded results.
                 </ThemedText>

@@ -21,7 +21,7 @@ export default function CompleteScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const placeholder = useThemeColor({}, 'placeholder');
-  const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
   const { batchSaveAndComplete } = useOnboarding();
 
   const [saving, setSaving] = useState(true);
@@ -96,7 +96,7 @@ export default function CompleteScreen() {
     return (
       <ThemedView style={styles.container}>
         <View style={[styles.centered, { paddingBottom: insets.bottom }]}>
-          <View style={[styles.iconCircle, { backgroundColor: dangerColor }]}>
+          <View style={[styles.iconCircle, { backgroundColor: dangerFill }]}>
             <IconSymbol name="xmark" size={32} color="#fff" />
           </View>
 

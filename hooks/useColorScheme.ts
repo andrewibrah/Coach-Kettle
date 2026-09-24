@@ -1,19 +1,15 @@
 import { useTheme } from '@/contexts/ThemeProvider';
-import { useColorScheme as useSystemColorScheme } from 'react-native';
 
 /**
  * Returns the current color scheme, respecting user preference if set.
  * Falls back to system color scheme.
+ *
+ * `ThemeContext` has a non-null default value and is never undefined outside
+ * a provider, so this calls `useTheme()` unconditionally — no try/catch
+ * needed, and none allowed: catching around a hook call makes it conditional,
+ * which violates the rules of hooks.
  */
 export function useColorScheme(): 'light' | 'dark' {
-  const systemScheme = useSystemColorScheme();
-
-  // Try to use ThemeProvider if available
-  try {
-    const { colorScheme } = useTheme();
-    return colorScheme;
-  } catch {
-    // ThemeProvider not available, fall back to system
-    return systemScheme === 'dark' ? 'dark' : 'light';
-  }
+  const { colorScheme } = useTheme();
+  return colorScheme;
 }

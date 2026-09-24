@@ -28,6 +28,7 @@ export default function NutritionHomeScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
   const successColor = useThemeColor({}, 'success');
   const warningColor = useThemeColor({}, 'warning');
 
@@ -101,7 +102,7 @@ export default function NutritionHomeScreen() {
       ) : (
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
           {error && (
-            <View style={[styles.errorBanner, { backgroundColor: dangerColor }]}>
+            <View style={[styles.errorBanner, { backgroundColor: dangerFill }]}>
               <ThemedText style={styles.errorBannerText}>{error}</ThemedText>
               <Pressable onPress={refresh} style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Retry">
                 <ThemedText style={styles.retryBtnText}>Retry</ThemedText>

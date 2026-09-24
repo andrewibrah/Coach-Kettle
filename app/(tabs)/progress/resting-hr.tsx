@@ -52,6 +52,7 @@ export default function RestingHrScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
   const dangerForeground = useThemeColor({}, 'dangerForeground');
   const successColor = useThemeColor({}, 'success');
 
@@ -234,7 +235,7 @@ export default function RestingHrScreen() {
           </View>
         )}
         {loadState === 'ready' && loadError && (
-          <View style={[styles.card, { backgroundColor: dangerColor }]}>
+          <View style={[styles.card, { backgroundColor: dangerFill }]}>
             <ThemedText style={[styles.errorBannerText, { color: dangerForeground }]} accessibilityRole="alert">
               Couldn&apos;t refresh. Showing previously loaded data.
             </ThemedText>

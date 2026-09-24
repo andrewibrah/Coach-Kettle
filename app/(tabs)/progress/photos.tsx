@@ -40,6 +40,7 @@ export default function BodyPhotosScreen() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'tintForeground');
   const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
   const dangerForeground = useThemeColor({}, 'dangerForeground');
 
   const { session } = useAuth();
@@ -231,7 +232,7 @@ export default function BodyPhotosScreen() {
           </View>
         )}
         {loadState === 'ready' && loadError && (
-          <View style={[styles.card, { backgroundColor: dangerColor }]}>
+          <View style={[styles.card, { backgroundColor: dangerFill }]}>
             <ThemedText style={[styles.errorBannerText, { color: dangerForeground }]} accessibilityRole="alert">
               Couldn&apos;t refresh. Showing previously loaded photos.
             </ThemedText>

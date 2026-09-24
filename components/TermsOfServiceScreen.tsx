@@ -32,6 +32,7 @@ export function TermsOfServiceScreen({ initialDoc = 'terms', readOnly = false }:
     const primaryColor = useThemeColor({}, 'tint');
     const onTint = useThemeColor({}, 'tintForeground');
     const borderColor = useThemeColor({}, 'border');
+    const shadowColor = useThemeColor({}, 'shadow');
 
     const handleAccept = async () => {
         setIsAccepting(true);
@@ -142,7 +143,7 @@ export function TermsOfServiceScreen({ initialDoc = 'terms', readOnly = false }:
                     style={({ pressed }) => [
                         styles.button,
                         styles.acceptButton,
-                        { backgroundColor: primaryColor },
+                        { backgroundColor: primaryColor, shadowColor },
                         pressed && styles.buttonPressed,
                     ]}
                     onPress={handleAccept}
@@ -303,7 +304,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 2,
-        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,

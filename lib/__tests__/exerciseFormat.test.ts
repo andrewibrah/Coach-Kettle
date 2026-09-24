@@ -57,7 +57,9 @@ test('nutrition toggle vocabulary has explicit display labels and saves raw valu
   for (const [value, label] of Object.entries(labels)) {
     assert.ok(source.includes(`${value}: '${label}'`), `Missing label for ${value}`);
   }
-  assert.ok(source.includes('pill(PREFERENCE_LABELS[v], values.includes(v), () => toggleIn(values, setter, v))'));
+  // 'checkbox' (task G, accessibilityRelease.test.ts): these are multi-select
+  // toggle groups, not mutually-exclusive radio options.
+  assert.ok(source.includes("pill(PREFERENCE_LABELS[v], values.includes(v), () => toggleIn(values, setter, v), 'checkbox')"));
   assert.ok(source.includes('accessibilityLabel={label}'));
   assert.ok(source.includes('dietary_preferences: dietaryPrefs'));
   assert.ok(source.includes('dietary_allergies: allergies'));

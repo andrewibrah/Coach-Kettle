@@ -81,7 +81,7 @@ export function WorkoutTable({
   onEditSet,
 }: Props) {
   const successColor = useThemeColor({}, 'success');
-  const dangerColor = useThemeColor({}, 'danger');
+  const dangerFill = useThemeColor({}, 'dangerFill');
   const { isLargeText, scaleSpace } = useLargeTextLayout();
 
   const openRowMenu = useCallback(
@@ -176,7 +176,7 @@ export function WorkoutTable({
             </Pressable>
             <Pressable
               onPress={() => onDeleteRow(item.id)}
-              style={({ pressed }) => [styles.swipeButton, { backgroundColor: dangerColor, minWidth: scaleSpace(80), minHeight: scaleSpace(44) }, isLargeText && styles.swipeButtonStacked, pressed && styles.swipePressed]}
+              style={({ pressed }) => [styles.swipeButton, { backgroundColor: dangerFill, minWidth: scaleSpace(80), minHeight: scaleSpace(44) }, isLargeText && styles.swipeButtonStacked, pressed && styles.swipePressed]}
               accessibilityRole="button"
               accessibilityLabel="Delete set"
             >
@@ -214,7 +214,7 @@ export function WorkoutTable({
         </Swipeable>
       );
     },
-    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle, successColor, dangerColor, isLargeText, scaleSpace, fallbackRowHeight]
+    [openRowMenu, onDuplicateRow, onDeleteRow, onIncrementSet, onBeginEditCell, editingCell, editValue, onChangeEditValue, onCommitEditCell, onReorderRow, activeDragIndex, dragTranslationY, measuredRowHeight, onDragStart, onDragEnd, swipeableContainerStyle, successColor, dangerFill, isLargeText, scaleSpace, fallbackRowHeight]
   );
 
   const handleScrollToIndexFailed = useCallback(

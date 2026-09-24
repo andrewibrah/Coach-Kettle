@@ -27,6 +27,7 @@ export function ScreenHeader({ title, subtitle, onBack, rightElement, style, ski
     const insets = useSafeAreaInsets();
     const subtitleColor = useThemeColor({}, "placeholder");
     const iconColor = useThemeColor({}, "icon");
+    const pressedSurface = useThemeColor({}, "pressedSurface");
 
     const handleBack = () => {
         if (onBack) {
@@ -47,7 +48,7 @@ export function ScreenHeader({ title, subtitle, onBack, rightElement, style, ski
                     {showBack ? (
                         <Pressable
                             onPress={handleBack}
-                            style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
+                            style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: pressedSurface }]}
                             accessibilityRole="button"
                             accessibilityLabel="Go back"
                         >
@@ -101,12 +102,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     backBtn: {
-        padding: 8,
-        marginLeft: -8,
+        minWidth: 44,
+        minHeight: 44,
+        alignItems: "center",
+        justifyContent: "center",
+        marginLeft: -10,
         borderRadius: 999,
-    },
-    backBtnPressed: {
-        backgroundColor: "rgba(0,0,0,0.05)",
+        flexShrink: 0,
     },
     titleWrap: {
         flexShrink: 1,

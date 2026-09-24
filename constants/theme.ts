@@ -36,6 +36,27 @@ export const Colors = {
     cameraOverlay: '#000000',
     cameraOverlayText: '#ffffff',
     cameraScrim: 'rgba(0,0,0,0.55)',
+    // Tinted surface behind a warning row/button (e.g. "Clear Local Cache").
+    warningSurface: '#FFF8E6',
+    // Tinted surface behind a danger row/button (e.g. "Log Out").
+    dangerSurface: '#FFF1F0',
+    // Filled danger button background. `danger` (#EF4444) against white text
+    // is ~3.76:1, which fails WCAG AA (4.5:1) for normal text — this darker
+    // red is for solid danger buttons with a white/light foreground; keep
+    // `danger`/`dangerForeground` for icon/text-only use.
+    dangerFill: '#DC2626',
+    // Overlay tint for a pressed row/button background.
+    pressedSurface: 'rgba(0,0,0,0.05)',
+    // Accent for premium/Pro affordances (crown, trophy). Same value in both
+    // themes — gold reads clearly on both light and dark surfaces.
+    premiumAccent: '#FFD700',
+    // `Switch` track color when off.
+    switchTrackInactive: '#767577',
+    // `Switch` thumb color. Same value in both themes — white reads clearly
+    // against both the light and dark track colors.
+    switchThumb: '#ffffff',
+    // Shadow color for elevated surfaces (e.g. primary CTA buttons).
+    shadow: '#000000',
   },
   dark: {
     text: '#ECEDEE',
@@ -61,6 +82,18 @@ export const Colors = {
     cameraOverlay: '#000000',
     cameraOverlayText: '#ffffff',
     cameraScrim: 'rgba(0,0,0,0.55)',
+    warningSurface: '#3d2d00',
+    dangerSurface: '#3d1515',
+    // Same darker red as light mode — see light.dangerFill for the contrast note.
+    dangerFill: '#DC2626',
+    // Lighter overlay than light mode so a press is visible against dark surfaces.
+    pressedSurface: 'rgba(255,255,255,0.08)',
+    // Same value as light mode — gold reads clearly on both light and dark surfaces.
+    premiumAccent: '#FFD700',
+    switchTrackInactive: '#767577',
+    // Same value as light mode — white reads clearly against both track colors.
+    switchThumb: '#ffffff',
+    shadow: '#000000',
   },
 };
 

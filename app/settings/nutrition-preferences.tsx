@@ -146,7 +146,10 @@ export default function NutritionPreferencesScreen() {
     }
   };
 
-  const pill = (label: string, active: boolean, onPress: () => void) => (
+  // `role: 'radio'` for single-select groups (Sex, Goal); `role: 'checkbox'`
+  // for multi-select toggle groups (dietary preferences, allergies, cuisines)
+  // — a multi-select pill is not a mutually-exclusive radio option.
+  const pill = (label: string, active: boolean, onPress: () => void, role: 'radio' | 'checkbox' = 'radio') => (
     <Pressable
       key={label}
       onPress={onPress}
@@ -154,9 +157,9 @@ export default function NutritionPreferencesScreen() {
         styles.pill,
         { backgroundColor: active ? tint : cardBg, opacity: pressed ? 0.7 : 1 },
       ]}
-      accessibilityRole="radio"
+      accessibilityRole={role}
       accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
+      accessibilityState={role === 'checkbox' ? { checked: active } : { selected: active }}
     >
       <ThemedText style={{ color: active ? onTint : undefined, fontWeight: '600' }}>{label}</ThemedText>
     </Pressable>
@@ -166,7 +169,7 @@ export default function NutritionPreferencesScreen() {
     <View style={[styles.card, { backgroundColor: cardBg }]}>
       <ThemedText type="subtitle">{title}</ThemedText>
       <View style={styles.pillRow}>
-        {list.map((v) => pill(PREFERENCE_LABELS[v], values.includes(v), () => toggleIn(values, setter, v)))}
+        {list.map((v) => pill(PREFERENCE_LABELS[v], values.includes(v), () => toggleIn(values, setter, v), 'checkbox'))}
       </View>
     </View>
   );

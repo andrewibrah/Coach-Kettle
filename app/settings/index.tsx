@@ -32,8 +32,11 @@ export default function SettingsScreen() {
     const dangerColor = useThemeColor({}, 'danger');
     const warningColor = useThemeColor({}, 'warning');
     const sectionTitleColor = useThemeColor({}, 'placeholder');
-    const cacheBg = isDark ? '#3d2d00' : '#FFF8E6';
-    const logoutBg = isDark ? '#3d1515' : '#FFF1F0';
+    const cacheBg = useThemeColor({}, 'warningSurface');
+    const logoutBg = useThemeColor({}, 'dangerSurface');
+    const premiumAccent = useThemeColor({}, 'premiumAccent');
+    const switchTrackInactive = useThemeColor({}, 'switchTrackInactive');
+    const switchThumb = useThemeColor({}, 'switchThumb');
 
     const handleLogout = async () => {
         try {
@@ -95,7 +98,7 @@ export default function SettingsScreen() {
                         accessibilityLabel={isPro ? 'Coach Kettle Pro — manage subscription' : 'Subscription — upgrade to Pro'}
                     >
                         <View style={styles.navRowContent}>
-                            <IconSymbol name="crown.fill" size={20} color={isPro ? '#FFD700' : activeColor} />
+                            <IconSymbol name="crown.fill" size={20} color={isPro ? premiumAccent : activeColor} />
                             <View style={styles.navRowText}>
                                 <ThemedText style={styles.navRowLabel}>
                                     {isPro ? 'Coach Kettle Pro' : 'Subscription'}
@@ -145,7 +148,7 @@ export default function SettingsScreen() {
                         accessibilityLabel="Personal Records — manage tracked lifts"
                     >
                         <View style={styles.navRowContent}>
-                            <IconSymbol name="trophy.fill" size={20} color="#FFD700" />
+                            <IconSymbol name="trophy.fill" size={20} color={premiumAccent} />
                             <View style={styles.navRowText}>
                                 <ThemedText style={styles.navRowLabel}>Personal Records</ThemedText>
                                 <ThemedText style={styles.navRowDescription}>
@@ -226,8 +229,8 @@ export default function SettingsScreen() {
                         <Switch
                             value={isDark}
                             onValueChange={(value) => setThemeMode(value ? 'dark' : 'light')}
-                            trackColor={{ false: '#767577', true: activeColor }}
-                            thumbColor="#fff"
+                            trackColor={{ false: switchTrackInactive, true: activeColor }}
+                            thumbColor={switchThumb}
                             accessibilityLabel="Dark mode"
                             accessibilityHint="Switches the app between the light and dark appearance"
                         />

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
 import { useTheme } from '@/contexts/ThemeProvider';
 
 /**
@@ -9,6 +8,11 @@ import { useTheme } from '@/contexts/ThemeProvider';
  * `ThemeProvider` (system / light / dark) — NOT just the OS scheme. Previously
  * this file returned only the OS scheme, so toggling the theme in settings did
  * nothing on web.
+ *
+ * `ThemeContext` has a non-null default value and is never undefined outside
+ * a provider, so this calls `useTheme()` unconditionally — no try/catch
+ * needed, and none allowed: catching around a hook call makes it conditional,
+ * which violates the rules of hooks.
  *
  * Static rendering (`web.output: "static"`) pre-renders with no `localStorage`,
  * so we report 'light' until the client has hydrated to avoid a hydration
@@ -22,14 +26,7 @@ export function useColorScheme(): 'light' | 'dark' {
     setHasHydrated(true);
   }, []);
 
-  const systemScheme = useRNColorScheme();
+  const { colorScheme } = useTheme();
 
-  let resolved: 'light' | 'dark';
-  try {
-    resolved = useTheme().colorScheme;
-  } catch {
-    resolved = systemScheme === 'dark' ? 'dark' : 'light';
-  }
-
-  return hasHydrated ? resolved : 'light';
+  return hasHydrated ? colorScheme : 'light';
 }
