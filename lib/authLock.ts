@@ -8,6 +8,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { PRIVACY_VERSION, TERMS_VERSION } from '@/constants/legal';
+
 // TTL: 4 hours in milliseconds
 const AUTH_TTL_MS = 4 * 60 * 60 * 1000;
 
@@ -18,8 +20,8 @@ const STORAGE_KEYS = {
   TERMS_VERSION: 'auth_terms_version',
 } as const;
 
-// Current terms version - increment when ToS changes significantly
-const CURRENT_TERMS_VERSION = '1.0.0';
+// Current terms version - bump TERMS_VERSION in constants/legal.ts when ToS changes significantly
+const CURRENT_TERMS_VERSION = TERMS_VERSION;
 
 /**
  * Get the timestamp of last successful authentication
@@ -138,7 +140,7 @@ export async function syncTermsAcceptanceToServer(): Promise<boolean> {
       await new Promise(r => setTimeout(r, delays[attempt]));
     }
     try {
-      const result = await api.recordTermsAcceptance(CURRENT_TERMS_VERSION, CURRENT_TERMS_VERSION);
+      const result = await api.recordTermsAcceptance(CURRENT_TERMS_VERSION, PRIVACY_VERSION);
       if (result?.ok) {
         if (attempt > 0) {
         } else {
@@ -170,7 +172,9 @@ export async function checkServerTermsAcceptance(): Promise<{
 } | null> {
   try {
     const { api } = await import('./api');
-    const result = await api.checkTermsAcceptance();
+    // Declaring the privacy version this build records lets the server keep
+    // older builds (which can't record it) out of a re-accept loop.
+    const result = await api.checkTermsAcceptance(PRIVACY_VERSION);
     return {
       accepted: result.accepted,
       needsAcceptance: result.needs_acceptance,

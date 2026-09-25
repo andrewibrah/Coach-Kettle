@@ -22,6 +22,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { checkServerTermsAcceptance, setLastAuthenticatedAt } from '@/lib/authLock';
+import { establishSessionFromParams, openOAuthSession, parseAuthRedirectParams } from '@/lib/authRedirect';
 import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -97,70 +98,17 @@ export default function SignIn() {
   // Listen for deep link events as fallback for OAuth callback
   useEffect(() => {
     const handleDeepLink = async (event: { url: string }) => {
-      let { queryParams, path } = Linking.parse(event.url);
-
-      // If no query params found, try parsing the hash from the raw URL manually
-      // Supabase implicit flow often returns tokens in the hash #access_token=...
-      if ((!queryParams || Object.keys(queryParams).length === 0) && event.url.includes('#')) {
-        const hashPart = event.url.split('#')[1];
-        if (hashPart) {
-          const hashParams: Record<string, string> = {};
-          hashPart.split('&').forEach(pair => {
-            const [key, value] = pair.split('=');
-            if (key && value) {
-              hashParams[key] = decodeURIComponent(value);
-            }
-          });
-          queryParams = { ...queryParams, ...hashParams };
-        }
-      }
+      const { path } = Linking.parse(event.url);
+      const queryParams = parseAuthRedirectParams(event.url);
 
       if (path?.includes('auth/callback') || event.url.includes('auth/callback')) {
         setLoading(true);
         try {
-          // 1. Handle code exchange (PKCE flow)
-          if (queryParams?.code) {
-            const { error: sessionError } = await supabase.auth.exchangeCodeForSession(
-              queryParams.code as string
-            );
-            if (sessionError) throw sessionError;
-
+          // PKCE code exchange, implicit-flow tokens (incl. magic link), or a provider error
+          if (await establishSessionFromParams(queryParams)) {
             await completeAuthAndNavigate();
             return;
           }
-
-          // 2. Handle access_token (Implicit flow & Magic Link)
-          if (queryParams?.access_token && queryParams?.refresh_token) {
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: queryParams.access_token as string,
-              refresh_token: queryParams.refresh_token as string,
-            });
-            if (sessionError) throw sessionError;
-
-            await completeAuthAndNavigate();
-            return;
-          }
-
-          // 3. Handle standalone access_token (rare but possible)
-          if (queryParams?.access_token) {
-            // If we only have access token, we can try getting user to verify validity
-            // But setSession usually requires refresh token for persistence
-            // For now, we'll try setting it if present
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: queryParams.access_token as string,
-              refresh_token: (queryParams.refresh_token as string) || '',
-            });
-            if (sessionError) throw sessionError;
-
-            await completeAuthAndNavigate();
-            return;
-          }
-
-          // 4. Handle error
-          if (queryParams?.error) {
-            throw new Error((queryParams.error_description as string) || (queryParams.error as string));
-          }
-
         } catch (err: any) {
           Alert.alert('Authentication Error', err.message);
         } finally {
@@ -240,73 +188,18 @@ export default function SignIn() {
   async function signInWithOAuth(provider: 'google') {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
-      });
+      const outcome = await openOAuthSession(provider, redirectTo);
 
-      if (error) throw error;
-
-      if (data?.url) {
-    
-
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectTo,
-          { showInRecents: true }
-        );
-
-        if (result.type === 'success' && result.url) {
-          let { queryParams } = Linking.parse(result.url);
-
-          if ((!queryParams || Object.keys(queryParams).length === 0) && result.url.includes('#')) {
-            const hashPart = result.url.split('#')[1];
-            if (hashPart) {
-              const hashParams: Record<string, string> = {};
-              hashPart.split('&').forEach(pair => {
-                const [key, value] = pair.split('=');
-                if (key && value) {
-                  hashParams[key] = decodeURIComponent(value);
-                }
-              });
-              queryParams = { ...queryParams, ...hashParams };
-            }
-          }
-
-          if (queryParams?.code) {
-            const { error: sessionError } = await supabase.auth.exchangeCodeForSession(
-              queryParams.code as string
-            );
-            if (sessionError) throw sessionError;
-            await completeAuthAndNavigate();
-            return;
-          }
-
-          if (queryParams?.access_token) {
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: queryParams.access_token as string,
-              refresh_token: (queryParams.refresh_token as string) || '',
-            });
-            if (sessionError) throw sessionError;
-            await completeAuthAndNavigate();
-            return;
-          }
-
-          if (queryParams?.error) {
-            throw new Error(
-              (queryParams.error_description as string) ||
-              (queryParams.error as string)
-            );
-          }
-        } else if (result.type === 'dismiss') {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            await completeAuthAndNavigate();
-            return;
-          }
+      if (outcome.type === 'success') {
+        if (await establishSessionFromParams(outcome.params)) {
+          await completeAuthAndNavigate();
+          return;
+        }
+      } else if (outcome.type === 'dismiss') {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await completeAuthAndNavigate();
+          return;
         }
       }
     } catch (err: any) {

@@ -28,6 +28,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="subscription" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="nutrition-preferences" />
+      <Stack.Screen name="delete-account" />
     </Stack>
   );
 }

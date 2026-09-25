@@ -340,6 +340,16 @@ export default function SettingsScreen() {
                         <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color={dangerColor} />
                         <Text style={[styles.logoutText, { color: dangerColor }]}>Log Out</Text>
                     </Pressable>
+                    <Pressable
+                        style={({ pressed }) => [styles.deleteAccountButton, { backgroundColor: logoutBg }, pressed && styles.buttonPressed]}
+                        onPress={() => router.push('/settings/delete-account' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Delete account"
+                        accessibilityHint="Opens a screen to permanently delete your account and data"
+                    >
+                        <IconSymbol name="trash" size={20} color={dangerColor} />
+                        <Text style={[styles.logoutText, { color: dangerColor }]}>Delete Account</Text>
+                    </Pressable>
                 </View>
             </ScrollView>
 
@@ -401,6 +411,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         borderRadius: 12,
         gap: 10,
+    },
+    deleteAccountButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: 44,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        gap: 10,
+        marginTop: 8,
     },
     logoutText: {
         fontSize: 17,

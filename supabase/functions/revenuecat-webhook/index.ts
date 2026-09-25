@@ -199,6 +199,12 @@ serve(async (req) => {
                     console.log(`[revenuecat-webhook] Duplicate event ${eventId}, skipping`);
                     return json({ ok: true, duplicate: true });
                 }
+                if (eventError.code === "23503") {
+                    // FK to auth.users: the account was deleted (delete-account). Ack so
+                    // RevenueCat stops retrying an event that can never be stored.
+                    console.log(`[revenuecat-webhook] ${eventType} event=${eventId} ignored: user_deleted`);
+                    return json({ ok: true, ignored: "user_deleted" });
+                }
                 throw new Error(`event log insert failed: ${eventError.message}`);
             }
         }

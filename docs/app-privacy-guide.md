@@ -131,7 +131,7 @@ Check:
 
 **Is email address used to track users?** No — select **No, we do not use it to track users**
 
-> Note: Email is obtained only via Apple Sign In. Coach Kettle receives only the email address, not the user's full name or other Apple ID data. It is used solely to identify the account in Supabase Auth.
+> Note: Email is obtained at sign-up from whichever method the user picks: email and password, Sign in with Apple (real or relayed address), or Google Sign-In. From Apple and Google, Coach Kettle receives only the email address and an account identifier, not the password. The email identifies the account in Supabase Auth and is also set as a subscriber attribute in RevenueCat (`lib/iap.ts`).
 
 ---
 

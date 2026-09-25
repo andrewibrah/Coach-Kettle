@@ -186,7 +186,7 @@ function renderDocument(props: Record<string, any>) {
     '@/contexts/AuthProvider': { useAuth: () => ({ signOut: async () => { calls.signOut++; } }) },
     '@/components/ui/themed-text': { ThemedText: 'Text' },
     '@/components/ui/themed-view': { ThemedView: 'View' },
-    '@/constants/legal': { TERMS_OF_SERVICE: '# Terms', PRIVACY_POLICY: '# Privacy' },
+    '@/constants/legal': { TERMS_OF_SERVICE: '# Terms', PRIVACY_POLICY: '# Privacy', CONSENT_AI_DISCLOSURE: 'AI disclosure', CONSENT_ACCEPT_TEXT: 'Consent' },
     '@/hooks/useThemeColor': { useThemeColor: () => '#000' },
     '@/lib/legalMode': legalMode,
   }).TermsOfServiceScreen;

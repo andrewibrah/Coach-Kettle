@@ -7,7 +7,7 @@ import { useAuthLock } from '@/contexts/AuthLockProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
-import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '@/constants/legal';
+import { CONSENT_ACCEPT_TEXT, CONSENT_AI_DISCLOSURE, PRIVACY_POLICY, TERMS_OF_SERVICE } from '@/constants/legal';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { legalDocTitle, type LegalDoc } from '@/lib/legalMode';
 
@@ -34,6 +34,7 @@ export function TermsOfServiceScreen({ initialDoc = 'terms', readOnly = false }:
     const onTint = useThemeColor({}, 'tintForeground');
     const borderColor = useThemeColor({}, 'border');
     const shadowColor = useThemeColor({}, 'shadow');
+    const disclosureBg = useThemeColor({}, 'secondaryBackground');
 
     const handleAccept = async () => {
         // Reader mode must never record acceptance, even if a control leaks through.
@@ -139,12 +140,21 @@ export function TermsOfServiceScreen({ initialDoc = 'terms', readOnly = false }:
 
             <ThemedView style={[styles.contentContainer, { borderColor }]}>
                 <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+                    {/* Acceptance records privacy 1.1.0, which covers this disclosure; the reader
+                        shows the same text in the Privacy Policy's AI Features section. */}
+                    {readOnly ? null : (
+                        <View style={[styles.disclosure, { backgroundColor: disclosureBg, borderColor }]}>
+                            <ThemedText style={styles.disclosureTitle}>AI features</ThemedText>
+                            <ThemedText style={styles.disclosureText}>{CONSENT_AI_DISCLOSURE}</ThemedText>
+                        </View>
+                    )}
                     <MarkdownText content={content} />
                 </ScrollView>
             </ThemedView>
 
             {readOnly ? null : (
             <ThemedView style={styles.footer}>
+                <ThemedText style={styles.consentText}>{CONSENT_ACCEPT_TEXT}</ThemedText>
                 <Pressable
                     style={({ pressed }) => [
                         styles.button,
@@ -303,6 +313,27 @@ const styles = StyleSheet.create({
     footer: {
         padding: 24,
         gap: 12,
+    },
+    consentText: {
+        fontSize: 13,
+        lineHeight: 18,
+        opacity: 0.7,
+        textAlign: 'center',
+    },
+    disclosure: {
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 8,
+    },
+    disclosureTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    disclosureText: {
+        fontSize: 14,
+        lineHeight: 20,
     },
     button: {
         height: 56,

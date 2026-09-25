@@ -6,7 +6,21 @@
  */
 
 export const TERMS_VERSION = '1.0.0';
-export const LAST_UPDATED = 'January 2026';
+export const LAST_UPDATED = 'September 24, 2026';
+
+// Must equal CURRENT_PRIVACY_VERSION in supabase/functions/terms-acceptance/versions.ts
+// (lib/__tests__/privacyRelease.test.ts checks it). Bumping it re-prompts every user once.
+export const PRIVACY_VERSION = '1.1.0';
+export const PRIVACY_LAST_UPDATED = 'September 24, 2026';
+
+// Shown on the acceptance gate and inside the Privacy Policy. Every claim is
+// checked against what the chat, coach, nutrition-analyze and meal-plan
+// functions actually send (docs: g11 inventory §3).
+export const CONSENT_AI_DISCLOSURE =
+  'To power AI features, Coach Kettle sends the content needed for each request to OpenAI: your workout text and current session, your coach questions and recent chat, meal descriptions or meal photos you choose to analyze, and, for coaching and meal plans, relevant profile and training details (such as age and date of birth, sex, height, weight and goals, dietary preferences and allergies, recent workouts including any heart rate you log, personal records, nutrition targets and recent food logs). We do not send your name, email, or account ID to OpenAI.';
+
+export const CONSENT_ACCEPT_TEXT =
+  'By tapping Accept and Continue, you agree to the Terms of Service and Privacy Policy, including sending this data to OpenAI when you use AI features.';
 
 export const TERMS_OF_SERVICE = `
 # Coach Kettle Terms of Service
@@ -29,7 +43,6 @@ Coach Kettle helps you track your workouts using natural language. You type or s
 
 **We provide:**
 - Secure authentication via email/password, Apple Sign-In, or Google Sign-In
-- Automatic session expiration after 4 hours of inactivity
 
 ## 3. How Authentication Works
 
@@ -52,7 +65,7 @@ We use OAuth 2.0, the industry standard. We receive only your email and a unique
 - Payment information (we don't process payments)
 
 ### Data deletion:
-You can request deletion of your account and all associated data at any time by contacting us.
+You can delete your account and its data at any time in the app: Settings → Delete account. The Privacy Policy lists what is removed. Deleting your account does not cancel an App Store subscription.
 
 ## 5. Acceptable Use
 
@@ -92,9 +105,9 @@ Questions? Reach us at support@coachkettle.app
 export const PRIVACY_POLICY = `
 # Coach Kettle Privacy Policy
 
-**Last Updated: ${LAST_UPDATED}**
+**Version ${PRIVACY_VERSION} · Last Updated: ${PRIVACY_LAST_UPDATED}**
 
-Your privacy matters. Here's exactly what data we collect and why.
+Your privacy matters. Here's exactly what data we collect, who we share it with, and why.
 
 ## Data We Collect
 
@@ -104,8 +117,19 @@ Your privacy matters. Here's exactly what data we collect and why.
 
 ### Workout Data
 - Exercise names, sets, reps, and weights you log
+- Cardio details you log, such as distance, calories, and heart rate
 - Dates and times of workouts
-- Any notes you add
+- Any notes or reflections you add
+- Personal records, templates, and programs
+
+### Profile, Body, and Nutrition Data
+- Profile details you enter: date of birth, sex, height, weight, goal weight, fitness focus, activity level, and equipment
+- Body measurements, resting heart rate, and progress photos you add
+- Food logs, nutrition targets, meal plans, dietary preferences, allergies, and disliked foods
+
+### Photos and Media
+- Photos and videos you attach to workouts, and progress photos, kept in private storage
+- Meal photos you choose to analyze are sent to OpenAI for that request and are not stored
 
 ### AI Chat Data
 - Messages you send to the AI coach
@@ -114,7 +138,10 @@ Your privacy matters. Here's exactly what data we collect and why.
 ### Technical Data
 - Device type and operating system
 - App version
-- Crash reports and error logs
+- Server error logs
+- Your IP address: our hosting and auth provider processes it to operate and secure the service, and we record it with your device's user agent when you accept these terms
+- In-app feature usage events (kept by us, not shared with analytics companies)
+- Your push notification token, if you turn on notifications
 
 ## Data We Don't Collect
 
@@ -129,6 +156,12 @@ Your privacy matters. Here's exactly what data we collect and why.
 3. **Customer support**: Help you if something goes wrong
 4. **Security**: Detect and prevent abuse
 
+## AI Features (OpenAI)
+
+${CONSENT_AI_DISCLOSURE}
+
+OpenAI processes this data to generate the response, under its API data usage policies.
+
 ## Data Storage & Security
 
 - All data is encrypted in transit (HTTPS/TLS)
@@ -139,8 +172,13 @@ Your privacy matters. Here's exactly what data we collect and why.
 ## Third Parties
 
 We use these service providers:
-- **Supabase**: Database and authentication (supabase.com)
-- **OpenAI**: AI-powered workout parsing (openai.com)
+- **Supabase**: Database, authentication, file storage, and server functions (supabase.com)
+- **OpenAI**: AI features, as described above (openai.com)
+- **RevenueCat**: Subscription management. Receives your account ID, purchase history, and email address (revenuecat.com)
+- **Apple**: App Store purchases and Sign in with Apple (apple.com)
+- **Google**: Google Sign-In (google.com)
+- **Expo**: Push notification delivery. Receives your push token and the notification text (expo.dev)
+- **Open Food Facts**: Barcode lookups. Only the barcode is sent, with no personal data (openfoodfacts.org)
 
 These providers have their own privacy policies and security practices.
 
@@ -149,8 +187,20 @@ These providers have their own privacy policies and security practices.
 You can:
 - **Access** your data at any time through the app
 - **Export** your workout history (feature coming soon)
-- **Delete** your account and all data by contacting us
+- **Delete** your account and data in the app: Settings → Delete account
 - **Opt out** of optional features
+
+## Deleting Your Account
+
+Go to **Settings → Delete account** and confirm by signing in again. Deletion permanently removes:
+- Your sign-in account
+- Your app data: profile, workouts, nutrition, coach history, programs, and personal records
+- Photos and videos you stored
+- Your RevenueCat subscriber record
+
+Deleting your account **does not cancel an App Store subscription**. Cancel it in your Apple ID subscription settings, or from Manage Subscription in the app, before you delete.
+
+A record of past purchase events, with your account link and personal details removed, may be kept for accounting. Copies in encrypted backups expire on our database provider's backup schedule.
 
 ## Children's Privacy
 
@@ -175,15 +225,3 @@ We'll notify you of significant privacy policy changes via email or in-app notif
 
 Privacy questions? Email privacy@coachkettle.app
 `.trim();
-
-export const CONSENT_CHECKBOX_TEXT =
-  'I have read and agree to the Terms of Service and Privacy Policy';
-
-export const CONSENT_EXPLANATION = `
-By creating an account, you acknowledge that:
-
-• Your workout data will be stored securely in the cloud
-• We may use AI services to help parse your workout input
-• You can delete your account and data at any time
-`.trim();
-

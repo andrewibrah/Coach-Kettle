@@ -3,16 +3,18 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import {
+    CURRENT_PRIVACY_VERSION,
+    CURRENT_TERMS_VERSION,
+    evaluateAcceptance,
+    type AcceptanceRow,
+} from "./versions.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
-
-// Current versions - update these when ToS/Privacy Policy changes
-const CURRENT_TERMS_VERSION = "1.0.0";
-const CURRENT_PRIVACY_VERSION = "1.0.0";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -150,47 +152,46 @@ async function recordAcceptance(
 }
 
 // GET: Check acceptance status
+// `declaredPrivacyVersion` is the privacy version the calling build can record
+// (1.0.2+ send it; 1.0.1 sends nothing). See versions.ts for why it matters.
 async function checkAcceptance(
     supabase: ReturnType<typeof createClient>,
-    userId: string
+    userId: string,
+    declaredPrivacyVersion: string | null
 ): Promise<Response> {
-    // Get the latest acceptance record for this user
+    // All acceptance records for this user, newest first (one per version pair)
     const { data, error } = await supabase
         .from("user_terms_acceptance")
         .select("terms_version, privacy_version, accepted_at")
         .eq("user_id", userId)
-        .order("accepted_at", { ascending: false })
-        .limit(1)
-        .single();
+        .order("accepted_at", { ascending: false });
 
-    if (error && error.code !== "PGRST116") {
-        // PGRST116 = no rows found (not an error condition)
+    if (error) {
         console.error("[terms-acceptance] Database error:", error);
         return respondJson({ error: "Database error" }, 500);
     }
 
-    if (!data) {
+    const rows = (data ?? []) as AcceptanceRow[];
+    const result = evaluateAcceptance(rows, declaredPrivacyVersion);
+    const shown = result.matching ?? result.latest;
+
+    if (!shown) {
         return respondJson({
             accepted: false,
             needs_acceptance: true,
             current_terms_version: CURRENT_TERMS_VERSION,
-            current_privacy_version: CURRENT_PRIVACY_VERSION,
+            current_privacy_version: result.requiredPrivacyVersion,
         });
     }
 
-    // Check if user has accepted the current versions
-    const isCurrentTerms = data.terms_version === CURRENT_TERMS_VERSION;
-    const isCurrentPrivacy = data.privacy_version === CURRENT_PRIVACY_VERSION;
-    const needsReacceptance = !isCurrentTerms || !isCurrentPrivacy;
-
     return respondJson({
-        accepted: !needsReacceptance,
-        needs_acceptance: needsReacceptance,
-        accepted_terms_version: data.terms_version,
-        accepted_privacy_version: data.privacy_version,
-        accepted_at: data.accepted_at,
+        accepted: result.accepted,
+        needs_acceptance: !result.accepted,
+        accepted_terms_version: shown.terms_version,
+        accepted_privacy_version: shown.privacy_version,
+        accepted_at: shown.accepted_at,
         current_terms_version: CURRENT_TERMS_VERSION,
-        current_privacy_version: CURRENT_PRIVACY_VERSION,
+        current_privacy_version: result.requiredPrivacyVersion,
     });
 }
 
@@ -213,7 +214,7 @@ serve(async (req) => {
         }
 
         if (req.method === "GET") {
-            return await checkAcceptance(supabase, userId);
+            return await checkAcceptance(supabase, userId, new URL(req.url).searchParams.get("privacy_version"));
         }
 
         return respondJson({ error: "Method not allowed" }, 405);

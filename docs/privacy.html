@@ -260,7 +260,7 @@
 
   <div class="page-header">
     <h1>Privacy Policy</h1>
-    <p>Effective date: March 29, 2026</p>
+    <p>Version 1.1.0 &middot; Effective date: September 24, 2026</p>
   </div>
 
   <div class="content">
@@ -295,7 +295,7 @@
 
       <h3>Account Data</h3>
       <ul>
-        <li><strong>Email address</strong> — collected via Apple Sign In during account creation. We do not collect your Apple ID password or any other Apple account credentials.</li>
+        <li><strong>Email address</strong> — used to identify your account. You can sign up with email and password, Sign in with Apple, or Google Sign-In. We never receive your Apple or Google password.</li>
       </ul>
 
       <h3>Fitness &amp; Health Data</h3>
@@ -306,6 +306,10 @@
         <li>Workout session timestamps and dates</li>
         <li>Personal records (PR) history</li>
         <li>Workout frequency patterns</li>
+        <li>Cardio details you log, such as distance, calories, and heart rate</li>
+        <li>Profile details you enter: date of birth, sex, height, weight, goal weight, fitness focus, activity level, and equipment</li>
+        <li>Body measurements, resting heart rate, and progress photos you add</li>
+        <li>Food logs, nutrition targets, meal plans, dietary preferences, allergies, and disliked foods</li>
       </ul>
       <p>
         This data constitutes health and fitness information. It is stored securely in your private account and is never shared with advertisers, data brokers, or analytics platforms.
@@ -313,16 +317,20 @@
 
       <h3>User Content</h3>
       <ul>
-        <li>Photos and videos you choose to attach to workout sessions</li>
+        <li>Photos and videos you choose to attach to workout sessions, and progress photos</li>
+        <li>Meal photos you choose to analyze with AI</li>
       </ul>
       <div class="highlight-box">
-        <p><strong>Important:</strong> Photos and videos are stored in a private Supabase Storage bucket. Your media is never publicly accessible, never indexed, and never shared with any third party. Only you can access your attached media through your authenticated account.</p>
+        <p><strong>Important:</strong> Workout photos, videos, and progress photos are stored in a private Supabase Storage bucket. They are never publicly accessible, never indexed, and never shared with any third party. Only you can access them through your authenticated account. Meal photos you choose to analyze are different: they are sent to OpenAI for that request (see Section 4) and are not stored.</p>
       </div>
 
       <h3>Technical / Device Data</h3>
       <ul>
         <li>Supabase anonymous session tokens (used for authentication state management)</li>
-        <li>App version and OS version (collected automatically by Expo/React Native for crash reporting purposes only)</li>
+        <li>App version and OS version, sent with requests</li>
+        <li>Your IP address: our hosting and auth provider (Supabase) processes it to operate and secure the service, and we record it with your device's user agent when you accept our Terms and Privacy Policy</li>
+        <li>In-app feature usage events, stored in our own database (no third-party analytics)</li>
+        <li>Your push notification token, if you turn on notifications</li>
       </ul>
 
       <h3>Data We Do NOT Collect</h3>
@@ -364,13 +372,33 @@
           </tr>
           <tr>
             <td>Parse workout input via AI</td>
-            <td>Exercise text only (anonymized)</td>
-            <td>Legitimate interest</td>
+            <td>Workout text and current session</td>
+            <td>Legitimate interest / Consent</td>
           </tr>
           <tr>
             <td>Provide AI coaching responses</td>
-            <td>Workout context text you provide</td>
+            <td>Coach questions, recent chat, and relevant profile and training details (see Section 4)</td>
             <td>Legitimate interest / Consent</td>
+          </tr>
+          <tr>
+            <td>Analyze meals and build meal plans via AI</td>
+            <td>Meal descriptions or photos you choose, nutrition targets, dietary preferences, recent food logs</td>
+            <td>Consent</td>
+          </tr>
+          <tr>
+            <td>Manage subscriptions</td>
+            <td>Account ID, purchase history, email address</td>
+            <td>Performance of a contract</td>
+          </tr>
+          <tr>
+            <td>Send notifications you turn on</td>
+            <td>Push token, notification text</td>
+            <td>Consent</td>
+          </tr>
+          <tr>
+            <td>Look up foods by barcode</td>
+            <td>The barcode only</td>
+            <td>Performance of a contract</td>
           </tr>
           <tr>
             <td>Store and retrieve media attachments</td>
@@ -408,15 +436,18 @@
 
       <h3>OpenAI</h3>
       <p>
-        We use OpenAI's API for two features: AI workout text parsing and the AI
-        coaching chat interface.
+        We use OpenAI's API for AI features: workout text parsing, the AI coach,
+        meal analysis, and meal plans.
       </p>
       <div class="highlight-box">
         <p>
-          <strong>What we send to OpenAI:</strong> Exercise log text you enter (e.g., "Bench 185 x 8")
-          and coaching questions you type. We never transmit your name, email address,
-          health metrics, media files, or any personally identifying information to OpenAI.
-          Inputs are sent as anonymous text strings only.
+          <strong>What we send to OpenAI:</strong> To power AI features, Coach Kettle sends the
+          content needed for each request to OpenAI: your workout text and current session, your
+          coach questions and recent chat, meal descriptions or meal photos you choose to analyze,
+          and, for coaching and meal plans, relevant profile and training details (such as age and
+          date of birth, sex, height, weight and goals, dietary preferences and allergies, recent
+          workouts including any heart rate you log, personal records, nutrition targets and recent
+          food logs). We do not send your name, email, or account ID to OpenAI.
         </p>
       </div>
       <p>
@@ -425,22 +456,45 @@
         Privacy policy: <a href="https://openai.com/privacy" style="color:var(--accent)">openai.com/privacy</a>
       </p>
 
-      <h3>Apple Sign In</h3>
+      <h3>RevenueCat</h3>
       <p>
-        Account creation and login use Apple's Sign In with Apple service. Apple
-        may provide us with a real or relayed email address per your Apple ID settings.
-        We do not receive your Apple ID password.
+        RevenueCat manages subscriptions. It receives your account ID, your purchase
+        history, and your email address.
+        <br/>
+        Privacy policy: <a href="https://www.revenuecat.com/privacy" style="color:var(--accent)">revenuecat.com/privacy</a>
+      </p>
+
+      <h3>Apple (App Store and Sign in with Apple)</h3>
+      <p>
+        Subscriptions are purchased through the App Store, and we verify receipts with
+        Apple. If you use Sign in with Apple, Apple may provide us with a real or relayed
+        email address per your Apple ID settings. We do not receive your Apple ID password.
         <br/>
         Privacy policy: <a href="https://www.apple.com/legal/privacy/" style="color:var(--accent)">apple.com/legal/privacy</a>
       </p>
 
-      <h3>Expo / React Native</h3>
+      <h3>Google Sign-In</h3>
       <p>
-        The app is built with Expo and React Native. Expo may collect anonymized
-        crash and diagnostic data to improve framework stability. This data does not
-        include your personal workout information.
+        If you sign in with Google, Google provides us with your email address and an
+        account identifier. We do not receive your Google password.
+        <br/>
+        Privacy policy: <a href="https://policies.google.com/privacy" style="color:var(--accent)">policies.google.com/privacy</a>
+      </p>
+
+      <h3>Expo Push Notifications</h3>
+      <p>
+        If you turn on notifications, Expo's push service delivers them. It receives
+        your push token and the notification text.
         <br/>
         Privacy policy: <a href="https://expo.dev/privacy" style="color:var(--accent)">expo.dev/privacy</a>
+      </p>
+
+      <h3>Open Food Facts</h3>
+      <p>
+        Barcode lookups are sent to Open Food Facts from our servers. Only the barcode
+        is sent, with no personal data.
+        <br/>
+        Privacy policy: <a href="https://world.openfoodfacts.org/privacy" style="color:var(--accent)">openfoodfacts.org/privacy</a>
       </p>
 
       <h3>Legal Disclosures</h3>
@@ -463,7 +517,6 @@
         <li>Data at rest is encrypted by Supabase using AES-256</li>
         <li>Authentication uses short-lived JWT tokens and Row-Level Security (RLS) policies so users can only access their own data</li>
         <li>Media files are stored in a private, access-controlled Supabase Storage bucket — no public URLs exist for your media</li>
-        <li>Biometric authentication (Face ID / Touch ID) is available to lock the app after inactivity</li>
       </ul>
       <p>
         No method of transmission or storage is 100% secure. In the event of a data
@@ -473,10 +526,26 @@
 
       <h3>Data Retention</h3>
       <p>
-        We retain your data for as long as your account is active. If you delete
-        your account, all associated personal data, workout records, and media
-        attachments are permanently deleted from our systems within 30 days,
-        except where retention is required by law.
+        We retain your data for as long as your account is active.
+      </p>
+
+      <h3>Deleting Your Account</h3>
+      <p>
+        You can delete your account in the app: <strong>Settings &rarr; Delete account</strong>.
+        You confirm by signing in again. Deletion permanently removes:
+      </p>
+      <ul>
+        <li>Your sign-in account</li>
+        <li>Your app data: profile, workouts, nutrition, coach history, programs, and personal records</li>
+        <li>Photos and videos you stored</li>
+        <li>Your RevenueCat subscriber record</li>
+      </ul>
+      <p>
+        <strong>Deleting your account does not cancel an App Store subscription.</strong>
+        Cancel it in your Apple ID subscription settings, or from Manage Subscription in
+        the app, before you delete. A record of past purchase events, with your account
+        link and personal details removed, may be kept for accounting. Copies in encrypted
+        backups expire on our database provider's backup schedule.
       </p>
     </div>
 
@@ -489,7 +558,7 @@
       <ul>
         <li><strong>Access:</strong> Request a copy of the personal data we hold about you.</li>
         <li><strong>Correction:</strong> Request correction of inaccurate data.</li>
-        <li><strong>Deletion:</strong> Request deletion of your account and all associated data ("right to be forgotten"). You can request this in-app (Settings &rarr; Account &rarr; Delete Account) or by emailing <a href="mailto:privacy@coachkettle.app" style="color:var(--accent)">privacy@coachkettle.app</a>.</li>
+        <li><strong>Deletion:</strong> Request deletion of your account and all associated data ("right to be forgotten"). You can do this in the app (Settings &rarr; Delete account; see Section 5) or by emailing <a href="mailto:privacy@coachkettle.app" style="color:var(--accent)">privacy@coachkettle.app</a>.</li>
         <li><strong>Portability:</strong> Request your workout data in a machine-readable format.</li>
       </ul>
 

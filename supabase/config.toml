@@ -62,3 +62,7 @@ file_size_limit = "50MB"
   # which carries no Authorization header) is never rejected by the gateway.
   [functions.food-barcode]
   verify_jwt = false
+  # delete-account verifies the bearer token itself via auth.getUser() (anon client)
+  # and returns its own 401, like the functions above.
+  [functions.delete-account]
+  verify_jwt = false

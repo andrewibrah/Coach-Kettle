@@ -114,6 +114,41 @@ export type LogSetResult = {
     pr?: LogSetPR | null;
 };
 
+export type DeleteAccountErrorCode =
+    | 'CONFIRMATION_REQUIRED'
+    | 'REAUTH_REQUIRED'
+    | 'CONFIG_MISSING'
+    | 'REVENUECAT_DELETE_FAILED'
+    | 'STORAGE_DELETE_FAILED'
+    | 'DB_PURGE_FAILED'
+    | 'AUTH_DELETE_FAILED';
+
+const DELETE_ACCOUNT_ERROR_CODES: DeleteAccountErrorCode[] = [
+    'CONFIRMATION_REQUIRED',
+    'REAUTH_REQUIRED',
+    'CONFIG_MISSING',
+    'REVENUECAT_DELETE_FAILED',
+    'STORAGE_DELETE_FAILED',
+    'DB_PURGE_FAILED',
+    'AUTH_DELETE_FAILED',
+];
+
+/**
+ * A delete-account failure the server explained. `REAUTH_REQUIRED` means the session's
+ * last sign-in is over 5 minutes old: sign in again, then retry. Every step is idempotent,
+ * so retrying after any other code is safe.
+ */
+export class DeleteAccountError extends Error {
+    readonly code: DeleteAccountErrorCode | null;
+    readonly status: number;
+    constructor(message: string, code: DeleteAccountErrorCode | null, status: number) {
+        super(message);
+        this.name = 'DeleteAccountError';
+        this.code = code;
+        this.status = status;
+    }
+}
+
 export const api = {
     chat: async (message: string, rows: ApiWorkoutRow[], lastExercise?: string) => {
         const res = await fetchWithAuth(`${API_BASE}/chat`, {
@@ -318,8 +353,9 @@ JSON shape — respond with exactly this structure:
         return (await res.json()) as { ok: boolean };
     },
 
-    checkTermsAcceptance: async () => {
-        const res = await fetchWithAuth(`${API_BASE}/terms-acceptance`, { method: 'GET' });
+    checkTermsAcceptance: async (privacyVersion?: string) => {
+        const query = privacyVersion ? `?privacy_version=${encodeURIComponent(privacyVersion)}` : '';
+        const res = await fetchWithAuth(`${API_BASE}/terms-acceptance${query}`, { method: 'GET' });
 
         if (!res.ok) {
             const body = await res.text();
@@ -468,5 +504,34 @@ JSON shape — respond with exactly this structure:
             privacy_version: string;
             message?: string;
         };
+    },
+
+    deleteAccount: async (options: { appleAuthorizationCode?: string } = {}) => {
+        const res = await fetchWithAuth(`${API_BASE}/delete-account`, {
+            method: 'POST',
+            body: JSON.stringify({
+                confirm: 'DELETE',
+                ...(options.appleAuthorizationCode ? { apple_authorization_code: options.appleAuthorizationCode } : {}),
+            }),
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            let code: DeleteAccountErrorCode | null = null;
+            let message = '';
+            try {
+                const body = JSON.parse(text) as { error?: { code?: string; message?: string } };
+                const serverCode = body.error?.code;
+                if (typeof serverCode === 'string' && (DELETE_ACCOUNT_ERROR_CODES as string[]).includes(serverCode)) {
+                    code = serverCode as DeleteAccountErrorCode;
+                }
+                if (typeof body.error?.message === 'string') message = body.error.message;
+            } catch {
+                // Non-JSON body (gateway error page) — fall through to a generic message.
+            }
+            throw new DeleteAccountError(message || `HTTP ${res.status}`, code, res.status);
+        }
+
+        return (await res.json()) as { ok: true };
     },
 };

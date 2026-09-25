@@ -2,6 +2,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { ThemedView } from '@/components/ui/themed-view';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { checkServerTermsAcceptance, setLastAuthenticatedAt } from '@/lib/authLock';
+import { parseAuthRedirectParams } from '@/lib/authRedirect';
 import { supabase } from '@/lib/supabase';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
@@ -20,22 +21,8 @@ export default function AuthCallback() {
       try {
         // Get the URL that opened this screen
         const url = await Linking.getInitialURL();
-        let queryParams = url ? Linking.parse(url).queryParams : null;
-
-        // Also check for hash params (implicit flow)
-        if (url && (!queryParams || Object.keys(queryParams).length === 0) && url.includes('#')) {
-          const hashPart = url.split('#')[1];
-          if (hashPart) {
-            const hashParams: Record<string, string> = {};
-            hashPart.split('&').forEach(pair => {
-              const [key, value] = pair.split('=');
-              if (key && value) {
-                hashParams[key] = decodeURIComponent(value);
-              }
-            });
-            queryParams = { ...queryParams, ...hashParams };
-          }
-        }
+        // Query params, or hash params for the implicit flow
+        const queryParams = url ? parseAuthRedirectParams(url) : null;
 
         if (queryParams) {
           // Handle OAuth code exchange (PKCE flow)

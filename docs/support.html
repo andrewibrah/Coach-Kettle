@@ -397,7 +397,7 @@
         about your recent workout history to give more relevant answers.
       </p>
       <div class="highlight-box">
-        <p>Your email and personal identifiers are never sent to the AI. Only the exercise text and questions you type are transmitted.</p>
+        <p>Your name, email, and account ID are never sent to the AI. See "What does the AI see when I use it?" below for exactly what is sent.</p>
       </div>
     </div>
 
@@ -408,7 +408,7 @@
       <h3><span class="faq-q-icon">Q</span> How do I delete my account and data?</h3>
       <p>You can request complete account and data deletion in two ways:</p>
       <ol>
-        <li><strong>In-app:</strong> Go to Settings &rarr; Account &rarr; Delete Account. This will permanently delete your account and all associated data.</li>
+        <li><strong>In-app:</strong> Go to Settings &rarr; Delete account and confirm by signing in again. This permanently deletes your account and all associated data. It does not cancel an App Store subscription, so cancel that first.</li>
         <li><strong>By email:</strong> Send a deletion request to <a href="mailto:privacy@coachkettle.app">privacy@coachkettle.app</a> from the email address associated with your account. We will process it within 30 days.</li>
       </ol>
       <p>
@@ -456,9 +456,12 @@
       <h3><span class="faq-q-icon">Q</span> Is my workout data shared or sold?</h3>
       <p>
         No. We do not sell, rent, or share your personal data with advertisers or
-        data brokers. Your data is shared only with our infrastructure providers
-        (Supabase for storage, OpenAI for AI features) under strict data processing
-        agreements.
+        data brokers. Your data is shared only with the service providers that run the
+        app: Supabase (database, sign-in, storage), OpenAI (AI features), RevenueCat
+        (subscriptions), Apple (App Store and Sign in with Apple), Google (Google
+        Sign-In), Expo (push notifications) and Open Food Facts (barcode lookups, with
+        no personal data). See the <a href="privacy.html">Privacy Policy</a> for what
+        each one receives.
       </p>
     </div>
 
@@ -474,9 +477,13 @@
     <div class="faq-card">
       <h3><span class="faq-q-icon">Q</span> What does the AI see when I use it?</h3>
       <p>
-        The AI (powered by OpenAI) only receives the exercise text you type and any
-        coaching questions you ask. Your email address, name, health metrics, and
-        media files are never sent to OpenAI.
+        The AI is powered by OpenAI. Each request sends only what that feature needs:
+        your workout text and current session, your coach questions and recent chat,
+        meal descriptions or meal photos you choose to analyze, and, for coaching and
+        meal plans, relevant profile and training details (such as age, sex, height,
+        weight and goals, dietary preferences and allergies, recent workouts, personal
+        records, nutrition targets and recent food logs). Your name, email address, and
+        account ID are never sent to OpenAI.
       </p>
     </div>
 
