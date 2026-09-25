@@ -3,14 +3,65 @@
 Target: the linked Supabase project (**production**). Run from the repo root on branch `1.0.2` at the release HEAD.
 Order (plan §9): additive migrations → Edge Functions → app build. Deploy the backend **before** shipping the 1.0.2 build; the live 1.0.1 app stays compatible with the new backend.
 
-## The one line
+**Requires Supabase CLI ≥ 2.117.** Check with `supabase --version` first; upgrade if older.
+
+**If `supabase db push` (or any command that logs in) times out or hangs creating a login
+role,** check whether the project is paused before assuming a network problem:
 
 ```sh
-supabase db push && for fn in nutrition-targets meal-plan daily-feedback profile body-metrics food-barcode notifications programming exercise-library coach; do supabase functions deploy "$fn" || { echo "DEPLOY FAILED: $fn"; break; }; done
+supabase projects list -o json
 ```
 
-- `db push` lists the pending migrations and asks `[Y/n]`. Check the list against the table below before answering Y. If it asks for the database password, enter it at the prompt (or `export SUPABASE_DB_PASSWORD=…` in your shell first; never commit or paste it).
-- Functions deploy one at a time and the loop stops at the first failure.
+If the target project's status is `INACTIVE`, it is paused — restore it from the Supabase
+Dashboard (Project → Settings → General → Restore project) before retrying.
+
+**Precondition for `20260924000100` (the nutrition-targets service_role REVOKE):** run
+`supabase functions list` **before** `db push` and confirm `nutrition-targets` is already at
+version ≥ 6 (the atomic-RPC-only version). If it is still at v5 or lower, the live function may
+still perform a direct table write that this migration revokes, and saves would start failing.
+Deploy `nutrition-targets` to v6+ first, confirm the version, then run `db push`.
+
+## Commands to run, in order
+
+Run each line separately — do not chain them. Confirm each step's output matches expectations
+before moving to the next.
+
+```sh
+supabase migration list
+```
+
+Compare the pending list against the migration table below.
+
+```sh
+supabase db push --dry-run
+```
+
+Review the exact SQL that will run. Confirm it matches the 3 new migrations (plus anything
+already pending from the prior 1.0.2 patch-audit lanes) and nothing else.
+
+```sh
+supabase db push
+```
+
+Answer `Y` only after the dry run matched. If it asks for the database password, enter it at the
+prompt (or `export SUPABASE_DB_PASSWORD=…` in your shell first; never commit or paste it).
+
+```sh
+supabase functions deploy body-metrics
+supabase functions deploy chat
+supabase functions deploy coach
+supabase functions deploy daily-feedback
+supabase functions deploy delete-account
+supabase functions deploy meal-plan
+supabase functions deploy nutrition-analyze
+supabase functions deploy revenuecat-webhook
+supabase functions deploy terms-acceptance
+```
+
+Deploy one at a time so a failure is attributable to a single function. **`terms-acceptance`
+must be deployed before the 1.0.2 build is submitted for review** — otherwise every new 1.0.2
+install loops at the privacy gate (an old server compares the latest acceptance row with `===`
+against `1.0.0`, which a 1.0.2 client recording `1.1.0` can never satisfy).
 
 ## Migration queue (local-only as of 2026-09-23; some 0904/0906 files may already be applied — `db push` skips those)
 
@@ -27,24 +78,70 @@ supabase db push && for fn in nutrition-targets meal-plan daily-feedback profile
 | 20260920000100_coherent_meal_plan_read | additive | `read_meal_plan` RPC |
 | 20260920000200_coherent_nutrition_target_read | additive | `read_nutrition_target_set` RPC |
 | 20260921000100_body_metrics_merge_comment | comment only | `COMMENT ON TABLE body_metrics` |
-| 20260924000100_revoke_service_role_target_writes | **privilege narrowing** | revokes INSERT/UPDATE/DELETE/TRUNCATE on nutrition_target_sets / nutrition_target_day_overrides from service_role (SELECT kept). Requires nutrition-targets v6 (atomic RPC only) live, as it is; saves go through the SECURITY DEFINER `save_nutrition_target_set_atomic` |
+| 20260924000100_revoke_service_role_target_writes | **privilege narrowing (non-destructive to data)** | revokes INSERT/UPDATE/DELETE/TRUNCATE on nutrition_target_sets / nutrition_target_day_overrides from service_role (SELECT kept). **Precondition:** `supabase functions list` must show `nutrition-targets` at version ≥ 6 (the atomic-RPC-only version) **before** this runs — see the precondition note above. Saves go through the SECURITY DEFINER `save_nutrition_target_set_atomic`, which is unaffected by the REVOKE because it runs as its owner. |
+| 20260924000400_fix_exercise_degree_mojibake | **data backfill (idempotent UPDATE of 4 seed rows by slug)** | replaces `в°` with `°` in 4 exercise names (sled-45-calf-press, sled-45-leg-press, sled-45-leg-press-back-pov, sled-45-leg-wide-press). Re-running is a no-op once the names are already correct. |
+| 20260924000900_delete_user_data | **additive (new SECURITY DEFINER function, EXECUTE → service_role only)** | `delete_user_data(uuid)` purge function used by the new `delete-account` function. Touches no data at migration time — it only creates the function. |
 
-No DROP / DELETE / TRUNCATE of user data. No destructive schema change.
+None of the migrations in this pass DROP or DELETE user data at migration time.
 
-## Functions (changed vs commit 9931ce3)
-nutrition-targets, meal-plan, daily-feedback (new `_shared/nutritionTarget*`, `mealPlanValidation`), profile (new `complete_onboarding_atomic` action; legacy `batch_onboarding` unchanged for 1.0.1), body-metrics, food-barcode (`_shared/openFoodFacts`, `verify_jwt=false` in config.toml — it does its own 401), notifications, programming, exercise-library (unpaginated default kept for 1.0.1), coach.
-Secrets needed (all present by name): SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY.
+## Functions (deploy set, diff vs the last deployed commit `667e8d1`)
+
+Deploy: **body-metrics, chat, coach, daily-feedback, delete-account (NEW), meal-plan,
+nutrition-analyze, revenuecat-webhook, terms-acceptance.**
+
+- **delete-account** is new. `verify_jwt = false` in `config.toml`, like every other function —
+  the handler verifies the bearer itself via `auth.getUser()` on the anon client and returns its
+  own 401. OPTIONS → 200; POST without auth → 401.
+- **daily-feedback** and **meal-plan**: only their imported `_shared/nutritionTargetResolution.ts`
+  changed, and only by a comment. Deploying them keeps source and deployment identical; this is
+  harmless, not a behavior change.
+- **food-barcode** is unchanged in this pass (still GET-only; GET without auth → 401) and is not
+  in the deploy list above, but its read-back line is kept below so the full function surface is
+  checked in one pass.
+
+Secrets needed:
+- Existing (already set; confirm present, never re-paste values): `SUPABASE_URL`,
+  `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `REVENUECAT_SECRET_API_KEY`.
+- **New, for Sign in with Apple token revocation** (optional — without them, account deletion
+  still works, but Apple tokens aren't revoked and the log shows `apple_revoke_failed
+  reason=missing_secret`): `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_CLIENT_ID`, `APPLE_PRIVATE_KEY`.
+
+  ```sh
+  supabase secrets set APPLE_TEAM_ID=<10-char Team ID>
+  supabase secrets set APPLE_KEY_ID=<10-char Key ID of a Sign in with Apple key>
+  supabase secrets set APPLE_CLIENT_ID=com.coachkettle.coachkettle
+  supabase secrets set APPLE_PRIVATE_KEY="$(cat /path/to/AuthKey_<KEYID>.p8)"
+  ```
+
+  Never paste secret values into chat, a commit, or this file. `supabase secrets list` shows
+  names only — use it to confirm what's already set before deciding what's missing.
 
 ## Read back (no token needed, writes nothing)
 
 ```sh
-supabase migration list    # every local migration should show a remote timestamp
-supabase functions list    # versions above: coach 26, profile 23, daily-feedback 8, exercise-library 5, nutrition-targets 5, meal-plan 4, notifications 4, body-metrics 4, programming 8, food-barcode 1
-REF=$(cat supabase/.temp/project-ref); for fn in nutrition-targets meal-plan daily-feedback profile body-metrics food-barcode notifications programming exercise-library coach; do printf '%-18s OPTIONS=%s POST=%s\n' $fn "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS https://$REF.supabase.co/functions/v1/$fn)" "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://$REF.supabase.co/functions/v1/$fn)"; done
+supabase migration list    # every local migration, including the 3 new ones, should show a remote timestamp
+supabase functions list    # confirm nutrition-targets >= 6 (precondition), and a bumped version on each function just deployed
+REF=$(cat supabase/.temp/project-ref)
+for fn in body-metrics chat coach daily-feedback delete-account meal-plan nutrition-analyze revenuecat-webhook terms-acceptance; do
+  printf '%-20s OPTIONS=%s POST=%s\n' "$fn" \
+    "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS https://$REF.supabase.co/functions/v1/$fn)" \
+    "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://$REF.supabase.co/functions/v1/$fn)"
+done
+# food-barcode is GET-only; unauthenticated GET should be 401, not POST
+printf '%-20s OPTIONS=%s GET=%s\n' food-barcode \
+  "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS https://$REF.supabase.co/functions/v1/food-barcode)" \
+  "$(curl -s -o /dev/null -w '%{http_code}' https://$REF.supabase.co/functions/v1/food-barcode)"
 ```
-Expect OPTIONS 200/204 and POST 401 for every function.
+Expect OPTIONS 200/204 and POST 401 for every function in the main loop, and OPTIONS 200/204 +
+GET 401 for `food-barcode`.
 
-Do **not** run `scripts/verify-body-metrics-persistence.mjs` against production (R4 stays FIXED-UNVERIFIED until a disposable stack exists).
+Do **not** run `scripts/verify-body-metrics-persistence.mjs` against production — it targets a
+LOCAL disposable stack only (see `QA_PACK.md`, "Disposable-stack runs"). R4 stays
+FIXED-UNVERIFIED against production until that local run happens.
 
 ## Rollback
-Prefer redeploying the previous function version from git (`git checkout 9931ce3 -- supabase/functions/<fn>` in a scratch worktree, then deploy). Migrations are additive; do not drop the new tables or RPCs, and do not delete production rows.
+Prefer redeploying the previous function version from git (`git checkout 667e8d1 --
+supabase/functions/<fn>` in a scratch worktree, then deploy). `delete-account` has no prior
+version to roll back to — if it must be pulled, remove the function via the Dashboard rather than
+deploying broken code. Migrations are additive or privilege-narrowing only; do not drop the new
+tables, functions, or RPCs, and do not delete production rows.
