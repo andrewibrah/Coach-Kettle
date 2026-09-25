@@ -66,11 +66,11 @@ DO $$
 DECLARE r jsonb; raised boolean := false;
 BEGIN
  r := public.delete_user_data('a0000000-0000-4000-8000-00000000000a');
- ASSERT r = '{"workout_log":3,"workouts":2,"chats":1,"chat_history":null,"event_logs":2,"subscription_events_scrubbed":2}'::jsonb,
+ ASSERT r = '{"workout_log":3,"workouts":2,"chats":1,"chat_history":null,"event_logs":2,"subscription_events_scrubbed":2,"skipped":[]}'::jsonb,
    'unexpected counts ' || r::text;
  -- Idempotent: a retry purges nothing and does not fail.
  r := public.delete_user_data('a0000000-0000-4000-8000-00000000000a');
- ASSERT r = '{"workout_log":0,"workouts":0,"chats":0,"chat_history":null,"event_logs":0,"subscription_events_scrubbed":0}'::jsonb,
+ ASSERT r = '{"workout_log":0,"workouts":0,"chats":0,"chat_history":null,"event_logs":0,"subscription_events_scrubbed":0,"skipped":[]}'::jsonb,
    'retry not idempotent ' || r::text;
  BEGIN
   PERFORM public.delete_user_data(NULL);
@@ -106,7 +106,9 @@ DO $$ BEGIN
 END $$;
 
 -- §0 variant: the live tables have no user_id column (20260113205331_remote_schema).
--- The purge skips them (null count) instead of failing, and still handles the rest.
+-- The purge skips them (null count) instead of failing, still handles the rest, and names
+-- them in "skipped" so the Edge Function can log it. chat_history is absent here (expected
+-- after remote_schema), so it is not reported as skipped.
 SAVEPOINT no_user_id;
 ALTER TABLE public.workouts DROP COLUMN user_id;
 ALTER TABLE public.chats DROP COLUMN user_id;
@@ -116,7 +118,7 @@ DO $$
 DECLARE r jsonb;
 BEGIN
  r := public.delete_user_data('b0000000-0000-4000-8000-00000000000b');
- ASSERT r = '{"workout_log":1,"workouts":null,"chats":null,"chat_history":null,"event_logs":2,"subscription_events_scrubbed":1}'::jsonb,
+ ASSERT r = '{"workout_log":1,"workouts":null,"chats":null,"chat_history":null,"event_logs":2,"subscription_events_scrubbed":1,"skipped":["workouts","chats"]}'::jsonb,
    'unexpected §0 counts ' || r::text;
 END $$;
 RESET ROLE;

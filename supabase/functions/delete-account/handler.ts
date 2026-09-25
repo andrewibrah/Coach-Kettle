@@ -357,11 +357,19 @@ export function createHandler(deps: DeleteAccountDeps) {
     // 5. Rows the auth cascade does not remove (event_logs, subscription_events payloads, and
     // workouts/workout_log/chats whose live FK state is unverified), in one transaction.
     try {
-      const { error } = await deps.admin.rpc("delete_user_data", { p_user_id: uid });
+      const { data, error } = await deps.admin.rpc("delete_user_data", { p_user_id: uid });
       if (error) {
         deps.log(`delete-account: step_failed step=db_purge code=${safeCode(error.code)}`);
         return fail("DB_PURGE_FAILED", 500);
       }
+      // "skipped" names tables that exist without a user_id column, so their rows were not
+      // purged. Not a failure (the auth cascade still runs), but it must not be silent.
+      // Only plain table identifiers are logged.
+      const skipped = (data as { skipped?: unknown } | null)?.skipped;
+      const tables = Array.isArray(skipped)
+        ? skipped.filter((t): t is string => typeof t === "string" && /^[a-z_]{1,63}$/.test(t))
+        : [];
+      if (tables.length > 0) deps.log(`delete-account: purge_skipped tables=${tables.join(",")}`);
     } catch {
       deps.log("delete-account: step_failed step=db_purge code=unknown");
       return fail("DB_PURGE_FAILED", 500);

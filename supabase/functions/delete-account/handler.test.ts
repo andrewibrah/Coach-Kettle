@@ -37,6 +37,7 @@ type Options = {
   listError?: string;
   removeError?: boolean;
   rpcError?: boolean;
+  rpcData?: unknown;
   deleteError?: boolean;
 };
 
@@ -104,7 +105,7 @@ function host(options: Options = {}) {
         rpcs.push({ name, args });
         return options.rpcError
           ? { data: null, error: { message: 'db down', code: 'XX000' } }
-          : { data: { workouts: 0 }, error: null };
+          : { data: 'rpcData' in options ? options.rpcData : { workouts: 0 }, error: null };
       },
       auth: {
         admin: {
@@ -502,6 +503,30 @@ test('DB purge error returns 500 DB_PURGE_FAILED and never deletes the auth user
   assertNoPii(api.logs);
 });
 
+// delete_user_data skips workouts/workout_log/chats whose live table has no user_id column
+// (g11 inventory §0). That must be visible in the logs, but the deletion still completes.
+test('purge that skipped tables logs one purge_skipped line and still deletes the auth user', async () => {
+  const api = host({ rpcData: { workout_log: 0, workouts: null, chats: null, chat_history: null, event_logs: 1, subscription_events_scrubbed: 0, skipped: ['workouts', 'chats'] } });
+  const res = await api.send();
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true });
+  assert.deepEqual(api.logs, ['delete-account: purge_skipped tables=workouts,chats']);
+  assert.deepEqual(api.deletedUsers, [UID]);
+});
+
+test('an empty, missing or malformed skipped list logs nothing and never leaks odd values', async () => {
+  for (const rpcData of [{ skipped: [] }, { workouts: 1 }, null, { skipped: 'workouts' }, { skipped: [42, null] }]) {
+    const api = host({ rpcData });
+    const res = await api.send();
+    assert.equal(res.status, 200);
+    assert.deepEqual(api.logs, []);
+    assert.deepEqual(api.deletedUsers, [UID]);
+  }
+  const api = host({ rpcData: { skipped: ['chats', `x ${UID}`, 'a@b.c'] } });
+  assert.equal((await api.send()).status, 200);
+  assert.deepEqual(api.logs, ['delete-account: purge_skipped tables=chats']);
+});
+
 test('auth delete error returns 500 AUTH_DELETE_FAILED and logs only the error code', async () => {
   const api = host({ deleteError: true });
   const res = await api.send();
@@ -528,6 +553,7 @@ test('no log line or error body contains the uid, email, token or provider secre
   const scenarios: Options[] = [
     { rcStatus: 500 }, { rcThrows: true }, { apple: true }, { apple: true, appleTokenStatus: 400, env: { APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K', APPLE_PRIVATE_KEY: 'not a pem', APPLE_CLIENT_ID: 'c' } },
     { listError: UID }, { removeError: true, tree: { [UID]: [{ name: 'a.jpg', id: '1' }] } }, { rpcError: true }, { deleteError: true },
+    { rpcData: { skipped: ['workouts', 'workout_log', 'chats'] } },
     { token: jwt([{ method: 'password', timestamp: 1 }]) }, { invalidToken: true },
   ];
   for (const options of scenarios) {

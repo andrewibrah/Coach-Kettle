@@ -21,6 +21,34 @@ version ≥ 6 (the atomic-RPC-only version). If it is still at v5 or lower, the 
 still perform a direct table write that this migration revokes, and saves would start failing.
 Deploy `nutrition-targets` to v6+ first, confirm the version, then run `db push`.
 
+## Pre-release read-only production check (run BEFORE release)
+
+Run these in the Supabase SQL editor (or `psql` with a read-only role). They read the catalog
+only and change nothing. Source: `.superpowers/sdd/release-1.0.2-gj/g11-inventory.md` §0.
+
+```sql
+-- Every FK that points at auth.users, with its delete rule
+SELECT c.conrelid::regclass AS tbl, a.attname AS col, c.conname,
+       CASE c.confdeltype WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+            WHEN 'r' THEN 'RESTRICT' WHEN 'a' THEN 'NO ACTION' WHEN 'd' THEN 'SET DEFAULT' END AS on_delete
+FROM pg_constraint c
+JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+WHERE c.contype = 'f' AND c.confrelid = 'auth.users'::regclass
+ORDER BY 1;
+
+-- Confirm workouts / workout_log / chats really have user_id today
+SELECT table_name, column_name FROM information_schema.columns
+WHERE table_schema='public' AND table_name IN ('workouts','workout_log','chats') AND column_name='user_id';
+```
+
+- **First query:** any `NO ACTION` or `RESTRICT` row outside the tables `delete_user_data` purges
+  would make `auth.admin.deleteUser` fail, and deletion returns `AUTH_DELETE_FAILED`. Fix that
+  FK before release.
+- **Second query:** it must return **3 rows** (`workouts`, `workout_log`, `chats`). A missing
+  row means `delete_user_data` cannot purge that table. The user is told their data is gone,
+  but those rows stay, and the function log shows
+  `delete-account: purge_skipped tables=<names>`. Do not release until that is resolved.
+
 ## Commands to run, in order
 
 Run each line separately — do not chain them. Confirm each step's output matches expectations
@@ -89,9 +117,11 @@ None of the migrations in this pass DROP or DELETE user data at migration time.
 Deploy: **body-metrics, chat, coach, daily-feedback, delete-account (NEW), meal-plan,
 nutrition-analyze, revenuecat-webhook, terms-acceptance.**
 
-- **delete-account** is new. `verify_jwt = false` in `config.toml`, like every other function —
-  the handler verifies the bearer itself via `auth.getUser()` on the anon client and returns its
-  own 401. OPTIONS → 200; POST without auth → 401.
+- **delete-account** is new. It is set to `verify_jwt = false` in `config.toml`, like the other
+  functions listed there (functions with no `config.toml` entry, such as body-metrics and
+  nutrition-analyze, keep the platform default). The handler verifies the bearer itself via
+  `auth.getUser()` on the anon client and returns its own 401. OPTIONS → 200; POST without
+  auth → 401.
 - **daily-feedback** and **meal-plan**: only their imported `_shared/nutritionTargetResolution.ts`
   changed, and only by a comment. Deploying them keeps source and deployment identical; this is
   harmless, not a behavior change.
@@ -139,9 +169,42 @@ Do **not** run `scripts/verify-body-metrics-persistence.mjs` against production 
 LOCAL disposable stack only (see `QA_PACK.md`, "Disposable-stack runs"). R4 stays
 FIXED-UNVERIFIED against production until that local run happens.
 
-## Rollback
-Prefer redeploying the previous function version from git (`git checkout 667e8d1 --
-supabase/functions/<fn>` in a scratch worktree, then deploy). `delete-account` has no prior
-version to roll back to — if it must be pulled, remove the function via the Dashboard rather than
-deploying broken code. Migrations are additive or privilege-narrowing only; do not drop the new
-tables, functions, or RPCs, and do not delete production rows.
+## Roll forward, not back
+
+Once the backend is deployed, fix bugs **forward**: patch on `1.0.2`, test, and redeploy the
+one affected function. Never roll back as a reflex.
+
+**Never roll these back:**
+- **`terms-acceptance`: never redeploy the `667e8d1` version (or anything older) once any
+  1.0.2 user has accepted privacy 1.1.0.** The old code compares only the latest acceptance
+  row with `=== "1.0.0"`. Every user who recorded `(1.0.0, 1.1.0)` would be asked to accept
+  again. Their re-accept posts the same pair, which is a duplicate no-op, so they loop forever
+  at a gate they can't dismiss (Decline only signs them out).
+- **`delete-account`: never remove or disable it once the 1.0.2 build is live.** The in-app
+  "Delete account" entry calls it, and App Store Guideline 5.1.1(v) requires in-app deletion
+  to work. If it has a bug, deploy a fix.
+
+**Don't roll back below this release unless it is the last resort.** An older version still
+runs, but it brings back a problem this release fixed:
+- `body-metrics`: back to the service-role client, undoing the least-privilege fix.
+- `chat`, `coach`: back to logging (and for coach, returning) raw OpenAI error bodies.
+- `revenuecat-webhook`: stops acking events for deleted users (FK 23503), so RevenueCat
+  retries them indefinitely.
+- `nutrition-analyze`: loses the 422 "unreadable" status and the confirm-branch 404/400
+  mapping, so the 1.0.2 client's distinct error messages fall back to generic ones.
+
+**Safe to redeploy an earlier version from git** (in a scratch worktree, then
+`supabase functions deploy <fn>`) for a function-local bug, as long as that version's
+request/response contract matches what the 1.0.1 and 1.0.2 clients send:
+- Every function **not** changed in `667e8d1..1.0.2`: chat-history, chats, default-templates,
+  entitlements, exercise-library, food-barcode, food-log, health, history, iap, log-set,
+  next-set, notifications, observability, parse, pr-tracking, profile, programming,
+  resting-hr, workout-templates.
+- `daily-feedback`, `meal-plan`: only a comment changed in their shared import in this release.
+- `nutrition-targets`: only at **v6 or later**. v5 and older write the target tables directly,
+  and migration `20260924000100` revoked those writes, so saves would fail.
+
+**Migrations are one-way.** They are additive or privilege-narrowing. Do not drop
+`delete_user_data`, the new RPCs or tables, and do not re-grant the service_role write
+privileges that `20260924000100` revoked. Do not delete production rows. Fix schema problems
+with a new forward migration.

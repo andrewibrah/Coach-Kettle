@@ -104,25 +104,38 @@ Notes:
 
 1. Manual entry: log a food with all four macros; confirm it appears in today's totals.
 2. **Text analysis error classes (task I4, this pass):** put the device in airplane mode, then
-   submit a text description for AI analysis. Expected message class: "temporarily unavailable"
-   (not the old generic "Could not analyze" string). Restore network.
+   submit a text description for AI analysis. Expected: "Nutrition analysis is temporarily
+   unavailable. Check your connection and try again." It must **not** say "This feature isn't
+   available yet. Please update the app…" (that message is only for a function that isn't
+   deployed) or the old generic "Could not analyze" string. Restore network.
 3. **Photo analysis error classes:** submit a genuinely unreadable/gibberish photo (e.g. a blank
    or solid-color image) for AI analysis. Expected message class: "we couldn't read that — try a
    clearer photo or more detail" (distinct from the network-unavailable message in step 2).
 4. Barcode scan: a recognized product, an incomplete product, and a not-found barcode — confirm
    three distinct outcomes (this was already correct pre-pass; confirm no regression).
-5. **Confirm-branch expiry (I4, flagged as a known, unfixed gap):** analyze a food photo/text,
-   then wait past the confirm window (or otherwise force a stale/expired analysis id) before
-   confirming. Expected (per the report): this still shows one generic "Could not add this food
-   log…" message for 404/409/410 alike — record what actually appears; this is not required to
-   pass, just to confirm the documented gap didn't get worse (e.g. a crash).
+5. **Confirm-branch error classes (task I4 fix round):** confirm errors now show distinct
+   messages. Check the ones you can trigger and record what appears:
+   - **Expired / not found:** analyze a food photo or text and wait past the confirm window
+     (15 minutes) before tapping confirm. Expected: "This analysis expired. Please analyze again."
+   - **Offline:** analyze, then turn on airplane mode before tapping confirm. Expected: "Could not
+     save. Check your connection and try again." Not "update the app". Restore network, then
+     check today's log to see whether the entry was saved before retrying.
+   - Not normally reachable from the UI, listed so you can recognise them:
+     - invalid (the function's 400): "Check every food name, weight, calorie, and macro value."
+     - conflict (409, e.g. a race with another confirm): "Could not confirm this log — check
+       today's log before retrying, it may already be saved."
+     - server trouble (500/502/503): same text as offline.
+     - not deployed (the platform's 404, not the function's own): "This feature isn't available
+       yet. Please update the app or try later." This should never appear once the backend is
+       deployed. If it does, record it.
 6. Edit and delete a logged entry; confirm totals update.
 7. Meal plan: generate a weekly plan (Pro sandbox only), confirm 7 days × correct meal slots.
 8. Cross midnight (or change device clock/timezone) and confirm the nutrition day rolls over
    without losing the prior day's log.
 
 Expected: error message shown to the user matches its class (unavailable vs. unreadable vs.
-not-deployed vs. generic), never the same string for airplane-mode and a bad photo.
+not-deployed vs. generic), never the same string for airplane-mode and a bad photo, and
+airplane mode never says "update the app".
 Readback: Nutrition day view after relaunch shows the logged entries and correct running totals
 for the day they were logged against.
 
@@ -299,6 +312,19 @@ Notes:
 Use **disposable account only**. Do not run this against Andrew's real account or any account
 with data you need to keep.
 
+**Pre-release production check (Andrew, read-only, BEFORE release):** run the two queries in
+`DEPLOY_RUNBOOK.md` → "Pre-release read-only production check". The FK query must show no
+`NO ACTION`/`RESTRICT` row outside the purged tables. The `user_id` query must return 3 rows
+(`workouts`, `workout_log`, `chats`). The second query is:
+
+```sql
+SELECT table_name, column_name FROM information_schema.columns
+WHERE table_schema='public' AND table_name IN ('workouts','workout_log','chats') AND column_name='user_id';
+```
+
+Result: PASS / FAIL / BLOCKED
+Evidence:
+
 1. **DA-01 — reachability:** Settings → confirm a "Delete account" row exists, is styled with a
    danger token (not a hardcoded hex), and is ≥44pt tall.
 2. **DA-02 — typed confirmation gate:** tap it, confirm the delete screen requires typing the
@@ -318,7 +344,9 @@ with data you need to keep.
    account's original credentials fails, or a new sign-up with the same email creates a genuinely
    fresh account (no leftover data); (c) in the RevenueCat dashboard, the deleted user's customer
    record is gone (or shows as deleted); (d) in the Supabase Storage dashboard, the
-   `workout-media/{uid}/` folder for that user is empty.
+   `workout-media/{uid}/` folder for that user is empty; (e) the `delete-account` function log
+   for this deletion has no `purge_skipped` line. If it has one, the named tables were not
+   purged; record it as a FAIL.
 5. **DA-05 — Apple token revocation (best-effort):** if `APPLE_TEAM_ID`/`APPLE_KEY_ID`/
    `APPLE_CLIENT_ID`/`APPLE_PRIVATE_KEY` secrets are set (see the runbook), confirm the function
    log for the deletion does **not** contain `apple_revoke_failed`. If those secrets are not yet

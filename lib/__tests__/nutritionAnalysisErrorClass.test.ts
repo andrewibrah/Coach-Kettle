@@ -9,8 +9,9 @@ vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../nutrition.ts', im
 });
 
 // The "couldn't analyze" copy must not conflate a downed provider (OpenAI
-// non-2xx/timeout -> the function's 502), an unreadable meal (the function's
-// 400/413/422), and a missing deployment (404 / no network) into one message.
+// non-2xx/timeout -> the function's 502) or no network, an unreadable meal
+// (the function's 400/413/422), and a missing deployment (platform 404) into
+// one message.
 test('classifies a downed provider as unavailable', () => {
   assert.equal(exports.classifyNutritionAnalysisError(new Error('HTTP 502: {"error":"Nutrition analysis failed"}')), 'unavailable');
   assert.equal(exports.classifyNutritionAnalysisError(new Error('HTTP 503: {"error":"Nutrition analysis is unavailable"}')), 'unavailable');
@@ -22,9 +23,24 @@ test('classifies the function rejecting malformed input/output as unreadable', (
   assert.equal(exports.classifyNutritionAnalysisError(new Error('HTTP 422: {"error":"Could not read that meal"}')), 'unreadable');
 });
 
-test('classifies a missing function or no network as not_deployed', () => {
+test('classifies a platform 404 (function not deployed) as not_deployed', () => {
   assert.equal(exports.classifyNutritionAnalysisError(new Error('HTTP 404: not found')), 'not_deployed');
-  assert.equal(exports.classifyNutritionAnalysisError(new TypeError('Network request failed')), 'not_deployed');
+  assert.equal(exports.classifyNutritionAnalysisError(new Error('HTTP 404: {"code":"NOT_FOUND","message":"Requested function was not found"}')), 'not_deployed');
+});
+
+// Weak gym signal is the common case: offline, a fetch timeout, or an abort
+// must say "check your connection", never "update the app".
+test('classifies offline, timeout and abort as unavailable, not not_deployed', () => {
+  assert.equal(exports.classifyNutritionAnalysisError(new TypeError('Network request failed')), 'unavailable');
+  assert.equal(exports.classifyNutritionAnalysisError(new TypeError('Network request timed out')), 'unavailable');
+  const abort = new Error('Aborted');
+  abort.name = 'AbortError';
+  assert.equal(exports.classifyNutritionAnalysisError(abort), 'unavailable');
+  assert.match(exports.nutritionAnalysisErrorMessage(new TypeError('Network request failed'), 'text'), /temporarily unavailable.*connection/);
+});
+
+test('a 404 carrying the function\'s own JSON error body is not read as a missing deployment', () => {
+  assert.equal(exports.classifyNutritionAnalysisError(new Error('HTTP 404: {"error":"Analysis not found"}')), 'other');
 });
 
 test('falls back to other for anything unrecognized', () => {
@@ -35,7 +51,7 @@ test('falls back to other for anything unrecognized', () => {
 test('nutritionAnalysisErrorMessage gives a distinct, honest message per class', () => {
   const unavailable = exports.nutritionAnalysisErrorMessage(new Error('HTTP 502: x'), 'text');
   const unreadable = exports.nutritionAnalysisErrorMessage(new Error('HTTP 422: x'), 'text');
-  const notDeployed = exports.nutritionAnalysisErrorMessage(new TypeError('Network request failed'), 'text');
+  const notDeployed = exports.nutritionAnalysisErrorMessage(new Error('HTTP 404: not found'), 'text');
   assert.notEqual(unavailable, unreadable);
   assert.notEqual(unavailable, notDeployed);
   assert.notEqual(unreadable, notDeployed);
@@ -64,7 +80,17 @@ test('classifies an expired or already-confirmed analysis session', () => {
 
 test('classifies a platform 404 (missing deployment) differently from the function\'s own not-found body', () => {
   assert.equal(exports.classifyNutritionConfirmError(new Error('HTTP 404: Cannot POST /functions/v1/nutrition-analyze')), 'not_deployed');
-  assert.equal(exports.classifyNutritionConfirmError(new TypeError('Network request failed')), 'not_deployed');
+  assert.equal(exports.classifyNutritionConfirmError(new Error('HTTP 404: {"code":"NOT_FOUND","message":"Requested function was not found"}')), 'not_deployed');
+  assert.equal(exports.classifyNutritionConfirmError(new Error('HTTP 404: {"error":"Something else"}')), 'other');
+});
+
+test('classifies confirm offline, timeout and abort as unavailable, not not_deployed', () => {
+  assert.equal(exports.classifyNutritionConfirmError(new TypeError('Network request failed')), 'unavailable');
+  assert.equal(exports.classifyNutritionConfirmError(new TypeError('Network request timed out')), 'unavailable');
+  const abort = new Error('Aborted');
+  abort.name = 'AbortError';
+  assert.equal(exports.classifyNutritionConfirmError(abort), 'unavailable');
+  assert.match(exports.nutritionConfirmErrorMessage(new TypeError('Network request failed')), /connection/);
 });
 
 test('classifies a confirm RPC conflict and the function\'s own validation separately', () => {
@@ -83,7 +109,7 @@ test('nutritionConfirmErrorMessage gives a distinct, honest message per class', 
     exports.nutritionConfirmErrorMessage(new Error('HTTP 409: {"error":"Confirmation failed"}')),
     exports.nutritionConfirmErrorMessage(new Error('HTTP 400: {"error":"Invalid confirmation"}')),
     exports.nutritionConfirmErrorMessage(new Error('HTTP 500: x')),
-    exports.nutritionConfirmErrorMessage(new TypeError('Network request failed')),
+    exports.nutritionConfirmErrorMessage(new Error('HTTP 404: {"code":"NOT_FOUND","message":"Requested function was not found"}')),
     exports.nutritionConfirmErrorMessage(new Error('HTTP 401: nope')),
   ];
   assert.equal(new Set(messages).size, messages.length, 'every confirm class must read differently');

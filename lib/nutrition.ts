@@ -39,24 +39,45 @@ export function isRetryableNutritionError(error: unknown): boolean {
  * The three classes a text/photo nutrition-analysis failure can honestly be
  * put into, so "couldn't analyze" doesn't conflate them:
  * - `unavailable`: the provider is down (OpenAI non-2xx/timeout -> the
- *   function's 502/503).
+ *   function's 502/503), or the request never got a response (offline,
+ *   fetch timeout, abort).
  * - `unreadable`: the input or the model's own output didn't validate (the
  *   function's 400/413/422).
- * - `not_deployed`: the function can't be reached at all (404, or no
- *   network).
+ * - `not_deployed`: the platform's 404 for a function that isn't deployed
+ *   (a body that isn't the function's own `{"error": ...}` shape).
  * - `other`: anything else (e.g. 401), left to existing generic handling.
  */
 export type NutritionAnalysisErrorClass = 'unavailable' | 'unreadable' | 'not_deployed' | 'other';
 
 const HTTP_STATUS = /^HTTP (\d+):/;
 
+// No response at all: offline/fetch failure, RN's fetch timeout TypeError, or
+// an abort. Broader than isRetryableNutritionError, which also gates the
+// offline save queue and is deliberately left as is.
+function isNoResponseError(error: unknown): boolean {
+  if (isRetryableNutritionError(error)) return true;
+  if (error instanceof TypeError && /network request timed out/i.test(error.message)) return true;
+  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+}
+
+// Every nutrition-analyze error body is `{"error": "<string>"}`; the platform's
+// not-found for an undeployed function is not.
+function hasFunctionErrorBody(message: string): boolean {
+  try {
+    const body: unknown = JSON.parse(message.replace(HTTP_STATUS, ''));
+    return typeof body === 'object' && body !== null && typeof (body as { error?: unknown }).error === 'string';
+  } catch {
+    return false;
+  }
+}
+
 export function classifyNutritionAnalysisError(error: unknown): NutritionAnalysisErrorClass {
-  if (isRetryableNutritionError(error)) return 'not_deployed';
+  if (isNoResponseError(error)) return 'unavailable';
   if (error instanceof Error) {
     const match = HTTP_STATUS.exec(error.message);
     if (match) {
       const status = Number(match[1]);
-      if (status === 404) return 'not_deployed';
+      if (status === 404) return hasFunctionErrorBody(error.message) ? 'other' : 'not_deployed';
       if (status === 502 || status === 503) return 'unavailable';
       if (status === 400 || status === 413 || status === 422) return 'unreadable';
     }
@@ -67,7 +88,7 @@ export function classifyNutritionAnalysisError(error: unknown): NutritionAnalysi
 export function nutritionAnalysisErrorMessage(error: unknown, mode: 'text' | 'photo'): string {
   switch (classifyNutritionAnalysisError(error)) {
     case 'unavailable':
-      return 'Nutrition analysis is temporarily unavailable. Please try again.';
+      return 'Nutrition analysis is temporarily unavailable. Check your connection and try again.';
     case 'unreadable':
       return "We couldn't read that — try a clearer photo or more detail.";
     case 'not_deployed':
@@ -93,9 +114,10 @@ export function nutritionAnalysisErrorMessage(error: unknown, mode: 'text' | 'ph
  *   for a reason other than not-found/expired/invalid-shape — most likely a
  *   race with another confirm of the same session.
  * - `invalid`: the function's own 400 (shape it rejects up front).
- * - `unavailable`: infra trouble (500/502/503) — not the user's fault.
- * - `not_deployed`: 404 without the "Analysis not found" marker, or no
- *   network.
+ * - `unavailable`: infra trouble (500/502/503) or no response at all
+ *   (offline, fetch timeout, abort) — not the user's fault.
+ * - `not_deployed`: the platform's 404 for an undeployed function (a body
+ *   that isn't the function's own `{"error": ...}` shape).
  * - `other`: anything else (e.g. 401), left to existing generic handling.
  */
 export type NutritionConfirmErrorClass = 'expired' | 'conflict' | 'invalid' | 'unavailable' | 'not_deployed' | 'other';
@@ -103,13 +125,14 @@ export type NutritionConfirmErrorClass = 'expired' | 'conflict' | 'invalid' | 'u
 const CONFIRM_NOT_FOUND_MARKER = 'Analysis not found';
 
 export function classifyNutritionConfirmError(error: unknown): NutritionConfirmErrorClass {
-  if (isRetryableNutritionError(error)) return 'not_deployed';
+  if (isNoResponseError(error)) return 'unavailable';
   if (error instanceof Error) {
     const match = HTTP_STATUS.exec(error.message);
     if (match) {
       const status = Number(match[1]);
       if (status === 404) {
-        return error.message.includes(CONFIRM_NOT_FOUND_MARKER) ? 'expired' : 'not_deployed';
+        if (!hasFunctionErrorBody(error.message)) return 'not_deployed';
+        return error.message.includes(CONFIRM_NOT_FOUND_MARKER) ? 'expired' : 'other';
       }
       if (status === 410) return 'expired';
       if (status === 409) return 'conflict';
@@ -129,7 +152,7 @@ export function nutritionConfirmErrorMessage(error: unknown): string {
     case 'invalid':
       return 'Check every food name, weight, calorie, and macro value.';
     case 'unavailable':
-      return 'Could not save. Please try again.';
+      return 'Could not save. Check your connection and try again.';
     case 'not_deployed':
       return "This feature isn't available yet. Please update the app or try later.";
     default:

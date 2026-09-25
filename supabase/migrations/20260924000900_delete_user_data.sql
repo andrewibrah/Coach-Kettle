@@ -7,6 +7,9 @@
 --     (20260113205331_remote_schema drops both, live code still filters by user_id).
 --     Each is deleted only if public.<table>.user_id exists. Deleting them explicitly also
 --     means a NO ACTION FK left on any of them cannot block the auth delete.
+--     A table that exists but has no user_id column is listed in the result's "skipped"
+--     array (always present, empty when nothing was skipped) so the Edge Function can log
+--     it; an absent table (chat_history, expected after remote_schema) is not.
 --     workout_log goes before workouts; workout_media rows cascade from workouts (0027:7).
 --   - event_logs: user_id has no FK (0007:10).
 --   - subscription_events: FK is ON DELETE SET NULL (0028:61) and raw_payload keeps the
@@ -28,6 +31,7 @@ DECLARE
   t text;
   n bigint;
   result jsonb := '{}'::jsonb;
+  skipped jsonb := '[]'::jsonb;
 BEGIN
   IF p_user_id IS NULL THEN
     RAISE EXCEPTION 'delete_user_data: user id is required' USING ERRCODE = '22004';
@@ -43,6 +47,9 @@ BEGIN
       result := result || jsonb_build_object(t, n);
     ELSE
       result := result || jsonb_build_object(t, NULL);
+      IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
+        skipped := skipped || to_jsonb(t);
+      END IF;
     END IF;
   END LOOP;
 
@@ -55,7 +62,7 @@ BEGIN
   GET DIAGNOSTICS n = ROW_COUNT;
   result := result || jsonb_build_object('subscription_events_scrubbed', n);
 
-  RETURN result;
+  RETURN result || jsonb_build_object('skipped', skipped);
 END;
 $$;
 COMMENT ON FUNCTION public.delete_user_data(uuid) IS
