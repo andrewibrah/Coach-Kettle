@@ -1,6 +1,6 @@
-const { withPodfile } = require('@expo/config-plugins');
+const { withPodfile } = require('expo/config-plugins');
 
-// Several third-party pods (RNSVG, RevenueCat, RNCAsyncStorage, SDWebImage, Sentry, etc.)
+// Several third-party pods (RNSVG, RevenueCat, RNCAsyncStorage, SDWebImage, etc.)
 // ship podspecs with iOS deployment targets older than current Xcode supports, which makes
 // `pod install` / `xcodebuild` fail with:
 //   "The iOS Simulator deployment target ... is set to X, but the range of supported
