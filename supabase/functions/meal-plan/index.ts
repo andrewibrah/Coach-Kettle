@@ -1,6 +1,6 @@
 // Deploy ONLY with service-only replace_meal_plan and read_meal_plan RPCs.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { requireEntitlement } from "../_shared/entitlements.ts";
 import { loadApprovedNutritionTargetInputs } from "../_shared/nutritionTargetLoading.ts";
 import { resolveApprovedNutritionTarget } from "../_shared/nutritionTargetResolution.ts";

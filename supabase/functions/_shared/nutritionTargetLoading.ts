@@ -1,4 +1,4 @@
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.48.0';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.50.1';
 import type { LegacyTargetInput, SavedTargetInput } from './nutritionTargetResolution.ts';
 
 type SavedSnapshot = SavedTargetInput & {

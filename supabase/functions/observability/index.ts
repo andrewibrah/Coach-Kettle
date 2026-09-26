@@ -2,7 +2,7 @@
 // Accepts log events and inserts into public.event_logs.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",

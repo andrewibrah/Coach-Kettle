@@ -3,7 +3,7 @@
 // Env: APPLE_SHARED_SECRET — run: supabase secrets set APPLE_SHARED_SECRET=<your_secret>
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { compactVerify, importX509 } from "https://deno.land/x/jose@v5.9.3/index.ts";
 
 const corsHeaders = {
