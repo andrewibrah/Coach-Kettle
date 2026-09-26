@@ -5,6 +5,11 @@ import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+// Private RN module (no public API exposes it). Its default export's
+// handleException is where RN 0.86 sends uncaught React errors
+// (src/private/renderer/errorhandling/ErrorHandlers.js onUncaughtError) and,
+// via setUpErrorHandling.js, the ErrorUtils global handler's errors too.
+import ExceptionsManager from 'react-native/Libraries/Core/ExceptionsManager';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthLockProvider } from '@/contexts/AuthLockProvider';
@@ -24,10 +29,13 @@ import { RestTimerToast } from '@/components/workout/RestTimerToast';
 import { ThemedText } from '@/components/ui/themed-text';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { formatCrashAlert, installCrashCapture, takeCrashRecord } from '@/lib/crashCapture';
+import { crashAlertTitle, formatCrashAlert, installCrashCapture, takeCrashRecord } from '@/lib/crashCapture';
 
-// Module scope so it is in place before the first render.
-installCrashCapture(ErrorUtils, Constants.expoConfig?.version ?? null);
+// Module scope so it is in place before the first render. buildNumber is the
+// binary's CFBundleVersion (the TestFlight build), not the app.json value.
+const buildNumber = Constants.platform?.ios?.buildNumber;
+const appVersion = Constants.expoConfig?.version ?? null;
+installCrashCapture(ExceptionsManager, appVersion && buildNumber ? `${appVersion} (${buildNumber})` : appVersion);
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -35,6 +43,8 @@ export const unstable_settings = {
 
 // expo-router renders this instead of the root layout when it throws while
 // rendering, so the message is on screen rather than aborting the app.
+// https://docs.expo.dev/router/error-handling/ (contract: expo-router
+// build/views/Try.d.ts ErrorBoundaryProps { error, retry }).
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const background = useThemeColor({}, 'background');
   const danger = useThemeColor({}, 'danger');
@@ -59,7 +69,7 @@ function RootLayout() {
   useEffect(() => {
     takeCrashRecord()
       .then((record) => {
-        if (record) Alert.alert('The app crashed last time', formatCrashAlert(record));
+        if (record) Alert.alert(crashAlertTitle(record), formatCrashAlert(record));
       })
       .catch(() => {});
   }, []);

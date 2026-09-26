@@ -27,20 +27,41 @@ export type CrashRecord = {
   appVersion: string | null;
 };
 
-type GlobalHandler = (error: any, isFatal?: boolean) => void;
+type HandleException = (error: unknown, isFatal: boolean) => void;
 
-type ErrorUtilsLike = {
-  getGlobalHandler: () => GlobalHandler;
-  setGlobalHandler: (handler: GlobalHandler) => void;
-};
+// Shape of react-native's ExceptionsManager default export.
+type ExceptionsManagerLike = { handleException: HandleException };
+
+const INSTALLED = Symbol.for('coachkettle.crashCapture.installed');
 
 function scrub(text: string): string {
   return text
     .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, '[token]')
+    .replace(/\b((?:access|refresh|provider|provider_refresh|id)_token|code)=[^&#\s]+/g, '$1=[redacted]')
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[id]')
     .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[email]');
 }
 
-export async function recordCrash(error: unknown, isFatal: boolean, appVersion: string | null): Promise<void> {
+// Serialises writes so a non-fatal error can never land after (and over) a fatal one.
+let writeQueue: Promise<void> = Promise.resolve();
+
+/** Stores the error, unless it is non-fatal and a fatal record is already waiting to be shown. */
+export function recordCrash(error: unknown, isFatal: boolean, appVersion: string | null): Promise<void> {
+  const write = writeQueue.then(() => writeRecord(error, isFatal, appVersion));
+  writeQueue = write.catch(() => {});
+  return write;
+}
+
+async function writeRecord(error: unknown, isFatal: boolean, appVersion: string | null): Promise<void> {
+  if (!isFatal) {
+    const existing = await AsyncStorage.getItem(CRASH_RECORD_KEY);
+    try {
+      if (existing !== null && (JSON.parse(existing) as CrashRecord).isFatal) return;
+    } catch {
+      // Corrupt record: overwrite it.
+    }
+  }
+
   const err = error as { message?: unknown; stack?: unknown } | null;
   const message = typeof err?.message === 'string' ? err.message : String(error);
   const stack = typeof err?.stack === 'string' ? err.stack.slice(0, MAX_STACK_LENGTH) : null;
@@ -66,6 +87,10 @@ export async function takeCrashRecord(): Promise<CrashRecord | null> {
   }
 }
 
+export function crashAlertTitle(record: CrashRecord): string {
+  return record.isFatal ? 'The app crashed last time' : 'An error occurred last time';
+}
+
 export function formatCrashAlert(record: CrashRecord): string {
   const stackLines = record.stack ? record.stack.split('\n').slice(0, ALERT_STACK_LINES).join('\n') : '';
   return [record.message, stackLines, `${record.timestamp}${record.appVersion ? ` · ${record.appVersion}` : ''}`]
@@ -74,18 +99,25 @@ export function formatCrashAlert(record: CrashRecord): string {
 }
 
 /**
- * Records every uncaught error, then chains to the previous global handler.
- * Fatal errors wait for the write (bounded by FATAL_WRITE_TIMEOUT_MS) so the
- * record lands before the abort; non-fatal errors chain immediately.
+ * Wraps react-native's ExceptionsManager.handleException, the single sink for
+ * both uncaught React render/effect/commit errors (renderer onUncaughtError /
+ * onCaughtError) and errors reported through ErrorUtils (setUpErrorHandling's
+ * global handler delegates to it). Records every error, then calls the
+ * original exactly once: fatal errors wait for the write (bounded by
+ * FATAL_WRITE_TIMEOUT_MS) so the record lands before the abort; non-fatal
+ * errors are handed over immediately.
  */
-export function installCrashCapture(errorUtils: ErrorUtilsLike, appVersion: string | null): void {
-  const previous = errorUtils.getGlobalHandler();
+export function installCrashCapture(exceptionsManager: ExceptionsManagerLike, appVersion: string | null): void {
+  const current = exceptionsManager.handleException as HandleException & { [INSTALLED]?: true };
+  // Fast Refresh re-runs the installing module; never stack a second wrapper.
+  if (current[INSTALLED]) return;
+  const original = current;
 
-  errorUtils.setGlobalHandler((error, isFatal) => {
+  const wrapped: HandleException & { [INSTALLED]?: true } = (error, isFatal) => {
     const write = recordCrash(error, !!isFatal, appVersion).catch(() => {});
 
     if (!isFatal) {
-      previous(error, isFatal);
+      original(error, isFatal);
       return;
     }
 
@@ -95,7 +127,9 @@ export function installCrashCapture(errorUtils: ErrorUtilsLike, appVersion: stri
     });
     Promise.race([write, timeout]).then(() => {
       clearTimeout(timer);
-      previous(error, isFatal);
+      original(error, isFatal);
     });
-  });
+  };
+  wrapped[INSTALLED] = true;
+  exceptionsManager.handleException = wrapped;
 }

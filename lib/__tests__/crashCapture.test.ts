@@ -52,13 +52,14 @@ function loadCrashCapture(storage: Storage, timers: { setTimeout: typeof setTime
   return exports;
 }
 
-function fakeErrorUtils(previous: (error: any, isFatal?: boolean) => void) {
-  let handler = previous;
-  return {
-    getGlobalHandler: () => handler,
-    setGlobalHandler: (next: typeof previous) => { handler = next; },
-    fire: (error: any, isFatal?: boolean) => handler(error, isFatal),
-  };
+// Stands in for react-native's ExceptionsManager default export: callers
+// (ErrorHandlers.onUncaughtError, setUpErrorHandling's ErrorUtils handler) look
+// `handleException` up on the object at call time.
+function fakeExceptionsManager(original: (error: any, isFatal: boolean) => void) {
+  const host = { handleException: original };
+  return Object.assign(host, {
+    fire: (error: any, isFatal: boolean) => host.handleException(error, isFatal),
+  });
 }
 
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEyMyJ9.c2lnbmF0dXJlX2hlcmU';
@@ -67,13 +68,14 @@ test('the crash key survives sign-out: clearAllCaches never matches it', () => {
   const { storage } = memoryStorage();
   const { CRASH_RECORD_KEY } = loadCrashCapture(storage);
   assert.equal(typeof CRASH_RECORD_KEY, 'string');
-  // Mirrors the prefix/substring filter in contexts/AuthProvider.tsx clearAllCaches().
-  assert.equal(
-    CRASH_RECORD_KEY.startsWith('sb-') || CRASH_RECORD_KEY.includes('supabase') ||
-      CRASH_RECORD_KEY.includes('auth') || CRASH_RECORD_KEY.startsWith('coach-kettle:nutrition'),
-    false,
-  );
-  assert.equal(read('contexts/AuthProvider.tsx').includes(CRASH_RECORD_KEY), false);
+  const authProvider = read('contexts/AuthProvider.tsx');
+  // Read the key filter from clearAllCaches() itself so the test follows it.
+  const prefixes = [...authProvider.matchAll(/key\.startsWith\('([^']+)'\)/g)].map((m) => m[1]);
+  const substrings = [...authProvider.matchAll(/key\.includes\('([^']+)'\)/g)].map((m) => m[1]);
+  assert.ok(prefixes.length > 0 && substrings.length > 0, 'clearAllCaches key filter not found');
+  for (const prefix of prefixes) assert.equal(CRASH_RECORD_KEY.startsWith(prefix), false, prefix);
+  for (const part of substrings) assert.equal(CRASH_RECORD_KEY.includes(part), false, part);
+  assert.equal(authProvider.includes(CRASH_RECORD_KEY), false);
 });
 
 test('recordCrash stores message, stack, isFatal, timestamp and app version; takeCrashRecord reads once then clears', async () => {
@@ -135,12 +137,12 @@ test('fatal: the original handler runs only after the write resolves', async () 
   const { storage, releaseWrites } = memoryStorage({ holdWrites: true });
   const { installCrashCapture, CRASH_RECORD_KEY } = loadCrashCapture(storage);
   const order: string[] = [];
-  const errorUtils = fakeErrorUtils((_error, isFatal) => {
+  const exceptionsManager = fakeExceptionsManager((_error, isFatal) => {
     order.push(`original:${isFatal}:${storage.data.has(CRASH_RECORD_KEY)}`);
   });
-  installCrashCapture(errorUtils, null);
+  installCrashCapture(exceptionsManager, null);
 
-  errorUtils.fire(new Error('fatal boom'), true);
+  exceptionsManager.fire(new Error('fatal boom'), true);
   await tick();
   assert.deepEqual(order, []);
 
@@ -158,10 +160,10 @@ test('fatal: the original handler still runs after the 500 ms timeout if the wri
   };
   const { installCrashCapture } = loadCrashCapture(storage, timers);
   const order: string[] = [];
-  const errorUtils = fakeErrorUtils(() => { order.push('original'); });
-  installCrashCapture(errorUtils, null);
+  const exceptionsManager = fakeExceptionsManager(() => { order.push('original'); });
+  installCrashCapture(exceptionsManager, null);
 
-  errorUtils.fire(new Error('fatal boom'), true);
+  exceptionsManager.fire(new Error('fatal boom'), true);
   await tick();
   assert.deepEqual(order, []);
   assert.equal(scheduled.length, 1);
@@ -176,12 +178,13 @@ test('non-fatal: the original handler runs immediately and the error is still re
   const { storage, releaseWrites } = memoryStorage({ holdWrites: true });
   const { installCrashCapture, takeCrashRecord } = loadCrashCapture(storage);
   const order: string[] = [];
-  const errorUtils = fakeErrorUtils((error, isFatal) => { order.push(`original:${error.message}:${isFatal}`); });
-  installCrashCapture(errorUtils, null);
+  const exceptionsManager = fakeExceptionsManager((error, isFatal) => { order.push(`original:${error.message}:${isFatal}`); });
+  installCrashCapture(exceptionsManager, null);
 
-  errorUtils.fire(new Error('soft'), false);
+  exceptionsManager.fire(new Error('soft'), false);
   assert.deepEqual(order, ['original:soft:false']);
 
+  await tick();
   releaseWrites();
   await tick();
   const record = await takeCrashRecord();
@@ -194,10 +197,10 @@ test('a failing storage write never swallows the crash', async () => {
   storage.setItem = () => Promise.reject(new Error('disk full'));
   const { installCrashCapture } = loadCrashCapture(storage);
   const order: string[] = [];
-  const errorUtils = fakeErrorUtils(() => { order.push('original'); });
-  installCrashCapture(errorUtils, null);
+  const exceptionsManager = fakeExceptionsManager(() => { order.push('original'); });
+  installCrashCapture(exceptionsManager, null);
 
-  errorUtils.fire(new Error('fatal boom'), true);
+  exceptionsManager.fire(new Error('fatal boom'), true);
   await tick();
   assert.deepEqual(order, ['original']);
 });
@@ -212,4 +215,92 @@ test('formatCrashAlert shows the message and only the first stack lines', () => 
   assert.equal(text.includes('at g'), false);
   assert.ok(text.includes('2026-09-26T19:31:08.000Z'));
   assert.ok(text.includes('1.0.2'));
+});
+
+test('the original handleException is called exactly once per error', async () => {
+  const { storage } = memoryStorage();
+  const { installCrashCapture } = loadCrashCapture(storage);
+  let calls = 0;
+  const exceptionsManager = fakeExceptionsManager(() => { calls++; });
+  installCrashCapture(exceptionsManager, null);
+
+  exceptionsManager.fire(new Error('fatal'), true);
+  exceptionsManager.fire(new Error('soft'), false);
+  await tick();
+  assert.equal(calls, 2);
+});
+
+test('installing twice (Fast Refresh) does not stack wrappers', async () => {
+  const { storage } = memoryStorage();
+  const { installCrashCapture } = loadCrashCapture(storage);
+  let calls = 0;
+  const writes: string[] = [];
+  const setItem = storage.setItem;
+  storage.setItem = (key, value) => { writes.push(key); return setItem(key, value); };
+  const exceptionsManager = fakeExceptionsManager(() => { calls++; });
+  installCrashCapture(exceptionsManager, null);
+  const wrapped = exceptionsManager.handleException;
+  installCrashCapture(exceptionsManager, null);
+  assert.equal(exceptionsManager.handleException, wrapped);
+
+  exceptionsManager.fire(new Error('fatal'), true);
+  await tick();
+  assert.equal(calls, 1);
+  assert.equal(writes.length, 1);
+});
+
+test('a non-fatal error never overwrites a stored fatal record', async () => {
+  const { storage } = memoryStorage();
+  const { recordCrash, takeCrashRecord } = loadCrashCapture(storage);
+  await recordCrash(new Error('the crash'), true, null);
+  await recordCrash(new Error('noise afterwards'), false, null);
+  const record = await takeCrashRecord();
+  assert.equal(record.message, 'the crash');
+  assert.equal(record.isFatal, true);
+});
+
+test('a non-fatal error raised while the fatal write is in flight cannot overwrite it', async () => {
+  const { storage, releaseWrites } = memoryStorage({ holdWrites: true });
+  const { recordCrash, takeCrashRecord } = loadCrashCapture(storage);
+  const fatal = recordCrash(new Error('the crash'), true, null);
+  const soft = recordCrash(new Error('noise'), false, null);
+  await tick();
+  releaseWrites();
+  await fatal;
+  await tick();
+  releaseWrites();
+  await soft;
+  const record = await takeCrashRecord();
+  assert.equal(record.message, 'the crash');
+});
+
+test('a later fatal replaces an earlier non-fatal record', async () => {
+  const { storage } = memoryStorage();
+  const { recordCrash, takeCrashRecord } = loadCrashCapture(storage);
+  await recordCrash(new Error('noise'), false, null);
+  await recordCrash(new Error('the crash'), true, null);
+  assert.equal((await takeCrashRecord()).message, 'the crash');
+});
+
+test('auth callback params and UUIDs are scrubbed', async () => {
+  const { storage } = memoryStorage();
+  const { recordCrash, takeCrashRecord } = loadCrashCapture(storage);
+  await recordCrash(
+    new Error('bad url coachkettle://auth/callback?code=abc-123&x=1#access_token=opaque1&refresh_token=r3fr35h&provider_token=pt for 0f8fad5b-d9cb-469f-a165-70867728950e'),
+    true,
+    null,
+  );
+  const record = await takeCrashRecord();
+  assert.equal(
+    record.message,
+    'bad url coachkettle://auth/callback?code=[redacted]&x=1#access_token=[redacted]&refresh_token=[redacted]&provider_token=[redacted] for [id]',
+  );
+});
+
+test('crashAlertTitle distinguishes a crash from a non-fatal error', () => {
+  const { storage } = memoryStorage();
+  const { crashAlertTitle } = loadCrashCapture(storage);
+  const base = { message: 'x', stack: null, timestamp: '2026-09-26T19:31:08.000Z', appVersion: null };
+  assert.equal(crashAlertTitle({ ...base, isFatal: true }), 'The app crashed last time');
+  assert.equal(crashAlertTitle({ ...base, isFatal: false }), 'An error occurred last time');
 });
