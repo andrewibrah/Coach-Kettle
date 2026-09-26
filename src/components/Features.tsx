@@ -4,42 +4,42 @@ const features = [
   {
     title: "Natural Language",
     description:
-      'Type "Bench 185 x 8" or "Squat 225 3x5" — parsed instantly, no forms required.',
+      'Type "Bench 185 x 8" or "Squat 225 3x5" — parsed instantly. Drop sets, supersets, and cardio too.',
     rotation: "-1.5deg",
     offsetY: "0px",
   },
   {
-    title: "PR Tracking",
+    title: "Nutrition",
     description:
-      "Personal records detected and celebrated automatically. Never miss a milestone.",
+      "Scan a barcode, snap a photo, or type what you ate. Calories and macros tracked against daily and weekly targets.",
     rotation: "1deg",
     offsetY: "-8px",
   },
   {
-    title: "AI Coaching",
+    title: "Accountability Coach",
     description:
-      "Get real-time lifting tips, form cues, and programming advice tailored to your workouts.",
+      "Reads what you actually logged. Miss sessions or blow your macros and it gets direct. Stack good days and it eases off.",
     rotation: "-0.5deg",
     offsetY: "6px",
   },
   {
-    title: "Gym Media",
+    title: "Programs",
     description:
-      "Attach photos and videos to sessions. Stored privately, never publicly accessible.",
+      "Multi-week plans with weekly progression and scheduled deloads. On a training day, tap Start and your session is loaded.",
     rotation: "1.5deg",
     offsetY: "-6px",
   },
   {
-    title: "History",
+    title: "PRs & Progress",
     description:
-      "Browse sessions, filter by body part, see progression over time at a glance.",
+      "Personal records detected and celebrated automatically. Body weight, measurements, and progress photos in one place.",
     rotation: "-1deg",
     offsetY: "4px",
   },
   {
     title: "Gym-Friendly",
     description:
-      "Minimal taps, big text, instant logging. Built for the gym floor.",
+      "1,300+ exercises with instructions, a built-in rest timer, big text, and offline logging. Built for the gym floor.",
     rotation: "1deg",
     offsetY: "-10px",
   },

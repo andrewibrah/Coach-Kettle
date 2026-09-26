@@ -15,7 +15,7 @@ import AxeBuilder from "@axe-core/playwright";
 /* The app mounts a HashRouter (src/main.tsx), so real URLs are /#/guide, not
    /guide. Navigating to /guide silently serves the Home route, which would
    make this whole suite pass while testing the same page five times. */
-const ROUTES = ["/", "/guide", "/privacy", "/support", "/eula"] as const;
+const ROUTES = ["/", "/guide", "/privacy", "/terms", "/support", "/eula"] as const;
 const url = (route: string) => (route === "/" ? "/#/" : `/#${route}`);
 const hashHref = (route: string) => `#${route}`;
 

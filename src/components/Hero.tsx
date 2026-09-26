@@ -213,7 +213,7 @@ export default function Hero() {
           {/* text-white/35 (#5d5d5d) was 3.08:1 — fails SC 1.4.3 at 11.2px.
               brand-muted is an existing token at 7.20:1. */}
           <p className="animate-fade-up mb-8 text-[0.7rem] font-medium tracking-[0.25em] text-brand-muted" style={{ animationDelay: "0.1s" }}>
-            YOUR AI WORKOUT COACH
+            YOUR AI WORKOUT &amp; NUTRITION COACH
           </p>
 
           {/* Main headline */}
@@ -232,8 +232,9 @@ export default function Hero() {
 
           {/* Description */}
           <p className="animate-fade-up mb-12 max-w-[500px] text-[1rem] font-light leading-[1.8] text-brand-muted" style={{ animationDelay: "0.4s" }}>
-            Type what you lifted. Coach Kettle parses it, tracks your PRs,
-            celebrates milestones, and coaches you — no forms, no friction.
+            Type what you lifted. Scan what you ate. Coach Kettle tracks your
+            PRs, macros, and programs, and tells you exactly where you slipped.
+            No forms, no friction.
           </p>
 
           {/* CTA buttons */}

@@ -97,13 +97,14 @@ export default function Support() {
             <QIcon /> How do I delete my account and data?
           </h3>
           <p className="mb-2 text-sm text-brand-muted">
-            You can request complete account and data deletion in two ways:
+            You can delete your account and data in two ways:
           </p>
           <ol role="list" className="mb-3 space-y-2 pl-5 text-sm text-brand-muted">
             <li className="relative pl-5 before:absolute before:left-0 before:font-bold before:text-brand-text before:content-['1.']">
-              <strong>In-app:</strong> Go to Settings &rarr; Account &rarr;
-              Delete Account. This will permanently delete your account and all
-              associated data.
+              <strong>In-app (version 1.0.2 or later):</strong> Go to Settings
+              &rarr; Delete Account and confirm by signing in again. Deletion
+              happens right away; copies in encrypted backups expire on our
+              database provider's backup schedule.
             </li>
             <li className="relative pl-5 before:absolute before:left-0 before:font-bold before:text-brand-text before:content-['2.']">
               <strong>By email:</strong> Send a deletion request to{" "}
@@ -117,9 +118,57 @@ export default function Support() {
               process it within 30 days.
             </li>
           </ol>
+          <p className="mb-2 text-sm text-brand-muted">
+            Deletion permanently removes your sign-in account, your profile,
+            workouts, nutrition, coach history, programs, personal records, and
+            the photos and videos you stored. This action is irreversible.
+          </p>
           <p className="text-sm text-brand-muted">
-            Deletion removes: your account, all workout sessions, PR records, and
-            any attached photos or videos. This action is irreversible.
+            <strong className="text-brand-text">
+              Deleting your account does not cancel an App Store subscription.
+            </strong>{" "}
+            Cancel it first (see below).
+          </p>
+        </FaqCard>
+
+        <FaqCard>
+          <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
+            <QIcon /> How do I cancel or manage my subscription?
+          </h3>
+          <p className="text-sm text-brand-muted">
+            Subscriptions are billed and managed by Apple. Open Settings &rarr;
+            your name &rarr; Subscriptions on your iPhone, or use Manage
+            Subscription inside Coach Kettle. Subscriptions auto-renew unless
+            cancelled at least 24 hours before the end of the current period.
+            Refund requests go through Apple at{" "}
+            <a
+              href="https://reportaproblem.apple.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-brand-text underline decoration-brand-border underline-offset-2 hover:decoration-brand-text"
+            >
+              reportaproblem.apple.com
+            </a>
+            .
+          </p>
+        </FaqCard>
+
+        <FaqCard>
+          <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
+            <QIcon /> What's free and what's in Pro?
+          </h3>
+          <p className="mb-2 text-sm text-brand-muted">
+            <strong className="text-brand-text">Free:</strong> unlimited workout
+            and nutrition logging, barcode scanning, the exercise library, PR
+            detection, the rest timer, body and progress tracking, your full
+            workout history, 5 AI coach messages per day, and 5 custom
+            templates. No ads.
+          </p>
+          <p className="text-sm text-brand-muted">
+            <strong className="text-brand-text">Pro:</strong> unlimited AI
+            coach messages, AI-generated weekly meal plans, advanced strength
+            analytics (estimated 1RM and volume per session), and unlimited
+            custom templates. Monthly and annual plans are available in the app.
           </p>
         </FaqCard>
 
@@ -145,8 +194,8 @@ export default function Support() {
             <QIcon /> My session disappeared — what happened?
           </h3>
           <p className="mb-2 text-sm text-brand-muted">
-            Coach Kettle saves data locally first (AsyncStorage) and then syncs
-            to the cloud in the background. If you lose a session:
+            Coach Kettle saves data on your phone first and then syncs to the
+            cloud in the background. If you lose a session:
           </p>
           <ul role="list" className="space-y-2 pl-5">
             <Bullet>
@@ -174,10 +223,11 @@ export default function Support() {
             <QIcon /> What data does Coach Kettle collect?
           </h3>
           <p className="mb-2 text-sm text-brand-muted">
-            We collect your email address (via Apple Sign In), your fitness data
-            (exercises, sets, reps, weights, timestamps), and any media you
-            choose to attach. We do not collect location data, contacts, or any
-            data unrelated to your workouts.
+            Your email and sign-in method (Apple, Google, or email), the
+            workouts, food, and body data you log, profile details you enter
+            (such as date of birth, height, weight, and goals), your coach
+            chats, and any photos or videos you attach. We do not collect
+            location data or contacts, and we don't sync with Apple Health.
           </p>
           <p className="text-sm text-brand-muted">
             See our full{" "}
@@ -193,13 +243,16 @@ export default function Support() {
 
         <FaqCard>
           <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
-            <QIcon /> Is my workout data shared or sold?
+            <QIcon /> Is my data shared or sold?
           </h3>
           <p className="text-sm text-brand-muted">
-            No. We do not sell, rent, or share your personal data with
-            advertisers or data brokers. Your data is shared only with our
-            infrastructure providers (Supabase for storage, OpenAI for AI
-            features) under strict data processing agreements.
+            We never sell your data, and Coach Kettle has no ads. Data is shared
+            only with the service providers that run the app: Supabase
+            (database and storage), OpenAI (AI features), RevenueCat
+            (subscriptions), Apple (sign-in and App Store purchases), Google
+            (sign-in), Expo
+            (push notifications), and Open Food Facts (barcode lookups, which
+            receive only the barcode).
           </p>
         </FaqCard>
 
@@ -208,9 +261,11 @@ export default function Support() {
             <QIcon /> Are my gym photos and videos private?
           </h3>
           <p className="text-sm text-brand-muted">
-            Yes. Photos and videos are stored in a private Supabase Storage
-            bucket. There are no public URLs for your media. Only you,
-            authenticated with your account, can access your attached media.
+            Yes. Workout media and progress photos are stored in private,
+            access-controlled storage with no public URLs. Only you,
+            signed in to your account, can access them. Meal photos you choose
+            to analyze are sent to OpenAI for that one request and are not
+            stored.
           </p>
         </FaqCard>
 
@@ -218,10 +273,17 @@ export default function Support() {
           <h3 className="mb-2 flex items-start gap-2 text-base font-bold">
             <QIcon /> What does Coach Kettle's AI see when I use it?
           </h3>
+          <p className="mb-2 text-sm text-brand-muted">
+            Each AI request sends OpenAI only what that request needs: your
+            workout text and current session, your coach questions and recent
+            chat, meal descriptions or photos you choose to analyze, and, for
+            coaching and meal plans, relevant profile and training details (such
+            as age, sex, height, weight, goals, dietary preferences, allergies,
+            recent workouts, PRs, nutrition targets, and recent food logs).
+          </p>
           <p className="text-sm text-brand-muted">
-            The AI (powered by OpenAI) only receives the exercise text you type
-            and any coaching questions you ask. Your email address, name, health
-            metrics, and media files are never sent to OpenAI.
+            Your name, email, and account ID are never sent to OpenAI. The app
+            asks you to accept this before you use AI features.
           </p>
         </FaqCard>
 
@@ -240,7 +302,7 @@ export default function Support() {
             {
               icon: <TipIconLock />,
               title: "Session lock",
-              desc: "Coach locks after 4 hours of inactivity. Use Face ID or Touch ID to unlock — your data is protected.",
+              desc: "For security, you'll sign in again 4 hours after your last sign-in.",
             },
           ].map((tip) => (
             <div
@@ -278,6 +340,14 @@ export default function Support() {
             <Bullet>
               Workout history search is chronological; full-text search across
               all exercises is coming in a future update.
+            </Bullet>
+            <Bullet>
+              Barcode lookups use the Open Food Facts database, so some products
+              may be missing. You can still log them by text or photo.
+            </Bullet>
+            <Bullet>
+              Form Check (video form analysis) is coming soon and isn't
+              available yet.
             </Bullet>
             <Bullet>Apple Watch sync is not yet available.</Bullet>
           </ul>

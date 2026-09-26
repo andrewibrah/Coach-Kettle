@@ -13,12 +13,18 @@ export default function Footer() {
             </p>
           </div>
 
-          <div className="flex gap-8 text-[0.75rem]">
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-[0.75rem]">
             <Link
               to="/privacy"
               className="-my-2 inline-flex items-center py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
             >
               Privacy
+            </Link>
+            <Link
+              to="/terms"
+              className="-my-2 inline-flex items-center py-2 text-brand-muted no-underline transition-colors duration-300 hover:text-brand-text"
+            >
+              Terms
             </Link>
             <Link
               to="/support"

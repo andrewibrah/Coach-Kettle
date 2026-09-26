@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Privacy from "./pages/Privacy";
 import Support from "./pages/Support";
 import Eula from "./pages/Eula";
+import Terms from "./pages/Terms";
 import Guide from "./pages/Guide";
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/guide" element={<Guide />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/support" element={<Support />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="/eula" element={<Eula />} />
         </Routes>
       </main>
