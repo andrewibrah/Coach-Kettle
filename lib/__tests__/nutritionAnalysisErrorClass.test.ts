@@ -127,4 +127,6 @@ test('classifies expo/fetch offline and cancel failures as unavailable', () => {
   assert.equal(exports.classifyNutritionAnalysisError(new FetchError('The Internet connection appears to be offline.')), 'unavailable');
   assert.equal(exports.classifyNutritionAnalysisError(new FetchError('Fetch request has been canceled')), 'unavailable');
   assert.equal(exports.classifyNutritionAnalysisError(new FetchError('The operation was aborted.')), 'unavailable');
+  assert.equal(exports.classifyNutritionAnalysisError(new FetchError('The request timed out.')), 'unavailable');
+  assert.equal(exports.classifyNutritionConfirmError(new FetchError('The request timed out.')), 'unavailable');
 });
