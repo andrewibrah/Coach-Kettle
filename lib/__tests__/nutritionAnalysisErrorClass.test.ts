@@ -114,3 +114,17 @@ test('nutritionConfirmErrorMessage gives a distinct, honest message per class', 
   ];
   assert.equal(new Set(messages).size, messages.length, 'every confirm class must read differently');
 });
+
+// SDK 56+ global fetch is expo/fetch: offline and cancel reject with its
+// FetchError ("fetch failed: <reason>"), which must still read as unavailable.
+const expoFetch: any = {};
+vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../../node_modules/expo/src/winter/fetch/FetchErrors.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {
+  exports: expoFetch, Error,
+});
+
+test('classifies expo/fetch offline and cancel failures as unavailable', () => {
+  const { FetchError } = expoFetch;
+  assert.equal(exports.classifyNutritionAnalysisError(new FetchError('The Internet connection appears to be offline.')), 'unavailable');
+  assert.equal(exports.classifyNutritionAnalysisError(new FetchError('Fetch request has been canceled')), 'unavailable');
+  assert.equal(exports.classifyNutritionAnalysisError(new FetchError('The operation was aborted.')), 'unavailable');
+});

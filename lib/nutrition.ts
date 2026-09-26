@@ -30,9 +30,17 @@ import type {
 
 const API = `${supabaseUrl}/functions/v1`;
 
+// expo/fetch (the global fetch since SDK 56) rejects with its FetchError, a
+// plain Error "fetch failed: <native reason>", instead of RN's TypeError.
+const EXPO_FETCH_FAILURE = /^fetch failed: /;
+const EXPO_FETCH_CANCELED = /^fetch failed: (Fetch request has been canceled|The operation was aborted\.)/;
+
 /** Queue only recognizable fetch transport failures, not HTTP rejection or bugs. */
 export function isRetryableNutritionError(error: unknown): boolean {
-  return error instanceof TypeError && /network request failed|failed to fetch|fetch failed|load failed/i.test(error.message);
+  if (error instanceof TypeError) {
+    return /network request failed|failed to fetch|fetch failed|load failed/i.test(error.message);
+  }
+  return error instanceof Error && EXPO_FETCH_FAILURE.test(error.message) && !EXPO_FETCH_CANCELED.test(error.message);
 }
 
 /**
@@ -57,6 +65,7 @@ const HTTP_STATUS = /^HTTP (\d+):/;
 function isNoResponseError(error: unknown): boolean {
   if (isRetryableNutritionError(error)) return true;
   if (error instanceof TypeError && /network request timed out/i.test(error.message)) return true;
+  if (error instanceof Error && EXPO_FETCH_CANCELED.test(error.message)) return true;
   return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
 }
 

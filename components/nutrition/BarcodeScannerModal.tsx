@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   },
   cameraWrap: { flex: 1, overflow: 'hidden' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  reticle: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  reticle: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   reticleBox: {
     width: '75%',
     aspectRatio: 1.6,
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   busyOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },

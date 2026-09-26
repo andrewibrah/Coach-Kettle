@@ -14,7 +14,7 @@ const INJECTION = `
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |build_configuration|
         deployment_target = build_configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
-        min_deployment_target = podfile_properties['ios.deploymentTarget'] || '15.1'
+        min_deployment_target = podfile_properties['ios.deploymentTarget'] || '16.4'
         if deployment_target && deployment_target.to_f < min_deployment_target.to_f
           build_configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_deployment_target
         end

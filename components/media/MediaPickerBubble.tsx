@@ -218,13 +218,13 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   uploadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   brokenOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(60,60,60,0.8)",
     justifyContent: "center",
     alignItems: "center",

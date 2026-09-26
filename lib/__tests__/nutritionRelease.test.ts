@@ -67,7 +67,7 @@ function providerHost() {
     if (name.endsWith('trainingSchedule')) return { isTrainingDay: () => false };
     if (name.endsWith('nutritionTargets')) return { dayOfWeekFromIso: () => 1, resolveApprovedClientTarget: () => ({ target: null }) };
     if (name.endsWith('nutritionTargetStorage')) return { targetStorageKey: () => 'fixture-key', parseJson: () => null, buildImportSaveRequest: () => null };
-    if (name.includes('async-storage')) return { default: { getItem: async () => null, removeItem: async () => {} } };
+    if (name.includes('async-storage')) return { __esModule: true, default: { getItem: async () => null, removeItem: async () => {} } };
     return {};
   } });
   return {
