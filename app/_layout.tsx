@@ -1,7 +1,10 @@
 import 'react-native-reanimated';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router/react-navigation';
-import { Stack } from 'expo-router';
+import Constants from 'expo-constants';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthLockProvider } from '@/contexts/AuthLockProvider';
@@ -18,13 +21,49 @@ import { ProgramProvider } from '@/contexts/ProgramContext';
 import { NotificationsProvider } from '@/contexts/NotificationsProvider';
 import { RestTimerProvider } from '@/contexts/RestTimerContext';
 import { RestTimerToast } from '@/components/workout/RestTimerToast';
+import { ThemedText } from '@/components/ui/themed-text';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
+import { formatCrashAlert, installCrashCapture, takeCrashRecord } from '@/lib/crashCapture';
+
+// Module scope so it is in place before the first render.
+installCrashCapture(ErrorUtils, Constants.expoConfig?.version ?? null);
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+// expo-router renders this instead of the root layout when it throws while
+// rendering, so the message is on screen rather than aborting the app.
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const background = useThemeColor({}, 'background');
+  const danger = useThemeColor({}, 'danger');
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'tintForeground');
+
+  return (
+    <View style={[styles.errorContainer, { backgroundColor: background }]}>
+      <ThemedText type="subtitle">Something went wrong</ThemedText>
+      <ThemedText style={[styles.errorMessage, { color: danger }]} selectable>
+        {error.message}
+      </ThemedText>
+      <TouchableOpacity style={[styles.retryButton, { backgroundColor: tint }]} onPress={retry}>
+        <ThemedText style={{ color: onTint }}>Retry</ThemedText>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function RootLayout() {
+  // Show (once) the crash recorded by installCrashCapture on the previous run.
+  useEffect(() => {
+    takeCrashRecord()
+      .then((record) => {
+        if (record) Alert.alert('The app crashed last time', formatCrashAlert(record));
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -113,3 +152,21 @@ function RootLayoutNav() {
     </NavigationThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    gap: 16,
+  },
+  errorMessage: {
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+});
