@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { gateAiRequest } from "../_shared/entitlements.ts";
+import { coachTextStream } from "./coachStream.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -326,51 +327,8 @@ serve(async (req) => {
             );
         }
 
-        // Create a stream that transforms OpenAI SSE into raw text
-        const stream = new ReadableStream({
-            async start(controller) {
-                const reader = response.body?.getReader();
-                if (!reader) {
-                    controller.close();
-                    return;
-                }
-
-                const decoder = new TextDecoder("utf-8");
-                const encoder = new TextEncoder();
-
-                try {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-
-                        const chunk = decoder.decode(value);
-                        const lines = chunk.split("\n");
-
-                        for (const line of lines) {
-                            const trimmed = line.trim();
-                            if (!trimmed || trimmed === "data: [DONE]") continue;
-                            if (trimmed.startsWith("data: ")) {
-                                const data = trimmed.slice(6);
-                                try {
-                                    const json = JSON.parse(data);
-                                    const content = json.choices?.[0]?.delta?.content;
-                                    if (content) {
-                                        controller.enqueue(encoder.encode(content));
-                                    }
-                                } catch (e) {
-                                    console.warn("[coach] openai_stream_parse_error");
-                                }
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.error("[coach] openai_stream_error");
-                    controller.error(err);
-                } finally {
-                    controller.close();
-                }
-            },
-        });
+        // Keep provider framing separate from transport chunk boundaries.
+        const stream = coachTextStream(response.body!);
 
         return new Response(stream, {
             headers: { ...corsHeaders, "Content-Type": "text/plain" },
