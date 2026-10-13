@@ -5,7 +5,7 @@ import { supabase, supabaseAnonKey } from './supabase';
  * Get auth headers for API calls to Supabase Edge Functions.
  * Handles session refresh automatically.
  */
-export async function getAuthHeaders(): Promise<HeadersInit> {
+export async function getAuthHeaders(expectedOwner?: string): Promise<HeadersInit> {
     let { data: { session }, error } = await supabase.auth.getSession();
 
     // If no session or error, try to refresh
@@ -32,6 +32,9 @@ export async function getAuthHeaders(): Promise<HeadersInit> {
         }
     }
 
+    if (expectedOwner && session?.user?.id !== expectedOwner) {
+        throw new Error('Session operation owner changed');
+    }
     if (!session?.access_token) {
         throw new Error('Not authenticated - please sign in');
     }
@@ -45,16 +48,16 @@ export async function getAuthHeaders(): Promise<HeadersInit> {
 /**
  * Get auth headers with Content-Type for JSON requests
  */
-export async function getJsonAuthHeaders(): Promise<HeadersInit> {
-    const authHeaders = await getAuthHeaders();
+export async function getJsonAuthHeaders(expectedOwner?: string): Promise<HeadersInit> {
+    const authHeaders = await getAuthHeaders(expectedOwner);
     return { ...authHeaders, 'Content-Type': 'application/json' };
 }
 
 /**
  * Fetch with automatic 401 retry after session refresh
  */
-export async function fetchWithAuth(url: string, options: RequestInit, retries = 1): Promise<Response> {
-    const headers = await getJsonAuthHeaders();
+export async function fetchWithAuth(url: string, options: RequestInit, retries = 1, expectedOwner?: string): Promise<Response> {
+    const headers = await getJsonAuthHeaders(expectedOwner);
 
     const res = await fetch(url, {
         ...options,
@@ -69,7 +72,7 @@ export async function fetchWithAuth(url: string, options: RequestInit, retries =
             return res;
         }
 
-        return fetchWithAuth(url, options, retries - 1);
+        return fetchWithAuth(url, options, retries - 1, expectedOwner);
     }
 
     return res;

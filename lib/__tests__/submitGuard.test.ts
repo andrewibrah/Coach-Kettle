@@ -22,6 +22,15 @@ test('a failure propagates and the guard resets for the next submit', async () =
   assert.equal(await guard.run(async () => {}), true);
 });
 
+test('a render-scoped guard rejects replay after the original operation settles', async () => {
+  const guard = createSubmitGuard({ once: true });
+  let runs = 0;
+  assert.equal(await guard.run(async () => { runs++; }), true);
+  assert.equal(await guard.run(async () => { runs++; }), false);
+  assert.equal(runs, 1);
+  assert.equal(guard.active, false);
+});
+
 test('the guard is taken synchronously, before the task awaits', () => {
   const guard = createSubmitGuard();
   void guard.run(() => new Promise<void>(() => {}));

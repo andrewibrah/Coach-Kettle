@@ -214,6 +214,7 @@ function deletionDeps(overrides: Record<string, any> = {}) {
     reauthenticate: async () => { calls.push('reauth'); return { status: 'ok', userId: 'user-1', appleAuthorizationCode: 'apple-code' }; },
     restoreSession: async () => { calls.push('restore'); },
     deleteAccount: async (opts: any) => { calls.push(`delete:${JSON.stringify(opts)}`); return { ok: true }; },
+    clearLocalDraft: async () => { calls.push('clearDraft'); },
     cancelLocalNotifications: async () => { calls.push('cancelAllLocal'); },
     signOut: async () => { calls.push('signOut'); },
     signOutLocal: async () => { calls.push('signOutLocal'); },
@@ -222,12 +223,13 @@ function deletionDeps(overrides: Record<string, any> = {}) {
   return { deps, calls };
 }
 
-test('success: re-auth, delete with the Apple code, then cancel notifications and sign out (caches cleared)', async () => {
+test('success: re-auth, delete with the Apple code, clear the saved workout, then cancel notifications and sign out (caches cleared)', async () => {
   const { deps, calls } = deletionDeps();
   assert.deepEqual(await accountDeletion.runAccountDeletion(deps), { ok: true });
-  assert.deepEqual(calls, ['reauth', 'delete:{"appleAuthorizationCode":"apple-code"}', 'cancelAllLocal', 'signOut', 'signOutLocal']);
-  // signOut is AuthProvider.signOut, which runs clearAllCaches() before touching Supabase.
-  assert.match(read('contexts/AuthProvider.tsx'), /const signOut = async \(\) => \{\s*try \{\s*\/\/[^\n]*\n\s*await clearAllCaches\(\);/);
+  // The draft clear is owner-checked, so it runs first, while the deleted user's session is still live.
+  assert.deepEqual(calls, ['reauth', 'delete:{"appleAuthorizationCode":"apple-code"}', 'clearDraft', 'cancelAllLocal', 'signOut', 'signOutLocal']);
+  // signOut is AuthProvider.signOut: it fences the draft, then runs clearAllCaches() before touching Supabase.
+  assert.match(read('contexts/AuthProvider.tsx'), /const signOut = async \(\) => \{\s*(?:\/\/[^\n]*\n\s*)*fenceWorkoutDraft\(\);\s*try \{\s*\/\/[^\n]*\n\s*await clearAllCaches\(\);/);
 });
 
 test('success: local cleanup keeps going when a step throws or signOut fails for the deleted user', async () => {
@@ -237,6 +239,14 @@ test('success: local cleanup keeps going when a step throws or signOut fails for
   });
   assert.deepEqual(await accountDeletion.runAccountDeletion(deps), { ok: true });
   assert.deepEqual(calls.slice(-3), ['cancelAllLocal', 'signOut', 'signOutLocal']);
+});
+
+test('success: a throwing draft clear does not stop notification cleanup or sign-out', async () => {
+  const { deps, calls } = deletionDeps({
+    clearLocalDraft: async () => { calls.push('clearDraft'); throw new Error('Workout draft could not be cleared.'); },
+  });
+  assert.deepEqual(await accountDeletion.runAccountDeletion(deps), { ok: true });
+  assert.deepEqual(calls.slice(2), ['clearDraft', 'cancelAllLocal', 'signOut', 'signOutLocal']);
 });
 
 test('cancelled or failed re-auth never calls deleteAccount and never signs out', async () => {
@@ -389,10 +399,24 @@ test('Settings has a 44pt destructive Delete account button that opens the new s
 
 // ---------- Delete Account screen ----------
 
-function renderDeleteScreen(opts: { provider?: string; reauthResult?: any; deleteError?: any } = {}) {
+const storedDraft = (ownerId?: string) => JSON.stringify({
+  ...(ownerId ? { ownerId } : {}), workoutId: 'w-1', dateISO: '2026-10-13', bodyParts: [], createdAt: 1, rows: [], updatedAt: 1,
+});
+
+function renderDeleteScreen(opts: { provider?: string; reauthResult?: any; deleteError?: any; draft?: string } = {}) {
   const h = harness();
   const calls: any[] = [];
   const provider = opts.provider ?? 'email';
+  // The real draft module over an in-memory store, so the owner check is exercised, not mocked.
+  const storage = new Map<string, string>();
+  if (opts.draft !== undefined) storage.set('workout_draft_v1', opts.draft);
+  const workoutDraft = load('lib/workoutDraft.ts', {}, {
+    '@react-native-async-storage/async-storage': { __esModule: true, default: {
+      getItem: async (k: string) => storage.get(k) ?? null,
+      setItem: async (k: string, v: string) => { storage.set(k, v); },
+      removeItem: async (k: string) => { storage.delete(k); },
+    } },
+  });
   const session = {
     access_token: 'old-access', refresh_token: 'old-refresh',
     user: { id: 'user-1', email: 'a@b.c', app_metadata: { provider }, identities: [{ provider }] },
@@ -412,6 +436,7 @@ function renderDeleteScreen(opts: { provider?: string; reauthResult?: any; delet
     '@/lib/iap': { useIAP: () => ({ presentCustomerCenter: async () => { calls.push(['customerCenter']); } }) },
     '@/lib/api': { api: { deleteAccount: async (o: any) => { calls.push(['deleteAccount', o]); if (opts.deleteError) throw opts.deleteError; return { ok: true }; } } },
     '@/lib/notifications': { cancelAllLocal: async () => { calls.push(['cancelAllLocal']); } },
+    '@/lib/workoutDraft': { clearWorkoutDraft: (...args: any[]) => { calls.push(['clearDraft', ...args]); return workoutDraft.clearWorkoutDraft(...args); } },
     '@/lib/accountDeletion': accountDeletion,
     '@/lib/reauth': {
       reauthenticate: async (method: string, creds: any) => {
@@ -425,7 +450,7 @@ function renderDeleteScreen(opts: { provider?: string; reauthResult?: any; delet
   }).default;
   const render = () => h.render(Screen);
   const find = (tree: any, label: string) => nodes(tree).find((n) => n.props.accessibilityLabel === label);
-  return { render, find, calls };
+  return { render, find, calls, storage };
 }
 
 test('delete screen explains what is deleted and that the App Store subscription is not cancelled', async () => {
@@ -466,6 +491,7 @@ test('password user: button disabled until DELETE and a password are entered; su
   assert.deepEqual(plain(calls), [
     ['reauth', 'password', { email: 'a@b.c', password: 'pw' }],
     ['deleteAccount', {}],
+    ['clearDraft', 'user-1'],
     ['cancelAllLocal'],
     ['signOut'],
     ['signOutLocal'],
@@ -508,6 +534,42 @@ test('new deletion files use theme tokens only (no hardcoded colours) and store 
   const screen = read('app/settings/delete-account.tsx');
   for (const token of ['dangerFill', 'dangerForeground', 'dangerSurface', 'danger']) {
     assert.match(screen, new RegExp(`useThemeColor\\(\\{\\}, '${token}'\\)`), token);
+  }
+});
+
+test('after a confirmed deletion the deleted user\'s saved workout is removed from the device', async () => {
+  const { render, find, calls, storage } = renderDeleteScreen({ provider: 'google', draft: storedDraft('user-1') });
+  find(render(), 'Type DELETE to confirm').props.onChangeText('DELETE');
+  await find(render(), 'Delete account permanently').props.onPress();
+  assert.equal(storage.has('workout_draft_v1'), false);
+  assert.deepEqual(plain(calls.map(([name]: any[]) => name)), ['reauth', 'deleteAccount', 'clearDraft', 'cancelAllLocal', 'signOut', 'signOutLocal', 'replace']);
+});
+
+test('a saved workout owned by another account (or no owner) is never removed, and sign-out still happens', async () => {
+  for (const draft of [storedDraft('owner-b'), storedDraft()]) {
+    const { render, find, calls, storage } = renderDeleteScreen({ provider: 'google', draft });
+    find(render(), 'Type DELETE to confirm').props.onChangeText('DELETE');
+    await find(render(), 'Delete account permanently').props.onPress();
+    assert.equal(storage.get('workout_draft_v1'), draft);
+    assert.deepEqual(plain(calls.find(([name]: any[]) => name === 'clearDraft')), ['clearDraft', 'user-1']);
+    assert.deepEqual(plain(calls.slice(-3)), [['signOut'], ['signOutLocal'], ['replace', '/auth/sign-in']]);
+  }
+});
+
+test('the saved workout is kept when deletion does not happen (re-auth cancelled/failed, wrong account, server error)', async () => {
+  for (const opts of [
+    { reauthResult: { status: 'cancelled' } },
+    { reauthResult: { status: 'failed' } },
+    { reauthResult: { status: 'ok', userId: 'someone-else' } },
+    { deleteError: Object.assign(new Error('x'), { code: 'REAUTH_REQUIRED' }) },
+    { deleteError: new Error('500') },
+  ]) {
+    const draft = storedDraft('user-1');
+    const { render, find, calls, storage } = renderDeleteScreen({ provider: 'google', draft, ...opts });
+    find(render(), 'Type DELETE to confirm').props.onChangeText('DELETE');
+    await find(render(), 'Delete account permanently').props.onPress();
+    assert.equal(storage.get('workout_draft_v1'), draft, JSON.stringify(opts));
+    assert.equal(calls.some(([name]: any[]) => name === 'clearDraft'), false, JSON.stringify(opts));
   }
 });
 

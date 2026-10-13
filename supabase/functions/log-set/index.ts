@@ -5,7 +5,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
-import { epley1rm, normalizeLiftName, resolveTrackedLift } from "../_shared/liftMatching.ts";
+import { resolveTrackedLift } from "../_shared/liftMatching.ts";
+import { numericText, validateWorkoutRow } from '../_shared/workoutValidation.ts';
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,11 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 interface WorkoutRow {
+    operation?: 'put' | 'drop' | 'revise';
+    sessionId: string;
+    rowId: string;
+    revision: number;
+    operationKey: string;
     exercise: string;
     set: number;
     weightLbs: string;
@@ -40,6 +46,10 @@ interface WorkoutRow {
     heartRate?: number;
     calories?: number;
     level?: number;
+    performance?: 'planned' | 'performed';
+    status?: 'syncing' | 'committed';
+    isRest?: boolean;
+    setKind?: string;
 }
 
 async function verifyAuth(req: Request): Promise<string> {
@@ -93,97 +103,55 @@ serve(async (req) => {
         );
     }
 
+    if (!payload.sessionId || !payload.rowId || !payload.operationKey ||
+        !Number.isSafeInteger(payload.revision) || payload.revision < 1 || !payload.dateISO) {
+        return new Response(JSON.stringify({ error: 'Session operation identity required.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (payload.operation !== undefined && !['put','drop','revise'].includes(payload.operation)) {
+        return new Response(JSON.stringify({ error: 'Invalid session operation.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const validationError = validateWorkoutRow(payload, payload.operation !== 'revise');
+    if (payload.operation !== 'drop' && (validationError || (payload.operation !== 'revise' &&
+        (payload.isRest || payload.status === 'syncing' || payload.performance === 'planned')))) {
+        return new Response(JSON.stringify({ error: validationError ?? 'Set is not performed.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const { exercise, set, weightLbs, reps, notes, isCardio, durationMins, distance, distanceUnit, heartRate, calories, level } = payload;
 
-    // Cardio entries may not have weightLbs/reps, so only require them for non-cardio
-    if (!exercise || (!isCardio && !weightLbs && !reps)) {
-        return new Response(
-            JSON.stringify({ error: "Missing required fields" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
 
     try {
-        // Prefer the client's local calendar date — an 8pm EST set belongs to
-        // the user's today, not tomorrow's UTC date.
-        const today = typeof payload.dateISO === "string" && /^\d{4}-\d{2}-\d{2}$/.test(payload.dateISO)
-            ? payload.dateISO
-            : new Date().toISOString().split("T")[0];
-
-        // ── Canonical lift resolution + deterministic PR pre-check ──────────
-        // Resolve typed shorthand ("bench") to the tracked lift's canonical
-        // name ("Bench Press") so the PR trigger actually fires, and read the
-        // previous e1RM BEFORE inserting so we can tell the client whether
-        // this set is a PR in the response (no realtime/race dependency).
         let canonicalExercise = exercise;
-        let pr: {
-            liftName: string;
-            weight: number;
-            reps: number;
-            newE1rm: number;
-            previousE1rm: number | null;
-        } | null = null;
+        let pr = null;
+        // Resolve canonical tracked names; the SQL transaction owns PR acknowledgement.
+        const { data: tracked, error: trackedError } = await supabaseAdmin.from('pr_tracked_lifts')
+            .select('lift_name').eq('user_id', userId).eq('is_active', true);
+        if (trackedError) throw new Error('Lift resolution unavailable');
+        canonicalExercise = resolveTrackedLift(exercise, (tracked ?? []).map((t: { lift_name: string }) => t.lift_name)) ?? exercise;
 
-        const weightNum = parseFloat(weightLbs ?? "");
-        const repsNum = parseInt(reps ?? "", 10);
-        const prEligible = !isCardio
-            && Number.isFinite(weightNum) && weightNum > 0
-            && Number.isFinite(repsNum) && repsNum > 0;
-
-        try {
-            const { data: tracked } = await supabaseAdmin
-                .from("pr_tracked_lifts")
-                .select("lift_name")
-                .eq("user_id", userId)
-                .eq("is_active", true);
-            const trackedNames = (tracked ?? []).map((t: { lift_name: string }) => t.lift_name);
-            const resolved = resolveTrackedLift(exercise, trackedNames);
-
-            if (resolved) {
-                canonicalExercise = resolved;
-                if (prEligible) {
-                    const { data: prRows } = await supabaseAdmin
-                        .from("pr_lifts")
-                        .select("lift_name, estimated_1rm")
-                        .eq("user_id", userId);
-                    const target = normalizeLiftName(resolved);
-                    const current = (prRows ?? []).find(
-                        (r: { lift_name: string }) => normalizeLiftName(r.lift_name) === target
-                    );
-                    const previousE1rm = current ? Number(current.estimated_1rm) : null;
-                    const newE1rm = epley1rm(weightNum, repsNum);
-                    if (previousE1rm === null || newE1rm > previousE1rm) {
-                        pr = { liftName: resolved, weight: weightNum, reps: repsNum, newE1rm, previousE1rm };
-                    }
-                }
-            }
-        } catch (matchErr) {
-            // PR detection is best-effort — never block set logging.
-            console.warn("[log-set] PR pre-check failed:", matchErr);
-        }
-
-        const { error } = await supabaseAdmin
-            .from("workout_log")
-            .insert({
-                workout_id: `live-${today}`,
-                workout_date: today,
-                user_id: userId,
-                exercise: canonicalExercise,
-                set_number: set || 1,
-                weight_lbs: weightLbs || '0',
-                reps: reps || '0',
-                notes: notes || null,
-                created_at: new Date().toISOString(),
-                // Cardio fields
-                is_cardio: isCardio ?? false,
-                duration_mins: durationMins ?? null,
-                distance: distance ?? null,
-                distance_unit: distanceUnit ?? null,
-                heart_rate: heartRate ?? null,
-                calories: calories ?? null,
-                level: level ?? null,
-            });
-
+        // The RPC runs under the verified caller JWT, never a body owner/service bypass.
+        const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+            global: { headers: { Authorization: req.headers.get("Authorization")! } },
+            auth: { autoRefreshToken: false, persistSession: false },
+        });
+        const { data: receipt, error } = await userClient.rpc('apply_workout_operation', {
+            p_session_id: payload.sessionId,
+            p_operation_key: payload.operationKey,
+            p_revision: payload.revision,
+            p_kind: payload.operation ?? 'put',
+            p_row_id: payload.rowId,
+            p_payload: { dateISO: payload.dateISO, row: {
+                id: payload.rowId, exercise: canonicalExercise, set: set ?? 1,
+                weightLbs: isCardio ? String(weightLbs ?? '') : numericText(weightLbs),
+                reps: isCardio ? String(reps ?? '') : numericText(reps), notes,
+                performance: payload.performance, setKind: payload.setKind,
+                isCardio, durationMins, distance, distanceUnit, heartRate, calories, level,
+            } },
+        });
+        // PR precheck is not an acknowledgement. Only the committed RPC can acknowledge.
+        pr = receipt?.pr ?? null;
+        if (!error && receipt?.ok !== true) throw new Error('Missing committed operation receipt');
         if (error) {
             console.error("[log-set] DB insert error:", error);
             return new Response(

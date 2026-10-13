@@ -1,9 +1,14 @@
 import { api } from "./api";
+import type { LogRow } from "../types/workout";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type WorkoutRow = {
   id?: string;
+  set?: number;
+  performance?: LogRow["performance"];
+  plannedTarget?: LogRow["plannedTarget"];
+  setKind?: LogRow["setKind"];
   exercise: string;
   weightLbs: string;
   reps: string;
@@ -49,6 +54,9 @@ export type WorkoutMediaRecord = {
 
 export type WorkoutSession = {
   id: string;
+  /** Persisted transport identity; retry reuses it, never a daily-live ID. */
+  revision?: number;
+  operationKey?: string;
   dateISO: string; // YYYY-MM-DD
   part: string;
   rows: WorkoutRow[];
@@ -75,8 +83,10 @@ export async function listWorkouts(): Promise<WorkoutSession[]> {
   }
 }
 
-async function upsertLocal(session: WorkoutSession) {
+async function upsertLocal(session: WorkoutSession, isCurrent = () => true) {
+  if (!isCurrent()) return;
   const existing = await listWorkouts();
+  if (!isCurrent()) return;
   const next = [session, ...existing.filter((w) => w.id !== session.id)];
   await AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(next));
 }
@@ -86,14 +96,33 @@ async function upsertLocal(session: WorkoutSession) {
  * best-effort. Returns whether the remote sync succeeded — unsynced sessions
  * are flagged pendingSync and retried by syncPendingWorkouts().
  */
-export async function saveWorkout(session: WorkoutSession): Promise<{ synced: boolean }> {
-  // 1. Local Write (Upsert) — the workout is safe from this point on.
-  await upsertLocal({ ...session, pendingSync: true });
+export async function saveWorkout(session: WorkoutSession, options?: { review?: Promise<SessionReview | null>; isCurrent?: () => boolean }): Promise<{ synced: boolean }> {
+  const isCurrent = options?.isCurrent ?? (() => true);
+  if (!session.operationKey || !session.revision) {
+    const prior = (await listWorkouts()).find(item => item.id === session.id);
+    const revision = Math.max(Date.now(), (prior?.revision ?? 0) + 1);
+    session = { ...session, revision, operationKey: `finalize:${session.id}:${revision}` };
+  }
+  // 1. Local Write (Upsert) — never wait for optional coaching before recovery.
+  await upsertLocal({ ...session, pendingSync: true }, isCurrent);
+  if (!isCurrent()) return { synced: false };
+  if (options?.review) {
+    const review = await options.review.catch(() => null);
+    if (!isCurrent()) return { synced: false };
+    if (review) {
+      session = { ...session, review };
+      // Optional enrichment failure must not undo the already-durable performance.
+      try { await upsertLocal({ ...session, pendingSync: true }, isCurrent); }
+      catch (error) { console.warn('[saveWorkout] Review could not be saved locally.', error); }
+    }
+  }
 
   // 2. Remote Sync (Best Effort)
   try {
+    if (!isCurrent()) return { synced: false };
     await api.saveWorkout(session);
-    await upsertLocal({ ...session, pendingSync: false });
+    if (!isCurrent()) return { synced: false };
+    await upsertLocal({ ...session, pendingSync: false }, isCurrent);
     return { synced: true };
   } catch (e) {
     console.warn("[saveWorkout] Supabase sync failed, saved locally only.", e);

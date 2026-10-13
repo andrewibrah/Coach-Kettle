@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { resolveTrackedLift } from "../_shared/liftMatching.ts";
+import { validateWorkoutRow } from '../_shared/workoutValidation.ts';
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,11 @@ interface WorkoutRow {
     heartRate?: number;
     calories?: number;
     level?: number;
+    set?: number;
+    performance?: 'planned' | 'performed';
+    status?: 'syncing' | 'committed';
+    isRest?: boolean;
+    setKind?: string;
 }
 
 interface SessionReview {
@@ -38,6 +44,8 @@ interface SessionReview {
 
 interface WorkoutSession {
     id: string;
+    revision?: number;
+    operationKey?: string;
     dateISO: string;
     part: string;
     rows: WorkoutRow[];
@@ -106,99 +114,34 @@ async function getUserContext(authHeader: string | null): Promise<{ supabase: Su
 // POST: Save/upsert workout session
 async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, userId: string): Promise<Response> {
     const rows = Array.isArray(session.rows) ? session.rows : [];
-    const rowsJson = JSON.stringify(rows);
-
-    // Serialize review if present
-    const reviewJson = session.review ? JSON.stringify(session.review) : null;
-
-    const { data, error } = await supabase
-        .from("workouts")
-        .upsert({
-            id: session.id,
-            dateISO: session.dateISO,
-            part: session.part,
-            createdAt: session.createdAt,
-            rows_json: rowsJson,
-            review_json: reviewJson,
-            reflection: session.reflection ?? null,
-            user_id: userId,
-        }, { onConflict: "id" })
-        .select()
-        .single();
-
-    if (error) {
-        console.error("[history] Database error:", error);
-        return respondJson({ error: "Database error" }, 500);
+    if (!Array.isArray(session.rows)) return respondJson({ error: 'rows must be an array' }, 400);
+    const errorMessage = rows.map(row => validateWorkoutRow(row)).find(Boolean);
+    if (errorMessage) return respondJson({ error: errorMessage }, 400);
+    if (!session.operationKey || !Number.isSafeInteger(session.revision) || session.revision! < 1 ||
+        rows.some(row => typeof row.id !== 'string' || !row.id) || new Set(rows.map(row => row.id)).size !== rows.length) {
+        return respondJson({ error: 'Session operation identity and unique row IDs required.' }, 400);
     }
-
-    // Reconcile workout_log: the final saved rows REPLACE the live per-set
-    // rows logged during the session (otherwise every set is double-counted
-    // and corrected typos live forever). Delete the day's live rows and any
-    // previous save of this workout, then insert the final rows.
-    if (data && rows.length > 0) {
-        const { error: delError } = await supabaseAdmin
-            .from("workout_log")
-            .delete()
-            .eq("user_id", userId)
-            .in("workout_id", [`live-${data.dateISO}`, data.id]);
-        if (delError) {
-            console.error("[history] Failed to clear live workout_log rows:", delError);
-            // Continue — worst case we keep the old double-insert behavior.
-        }
-
-        // Canonicalize exercise names against tracked lifts so workout_log
-        // stores one name per lift (same resolution as log-set).
-        let trackedNames: string[] = [];
-        try {
-            const { data: tracked } = await supabaseAdmin
-                .from("pr_tracked_lifts")
-                .select("lift_name")
-                .eq("user_id", userId)
-                .eq("is_active", true);
-            trackedNames = (tracked ?? []).map((t: { lift_name: string }) => t.lift_name);
-        } catch { /* non-blocking */ }
-
-        const workoutLogRows = rows.map((row: WorkoutRow, index: number) => ({
-            workout_id: data.id,
-            workout_date: data.dateISO,
-            user_id: userId,
-            exercise: resolveTrackedLift(row.exercise, trackedNames) ?? row.exercise,
-            set_number: index + 1,
-            weight_lbs: row.weightLbs || '0',
-            reps: row.reps || '0',
-            notes: row.notes || null,
-            created_at: new Date().toISOString(),
-            // Cardio-specific fields
-            is_cardio: row.isCardio ?? false,
-            duration_mins: row.durationMins ?? null,
-            distance: row.distance ?? null,
-            distance_unit: row.distanceUnit ?? null,
-            heart_rate: row.heartRate ?? null,
-            calories: row.calories ?? null,
-            level: row.level ?? null,
+    let trackedNames: string[] = [];
+    const { data: tracked, error: trackedError } = await supabase
+        .from('pr_tracked_lifts').select('lift_name').eq('user_id', userId).eq('is_active', true);
+    if (trackedError) return respondJson({ error: 'Database error' }, 500);
+    trackedNames = (tracked ?? []).map((t: { lift_name: string }) => t.lift_name);
+    // Preserve raw quantities, including number/string, null and absent keys, for
+    // SQL's exact snapshot coherence check. Typed insertion normalizes strength
+    // text only after validation; cardio display absence never becomes zero.
+    const logRows = rows.filter(row => !validateWorkoutRow(row, true) && !row.isRest &&
+        row.status !== 'syncing' && row.performance !== 'planned').map(row => ({
+            ...row, exercise: resolveTrackedLift(row.exercise, trackedNames) ?? row.exercise,
         }));
-
-        // Use admin client to bypass RLS for workout_log insert
-        const { error: logError } = await supabaseAdmin
-            .from('workout_log')
-            .insert(workoutLogRows);
-
-        if (logError) {
-            console.error('[history] Error inserting workout_log (PR detection may not trigger):', logError);
-            // Don't fail the entire request - workout is already saved
-        } else {
-            console.log(`[history] Reconciled ${workoutLogRows.length} rows into workout_log`);
-
-            // Retract any PR recorded today whose backing set was corrected
-            // away before this final save (e.g. the "Bench 1850" typo).
-            const { error: prError } = await supabaseAdmin.rpc("reconcile_workout_prs", {
-                p_user_id: userId,
-                p_date: data.dateISO,
-            });
-            if (prError) {
-                console.error("[history] PR reconciliation failed:", prError.message);
-            }
-        }
+    const { data: receipt, error } = await supabase.rpc('apply_workout_operation', {
+        p_session_id: session.id, p_operation_key: session.operationKey,
+        p_revision: session.revision, p_kind: 'finalize', p_row_id: null,
+        p_payload: { dateISO: session.dateISO, part: session.part, createdAt: session.createdAt,
+            rows, logRows, review: session.review ?? null, reflection: session.reflection ?? null },
+    });
+    if (error || receipt?.ok !== true) {
+        console.error('[history] Transaction failed:', error);
+        return respondJson({ error: 'Database error' }, 500);
     }
 
     return respondJson({ ok: true });
@@ -324,19 +267,13 @@ async function updateWorkoutMeta(
 }
 
 // DELETE: Delete workout by ID
-async function deleteWorkout(workoutId: string, supabase: SupabaseClient, userId: string): Promise<Response> {
-    const { error } = await supabase
-        .from("workouts")
-        .delete()
-        .eq("id", workoutId)
-        .eq("user_id", userId);
-
-    if (error) {
-        console.error("[history] Database error:", error);
-        return respondJson({ error: "Database error" }, 500);
-    }
-
-    return respondJson({ ok: true });
+async function deleteWorkout(workoutId: string, supabase: SupabaseClient, operation: { revision: number; operationKey: string }): Promise<Response> {
+    const { data: receipt, error } = await supabase.rpc('apply_workout_operation', {
+        p_session_id: workoutId, p_operation_key: operation.operationKey, p_revision: operation.revision,
+        p_kind: 'delete', p_row_id: null, p_payload: {},
+    });
+    if (error || receipt?.ok !== true) return respondJson({ error: 'Database error' }, 500);
+    return respondJson(receipt);
 }
 
 serve(async (req) => {
@@ -398,30 +335,15 @@ serve(async (req) => {
             return await listWorkouts(supabase, userId);
         }
 
-        if (req.method === "DELETE") {
-            // Try to get workout ID from path or query param
-            let idToDelete = workoutId;
-
-            if (!idToDelete) {
-                // Check query param
-                idToDelete = url.searchParams.get("id");
+        if (req.method === 'DELETE') {
+            let operation: { id?: string; revision: number; operationKey: string };
+            try { operation = await req.json(); } catch { return respondJson({ error: 'Operation identity required' }, 400); }
+            const idToDelete = workoutId ?? url.searchParams.get('id') ?? operation.id;
+            if (!idToDelete || !operation.operationKey || !Number.isSafeInteger(operation.revision) || operation.revision < 1 ||
+                (operation.id !== undefined && operation.id !== idToDelete)) {
+                return respondJson({ error: 'Operation identity required' }, 400);
             }
-
-            if (!idToDelete) {
-                // Check body
-                try {
-                    const body = await req.json();
-                    idToDelete = body.id;
-                } catch {
-                    // No body
-                }
-            }
-
-            if (!idToDelete) {
-                return respondJson({ error: "workout_id is required" }, 400);
-            }
-
-            return await deleteWorkout(idToDelete, supabase, userId);
+            return await deleteWorkout(idToDelete, supabase, operation);
         }
 
         return respondJson({ error: "Method not allowed" }, 405);

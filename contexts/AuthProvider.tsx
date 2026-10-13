@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { logOutRevenueCat } from '@/lib/iap';
-import { clearWorkoutDraft } from '@/lib/workoutDraft';
+import { fenceWorkoutDraft } from '@/lib/workoutDraft';
 import { clearWorkouts } from '@/lib/workoutStorage';
 import { clearOnboardingDraft } from '@/lib/onboardingDraft';
 import { clearExerciseCache } from '@/lib/exerciseLibrary';
@@ -31,19 +31,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check initial session
+    let disposed = false;
+    let observedAuthChange = false;
+    let ownerId: string | undefined;
+    const applySession = (next: Session | null) => {
+      if (disposed) return;
+      const nextOwner = next?.user?.id;
+      // Fence synchronously: route callbacks may run before React rerenders.
+      if (ownerId !== nextOwner) fenceWorkoutDraft();
+      ownerId = nextOwner;
+      setSession(next);
+      setLoading(false);
+    };
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
+      if (!observedAuthChange) applySession(session);
     });
-
-    // Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => {
+      observedAuthChange = true;
+      applySession(next);
     });
-
-    return () => subscription.unsubscribe();
+    return () => { disposed = true; subscription.unsubscribe(); };
   }, []);
 
   // Clear all local caches (workout history, Supabase auth tokens)
@@ -58,9 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Clear workout history cache + any in-progress draft
+    // Recovery is not a cache: never removed here. Sign-out fences it instead.
     await attempt('workouts', clearWorkouts);
-    await attempt('workout draft', clearWorkoutDraft);
     await attempt('exercise library', clearExerciseCache);
 
     // NOTE: tutorial_shown_v1 is intentionally NOT cleared — the tutorial
@@ -97,6 +103,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Invalidate queued draft writes before any async cleanup. Settings
+    // "Clear Cache" keeps the same owner, so it must not fence.
+    fenceWorkoutDraft();
     try {
       // Try to clear caches but don't let it block signOut
       await clearAllCaches();

@@ -43,10 +43,10 @@ import { saveCoachChatQA, saveWorkoutChatQA } from "@/lib/chatStorage";
 import { type WorkoutTemplate, type WorkoutTemplateItem } from "@/lib/profile";
 import { firePRCelebration } from "@/lib/notifications";
 import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
-import { expandTemplateToRows, getLastExerciseFromRows, makeId, makeRestRow, nextSetNumberForExercise, normalizeExercise, resequenceSets, todayISO } from "@/lib/workoutRules";
+import { expandTemplateToRows, getLastExerciseFromRows, makeId, makeRestRow, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
 import { saveWorkout as saveWorkoutLocalFirst, type SessionReview } from "@/lib/workoutStorage";
 import { type LogRow } from "@/types/workout";
-import { clearWorkoutDraft, getWorkoutDraft, saveWorkoutDraft } from "@/lib/workoutDraft";
+import { clearWorkoutDraft, getWorkoutDraft, getWorkoutDraftGeneration, saveWorkoutDraft } from "@/lib/workoutDraft";
 import { TutorialModal } from "@/components/tutorial/TutorialModal";
 import { Toast } from "@/components/ui/Toast";
 import { useToast } from "@/hooks/useToast";
@@ -61,35 +61,67 @@ import { resolveProgramDayStatus, resolveScheduledDayIndex, resolveHomeStartDeci
 import { formatProgramDayLabel } from "@/lib/programFormat";
 
 
+import { createSessionOwnership, settleOptionalReview, type EndOwnership, type SavePhase } from '@/lib/sessionOwnership';
+import { performedRows, isPendingSet, isPerformedRow, resolveEditedPerformance } from '@/lib/performedSets';
+import { serializeWorkoutRows } from '@/lib/workoutSerialization';
+import { numericText, validateWorkoutRow } from '@/lib/workoutValidation';
+import { createSubmitGuard } from '@/lib/submitGuard';
+import { sessionOperations } from '@/lib/sessionOperationDelivery';
+
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
 // ── Pure module-level helpers (no component state dependencies) ───────────────
 function buildRowsFromApi(apiRows: ApiWorkoutRow[]): LogRow[] {
-  return apiRows
+  if (!Array.isArray(apiRows) || apiRows.some(row => validateWorkoutRow(row))) throw new Error('Invalid parsed set values.');
+  const builtRows = apiRows
     .filter((row) => row.exercise && row.exercise.trim())
     .map((row) => ({
-      id: `${Date.now()}-${Math.random()}`,
+      ...(row.performance === undefined ? {} : { performance: row.performance }),
+      ...(row.setKind === undefined ? {} : { setKind: row.setKind }),
+      ...(row.plannedTarget === undefined ? {} : { plannedTarget: { ...row.plannedTarget } }),
+      ...(row.isCardio === undefined ? {} : { isCardio: row.isCardio }),
+      ...(row.durationMins === undefined ? {} : { durationMins: row.durationMins }),
+      ...(row.distance === undefined ? {} : { distance: row.distance }),
+      ...(row.distanceUnit === undefined ? {} : { distanceUnit: row.distanceUnit }),
+      ...(row.heartRate === undefined ? {} : { heartRate: row.heartRate }),
+      ...(row.calories === undefined ? {} : { calories: row.calories }),
+      ...(row.level === undefined ? {} : { level: row.level }),
+      id: row.id || `${Date.now()}-${Math.random()}`,
       exercise: row.exercise.trim(),
       set: Number.isFinite(row.set) ? row.set : 1,
-      weightLbs: String(row.weightLbs ?? "").trim(),
-      reps: String(row.reps ?? "").trim(),
+      weightLbs: row.isCardio ? String(row.weightLbs ?? '').trim() : numericText(row.weightLbs),
+      reps: row.isCardio ? String(row.reps ?? '').trim() : numericText(row.reps),
       notes: String(row.notes ?? "").trim(),
-      timestamp: Date.now(),
+      timestamp: Number.isFinite(row.timestamp) ? row.timestamp! : Date.now(),
       status: "committed" as const,
     }));
+  // A parse response may contain only a load. Keep it visible/editable, but
+  // never promote absent reps (or a prescribed target) into performance.
+  return builtRows.map(row => ({
+    ...row,
+    performance: isPerformedRow(row) ? "performed" : "planned",
+  }));
 }
 
 const toApiRows = (sourceRows: LogRow[]): ApiWorkoutRow[] =>
-  sourceRows.map((row) => ({
-    exercise: row.exercise,
-    set: row.set,
-    weightLbs: row.weightLbs,
-    reps: row.reps,
-    notes: row.notes,
-  }));
+  serializeWorkoutRows(sourceRows);
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { session } = useAuth();
+  const sessionProvenanceRef = useRef<{ ownerId: string; generation: number } | null>(null);
+  const recoveryOwnerRef = useRef<{ ownerId: string; generation: number } | null>(null);
+  const canUseSession = useCallback(() => !!session?.user?.id && sessionProvenanceRef.current?.ownerId === session.user.id &&
+    sessionProvenanceRef.current.generation === getWorkoutDraftGeneration(), [session?.user?.id]);
+  const canStartSession = useCallback(() => !!session?.user?.id && recoveryOwnerRef.current?.ownerId === session.user.id &&
+    recoveryOwnerRef.current.generation === getWorkoutDraftGeneration(), [session?.user?.id]);
+  // The owner's own End cleanup advances the draft generation. Callers re-stamp
+  // only after verifying no auth fence intervened, so only auth revokes access.
+  const restampOwner = (ownerId: string | undefined, generation: number, sessionContinues: boolean) => {
+    if (!ownerId) return;
+    recoveryOwnerRef.current = { ownerId, generation };
+    sessionProvenanceRef.current = sessionContinues ? { ownerId, generation } : null;
+  };
 
 
   const { width } = useWindowDimensions();
@@ -116,7 +148,15 @@ export default function HomeScreen() {
     pendingScrollRef.current = index;
   }, []);
 
-  const [rows, setRows] = useState<LogRow[]>([]);
+  const [rows, setRowsState] = useState<LogRow[]>([]);
+  const draftRowsRef = useRef(rows);
+  draftRowsRef.current = rows;
+  // Synchronous row identity for End and request fences before React rerenders.
+  const setRows = useCallback((value: LogRow[] | ((prev: LogRow[]) => LogRow[])) => {
+    const next = typeof value === 'function' ? value(draftRowsRef.current) : value;
+    draftRowsRef.current = next;
+    setRowsState(next);
+  }, []);
 
   // Execute queued scrolls AFTER React commits the new rows to the FlatList.
   useEffect(() => {
@@ -161,6 +201,15 @@ export default function HomeScreen() {
 
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const ownership = useRef(createSessionOwnership('initial')).current;
+  const [savePhase, setSavePhase] = useState<SavePhase>('idle');
+  const finalizing = savePhase === 'confirming' || savePhase === 'saving';
+  // Session ownership: mount/unmount
+  useEffect(() => {
+    ownership.mount();
+    return () => ownership.dispose();
+  }, [ownership]);
+
   // Session review modal state
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -192,13 +241,14 @@ export default function HomeScreen() {
   const draftToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onResetForNewDay = useCallback((_nextDate: string) => {
+    if (!draftChecked || !canStartSession()) return;
     setRows([]);
     setMessageInput("");
     setLoading(false);
     setEditingCell(null);
     setEditValue("");
-    clearWorkoutDraft();
-  }, []);
+    // Inactive date rollover is not explicit abandonment. Never delete recovery.
+  }, [draftChecked, setRows, canStartSession]);
 
   const {
     workoutActive,
@@ -208,11 +258,18 @@ export default function HomeScreen() {
     bodyParts,
     title,
     selectedPart,
-    startWorkoutSession,
+    startWorkoutSession: beginWorkoutSession,
     restoreWorkoutSession,
     endWorkoutSession,
     buildWorkoutToSave,
-  } = useWorkoutSession({ onResetForNewDay });
+  } = useWorkoutSession({ onResetForNewDay, recoveryResolved: draftChecked });
+  const startWorkoutSession = (parts: string[]) => {
+    if (!draftChecked || !canStartSession()) return;
+    sessionProvenanceRef.current = { ownerId: session!.user.id, generation: getWorkoutDraftGeneration() };
+    beginWorkoutSession(parts);
+  };
+  // Post-End presentation (review close/reflection) belongs to the recovery owner.
+  const ownsPresentation = () => workoutActive ? canUseSession() : canStartSession();
 
   // ── Dashboard data (all pre-loaded by root providers — zero extra API calls) ──
   const { program, currentWeek, loading: programLoading } = useProgram();
@@ -237,16 +294,40 @@ export default function HomeScreen() {
   }, []);
 
   // ── Draft persistence: restore on mount ──
-  const draftRestoredRef = useRef(false);
   useEffect(() => {
-    if (draftRestoredRef.current) return;
-    draftRestoredRef.current = true;
+    let disposed = false;
+    const ownerId = session?.user?.id;
+    const generation = getWorkoutDraftGeneration();
+    recoveryOwnerRef.current = null;
+    sessionProvenanceRef.current = null;
+    setDraftChecked(false);
+    setRows([]);
+    endWorkoutSession();
+    setMessageInput(''); setEditingCell(null); setEditValue(''); setLoading(false);
+    setCoachAnswer(null); setCoachOpen(false); setReviewModalVisible(false);
+    setNameModalVisible(false); setRoutineModalVisible(false);
+    if (!ownerId) return () => { disposed = true; };
+    let resolved = false;
 
     getWorkoutDraft().then((draft) => {
-      if (!draft) return;
-      if (draft.dateISO === todayISO()) {
-        // Same-day draft exists — restore it
-        setRows(draft.rows);
+      if (disposed || generation !== getWorkoutDraftGeneration()) return;
+      if (!draft) { resolved = true; return; }
+      if (draft.ownerId !== ownerId) {
+        showToast(draft.ownerId ? 'A saved session belongs to another account. It was kept; sign in to its original account to recover. Start and import are blocked.' : 'This older saved session has no verified owner. It was kept unchanged; recovery, Start and import are blocked until ownership can be established safely.', 'info');
+        return;
+      }
+      sessionProvenanceRef.current = { ownerId, generation };
+      resolved = true;
+      {
+        // Drafts are in-progress sessions, including overnight/uncertain legacy
+        // sessions. No approved abandoned-session TTL: preserve, never expire.
+        const interrupted = draft.rows.some((row) => row.status === 'syncing');
+        setRows(draft.rows.map((row) => row.status === 'syncing' ? {
+          ...row, status: 'committed' as const, performance: 'planned' as const,
+          weightLbs: '', reps: '',
+          notes: `Parsing interrupted — edit or delete this incomplete row.${row.pendingInput ? ` Original input: ${row.pendingInput}` : ' Original input unavailable in this older draft.'}`,
+        } : row));
+        if (interrupted) showToast('Parsing was interrupted. Incomplete rows can be edited or deleted; no request was retried.', 'info');
         restoreWorkoutSession(
           draft.bodyParts,
           draft.workoutId,
@@ -258,51 +339,77 @@ export default function HomeScreen() {
           setDraftRestoredToast(false);
           draftToastTimerRef.current = null;
         }, 3000);
-      } else {
-        // Stale draft from a different day — clear it silently
-        clearWorkoutDraft();
       }
-    }).finally(() => {
-      setDraftChecked(true);
+    }).then(() => {
+      if (!disposed && resolved && generation === getWorkoutDraftGeneration()) {
+        recoveryOwnerRef.current = { ownerId, generation };
+        setDraftChecked(true);
+      }
+    }).catch(() => {
+      if (!disposed) showToast('Unable to restore the saved session. Recovery data was kept; restart to retry before starting a new workout.', 'info');
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { disposed = true; };
+  }, [session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftGenerationRef = useRef({ workoutId, generation: getWorkoutDraftGeneration() });
+  if (draftGenerationRef.current.workoutId !== workoutId) {
+    draftGenerationRef.current = { workoutId, generation: getWorkoutDraftGeneration() };
+  }
+  const draftGeneration = draftGenerationRef.current.generation;
+  const persistDraftRows = useCallback((nextRows: LogRow[]) => {
+    draftRowsRef.current = nextRows;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = null;
+    if (!canUseSession() || !draftChecked || !workoutActive || !workoutId || !workoutDateISO) return;
+    // Empty is an active session snapshot, not absence of a session.
+    saveWorkoutDraft({
+      ownerId: sessionProvenanceRef.current!.ownerId, workoutId, dateISO: workoutDateISO, bodyParts,
+      createdAt: workoutCreatedAt ?? Date.now(), rows: nextRows, updatedAt: Date.now(),
+    }, draftGeneration).catch(() => showToast('Session changes could not be saved on this device. Keep the app open and retry.', 'info'));
+  }, [draftChecked, workoutActive, workoutId, workoutDateISO, bodyParts, workoutCreatedAt, draftGeneration, showToast, canUseSession]);
 
   // ── Draft persistence: debounced autosave on row changes ──
   useEffect(() => {
-    if (!workoutActive || rows.length === 0 || !workoutId || !workoutDateISO) return;
+    if (!draftChecked || !workoutActive || !workoutId || !workoutDateISO) return;
     const timer = setTimeout(() => {
-      saveWorkoutDraft({
-        workoutId,
-        dateISO: workoutDateISO,
-        bodyParts,
-        createdAt: workoutCreatedAt ?? Date.now(),
-        rows,
-        updatedAt: Date.now(),
-      });
+      persistDraftRows(rows);
     }, 500);
+    draftSaveTimerRef.current = timer;
     return () => clearTimeout(timer);
-  }, [rows, workoutActive, workoutId, workoutDateISO, bodyParts, workoutCreatedAt]);
+  }, [rows, draftChecked, workoutActive, workoutId, workoutDateISO, persistDraftRows]);
 
   // ── Draft persistence: immediate save on app background ──
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background' && workoutActive && rows.length > 0 && workoutId && workoutDateISO) {
+      if (state === 'background') {
         // Fire-and-forget — save immediately before iOS kills the process
-        saveWorkoutDraft({
-          workoutId,
-          dateISO: workoutDateISO,
-          bodyParts,
-          createdAt: workoutCreatedAt ?? Date.now(),
-          rows,
-          updatedAt: Date.now(),
-        });
+        persistDraftRows(draftRowsRef.current);
       }
     });
     return () => sub.remove();
-  }, [workoutActive, rows, workoutId, workoutDateISO, bodyParts, workoutCreatedAt]);
+  }, [rows, persistDraftRows]);
 
   // Subscribe to PR breakthrough notifications
-  const { session } = useAuth();
+  const sessionOwnerKey = `${session?.user?.id ?? 'anonymous'}:${workoutId ?? savedWorkoutIdRef.current ?? 'inactive'}`;
+  // Synchronous render fence: a passive effect alone permits a late callback gap.
+  ownership.setOwner(sessionOwnerKey);
+  const renderOwner = ownership.capture();
+
+  const queueAbandon = async () => {
+    const owner = sessionProvenanceRef.current?.ownerId;
+    if (!canUseSession() || !owner || !workoutId || !workoutDateISO) throw new Error('Session provenance required');
+    await sessionOperations.abandon(owner, workoutId, workoutDateISO);
+    sessionOperations.flush(owner).catch(() => showToast('Abandon reconciliation is pending; the durable operation was kept.', 'info'));
+  };
+  useEffect(() => {
+    const owner = session?.user?.id;
+    if (!owner) return;
+    const retry = () => sessionOperations.flush(owner).catch(() => showToast('Session operation recovery could not be read; stored data was kept.', 'info'));
+    retry();
+    const sub = AppState.addEventListener('change', state => { if (state === 'active') retry(); });
+    return () => sub.remove();
+  }, [session?.user?.id, showToast]);
   const { showCelebration } = usePRCelebration();
   const lastCelebratedRef = useRef<string>('');
   const { state: restTimerState, start: startRestTimer, registerRestEntrySink } = useSharedRestTimer();
@@ -346,19 +453,33 @@ export default function HomeScreen() {
     }
   }, [showCelebration]);
 
+  const queueLiveRows = useCallback(async (changed: LogRow[], operation: 'put' | 'drop' | 'revise' = 'put') => {
+    const owner = sessionProvenanceRef.current?.ownerId;
+    if (!canUseSession() || !owner || !workoutId || !workoutDateISO) throw new Error('Session provenance required');
+    const effectOwner = ownership.capture();
+    const effectGeneration = getWorkoutDraftGeneration();
+    await sessionOperations.rows(owner, workoutId, workoutDateISO, changed, operation);
+    // Durable intent precedes HTTP; background/foreground and mount retry it.
+    sessionOperations.flush(owner, receipt => {
+      if (ownership.isCurrent(effectOwner) && getWorkoutDraftGeneration() === effectGeneration && receipt.pr) celebratePR(receipt.pr);
+    }).catch(() => { if (ownership.isCurrent(effectOwner)) showToast('Remote session reconciliation is pending; recovery was kept.', 'info'); });
+  }, [canUseSession, workoutId, workoutDateISO, ownership, celebratePR, showToast]);
+
   // When a rest timer is started (e.g. from the Timer tab), drop a clear marker
   // into the active workout log between sets — appended, never overwriting input.
   useEffect(() => {
+    const restOwner = ownership.capture();
     return registerRestEntrySink(({ durationSec }) => {
-      if (!workoutActive) return;
+      if (!workoutActive || !canUseSession() || ownership.busy || !ownership.isSession(restOwner)) return;
       setRows((prev) => [...prev, makeRestRow(durationSec)]);
       scrollToBottom();
     });
-  }, [registerRestEntrySink, workoutActive, scrollToBottom]);
+  }, [registerRestEntrySink, workoutActive, scrollToBottom, ownership, setRows, sessionOwnerKey, canUseSession]);
 
   useEffect(() => {
     const userId = session?.user?.id;
-    if (!userId) return;
+    if (!userId || !workoutActive) return;
+    const prOwner = ownership.capture();
 
     const channel = supabase
       .channel('pr_breakthroughs')
@@ -371,6 +492,7 @@ export default function HomeScreen() {
           filter: `user_id=eq.${userId}`,
         },
         async (payload) => {
+          if (ownership.busy || !ownership.isSession(prOwner)) return;
           const prData = payload.new as any;
 
           // Deduplicate against client-side PR check
@@ -403,7 +525,7 @@ export default function HomeScreen() {
     return () => {
       channel.unsubscribe();
     };
-  }, [session?.user?.id, showCelebration]);
+  }, [session?.user?.id, showCelebration, workoutActive, sessionOwnerKey, ownership]);
 
   useEffect(() => {
     (async () => {
@@ -415,7 +537,8 @@ export default function HomeScreen() {
   // openCoach is a plain function (commitPendingAndGet is defined below — useCallback
   // would create a forward-reference TypeScript error)
   const openCoach = () => {
-    commitPendingAndGet();
+    if (!canUseSession() || ownership.busy) return;
+    if (!commitPendingAndGet()) return;
     setCoachError(null);
     setCoachOpen(true);
   };
@@ -426,7 +549,11 @@ export default function HomeScreen() {
 
   const submitCoachQuestion = async (chatHistory?: { role: string; content: string }[]) => {
     const q = coachQuestion.trim();
-    if (!q || coachLoading) return;
+    if (!canUseSession() || !q || coachLoading || ownership.busy || !ownership.isSession(renderOwner)) return;
+    const request = ownership.beginRequest('coach');
+    if (!request) return;
+    const requestDraftGeneration = getWorkoutDraftGeneration();
+    const ownsRequest = () => ownership.isCurrentRequest(request) && getWorkoutDraftGeneration() === requestDraftGeneration;
     setCoachLoading(true);
     setCoachError(null);
     setCoachAnswer(null);
@@ -444,8 +571,9 @@ export default function HomeScreen() {
     try {
       // Stream the response
       const res = await api.askCoach(q, toApiRows(rows), (chunk) => {
-        setCoachAnswer((prev) => (prev || "") + chunk);
+        if (ownsRequest()) setCoachAnswer((prev) => (prev || "") + chunk);
       }, recentHistory);
+      if (!ownsRequest()) return;
       const answerText = res.answer?.trim() || "Coach had no response.";
       setCoachAnswer(answerText);
 
@@ -458,6 +586,7 @@ export default function HomeScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (err) {
+      if (!ownsRequest()) return;
       if (err instanceof FeatureGateError && err.code === "AI_LIMIT_REACHED") {
         setCoachError("You've hit today's free message limit.");
         showAiLimitAlert();
@@ -469,14 +598,14 @@ export default function HomeScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } finally {
-      setCoachLoading(false);
+      if (ownership.finishRequest(request) && getWorkoutDraftGeneration() === requestDraftGeneration) setCoachLoading(false);
     }
   };
 
   const onStartWorkout = () => {
     // Guard: wait for draft restore to resolve before allowing a new session.
     // Tapping before restore completes could orphan an in-progress draft.
-    if (!draftChecked) return;
+    if (!draftChecked || !canStartSession()) return;
     if (workoutActive) {
       showToast('End the current workout before starting a new one.', 'info');
       return;
@@ -490,14 +619,14 @@ export default function HomeScreen() {
   // onStartWorkout; falls back to it for rest days, no program, or when the
   // scheduled day can't be resolved.
   const handleStartFromHome = () => {
-    if (!draftChecked) return;
+    if (!draftChecked || !canStartSession()) return;
     if (workoutActive) {
       showToast('End the current workout before starting a new one.', 'info');
       return;
     }
     // Inline-edit guard (no-op here since no session is active yet, but
     // kept for parity with every other mutation entry point).
-    commitPendingAndGet();
+    if (!commitPendingAndGet()) return;
 
     if (program && currentWeek && 'days' in currentWeek && currentWeek.days) {
       const trainingWeekdays = resolveTrainingDays(program.days_per_week, profile?.training_days);
@@ -521,6 +650,7 @@ export default function HomeScreen() {
         const day = currentWeek.days.find((d) => d.day_index === decision.dayIndex);
         const items = resolveProgramDayItems(currentWeek.days, decision.dayIndex);
         if (day && items) {
+          invalidateResponses();
           startWorkoutSession([formatProgramDayLabel(day)]);
           const skeletonRows = expandTemplateToRows(
             items.map((item) => ({
@@ -547,8 +677,14 @@ export default function HomeScreen() {
   };
 
   const confirmStartWorkout = (name: string) => {
+    if (!draftChecked || !canStartSession()) return;
+    if (workoutActive) {
+      showToast('End the current workout before starting a new one.', 'info');
+      return;
+    }
     setNameModalVisible(false);
     // Directly start with just the name
+    invalidateResponses();
     startWorkoutSession(name ? [name] : []);
     setRows([]);
     setMessageInput("");
@@ -558,7 +694,13 @@ export default function HomeScreen() {
 
   // Start workout from a template with skeleton rows
   const handleSelectTemplateForStart = (template: WorkoutTemplate, items: WorkoutTemplateItem[]) => {
+    if (!draftChecked || !canStartSession()) return;
+    if (workoutActive) {
+      showToast('End the current workout before starting a new one.', 'info');
+      return;
+    }
     setNameModalVisible(false);
+    invalidateResponses();
     startWorkoutSession([template.name]);
 
     // Expand template items into skeleton rows
@@ -576,6 +718,8 @@ export default function HomeScreen() {
 
   // Import routine into current workout (or start new one if not active)
   const handleImportRoutine = (template: WorkoutTemplate, items: WorkoutTemplateItem[]) => {
+    if (!draftChecked || !canStartSession() || (workoutActive && !canUseSession()) || ownership.busy) return;
+    invalidateResponses();
     setRoutineModalVisible(false);
 
     // Expand template items into skeleton rows
@@ -597,9 +741,38 @@ export default function HomeScreen() {
     scrollToBottom();
   };
 
+  const invalidateResponses = useCallback(() => {
+    ownership.invalidateRequests();
+    // A request invalidation is not a completed set. Retain exact input as an
+    // editable interruption, consistent with P1 process-death recovery.
+    setRows(prev => prev.map(row => row.status === 'syncing' ? {
+      ...row, status: 'committed' as const, performance: 'planned' as const,
+      weightLbs: '', reps: '',
+      notes: `Parsing interrupted — edit or delete this incomplete row.${row.pendingInput ? ` Original input: ${row.pendingInput}` : ' Original input unavailable.'}`,
+    } : row));
+    setLoading(false); setCoachLoading(false);
+    setAiBubbleText(null); setCoachAnswer(null); setCoachError(null);
+    setCoachOpen(false); setRestPrompt(null);
+  }, [ownership, setRows]);
+
+  const presentationOwnerRef = useRef(sessionOwnerKey);
+  // Session ownership: presentation reset
+  useEffect(() => {
+    if (presentationOwnerRef.current === sessionOwnerKey) return;
+    presentationOwnerRef.current = sessionOwnerKey;
+    // The render fence already invalidated old requests. Reset presentation,
+    // not ownership again, so this effect cannot revoke a new request token.
+    setLoading(false); setCoachLoading(false);
+    setAiBubbleText(null); setCoachAnswer(null); setCoachError(null);
+    setCoachOpen(false); setRestPrompt(null);
+    setReviewModalVisible(false); setSessionReview(null); setReviewLoading(false);
+    setSavePhase('idle');
+  }, [sessionOwnerKey]);
+
   const onClearRows = () => {
-    commitPendingAndGet();
-    if (!rows.length) return;
+    if (!canUseSession() || ownership.busy) return;
+    if (!draftRowsRef.current.length) { invalidateResponses(); return; }
+    const clearOwner = ownership.capture();
     Alert.alert(
       "Clear table?",
       "This will remove all sets in the current session.",
@@ -608,8 +781,22 @@ export default function HomeScreen() {
         {
           text: "Clear",
           style: "destructive",
-          onPress: () => {
-            setRows([]);
+          onPress: async () => {
+            if (!canUseSession() || ownership.busy || !ownership.isCurrent(clearOwner)) return;
+            const clearing = draftRowsRef.current.slice();
+            invalidateResponses();
+            const afterInvalidation = ownership.capture();
+            try {
+              await queueLiveRows(clearing, 'drop');
+            } catch {
+              if (ownership.isCurrent(afterInvalidation)) showToast('Clear could not be saved on this device. Your rows were kept; retry Clear.', 'info');
+              return;
+            }
+            if (!canUseSession() || !ownership.isSession(afterInvalidation)) return;
+            const clearedIds = new Set(clearing.map(row => row.id));
+            const remaining = draftRowsRef.current.filter(row => !clearedIds.has(row.id));
+            persistDraftRows(remaining);
+            setRows(remaining);
             setEditingCell(null);
             setEditValue("");
           },
@@ -629,9 +816,18 @@ export default function HomeScreen() {
   };
 
   const beginCellEdit = (rowId: string, field: EditableField, value: string) => {
+    if (!canUseSession() || ownership.busy) return;
+    invalidateResponses();
     if (editingCell && (editingCell.rowId !== rowId || editingCell.field !== field)) {
-      const { nextRows, changed } = applyPendingEdit(rows);
-      if (changed) setRows(nextRows);
+      const { nextRows, changed, invalid } = applyPendingEdit(rows);
+      if (invalid) return;
+      if (changed) {
+        const updates = nextRows.filter(row => isPerformedRow(row) && JSON.stringify(row) !== JSON.stringify(rows.find(old => old.id === row.id)));
+        const retractions = nextRows.filter(row => !isPerformedRow(row) && isPerformedRow(rows.find(old => old.id === row.id) ?? row));
+        if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+        if (retractions.length) queueLiveRows(retractions, 'revise').catch(() => showToast('Live corrections could not be queued on this device. Keep the session open and retry.', 'info'));
+        setRows(nextRows);
+      }
     }
     // Direct scroll (not deferred) — rows aren't changing, just editing focus
     const rowIndex = rows.findIndex((r) => r.id === rowId);
@@ -653,13 +849,19 @@ export default function HomeScreen() {
   };
 
   const applyPendingEdit = useCallback(
-    (list: LogRow[]): { nextRows: LogRow[]; changed: boolean } => {
+    (list: LogRow[]): { nextRows: LogRow[]; changed: boolean; invalid?: boolean } => {
       if (!editingCell) return { nextRows: list, changed: false };
       const idx = list.findIndex((r) => r.id === editingCell.rowId);
       if (idx === -1) return { nextRows: list, changed: false };
 
       const current = list[idx];
       const trimmed = editingCell.field === "notes" ? editValue : editValue.trim();
+      const candidate = { ...current, [editingCell.field]: trimmed };
+      const error = validateWorkoutRow(candidate);
+      if (error) {
+        showToast(error, 'info');
+        return { nextRows: list, changed: false, invalid: true };
+      }
       let updated: LogRow = { ...current };
       let changed = false;
 
@@ -670,8 +872,7 @@ export default function HomeScreen() {
           changed = true;
         }
       } else if (editingCell.field === "set") {
-        const parsed = Number.parseInt(trimmed, 10);
-        if (!Number.isFinite(parsed) || parsed <= 0) return { nextRows: list, changed: false };
+        const parsed = Number(trimmed);
         if (parsed !== current.set) {
           updated.set = parsed;
           changed = true;
@@ -688,8 +889,7 @@ export default function HomeScreen() {
             changed = true;
           }
         } else {
-          const parsedReps = Number.parseInt(trimmed, 10);
-          if (!Number.isFinite(parsedReps) || parsedReps <= 0) return { nextRows: list, changed: false };
+          const parsedReps = Number(trimmed);
           const asString = String(parsedReps);
           if (asString !== current.reps) {
             updated.reps = asString;
@@ -704,6 +904,9 @@ export default function HomeScreen() {
       }
 
       if (!changed) return { nextRows: list, changed: false };
+      if (editingCell.field === "weightLbs" || editingCell.field === "reps") {
+        updated = resolveEditedPerformance(current, updated, editingCell.field === "reps");
+      }
 
       const without = [...list];
       without.splice(idx, 1);
@@ -717,7 +920,7 @@ export default function HomeScreen() {
       let insertionIndex = Math.min(idx, without.length);
 
       if (editingCell.field === "set") {
-        const desiredIdx = Math.max((Number.parseInt(trimmed, 10) || 1) - 1, 0);
+        const desiredIdx = Math.max(Number(trimmed) - 1, 0);
         insertionIndex = sameExercisePositions.length
           ? Math.min(sameExercisePositions[0] + desiredIdx, without.length)
           : Math.min(idx, without.length);
@@ -732,44 +935,90 @@ export default function HomeScreen() {
 
       return { nextRows: resequenceSets(nextRows), changed: true };
     },
-    [editValue, editingCell]
+    [editValue, editingCell, showToast]
   );
 
   const commitCellEdit = useCallback(() => {
+    if (!canUseSession() || ownership.busy) return;
     if (!editingCell) return;
-    setRows((prev) => applyPendingEdit(prev).nextRows);
+    const previous = draftRowsRef.current;
+    const result = applyPendingEdit(previous);
+    if (result.invalid) return;
+    const updates = result.nextRows.filter(row => isPerformedRow(row) &&
+      JSON.stringify(row) !== JSON.stringify(previous.find(old => old.id === row.id)));
+    const retractions = result.nextRows.filter(row => !isPerformedRow(row) &&
+      isPerformedRow(previous.find(old => old.id === row.id) ?? row));
+    if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+    if (retractions.length) queueLiveRows(retractions, 'revise').catch(() => showToast('Live corrections could not be queued on this device. Keep the session open and retry.', 'info'));
+    setRows(result.nextRows);
     setEditingCell(null);
     setEditValue("");
-  }, [applyPendingEdit, editingCell]);
+  }, [applyPendingEdit, editingCell, ownership, setRows, queueLiveRows, showToast, canUseSession]);
 
   const withPendingRows = useCallback(
     (mutator: (rowsList: LogRow[]) => LogRow[]) => {
+      if (!canUseSession() || ownership.busy) return;
+      if (applyPendingEdit(draftRowsRef.current).invalid) return;
+      invalidateResponses();
       setRows((prev) => {
         const { nextRows } = applyPendingEdit(prev);
-        return mutator(nextRows);
+        const changed = mutator(nextRows);
+        const updates = changed.filter(row => isPerformedRow(row) &&
+          JSON.stringify(row) !== JSON.stringify(prev.find(old => old.id === row.id)));
+        const retractions = changed.filter(row => !isPerformedRow(row) &&
+          isPerformedRow(prev.find(old => old.id === row.id) ?? row));
+        if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+        if (retractions.length) queueLiveRows(retractions, 'revise').catch(() => showToast('Live corrections could not be queued on this device. Keep the session open and retry.', 'info'));
+        return changed;
       });
       if (editingCell) {
         setEditingCell(null);
         setEditValue("");
       }
     },
-    [applyPendingEdit, editingCell]
+    [applyPendingEdit, editingCell, invalidateResponses, ownership, setRows, queueLiveRows, showToast, canUseSession]
   );
 
-  const commitPendingAndGet = () => {
-    if (!editingCell) return rows;
-    const { nextRows } = applyPendingEdit(rows);
+  const commitPendingAndGet = (deliver = true) => {
+    if (workoutActive && !canUseSession()) return null;
+    if (!editingCell) return draftRowsRef.current;
+    const previous = draftRowsRef.current;
+    const { nextRows, invalid } = applyPendingEdit(previous);
+    if (invalid) return null;
+    if (deliver) {
+      const updates = nextRows.filter(row => isPerformedRow(row) && JSON.stringify(row) !== JSON.stringify(previous.find(old => old.id === row.id)));
+      const retractions = nextRows.filter(row => !isPerformedRow(row) && isPerformedRow(previous.find(old => old.id === row.id) ?? row));
+      if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+      if (retractions.length) queueLiveRows(retractions, 'revise').catch(() => showToast('Live corrections could not be queued on this device. Keep the session open and retry.', 'info'));
+    }
     setRows(nextRows);
     setEditingCell(null);
     setEditValue("");
     return nextRows;
   };
 
-  const deleteRow = (rowId: string) => {
-    withPendingRows((prev) => {
-      const nextRows = prev.filter((r) => r.id !== rowId);
-      return resequenceSets(nextRows);
+  const deleteRow = async (rowId: string) => {
+    if (!canUseSession() || ownership.busy || applyPendingEdit(draftRowsRef.current).invalid) return;
+    const removed = draftRowsRef.current.find(row => row.id === rowId);
+    if (!removed) return;
+    invalidateResponses();
+    const deletionOwner = ownership.capture();
+    const deletionGeneration = getWorkoutDraftGeneration();
+    try { await queueLiveRows([removed], 'drop'); }
+    catch {
+      if (ownership.isCurrent(deletionOwner)) showToast('Deletion could not be saved on this device. Your row was kept; retry delete.', 'info');
+      return;
+    }
+    if (!ownership.isSession(deletionOwner) || getWorkoutDraftGeneration() !== deletionGeneration) return;
+    const previous = draftRowsRef.current;
+    const nextRows = resequenceSets(previous.filter(row => row.id !== rowId));
+    const updates = nextRows.filter(row => isPerformedRow(row) && JSON.stringify(row) !== JSON.stringify(previous.find(old => old.id === row.id)));
+    if (updates.length) queueLiveRows(updates).catch(() => {
+      if (ownership.isCurrent(deletionOwner)) showToast('Live numbering changes could not be queued on this device. Recovery was kept.', 'info');
     });
+    persistDraftRows(nextRows);
+    setRows(nextRows);
+    setEditingCell(null); setEditValue('');
   };
 
   const duplicateRow = (rowId: string) => {
@@ -791,29 +1040,38 @@ export default function HomeScreen() {
   };
 
   const handleReorderRow = useCallback((fromIndex: number, toIndex: number) => {
+    if (!canUseSession() || ownership.busy) return;
+    invalidateResponses();
     setRows(prev => {
       const clamped = Math.max(0, Math.min(toIndex, prev.length - 1));
       if (fromIndex === clamped) return prev;
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
       next.splice(clamped, 0, moved);
-      return resequenceSets(next);
+      const changed = resequenceSets(next);
+      const updates = changed.filter(row => isPerformedRow(row) &&
+        JSON.stringify(row) !== JSON.stringify(prev.find(old => old.id === row.id)));
+      if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+      return changed;
     });
-  }, []);
+  }, [invalidateResponses, ownership, setRows, queueLiveRows, showToast, canUseSession]);
 
   const handleOpenEditSet = (rowId: string) => {
+    if (!canUseSession() || ownership.busy) return;
     setTargetRowId(rowId);
     setEditSetModalVisible(true);
   };
 
   const handleSaveSet = (updatedRow: LogRow) => {
+    const error = validateWorkoutRow(updatedRow);
+    if (error) { showToast(error, 'info'); return; }
     withPendingRows((prev) => {
       const idx = prev.findIndex((r) => r.id === updatedRow.id);
       if (idx === -1) return prev;
 
       const oldRow = prev[idx];
       const next = [...prev];
-      next[idx] = updatedRow;
+      next[idx] = resolveEditedPerformance(oldRow, updatedRow, updatedRow.reps !== oldRow.reps);
 
       // If exercise name changed, re-sequence
       if (normalizeExercise(oldRow.exercise) !== normalizeExercise(updatedRow.exercise)) {
@@ -833,254 +1091,207 @@ export default function HomeScreen() {
   };
 
   const onEndWorkout = async () => {
-    const committedRows = commitPendingAndGet();
-
-    if (!workoutActive) {
-      showToast('Start a workout first.', 'info');
-      return;
+    if (!ownership.isSession(renderOwner) || getWorkoutDraftGeneration() !== draftGeneration) return;
+    if (!workoutActive) { showToast('Start a workout first.', 'info'); return; }
+    if (!canUseSession() || ownership.busy) return;
+    // Confirmation must not dispatch mutations; the confirmed final snapshot owns them.
+    const committedRows = commitPendingAndGet(false);
+    if (!committedRows) return;
+    const token = ownership.beginEnd(committedRows);
+    if (!token) return;
+    invalidateResponses();
+    setSavePhase('confirming');
+    const empty = performedRows(token.rows).length === 0;
+    const proceed = await new Promise<boolean>(resolve => Alert.alert(
+      empty ? 'End empty session?' : 'End workout?',
+      empty ? 'No sets logged. Nothing will be saved to history.' : 'This will save and generate your workout review.',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+        { text: empty ? 'End Session' : 'Save', style: empty ? 'destructive' : 'default', onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    ));
+    if (!ownership.isCurrentEnd(token) || getWorkoutDraftGeneration() !== draftGeneration) { ownership.releaseEnd(token); return; }
+    if (!proceed) { ownership.releaseEnd(token); setSavePhase('idle'); return; }
+    if (!empty) { await handleEndWorkoutWithReview(token.rows, token); return; }
+    setSavePhase('saving');
+    let cleanupGeneration: number | null = null;
+    const endOwner = sessionProvenanceRef.current?.ownerId;
+    try {
+      await queueAbandon();
+      if (!ownership.isCurrentEnd(token) || getWorkoutDraftGeneration() !== draftGeneration) return;
+      const cleanup = clearWorkoutDraft(endOwner, draftGeneration);
+      cleanupGeneration = getWorkoutDraftGeneration();
+      await cleanup;
+      if (!ownership.isCurrentEnd(token) || getWorkoutDraftGeneration() !== cleanupGeneration) return;
+      restampOwner(endOwner, cleanupGeneration, false);
+      endWorkoutSession(); setRows([]); setMessageInput(''); setEditingCell(null); setEditValue('');
+      ownership.releaseEnd(token); setSavePhase('idle');
+    } catch {
+      if (!ownership.isCurrentEnd(token) || getWorkoutDraftGeneration() !== (cleanupGeneration ?? draftGeneration)) return;
+      draftGenerationRef.current = { workoutId, generation: getWorkoutDraftGeneration() };
+      restampOwner(endOwner, getWorkoutDraftGeneration(), true);
+      ownership.releaseEnd(token); setSavePhase('failed');
+      showToast('Session could not be ended. Recovery data was kept; retry End.', 'info');
+    } finally {
+      ownership.releaseEnd(token);
     }
-    const loggedSets = committedRows.filter((r) => !r.isRest);
-    if (!loggedSets.length) {
-      Alert.alert(
-        "End empty session?",
-        "No sets logged. Nothing will be saved to history.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "End Session",
-            style: "destructive",
-            onPress: () => {
-              clearWorkoutDraft();
-              endWorkoutSession();
-              setRows([]);
-              setMessageInput("");
-              setEditingCell(null);
-              setEditValue("");
-            },
-          },
-        ]
-      );
-      return;
-    }
-
-    const proceed = await new Promise<boolean>((resolve) => {
-      Alert.alert(
-        "End workout?",
-        "This will save and generate your workout review.",
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => resolve(false)
-          },
-          {
-            text: "Save",
-            style: "default",
-            onPress: () => resolve(true)
-          },
-        ]
-      );
-    });
-    if (!proceed) return;
-
-    // Route through the review flow — same path as typing "done"
-    handleEndWorkoutWithReview(committedRows);
   };
 
-  // Handle end workout with auto-save and AI review generation
-  const handleEndWorkoutWithReview = async (currentRows: LogRow[]) => {
-    const committedRows = currentRows.filter(r => r.status === "committed" && !r.isRest);
-    if (committedRows.length === 0) {
+  // Finalization owns a deep snapshot, not the mutable render's row objects.
+  const handleEndWorkoutWithReview = async (currentRows: LogRow[], reserved?: EndOwnership) => {
+    if (!canUseSession()) return;
+    const token = reserved ?? ownership.beginEnd(currentRows);
+    if (!token || !ownership.isCurrentEnd(token)) return;
+    const committedRows = performedRows(token.rows);
+    if (!committedRows.length) {
+      ownership.releaseEnd(token);
+      setSavePhase('idle');
       showToast('Log some sets before ending your workout.', 'info');
       return;
     }
-
-    // Capture workoutId before endWorkoutSession clears it
+    invalidateResponses();
     savedWorkoutIdRef.current = workoutId ?? null;
-
-    // Show review modal with loading state
+    setSavePhase('saving');
     setReviewModalVisible(true);
     setReviewLoading(true);
     setSessionReview(null);
-
-    // Capture state
-    const rowsToSave = [...committedRows];
-
-    // Build stored rows
-    const storedRows = rowsToSave.map((row) => ({
-      exercise: row.exercise,
-      weightLbs: row.weightLbs,
-      reps: row.reps,
-      notes: row.notes,
-      timestamp: row.timestamp,
-    }));
-
-    // Generate review
+    const ownsSave = () => ownership.isCurrentEnd(token) && getWorkoutDraftGeneration() === draftGeneration;
+    const storedRows = serializeWorkoutRows(committedRows);
+    // Strength rating/progression is optional and inapplicable to cardio-only
+    // sessions. Keep all performed evidence durable, not just reviewable sets.
+    const strengthRows = committedRows.filter(r => !r.isCardio && r.setKind !== 'cardio');
+    const reviewPromise = strengthRows.length
+      ? settleOptionalReview(api.generateSessionReview(strengthRows.map(r => ({
+        id: r.id, timestamp: r.timestamp, performance: r.performance,
+        isCardio: r.isCardio, setKind: r.setKind, plannedTarget: r.plannedTarget,
+        exercise: r.exercise, set: r.set, weightLbs: r.weightLbs, reps: r.reps, notes: r.notes,
+      })), selectedPart)
+        .then(data => ({ ...data, generatedAt: Date.now() })))
+      : Promise.resolve(null);
+    let cleanupGeneration: number | null = null;
+    const endOwner = sessionProvenanceRef.current?.ownerId;
     try {
-      const reviewData = await api.generateSessionReview(
-        rowsToSave.map(r => ({
-          exercise: r.exercise,
-          set: r.set,
-          weightLbs: r.weightLbs,
-          reps: r.reps,
-          notes: r.notes,
-        })),
-        selectedPart
-      );
-
-      const review: SessionReview = {
-        ...reviewData,
-        generatedAt: Date.now(),
-      };
-
+      // Local history must be written before waiting for optional AI review.
+      const { synced } = await saveWorkoutLocalFirst(buildWorkoutToSave(storedRows), { review: reviewPromise, isCurrent: ownsSave });
+      if (!ownsSave()) return;
+      const cleanup = clearWorkoutDraft(endOwner, draftGeneration);
+      cleanupGeneration = getWorkoutDraftGeneration();
+      await cleanup;
+      if (!ownership.isCurrentEnd(token) || getWorkoutDraftGeneration() !== cleanupGeneration) return;
+      const review = await reviewPromise;
+      if (!ownership.isCurrentEnd(token) || getWorkoutDraftGeneration() !== cleanupGeneration) return;
+      restampOwner(endOwner, cleanupGeneration, false);
       setSessionReview(review);
       setReviewLoading(false);
-
-      // Save workout with review — local-first: AsyncStorage always succeeds,
-      // remote sync is retried later if the gym has no signal.
-      const workoutPayload = {
-        ...buildWorkoutToSave(storedRows),
-        review,
-      };
-
-      const { synced } = await saveWorkoutLocalFirst(workoutPayload);
-
-      // Clear draft + UI after successful (local) save
-      clearWorkoutDraft();
+      setSavePhase('saved');
       endWorkoutSession();
       setRows([]);
-      setMessageInput("");
+      setMessageInput('');
       setEditingCell(null);
-      setEditValue("");
-
-      if (!synced) {
-        showToast('Saved on this device — will sync when back online.', 'info');
-      }
-
-      if (Platform.OS === "ios") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+      setEditValue('');
+      ownership.releaseEnd(token);
+      if (!synced) showToast('Saved on this device — will sync when back online.', 'info');
     } catch (error) {
-      // Review generation failed (offline / AI limit) — the workout itself
-      // still saves local-first and syncs later.
-      console.error("[handleEndWorkoutWithReview] Error:", error);
-      setReviewLoading(false);
-
-      const { synced } = await saveWorkoutLocalFirst(buildWorkoutToSave(storedRows));
-      clearWorkoutDraft();
-      endWorkoutSession();
-      setRows([]);
-      setMessageInput("");
-      setEditingCell(null);
-      setEditValue("");
-      if (!synced) {
-        showToast('Saved on this device — will sync when back online.', 'info');
+      if (!ownership.isCurrentEnd(token) || getWorkoutDraftGeneration() !== (cleanupGeneration ?? draftGeneration)) return;
+      if (cleanupGeneration !== null) {
+        draftGenerationRef.current = { workoutId, generation: cleanupGeneration };
+        restampOwner(endOwner, cleanupGeneration, true);
       }
+      console.error('[handleEndWorkoutWithReview] Save failed:', error);
+      setReviewLoading(false);
+      setSavePhase('failed');
+      showToast('Workout could not be finished on this device. Your session was kept. Retry End to save it.', 'info');
+      ownership.releaseEnd(token);
+    } finally {
+      // Identity-based release cannot unlock a newer owner's End token.
+      ownership.releaseEnd(token);
     }
   };
 
-  const syncSkeletonFilledRow = useCallback((filledRow: LogRow, weight: string, reps?: string) => {
-    const repsToUse = reps || filledRow.reps;
-
-    api.logSet({
-      exercise: filledRow.exercise,
-      set: filledRow.set,
-      weightLbs: weight,
-      reps: repsToUse,
-      notes: filledRow.notes || "",
-      dateISO: workoutDateISO ?? undefined,
-    })
-      .then((res) => {
-        if (res?.pr) celebratePR(res.pr);
-      })
-      .catch(err => console.error("Failed to sync skeleton fill", err));
-  }, [workoutDateISO, celebratePR]);
-
+  // One guard per rendered composer callback. A newer render/session does not
+  // inherit an old provider's latch; ownership still fences its late result.
+  const submissionGuard = createSubmitGuard({ once: true });
   const sendMessage = async () => {
+    await submissionGuard.run(async () => {
     const message = messageInput.trim();
-    if (!message || loading) return;
+    if (!canUseSession() || !message || loading || ownership.busy || !ownership.isSession(renderOwner)) return;
     if (!workoutActive) {
       showToast('Start a workout before logging sets.', 'info');
       return;
     }
 
     const currentRows = commitPendingAndGet();
+    if (!currentRows) return;
+    const effectOwner = ownership.capture();
+    const effectsDraftGeneration = getWorkoutDraftGeneration();
+    const logPerformedRows = (changedRows: LogRow[]) => {
+      // Each actual changed row (fill or append) logs once.
+      const eligible = performedRows(changedRows).filter(row => !validateWorkoutRow(row, true) &&
+        (row.isCardio || Number(row.reps) > 0));
+      if (eligible.length) queueLiveRows(eligible)
+        .catch(() => { if (ownership.isCurrent(effectOwner) && getWorkoutDraftGeneration() === effectsDraftGeneration) showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'); });
+
+      // Start rest timer for the last logged non-cardio set
+      const lastWorking = [...eligible].reverse().find((r) => !r.isCardio);
+      if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
+        const reps = Number(lastWorking.reps);
+        triggerRestTimer({
+          exercise: lastWorking.exercise,
+          repsLastSet: Number.isFinite(reps) ? reps : undefined,
+          isCompound: isCompoundExercise(lastWorking.exercise),
+        });
+      }
+
+    };
     // Don't set loading yet, as we try fast parse synchronously
 
     // Local synchronous parse - pass currentRows for routine-aware parsing
-    const gateDecision = decideAndParse(message, {
+    const gateDecision = decideAndParse(messageInput, {
       lastExercise: getLastExerciseFromRows(currentRows),
       currentRows: currentRows.map(r => ({
         id: r.id,
+        performance: r.performance,
+        status: r.status,
+        setKind: r.setKind,
+        isRest: r.isRest,
+        isCardio: r.isCardio,
         exercise: r.exercise,
         weightLbs: r.weightLbs,
         reps: r.reps,
       })),
     });
 
-    // Handle routine-aware fill skeleton decision
-    if (gateDecision.kind === "fill_skeleton") {
-      const { weight, reps, targetRowIndex } = gateDecision;
-      setRows((prev) => {
-        const next = [...prev];
-        if (next[targetRowIndex]) {
-          next[targetRowIndex] = {
-            ...next[targetRowIndex],
-            weightLbs: weight,
-            ...(reps ? { reps } : {}),
-          };
-        }
-        return next;
-      });
-      setMessageInput("");
-
-      const filledRow = currentRows[targetRowIndex];
-      if (filledRow) {
-        syncSkeletonFilledRow(filledRow, weight, reps);
-      }
-
-      if (Platform.OS === "ios") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-      const nextVisibleRow = Math.min(targetRowIndex + 1, currentRows.length - 1);
-      scrollToRowIndex(nextVisibleRow, currentRows.length);
+    if (gateDecision.kind === "validation") {
+      // Keep the composer untouched; malformed sets must not reach AI or writes.
+      showToast(gateDecision.clarification, 'info');
       return;
     }
 
-    if (gateDecision.kind === "fill_skeleton_batch") {
-      const updates = gateDecision.updates;
-      setRows((prev) => {
-        const next = [...prev];
-        updates.forEach(({ targetRowIndex, weight, reps }) => {
-          if (!next[targetRowIndex]) return;
-          next[targetRowIndex] = {
-            ...next[targetRowIndex],
-            weightLbs: weight,
-            ...(reps ? { reps } : {}),
-          };
-        });
-        return next;
-      });
-      setMessageInput("");
-
+    // One fill transition and the same effects as explicit-name fills/appends.
+    if (gateDecision.kind === "fill_skeleton" || gateDecision.kind === "fill_skeleton_batch") {
+      const updates = gateDecision.kind === "fill_skeleton" ? [gateDecision] : gateDecision.updates;
+      const next = [...currentRows];
+      const changedRows: LogRow[] = [];
       updates.forEach(({ targetRowIndex, weight, reps }) => {
-        const filledRow = currentRows[targetRowIndex];
-        if (!filledRow) return;
-        syncSkeletonFilledRow(filledRow, weight, reps);
+        const candidate = next[targetRowIndex];
+        if (!candidate || !isPendingSet(candidate)) return;
+        const updated = resolveEditedPerformance(candidate, {
+          ...candidate,
+          weightLbs: weight,
+          reps: reps ?? candidate.reps,
+          setKind: candidate.setKind ?? 'work',
+          status: 'committed',
+          timestamp: Date.now(),
+        }, reps !== undefined);
+        next[targetRowIndex] = updated;
+        changedRows.push(updated);
       });
-
-      if (Platform.OS === "ios") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-      const lastUpdatedIndex = updates[updates.length - 1]?.targetRowIndex ?? 0;
-      const nextUnfilledIndex = currentRows.findIndex(
-        (row, idx) => idx > lastUpdatedIndex && row.exercise && !row.weightLbs
-      );
-      if (nextUnfilledIndex !== -1) {
-        scrollToRowIndex(nextUnfilledIndex, currentRows.length);
-      } else {
-        scrollToRowIndex(lastUpdatedIndex, currentRows.length);
-      }
+      setRows(next);
+      setMessageInput("");
+      logPerformedRows(changedRows);
+      const lastIndex = updates[updates.length - 1]?.targetRowIndex ?? 0;
+      scrollToRowIndex(Math.min(lastIndex + 1, next.length - 1), next.length);
       return;
     }
 
@@ -1092,30 +1303,27 @@ export default function HomeScreen() {
         // Parsing failed but continue silently - parsing logic intact
         return;
       }
+      const changedRows: LogRow[] = [];
       const addOrFillRow = (rowData: ParsedRow, setOverride?: number) => {
         const normalizedExercise = rowData.exercise.trim().toLowerCase();
-        for (let i = next.length - 1; i >= 0; i -= 1) {
+        for (let i = 0; i < next.length; i += 1) {
           const candidate = next[i];
-          if (!candidate?.exercise) continue;
+          if (!candidate?.exercise || candidate.isRest || candidate.isCardio || rowData.isCardio) continue;
           if (candidate.exercise.trim().toLowerCase() !== normalizedExercise) continue;
-
-          const missingWeight = !candidate.weightLbs;
-          const missingReps = !candidate.reps;
-          const missingNotes = !candidate.notes;
-          const canFillWeight = missingWeight && !!rowData.weightLbs;
-          const canFillReps = missingReps && !!rowData.reps;
-          const canFillNotes = missingNotes && !!rowData.notes;
-
-          if (canFillWeight || canFillReps || canFillNotes) {
-            const updated = { ...candidate };
-            if (canFillWeight) updated.weightLbs = rowData.weightLbs;
-            if (canFillReps) updated.reps = rowData.reps;
-            if (canFillNotes) updated.notes = rowData.notes;
-            next[i] = updated;
-            return;
-          }
-
-          break;
+          if (rowData.kind === 'warmup' || candidate.setKind === 'warmup') continue;
+          if (!isPendingSet(candidate)) continue;
+          const updated = resolveEditedPerformance(candidate, {
+            ...candidate,
+            setKind: rowData.setKind ?? (rowData.kind === 'dropset' ? 'drop' : rowData.kind === 'superset' ? 'superset' : 'work'),
+            weightLbs: rowData.weightLbs,
+            reps: rowData.reps,
+            timestamp: Date.now(),
+            status: 'committed',
+            notes: rowData.notes ? (candidate.notes ? `${candidate.notes}\n${rowData.notes}` : rowData.notes) : candidate.notes,
+          }, true);
+          next[i] = updated;
+          changedRows.push(updated);
+          return;
         }
 
         const setVal =
@@ -1136,6 +1344,8 @@ export default function HomeScreen() {
             notes: rowData.notes,
             timestamp: Date.now(),
             status: "committed",
+            performance: "performed",
+            setKind: rowData.setKind ?? (rowData.kind === "warmup" ? "warmup" : rowData.kind === "dropset" ? "drop" : rowData.kind === "superset" ? "superset" : rowData.isCardio ? "cardio" : "work"),
             // Cardio fields
             isCardio: rowData.isCardio,
             durationMins: rowData.durationMins,
@@ -1148,48 +1358,16 @@ export default function HomeScreen() {
         ];
       };
 
-      const prevLength = next.length; // snapshot before loop
-      parsedRows.forEach((row) => addOrFillRow(row));
+      parsedRows.forEach((row) => {
+        const beforeLength = next.length;
+        addOrFillRow(row);
+        if (next.length > beforeLength) changedRows.push(next[next.length - 1]);
+      });
       setRows(next);
       setMessageInput("");
       setLoading(false);
 
-      // Sync log to backend using actual set numbers from newly-added rows
-      // (fill-path rows are handled separately by syncSkeletonFilledRow).
-      // The response tells us deterministically whether the set was a PR.
-      const addedRows = next.slice(prevLength);
-      addedRows.forEach(row => {
-        api.logSet({
-          exercise: row.exercise,
-          set: row.set,           // real set number from nextSetNumberForExercise
-          weightLbs: row.weightLbs,
-          reps: row.reps,
-          notes: row.notes,
-          dateISO: workoutDateISO ?? undefined,
-          isCardio: row.isCardio,
-          durationMins: row.durationMins,
-          distance: row.distance,
-          distanceUnit: row.distanceUnit,
-          heartRate: row.heartRate,
-          calories: row.calories,
-          level: row.level,
-        })
-          .then((res) => {
-            if (res?.pr) celebratePR(res.pr);
-          })
-          .catch(err => console.error("Failed to sync row", err));
-      });
-
-      // Start rest timer for the last logged non-cardio set
-      const lastWorking = [...parsedRows].reverse().find((r) => !r.isCardio);
-      if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
-        const reps = parseInt(lastWorking.reps, 10);
-        triggerRestTimer({
-          exercise: lastWorking.exercise,
-          repsLastSet: Number.isFinite(reps) ? reps : undefined,
-          isCompound: isCompoundExercise(lastWorking.exercise),
-        });
-      }
+      logPerformedRows(changedRows);
 
       scrollToBottom();
       return;
@@ -1199,19 +1377,19 @@ export default function HomeScreen() {
     if (gateDecision.kind === "end_workout") {
       setMessageInput("");
 
-      if (currentRows.length === 0) {
-        showToast('Log some sets before ending your workout.', 'info');
-        return;
-      }
 
       // Trigger the end workout flow with review
-      handleEndWorkoutWithReview(currentRows);
+      await onEndWorkout();
       return;
     }
 
     if (gateDecision.kind === "ai") {
       // For questions we skip the ghost row (no workout data expected).
       // For parse attempts we show a ghost row while the AI responds.
+      const request = ownership.beginRequest('workout');
+      if (!request) return;
+      const requestDraftGeneration = getWorkoutDraftGeneration();
+      const ownsRequest = () => ownership.isCurrentRequest(request) && getWorkoutDraftGeneration() === requestDraftGeneration;
       const isQuestion = gateDecision.reason === "conversational_question";
       const ghostId = isQuestion ? null : makeId();
 
@@ -1228,6 +1406,7 @@ export default function HomeScreen() {
           notes: "Parsing...",
           timestamp: Date.now(),
           status: "syncing",
+          pendingInput: messageInput,
         };
         setRows((prev) => [...prev, optimisticRow]);
       }
@@ -1235,6 +1414,8 @@ export default function HomeScreen() {
       try {
         const lastExercise = getLastExerciseFromRows(currentRows);
         const res = await api.chat(message, toApiRows(currentRows), lastExercise);
+        if (!ownsRequest()) return;
+        if (ghostId && !draftRowsRef.current.some(r => r.id === ghostId && r.status === 'syncing')) return;
 
         if (res.answer) {
           // AI answered a question or couldn't parse — show the response bubble
@@ -1244,7 +1425,14 @@ export default function HomeScreen() {
           saveWorkoutChatQA(message, res.answer, Date.now()).catch((err) =>
             console.warn("[Workout] Failed to save chat history:", err)
           );
-        } else if (res.rows && res.rows.length > 0) {
+        } else if (!isQuestion && res.rows && res.rows.length > 0) {
+          if (!Array.isArray(res.rows) || res.rows.some(row => validateWorkoutRow(row))) {
+            if (ghostId) setRows((prev) => prev.filter(r => r.id !== ghostId));
+            setMessageInput(messageInput);
+            showToast('Parsed set values are invalid. Your input has been kept for correction.', 'info');
+            return;
+          }
+          // Conversational intent is answer-only, even if the model returns sets.
           // AI parsed workout rows — add them to the session
           const newRows = buildRowsFromApi(res.rows).map((r) => ({
             ...r,
@@ -1255,47 +1443,26 @@ export default function HomeScreen() {
               ? prev.filter((r) => r.id !== ghostId).concat(newRows)
               : prev.concat(newRows)
           );
-          // Sync AI-parsed rows live (same path as fast-parsed rows) so PR
-          // detection and next-set suggestions see them immediately.
-          newRows.forEach((row) => {
-            api.logSet({
-              exercise: row.exercise,
-              set: row.set,
-              weightLbs: row.weightLbs,
-              reps: row.reps,
-              notes: row.notes,
-              dateISO: workoutDateISO ?? undefined,
-            })
-              .then((res) => {
-                if (res?.pr) celebratePR(res.pr);
-              })
-              .catch(err => console.error("Failed to sync AI row", err));
-          });
-          // Start rest timer for the last AI-parsed non-cardio row
-          const lastWorking = [...newRows].reverse().find((r) => !r.isCardio);
-          if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
-            const reps = parseInt(lastWorking.reps, 10);
-            triggerRestTimer({
-              exercise: lastWorking.exercise,
-              repsLastSet: Number.isFinite(reps) ? reps : undefined,
-              isCompound: isCompoundExercise(lastWorking.exercise),
-            });
-          }
+          // Share performed-only live logging and one rest effect with fast/fill.
+          logPerformedRows(newRows);
           scrollToBottom();
         } else {
           // Empty response — remove ghost row silently
           if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));
         }
       } catch (e) {
+        if (!ownsRequest()) return;
+        setMessageInput(messageInput);
         console.warn('[workout] sendMessage failed', e);
         if (ghostId) setRows((prev) => prev.filter((r) => r.id !== ghostId));
         if (e instanceof FeatureGateError && e.code === 'AI_LIMIT_REACHED') {
           showAiLimitAlert();
         }
       } finally {
-        setLoading(false);
+        if (ownership.finishRequest(request) && getWorkoutDraftGeneration() === requestDraftGeneration) setLoading(false);
       }
     }
+    });
   };
 
   return (
@@ -1360,6 +1527,7 @@ export default function HomeScreen() {
 
         <WorkoutBottomBar
           workoutActive={workoutActive}
+          finalizing={finalizing}
           loading={loading}
           messageInput={messageInput}
           setMessageInput={setMessageInput}
@@ -1460,17 +1628,21 @@ export default function HomeScreen() {
 
         <SessionReviewModal
           visible={reviewModalVisible}
+          savePhase={savePhase}
+          onRetry={() => { void onEndWorkout(); }}
           loading={reviewLoading}
           review={sessionReview}
           workoutTitle={title}
           workoutId={savedWorkoutIdRef.current}
           userId={session?.user?.id}
           onClose={() => {
+            if (!ownsPresentation() || ownership.busy) return;
             setReviewModalVisible(false);
             setSessionReview(null);
             savedWorkoutIdRef.current = null;
           }}
           onSaveReflection={(text) => {
+            if (!ownsPresentation()) return;
             const wId = savedWorkoutIdRef.current;
             if (wId && text) {
               api.updateWorkoutMeta(wId, { reflection: text }).catch((err) =>

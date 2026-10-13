@@ -1,4 +1,6 @@
+import { isPerformedRow } from './performedSets';
 import { supabaseUrl } from './supabase';
+import type { LogRow } from '../types/workout';
 import { fetchWithAuth } from './auth';
 import { fetchProfile, UserProfile } from './profile';
 import { parseFeatureGateError } from './entitlements';
@@ -81,6 +83,12 @@ function buildAIContextString(profile: UserProfile | null): string {
 const API_BASE = `${supabaseUrl}/functions/v1`;
 
 export type ApiWorkoutRow = {
+    // Optional canonical evidence; legacy/parse responses may omit it.
+    id?: LogRow["id"];
+    timestamp?: LogRow["timestamp"];
+    performance?: LogRow["performance"];
+    setKind?: LogRow["setKind"];
+    plannedTarget?: LogRow["plannedTarget"];
     exercise: string;
     set: number;
     weightLbs: string;
@@ -220,6 +228,8 @@ export const api = {
         weakness: string;
         nextSessionNote: string;
     }> => {
+        rows = rows.filter(row => !row.isCardio && row.setKind !== 'cardio' && isPerformedRow(row));
+        if (!rows.length) throw new Error('Session review unavailable');
         const profile = await getCachedProfile('');
         const profileContext = buildAIContextString(profile);
 
@@ -264,20 +274,22 @@ JSON shape — respond with exactly this structure:
             }
 
             const parsed = JSON.parse(jsonMatch[0]);
+            if (!parsed || typeof parsed.rating !== 'number' || !Number.isFinite(parsed.rating)
+                || parsed.rating < 1 || parsed.rating > 10
+                || !Array.isArray(parsed.strengths) || !parsed.strengths.every((item: unknown) => typeof item === 'string')
+                || typeof parsed.weakness !== 'string' || typeof parsed.nextSessionNote !== 'string') {
+                throw new Error('Invalid session review');
+            }
 
             return {
-                rating: Math.min(10, Math.max(1, Number(parsed.rating) || 7)),
-                strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 3) : ['Great effort today!'],
-                weakness: String(parsed.weakness || 'Keep pushing yourself'),
-                nextSessionNote: String(parsed.nextSessionNote || 'Stay consistent and keep logging your workouts'),
+                rating: parsed.rating,
+                strengths: parsed.strengths.slice(0, 3),
+                weakness: parsed.weakness,
+                nextSessionNote: parsed.nextSessionNote,
             };
         } catch {
-            return {
-                rating: 7,
-                strengths: ['Completed your workout', 'Logged all your sets'],
-                weakness: 'Consider tracking more details',
-                nextSessionNote: 'Keep up the consistency!',
-            };
+            // Optional AI failure must not manufacture evidence of completion.
+            throw new Error('Session review unavailable');
         }
     },
 
@@ -318,14 +330,22 @@ JSON shape — respond with exactly this structure:
     },
 
     deleteWorkout: async (id: string) => {
-        const res = await fetchWithAuth(`${API_BASE}/history/${id}`, { method: 'DELETE' });
+        // Deletion is terminal: an ID can never be reused/resurrected. Derive one
+        // permanent identity instead of a clock key or a process-local retry cache.
+        // This survives lost acknowledgements, successful retries and app restarts.
+        const revision = Number.MAX_SAFE_INTEGER;
+        const operationKey = `delete:${id}:terminal:v1`;
+        const res = await fetchWithAuth(`${API_BASE}/history/${id}`, {
+            method: 'DELETE', body: JSON.stringify({ id, revision, operationKey }),
+        });
         if (!res.ok) {
             const body = await res.text();
             throw new Error(`Failed to delete workout: ${res.status} - ${body}`);
         }
+        return await res.json();
     },
 
-    logSet: async (row: ApiWorkoutRow & { dateISO?: string }): Promise<LogSetResult | null> => {
+    logSet: async (row: ApiWorkoutRow & { dateISO?: string; sessionId?: string; rowId?: string; revision?: number; operationKey?: string; operation?: 'put' | 'drop' }): Promise<LogSetResult | null> => {
         try {
             const res = await fetchWithAuth(`${API_BASE}/log-set`, {
                 method: 'POST',
