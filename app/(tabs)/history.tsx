@@ -73,6 +73,9 @@ export default function HistoryScreen() {
   const tintColor = useThemeColor({}, 'tint');
   const dangerColor = useThemeColor({}, 'danger');
   const { session } = useAuth();
+  // Read at call time: the focus callback below is memoized once, so a captured value would go stale.
+  const ownerRef = useRef('');
+  ownerRef.current = session?.user.id ?? '';
   const successColor = useThemeColor({}, 'success');
   const warningColor = useThemeColor({}, 'warning');
 
@@ -82,7 +85,7 @@ export default function HistoryScreen() {
 
       // Push any locally-saved workouts that never reached the server.
       // Owner-bound: a sign-out/account switch mid-sync cannot send these under another account.
-      await syncPendingWorkouts(session?.user.id ?? '').catch(() => 0);
+      await syncPendingWorkouts(ownerRef.current).catch(() => 0);
 
       const data = await api.getHistory();
       // Merge: server is truth, but still-pending local sessions win so an
