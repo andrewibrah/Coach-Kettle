@@ -53,7 +53,7 @@ export function nextSetNumberForExercise(rows: LogRow[], exercise: string): numb
   const target = exercise.trim().toLowerCase();
   let maxSet = 0;
   for (const row of rows) {
-    if (!row?.exercise) continue;
+    if (!row?.exercise || row.isRest || row.setKind === "warmup") continue;
     const normalized = row.exercise.trim().toLowerCase();
     if (normalized === target) {
       const setVal = Number.isFinite(row.set) ? row.set : 0;
@@ -72,6 +72,7 @@ export function resequenceSets(list: LogRow[]): LogRow[] {
   const counters: Record<string, number> = {};
   return list.map((row) => {
     if (row.isRest) return row; // rest markers keep set 0 and don't count
+    if (row.setKind === "warmup") return { ...row, set: 0 };
     const norm = normalizeExercise(row.exercise);
     const nextSet = (counters[norm] || 0) + 1;
     counters[norm] = nextSet;
@@ -89,7 +90,7 @@ export interface TemplateItem {
 /**
  * Expand workout template items into skeleton LogRows.
  * Each template item with N sets becomes N LogRow entries,
- * with weight empty (user fills in) and reps pre-filled.
+ * Actual values start empty; prescribed values live only in plannedTarget.
  */
 export function expandTemplateToRows(items: TemplateItem[]): LogRow[] {
   const rows: LogRow[] = [];
@@ -104,10 +105,13 @@ export function expandTemplateToRows(items: TemplateItem[]): LogRow[] {
         exercise: item.lift_name,
         set: setNum,
         weightLbs: "", // Empty - user fills in during workout
-        reps: reps,
+        reps: "", // actual reps are entered, never copied from a target
         notes: "",
         timestamp: Date.now(),
         status: "committed",
+        performance: "planned",
+        setKind: "work",
+        plannedTarget: { reps, ...(item.target_weight != null ? { weightLbs: String(item.target_weight) } : {}) },
       });
     }
   }

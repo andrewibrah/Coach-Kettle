@@ -2,6 +2,7 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useLargeTextLayout } from "@/hooks/useLargeTextLayout";
 import { LogRow } from "@/types/workout";
+import { isPerformedRow } from "@/lib/performedSets";
 import { useCallback, useEffect, useRef } from "react";
 import { LayoutChangeEvent, StyleSheet, TextInput, View, Keyboard, Pressable } from "react-native";
 
@@ -55,6 +56,7 @@ export function WorkoutCard({
     onCommitEditCell
 }: Props) {
     const isSyncing = row.status === 'syncing';
+    const setLabel = `${isPerformedRow(row) ? (row.setKind === 'warmup' ? 'Warmup' : 'Set') : 'Planned'} ${row.set}`;
     const { isLargeText, scaleSpace } = useLargeTextLayout();
     const inputRef = useRef<TextInput>(null);
     const cardBg = useThemeColor({}, 'cardBackground');
@@ -252,13 +254,19 @@ export function WorkoutCard({
                     style={{ minHeight: scaleSpace(44), justifyContent: "center" }}
                     disabled={isSyncing}
                     accessibilityRole="button"
-                    accessibilityLabel={`Set ${row.set} — tap to increment, long press to edit`}
+                    accessibilityLabel={`${setLabel} — tap to increment, long press to edit`}
                 >
                     {editingField === "set" ? renderInput("Set", "numeric") : (
-                        <ThemedText style={[styles.set, { color: setLabelColor, backgroundColor: setLabelBg }, isSyncing && { color: labelColor }]}>Set {row.set}</ThemedText>
+                        <ThemedText style={[styles.set, { color: setLabelColor, backgroundColor: setLabelBg }, isSyncing && { color: labelColor }]}>{setLabel}</ThemedText>
                     )}
                 </Pressable>
             </View>
+
+            {row.plannedTarget && (
+                <ThemedText style={{ color: noteColor }}>
+                    Target: {row.plannedTarget.reps || "—"} reps{row.plannedTarget.weightLbs != null ? ` at ${row.plannedTarget.weightLbs} lbs` : ""}
+                </ThemedText>
+            )}
 
             <View style={[styles.details, isLargeText && styles.detailsStacked, { marginBottom: (row.notes || editingField === "notes") ? 12 : 0 }]}>
                 {row.isCardio ? (
@@ -312,9 +320,9 @@ export function WorkoutCard({
                             {editingField === "weightLbs" ? (
                                 renderInput("Lbs", "numeric")
                             ) : (
-                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)} hitSlop={10} style={{ minHeight: scaleSpace(44), justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Weight: ${row.weightLbs && row.weightLbs !== "0" ? `${row.weightLbs} lbs` : 'not set'}, tap to edit`}>
+                                <Pressable onPress={() => onBeginEditCell?.(row.id, "weightLbs", row.weightLbs)} hitSlop={10} style={{ minHeight: scaleSpace(44), justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Weight: ${row.weightLbs !== "" ? `${row.weightLbs} lbs` : 'not set'}, tap to edit`}>
                                     <ThemedText style={styles.detailValue}>
-                                        {row.weightLbs && row.weightLbs !== "0" ? row.weightLbs : "—"}
+                                        {row.weightLbs !== "" ? row.weightLbs : "—"}
                                         <ThemedText style={[styles.detailLabel, { color: labelColor }]}> lbs</ThemedText>
                                     </ThemedText>
                                 </Pressable>
