@@ -1,3 +1,7 @@
+import type { LogRow } from '../types/workout';
+import { isPerformedRow } from './performedSets.ts';
+import { numericValue } from './workoutValidation.ts';
+
 type ParsedRowKind = "normal" | "warmup" | "dropset" | "superset" | "cardio";
 
 export type ParsedRow = {
@@ -6,6 +10,7 @@ export type ParsedRow = {
   reps: string;
   notes: string;
   kind?: ParsedRowKind;
+  setKind?: LogRow['setKind'];
   // Cardio-specific fields
   isCardio?: boolean;
   durationMins?: number;
@@ -42,6 +47,7 @@ export type GateDecision =
     meta?: { pattern?: FastPattern };
   }
   | { kind: "ai"; reason: GateDecisionReason }
+  | { kind: "validation"; reason: "invalid_set_input"; originalInput: string; clarification: string }
   | { kind: "end_workout"; reason: "end_workout_intent" }
   | {
     kind: "fill_skeleton";
@@ -58,6 +64,11 @@ export type GateDecision =
 
 export interface SkeletonRow {
   id: string;
+  performance?: "planned" | "performed";
+  status?: "syncing" | "committed";
+  setKind?: LogRow['setKind'];
+  isRest?: boolean;
+  isCardio?: boolean;
   exercise: string;
   weightLbs: string;
   reps: string;
@@ -109,7 +120,37 @@ const isSameSet = (message: string): boolean => SAME_SET_RE.test(message.trim())
 // Only catches clearly non-workout inputs (no digits at all, or strong question signals).
 
 const QUESTION_PREFIX_RE =
-  /^(?:what(?:'?s)?|how|should|can|is|am|do|why|when|where|which|who|help|suggest|recommend|advice|tips?)\b/i;
+  /^(?:what(?:'?s)?|how|should|can|could|would|will|is|are|was|were|am|do|does|did|why|when|where|which|who|help|suggest|recommend|advice|tips?)\b/i;
+
+// Inspect only the syntactic prefix, not the disclosure after a numeric set.
+// Personal subjects, temporal introductions and sentence predicates are not
+// exercise labels; their numbers must never acquire logging intent.
+const hasConversationalPrefix = (message: string): boolean => {
+  const prefix = message.split(/\d/, 1)[0];
+  // A quantity of elapsed time is not a rep count. Intentional activity/time
+  // commands retain their existing cardio grammar; later set notes are outside
+  // this first-number boundary and cannot change the intent of a completed set.
+  const temporalQuantity = /^[^\d]+\d+(?:\.\d+)?\s*(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\b/i.test(message) &&
+    !hasCardioSignals(message.toLowerCase());
+  return temporalQuantity || QUESTION_PREFIX_RE.test(message) ||
+    /^(?:i|my|mine|we|our|ours|you|your|yours|he|his|she|her|hers|they|their|theirs|it|its|this|that|these|those|after|before|during|yesterday|today|earlier)\b/i.test(message) ||
+    /\b(?:hurts?|felt|feels?|is|are|was|were|has|have|had|did|suggested|starts?|started|begins?|began|begun|lasts?|lasted|persists?|persisted|continues?|continued|returns?|returned|seems?|seemed|worsens?|worsened|improves?|improved)\b/i.test(prefix) ||
+    /\b(?:pain|soreness|stiffness|aching|numbness|cramps?)\s*$/i.test(prefix) ||
+    /\b(?:after|before|since|at|during)\s*$/i.test(prefix);
+};
+
+// Intent is not a whitelist of valid numeric patterns: missing reps, signs and
+// unknown units must still reach validation. Conversational syntax outranks a
+// numeric mention; bare numeric questions do not acquire an exercise from context.
+const hasExplicitSetIntent = (message: string): boolean => {
+  if (hasConversationalPrefix(message)) return false;
+  const prefix = message.match(/^([a-z][a-z\s'()/&-]*?)\s+([+\-]?\s*(?:\d|\.\d))/i);
+  if (!prefix) return false;
+  const numericTail = message.slice(prefix[1].length).trimStart();
+  // A relational phrase after the first number asks about a proposed set,
+  // rather than declaring a completed weight/reps prefix with annotations.
+  return !/^\d+(?:\.\d+)?\s*(?:kgs?|lbs?|plates?)?\s+(?:for|too|with|without|enough|okay|ok|safe)\b/i.test(numericTail);
+};
 
 const isConversationalQuestion = (message: string): boolean => {
   const trimmed = message.trim();
@@ -133,8 +174,9 @@ const formatWeight = (num: number): string => {
 };
 
 const normalizeWeightToLbs = (value: string, unit?: string): string => {
-  const raw = parseFloat(value);
-  if (!Number.isFinite(raw)) return "";
+  const parsed = numericValue(value);
+  if (parsed.kind !== 'known') return "";
+  const raw = parsed.value;
   if (!unit) return formatWeight(raw);
   const u = unit.toLowerCase();
   if (u.startsWith("kg")) return formatWeight(raw * KG_TO_LB);
@@ -174,7 +216,7 @@ const parseCommaSeparatedSkeletonWeights = (message: string): string[] => {
 // ─── Pair parsing ─────────────────────────────────────────────────────────────
 
 type NumberPair = { weight: string; reps: string };
-type ParsedPairs = { pairs: NumberPair[]; leftoverNumericCount: number; numberCount: number };
+type ParsedPairs = { pairs: NumberPair[]; leftoverNumericCount: number; numberCount: number; invalid?: boolean; notes?: string };
 
 const parsePairsFromTail = (tail: string): ParsedPairs => {
   const pairs: NumberPair[] = [];
@@ -196,20 +238,30 @@ const parsePairsFromTail = (tail: string): ParsedPairs => {
     return { pairs, leftoverNumericCount: 0, numberCount: commaTokens.length };
   }
 
-  // Standard regex: matches "weight [unit] [x] reps" pairs
+  // Consume from the beginning, with a real separator and whole rep token.
+  // Never search past a sign/unit or backtrack-split a single numeral.
   const pairRegex =
-    /(\d+(?:\.\d+)?)(?:\s*(kg|kgs?|lb|lbs?|plates?|plate))?\s*(?:x|×)?\s*(\d+(?:\.\d+)?)(?:\s*reps?)?/gi;
-  let match: RegExpExecArray | null;
-  while ((match = pairRegex.exec(tail))) {
-    pairs.push({
-      weight: normalizeWeightToLbs(match[1], match[2]),
-      reps: match[3],
-    });
+    /^(\d+(?:\.\d+)?)(?:\s*(kgs?|lbs?|plates?))?(?:\s*[x×]\s*|\s+)(\d+)(?:\s*reps?)?(?=$|\s|[,(:;!?—]|\.(?!\d))/i;
+  let remaining = tail.trimStart();
+  while (remaining) {
+    const match = remaining.match(pairRegex);
+    if (!match) {
+      if (!pairs.length || /^(?:[+\-]?\d|[.,]\d|[x×](?:\s|$))/i.test(remaining)) {
+        return { pairs: [], leftoverNumericCount: 0, numberCount: 0, invalid: true };
+      }
+      break;
+    }
+    const weight = normalizeWeightToLbs(match[1], match[2]);
+    if (!weight || !Number.isFinite(Number(weight)) || !Number.isSafeInteger(Number(match[3]))) {
+      return { pairs: [], leftoverNumericCount: 0, numberCount: 0, invalid: true };
+    }
+    pairs.push({ weight, reps: match[3] });
+    remaining = remaining.slice(match[0].length).trimStart();
   }
 
   const numberCount = (tail.match(/\d+(?:\.\d+)?/g) ?? []).length;
   const leftoverNumericCount = Math.max(0, numberCount - pairs.length * 2);
-  return { pairs, leftoverNumericCount, numberCount };
+  return { pairs, leftoverNumericCount, numberCount, notes: remaining };
 };
 
 // ─── Exercise extraction ──────────────────────────────────────────────────────
@@ -229,20 +281,78 @@ const hasMultipleExerciseSignals = (segment: string): boolean =>
   /\b(and|&)\b/.test(segment) || /[,/]/.test(segment);
 
 const hasCardioSignals = (lower: string): boolean => {
-  // Explicit "cardio" keyword always triggers cardio mode
-  if (/\bcardio\b/.test(lower)) return true;
-
-  // Must have BOTH a cardio machine/activity AND a time/distance indicator
-  const hasCardioActivity = /\belliptical\b|\btreadmill\b|\bbike\b|\brower\b|\brun\b|\bjog\b|\bstairmaster\b|\bstairclimber\b|\bcycling\b/.test(lower);
-  const hasTimeOrDistance = /\bmins?\b|\bminutes?\b|\bmiles?\b|\bkm\b|\bhour\b|\bhr\b/.test(lower);
-
-  return hasCardioActivity && hasTimeOrDistance;
+  // Mode comes from a command/activity prefix, never a word in set notes.
+  // Activity-only syntax requires its first numeric token to be time/distance;
+  // e.g. Bike 100 8 after 15 min cardio is still a strength-set disclosure.
+  return /^cardio\b/.test(lower) ||
+    /^(?:elliptical|treadmill|bike|rower|run|jog|stairmaster|stairclimber|cycling)\s+\d+(?:\.\d+)?\s*(?:mins?|minutes?|miles?|km|meters?|m|hours?|hr)\b/.test(lower);
 };
+
+// Cardio metrics are consumed from the command boundary, never found by a
+// substring search. Commas/semicolons separate fields, not decimal digits.
+function parseCardioCommand(message: string): { invalid: true } | { invalid: false; row: ParsedRow } | null {
+  const prefix = message.match(/^(cardio(?:\s+[a-z]+)?|elliptical|treadmill|bike|rower|run|jog|stairmaster|stairclimber|cycling)\s+(.+)$/i);
+  if (!prefix) return null;
+  let remaining = prefix[2];
+  const unit = '(minutes?|mins?|miles?|km|meters?|m|hours?|hrs?|calories?|cals?|kcal)';
+  // Non-cardio activity names can also be strength labels. Their first quantity
+  // must be a time/distance declaration (including malformed numeric attempts).
+  if (!/^cardio\b/i.test(prefix[1]) && !new RegExp('^[^\\s]+\\s*' + unit + '\\b', 'i').test(remaining)) return null;
+  const row: ParsedRow = { exercise: prefix[1], weightLbs: '', reps: '', notes: '', kind: 'cardio', isCardio: true };
+  let count = 0;
+  while (remaining) {
+    const labeled = remaining.match(/^(hr|heart\s*rate|bpm|level|lvl|resistance|incline)\s+([^\s;]+)(?=$|\s|;)/i);
+    const quantity = remaining.match(new RegExp('^([^\\s]+?)\\s*' + unit + '(?=$|\\s|[,;])', 'i'));
+    if (!labeled && !quantity) {
+      // Narrative annotations remain literal after a completed declaration;
+      // numeric/metric attempts cannot be silently demoted to annotations.
+      if (!count || /^(?:[+\-.,\d]|NaN\b|Infinity\b|hr\b|heart\s*rate\b|bpm\b|level\b|lvl\b|resistance\b|incline\b)/i.test(remaining)) return { invalid: true };
+      row.notes = remaining;
+      break;
+    }
+    const match = labeled || quantity!;
+    const raw = labeled ? match[2] : match[1];
+    // A trailing separator belongs to the field only if not followed by a digit.
+    const token = raw.replace(/,$/, '');
+    const value = numericValue(token);
+    if (value.kind !== 'known') return { invalid: true };
+    let field: 'durationMins' | 'distance' | 'heartRate' | 'calories' | 'level';
+    let n = value.value;
+    const name = (labeled ? match[1] : match[2]).toLowerCase();
+    if (/^(hr|heart|bpm)/.test(name) && labeled) field = 'heartRate';
+    else if (labeled) field = 'level';
+    else if (/^(min|hour|hr)/.test(name)) { field = 'durationMins'; if (/^(hour|hr)/.test(name)) n *= 60; }
+    else if (/^(cal|kcal)/.test(name)) field = 'calories';
+    else { field = 'distance'; row.distanceUnit = name.startsWith('mile') ? 'miles' : name === 'km' ? 'km' : 'meters'; }
+    if (!Number.isFinite(n) || row[field] !== undefined) return { invalid: true };
+    row[field] = n;
+    count++;
+    remaining = remaining.slice(match[0].length);
+    // A declared unit closes the numeric token; its following comma separates
+    // fields. Label-first numbers consume commas within their whole token above.
+    remaining = remaining.replace(/^[\s,;]+/, '');
+  }
+  row.reps = row.durationMins !== undefined ? String(row.durationMins) : row.distance !== undefined ? String(row.distance) : '';
+  row.weightLbs = row.distance !== undefined && row.durationMins !== undefined ? String(row.distance) : '';
+  return { invalid: false, row };
+}
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function decideAndParse(message: string, context: GateContext): GateDecision {
   const trimmed = message.trim();
+  if (!hasConversationalPrefix(trimmed) && (
+      /^[^\d]*\b(?:NaN|Infinity)\s+(?:\d|[+-]?\.\d)/i.test(trimmed) ||
+      /^[^\d]*\d+(?:\.\d+)?\s*(?:kgs?|lbs?|plates?)?\s*(?:x|×)?\s+\b(?:NaN|Infinity)\b/i.test(trimmed))) {
+    return { kind: 'validation', reason: 'invalid_set_input', originalInput: message,
+      clarification: 'Set quantities must be finite non-negative numbers with whole reps. Your input has been kept for correction.' };
+  }
+  const cardio = parseCardioCommand(trimmed);
+  if (cardio) {
+    if (cardio.invalid) return { kind: 'validation', reason: 'invalid_set_input', originalInput: message,
+      clarification: 'Cardio quantities must be finite non-negative numbers. Your input has been kept for correction.' };
+    return buildFastDecision([cardio.row], 'cardio');
+  }
 
   if (!trimmed) return makeAiDecision("empty_message");
 
@@ -255,7 +365,7 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
     if (context.currentRows && context.currentRows.length > 0) {
       const lastFilled = [...context.currentRows]
         .reverse()
-        .find((r) => r.exercise && r.weightLbs && r.reps);
+        .find((r) => r.exercise.trim() && isPerformedRow(r) && !r.isCardio);
       if (lastFilled) {
         return buildFastDecision(
           [
@@ -264,21 +374,26 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
               weightLbs: lastFilled.weightLbs,
               reps: lastFilled.reps,
               notes: "",
-              kind: "normal",
+              kind: lastFilled.setKind === "warmup" ? "warmup" : lastFilled.setKind === "drop" ? "dropset" : lastFilled.setKind === "superset" ? "superset" : "normal",
+              setKind: lastFilled.setKind,
             },
           ],
           "single"
         );
       }
     }
-    // No prior row to duplicate — let AI handle it
-    return makeAiDecision("conversational_question");
+    return {
+      kind: "validation",
+      reason: "invalid_set_input",
+      originalInput: message,
+      clarification: "Log a complete set before repeating it. Your input has been kept for correction.",
+    };
   }
 
   // ─── Skeleton fill (routine-aware) ─────────────────────────────────────────
   if (context.currentRows && context.currentRows.length > 0) {
     const emptyRowIndices = context.currentRows
-      .map((row, index) => (row.exercise && !row.weightLbs ? index : -1))
+      .map((row, index) => (row.exercise && !row.isRest && !row.isCardio && row.status !== "syncing" && row.performance !== "performed" && (row.performance === "planned" || !row.weightLbs) ? index : -1))
       .filter((index) => index !== -1);
 
     const nextEmptyIdx = emptyRowIndices[0] ?? -1;
@@ -332,8 +447,11 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
     }
   }
 
-  // ─── Conversational / question → AI ────────────────────────────────────────
-  if (isConversationalQuestion(trimmed)) {
+  // Classify intent independently of numeric validity and terminal punctuation.
+  // Explicit label + numeric prefix is a set attempt even when its tokens are
+  // malformed; only the parser below decides whether it can be logged.
+  if (hasConversationalPrefix(trimmed) ||
+      (isConversationalQuestion(trimmed) && !hasExplicitSetIntent(trimmed))) {
     return makeAiDecision("conversational_question");
   }
 
@@ -344,31 +462,79 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
   const tokens = normalized.split(" ");
 
   const firstNumberIdx = tokens.findIndex((tok) => numberRegex.test(tok));
-  const warmupFlag = /\bwarm\s*-?\s*up\b/.test(lower);
-  const isSuperset = /\bsuperset\b/.test(lower) || /\bss\b/.test(lower);
-  const isDropset = /\bdrops?et\b/.test(lower) || /\bdrop set\b/.test(lower);
-  const isCardio = hasCardioSignals(lower);
-
   const exerciseSegment =
     firstNumberIdx > -1 ? tokens.slice(0, firstNumberIdx).join(" ") : normalized;
+
+  // Validate the numeric prefix before interpreting any trailing control grammar.
+  // Keep original offsets: only separator whitespace is removed from annotations.
+  const rawTokens = [...message.matchAll(/\S+/g)];
+  const tail = firstNumberIdx > -1 ? message.slice(rawTokens[firstNumberIdx].index) : "";
+  const { pairs, leftoverNumericCount, numberCount, invalid, notes } = parsePairsFromTail(tail);
+  const warmupCommand = /^(?:warm\s*-?\s*up)$/i;
+  const warmupFlag = /\bwarm\s*-?\s*up\b/i.test(exerciseSegment) ||
+    warmupCommand.test((notes || '').trim()) ||
+    /^\d+\s+warm\s*-?\s*up\s*$/i.test(tail);
+  const isSuperset = /\b(?:superset|ss)\b/i.test(exerciseSegment) ||
+    (!invalid && pairs.length > 1 && hasMultipleExerciseSignals(exerciseSegment) &&
+      /^(?:superset|ss)$/i.test((notes || '').trim()));
+  // A terminal dropset marker is intentional only after multiple validated pairs.
+  const isDropset = /\b(?:drops?et|drop set)\b/i.test(exerciseSegment) ||
+    (!invalid && pairs.length > 1 && /^(?:drops?et|drop set)$/i.test((notes || '').trim()));
+  const isCardio = hasCardioSignals(lower);
 
   if (!isSuperset && exerciseSegment && hasMultipleExerciseSignals(exerciseSegment)) {
     return makeAiDecision("multiple_entries_or_sets");
   }
 
-  const exercises = extractExercises(exerciseSegment, isSuperset);
+  const exercises = extractExercises(
+    warmupFlag ? exerciseSegment.replace(/\bwarm\s*-?\s*up\b/ig, '').trim() : exerciseSegment,
+    isSuperset
+  );
 
-  if (!exercises.length && context.lastExercise) {
-    exercises.push(context.lastExercise.trim());
+  const lastPerformed = [...(context.currentRows ?? [])].reverse()
+    .find(row => row.exercise.trim() && isPerformedRow(row) && !row.isCardio);
+  // Session rows are authoritative; a last-exercise hint may refer to a ghost
+  // or template. Only the no-session legacy caller may rely on that hint.
+  const inferredExercise = context.currentRows ? lastPerformed?.exercise : context.lastExercise;
+  if (!exercises.length && inferredExercise) {
+    exercises.push(inferredExercise.trim());
+  }
+  if (!exercises.length && !exerciseSegment && context.currentRows) {
+    return {
+      kind: "validation", reason: "invalid_set_input", originalInput: message,
+      clarification: "Log a complete set with an exercise before using shorthand. Your input has been kept for correction.",
+    };
   }
   if (!exercises.length) return makeAiDecision("missing_exercise");
   if (!isSuperset && exercises.length > 1) return makeAiDecision("multiple_entries_or_sets");
 
-  const tail = firstNumberIdx > -1 ? tokens.slice(firstNumberIdx).join(" ") : "";
-
   // Single number input
-  const singleNumberMatch = tail.match(/^(?:x\s*)?(\d+)$/);
-  if (singleNumberMatch && !isSuperset && !isDropset && !isCardio) {
+  const malformedSign = /[+\-]$/.test(exerciseSegment);
+  // Only explicit bodyweight entries may carry prose; bare-number inference
+  // remains numeric-only. A unit or another numeric token is not a disclosure.
+  const singleNumberMatch = exerciseSegment
+    ? tail.match(/^(?:x\s*)?(\d+)(?=$|\s|[(:;!?—]|\.(?!\d))\s*((?!(?:for|kgs?|lbs?|plates?|oz|x)\b)(?:[a-z(:;!?—].*|\.(?!\d).*))?$/i)
+    : tail.trim().match(/^(?:x\s*)?(\d+)$/);
+  // A lone label immediately followed by another number competes with the
+  // weight-unit-reps grammar. Unknown labels cannot turn a rejected pair into
+  // invented bodyweight reps, even when more prose/punctuation follows it.
+  // Effort labels and explicit narrative qualifiers introduce notes instead;
+  // their numbers remain literal text, never structured effort measurements.
+  const bodyweightSuffix = singleNumberMatch?.[2] || '';
+  // Lex the second numeric attempt as a whole: arbitrary label words/token
+  // punctuation, optional label delimiter, x/× and a sign with its own spaces.
+  // Clear observation/relational prose before that number is an annotation;
+  // isolated arbitrary labels are ambiguous units, not invented rep counts.
+  // Colon/equal is a lexical label boundary, even when attached on either
+  // side: label:8 and label=+8 are numeric attempts, not bodyweight notes.
+  // Exclude these delimiters from label tokens instead of requiring whitespace
+  // before them; complete positive annotation labels below still retain notes.
+  const apparentUnitPair = /^[a-z][^\s:=]*(?:\s+[a-z][^\s:=]*)*(?:\s*[:=]\s*|\s+)(?:[x×]\s*)?(?:[+\-]\s*)?(?:\d|\.\d)/i.test(bodyweightSuffix);
+  const annotationPrefix = /^(?:rpe|rir|pain|fatigue|unknown|after|before|during|since|at)(?=\s|$|[:=(])/i.test(bodyweightSuffix) ||
+    /^[^\d]*\b(?:pain|soreness|stiffness|aching|numbness|cramps?|after|before|during|since|at)(?=\s|$|[:=(])/i.test(bodyweightSuffix);
+  const ambiguousBodyweightPair = apparentUnitPair && !annotationPrefix;
+  if (singleNumberMatch && !ambiguousBodyweightPair && Number.isSafeInteger(Number(singleNumberMatch[1])) &&
+      !malformedSign && !isSuperset && !isDropset && !isCardio) {
     const singleNum = parseInt(singleNumberMatch[1], 10);
 
     // ── Bare number shorthand (no exercise name typed) ──────────────────
@@ -382,8 +548,7 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
         .find(
           (r) =>
             r.exercise.trim().toLowerCase() === targetExLower &&
-            r.weightLbs &&
-            r.reps
+            isPerformedRow(r) && !r.isCardio
         );
 
       if (lastFilledForExercise) {
@@ -426,7 +591,7 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
           exercise: exercises[0],
           weightLbs: "0",
           reps: singleNumberMatch[1],
-          notes: warmupFlag ? "warmup" : "",
+          notes: singleNumberMatch[2] || (warmupFlag ? "warmup" : ""),
           kind: warmupFlag ? "warmup" : "normal",
         },
       ],
@@ -434,63 +599,13 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
     );
   }
 
-  const { pairs, leftoverNumericCount, numberCount } = parsePairsFromTail(tail);
-
-  // ─── Cardio ─────────────────────────────────────────────────────────────────
-  if (isCardio) {
-    const minutesMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:min|mins|minutes?)/);
-    const milesMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mile|miles)/);
-    const kmMatch = lower.match(/(\d+(?:\.\d+)?)\s*km/);
-    const metersMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:m|meters?)\b/);
-    const hrMatch = lower.match(/(?:hr|heart\s*rate)\s*(\d+)/i);
-    const caloriesMatch = lower.match(/(\d+)\s*(?:cal|cals|calories?|kcal)/);
-    const levelMatch = lower.match(/(?:level|lvl|resistance|incline)\s*(\d+)/i);
-
-    // Extract cardio values
-    const durationMins = minutesMatch ? parseFloat(minutesMatch[1]) : undefined;
-    const distance = milesMatch ? parseFloat(milesMatch[1])
-      : kmMatch ? parseFloat(kmMatch[1])
-      : metersMatch ? parseFloat(metersMatch[1])
-      : undefined;
-    const distanceUnit: 'miles' | 'km' | 'meters' | undefined = milesMatch ? 'miles'
-      : kmMatch ? 'km'
-      : metersMatch ? 'meters'
-      : undefined;
-    const heartRate = hrMatch ? parseInt(hrMatch[1], 10) : undefined;
-    const calories = caloriesMatch ? parseInt(caloriesMatch[1], 10) : undefined;
-    const level = levelMatch ? parseInt(levelMatch[1], 10) : undefined;
-
-    // Build display values for backwards compat (reps shows duration, weightLbs shows distance)
-    const displayReps = durationMins ? `${durationMins}` : distance ? `${distance}` : "";
-    const displayWeight = distance && durationMins ? `${distance}` : "";
-
-    // Build notes
-    const notesParts: string[] = [];
-    if (durationMins) notesParts.push(`${durationMins} min`);
-    if (distance && distanceUnit) notesParts.push(`${distance} ${distanceUnit}`);
-    if (calories) notesParts.push(`${calories} cal`);
-    if (heartRate) notesParts.push(`HR ${heartRate}`);
-    if (level) notesParts.push(`Lvl ${level}`);
-
-    return buildFastDecision(
-      [
-        {
-          exercise: exercises[0],
-          weightLbs: displayWeight,
-          reps: displayReps,
-          notes: notesParts.join(", "),
-          kind: "cardio",
-          isCardio: true,
-          durationMins,
-          distance,
-          distanceUnit,
-          heartRate,
-          calories,
-          level,
-        },
-      ],
-      "cardio"
-    );
+  if (invalid || malformedSign) {
+    return {
+      kind: "validation",
+      reason: "invalid_set_input",
+      originalInput: message,
+      clarification: "Could not log this set. Use a non-negative weight in lb, kg or plates and a whole rep count, for example Bench 185 x 8. Your input has been kept for correction.",
+    };
   }
 
   // ─── Superset ───────────────────────────────────────────────────────────────
@@ -525,8 +640,8 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
       exercise: exercises[0],
       weightLbs: pair.weight,
       reps: pair.reps,
-      notes: "",
-      kind: "normal" as ParsedRowKind,
+      notes: warmupFlag ? (notes || "warmup") : "",
+      kind: (warmupFlag ? "warmup" : "normal") as ParsedRowKind,
     }));
     if (rows.some((r) => !r.reps)) return makeAiDecision("missing_reps");
     if (leftoverNumericCount > 0) return makeAiDecision("multiple_entries_or_sets");
@@ -541,7 +656,7 @@ export function decideAndParse(message: string, context: GateContext): GateDecis
           exercise: exercises[0],
           weightLbs: pairs[0].weight,
           reps: pairs[0].reps,
-          notes: warmupFlag ? "warmup" : "",
+          notes: notes || (warmupFlag ? "warmup" : ""),
           kind: warmupFlag ? "warmup" : "normal",
         },
       ],
