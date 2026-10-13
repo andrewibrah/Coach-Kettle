@@ -12,7 +12,7 @@ production.
 | SPEC 1 | independent, read-only, fresh context | FAIL: 1 HIGH, 3 MEDIUM, 3 LOW, 1 decision |
 | re-SPEC | independent, read-only, fresh context | PASS: F1–F5, F7 and item 13 closed; 2 new LOW (N1, N2) fixed afterwards |
 | QUALITY 1 | separate independent reviewer | CHANGES REQUIRED: 1 HIGH, 1 MEDIUM, 4 LOW, 1 NIT |
-| QUALITY 2 | same QUALITY reviewer, re-review of 5963350 (5f675c6 lint fix noted) | **APPROVED**: all blocking findings closed, no regression; 2 non-blocking residuals |
+| QUALITY 2 | same QUALITY reviewer, re-review of 5963350; 5f675c6 confirmation requested separately | **APPROVED**: all blocking findings closed, no regression; 2 non-blocking residuals |
 
 ## Findings → fix → test
 
@@ -39,8 +39,14 @@ production.
 
 ## Local verification
 
-- An isolated worktree at each commit (only that commit's hunks, `node_modules` symlinked) gives lib 3428/0, Edge
-  `_shared` 85/0, `tsc` 0, lint 0, and `P4_APPLY=true python3 supabase/tests/p4_session_sql.py` exit 0.
+- Isolated worktrees (`node_modules` symlinked, no other session's uncommitted work):
+  - 72191e4: lib 3411/0, Edge `_shared` 81/0, `tsc` 0, lint exit 0, SQL suite exit 0.
+  - 5963350: lib 3428/0, `_shared` 85/0, `tsc` 0, SQL suite exit 0. It had one lint warning
+    (`exhaustive-deps`), because only the exit code was checked; fixed in 5f675c6.
+  - Final HEAD 80a039d, which includes the later C1 commit: lib 3446/0, `_shared` 85/0, `tsc` 0,
+    `expo lint --max-warnings 0` exit 0, `P4_APPLY=true python3 supabase/tests/p4_session_sql.py` exit 0.
+  - All four P4 commits pass `git diff --check`. Earlier phase commits 5189c7a, 1f77fe2 and ae32d91 carry
+    pre-existing whitespace (0100 trailing spaces, doc EOF blank lines).
 - Local Supabase stack (colima, project `ck-local`), fresh chain: 64 migrations apply, including
   0100/0200/0300/0400, and the purge test passes. `20260113205331_remote_schema.sql` fails from scratch
   ("chats already exists"). That predates P4 and needs a decision before `supabase db reset` can work
