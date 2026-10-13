@@ -7,6 +7,7 @@ import { isPerformedRow } from '../performedSets.ts';
 import { numericText, validateWorkoutRow } from '../workoutValidation.ts';
 import { runWorkoutRoute } from './inSessionHarness.ts';
 import { sourceClosure, sourceModule } from './workoutIdentityHarness.ts';
+import * as nextSetDecision from '../nextSetDecision.ts';
 
 const plain = (value: any) => JSON.parse(JSON.stringify(value));
 const cardio = { id: 'cardio-original', exercise: 'Bike', set: 2, weightLbs: '', reps: '', notes: 'literal no pain', timestamp: 123, performance: 'performed', setKind: 'cardio', isCardio: true, durationMins: 12.5, distance: 0, distanceUnit: 'km', heartRate: 120, calories: 0, level: 0, plannedTarget: { reps: '', weightLbs: '' } };
@@ -62,7 +63,7 @@ function historyEdge(failure: { stage?: 'delete' | 'insert' | 'pr' } = {}) {
 
 function actualApi(fetchWithAuth: any) {
   return sourceModule('lib/api.ts', {
-    './performedSets': { isPerformedRow },
+    './performedSets': { isPerformedRow }, './nextSetDecision': nextSetDecision,
     './supabase': { supabaseUrl: 'https://offline.invalid' }, './auth': { fetchWithAuth },
     './profile': { fetchProfile: async () => null }, './entitlements': { parseFeatureGateError: () => null },
     './nutrition': {}, './coaching': {}, './programming': {}, './bodyMetrics': {}, './exerciseLibrary': {},

@@ -12,6 +12,7 @@ import type {
   Periodization,
   NextSetResult,
 } from '@/types/programming';
+import type { NextSetEvidenceInput } from '@/lib/nextSetDecision';
 
 const API = `${supabaseUrl}/functions/v1`;
 
@@ -97,14 +98,27 @@ export async function archiveProgram(programId: string): Promise<WorkoutProgram>
 // ---------- Next-set suggestion ----------
 export async function fetchNextSetSuggestion(exercise: string, sessionId?: string): Promise<NextSetResult> {
   const session = sessionId ? `&session=${encodeURIComponent(sessionId)}` : '';
+  return nextSetResult(() => fetchWithAuth(
+    `${API}/next-set?exercise=${encodeURIComponent(exercise)}${session}`,
+    { method: 'GET' }
+  ));
+}
+
+/** A2 (used by A3): POST current-session evidence; the server returns `decision` only while adaptiveNextSet is on. */
+export async function fetchNextSetDecision(exercise: string, evidence: NextSetEvidenceInput): Promise<NextSetResult> {
+  return nextSetResult(() => fetchWithAuth(`${API}/next-set`, {
+    method: 'POST',
+    body: JSON.stringify({ exercise, sessionId: evidence.sessionId, evidence }),
+  }));
+}
+
+async function nextSetResult(request: () => Promise<Response>): Promise<NextSetResult> {
   try {
-    const res = await fetchWithAuth(
-      `${API}/next-set?exercise=${encodeURIComponent(exercise)}${session}`,
-      { method: 'GET' }
-    );
+    const res = await request();
     if (!res.ok) return { status: 'unavailable', reason: 'error', baseline: null };
     const data = await res.json();
     const baseline = data?.baseline ?? null;
+    if (data?.decision) return { status: 'decision', decision: data.decision, baseline };
     if (data?.suggestion) return { status: 'suggestion', suggestion: data.suggestion, baseline };
     // A response without a baseline field (older server) is not evidence of no history.
     if (data && 'baseline' in data && data.baseline === null) return { status: 'no_history' };

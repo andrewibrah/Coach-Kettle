@@ -8,6 +8,7 @@ import { createSessionOwnership } from '../sessionOwnership.ts';
 import { createHash } from 'node:crypto';
 import { COACHING_POLICY } from '../coachingPolicy.ts';
 import { runWorkoutRoute } from './inSessionHarness.ts';
+import * as nextSetDecision from '../nextSetDecision.ts';
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const node = (type: any, props: any) => ({ type, props });
@@ -173,7 +174,7 @@ const valid = { rating: 6, strengths: ['Squat 225x5'], weakness: 'w', nextSessio
 async function reviewBody(policy?: any) {
   let body: any = null;
   const api = sourceModule('lib/api.ts', {
-    './performedSets': { isPerformedRow: (r: any) => r.performance === 'performed' },
+    './performedSets': { isPerformedRow: (r: any) => r.performance === 'performed' }, './nextSetDecision': nextSetDecision,
     './supabase': { supabaseUrl: 'https://offline.invalid' },
     './auth': { fetchWithAuth: async (_url: string, init: any) => { body = init.body; return { ok: true, text: async () => JSON.stringify(valid) }; } },
     './profile': { fetchProfile: async () => null }, './entitlements': { parseFeatureGateError: () => null },
@@ -282,7 +283,7 @@ function fakeClock() {
 function streamingApi(reader: any, clock: any, signals: any[]) {
   // Own VM: the streaming path needs the runtime's TextDecoder/AbortController globals.
   const deps: any = {
-    './performedSets': { isPerformedRow: () => true }, './supabase': { supabaseUrl: 'https://offline.invalid' },
+    './performedSets': { isPerformedRow: () => true }, './nextSetDecision': nextSetDecision, './supabase': { supabaseUrl: 'https://offline.invalid' },
     './auth': { fetchWithAuth: async (_url: string, init: any) => { signals.push(init.signal); return { ok: true, body: { getReader: () => reader } }; } },
     './profile': { fetchProfile: async () => null }, './entitlements': { parseFeatureGateError: () => null },
     './nutrition': {}, './coaching': {}, './programming': {}, './bodyMetrics': {}, './exerciseLibrary': {},
@@ -350,7 +351,7 @@ test('restWorkSetsOnly on: a [work, warmup] batch still rests once for the work 
 
 async function reviewNote(note: string, policy?: any) {
   const api = sourceModule('lib/api.ts', {
-    './performedSets': { isPerformedRow: () => true }, './supabase': { supabaseUrl: 'https://offline.invalid' },
+    './performedSets': { isPerformedRow: () => true }, './nextSetDecision': nextSetDecision, './supabase': { supabaseUrl: 'https://offline.invalid' },
     './auth': { fetchWithAuth: async () => ({ ok: true, text: async () => JSON.stringify({ ...valid, nextSessionNote: note }) }) },
     './profile': { fetchProfile: async () => null }, './entitlements': { parseFeatureGateError: () => null },
     './nutrition': {}, './coaching': {}, './programming': {}, './bodyMetrics': {}, './exerciseLibrary': {},

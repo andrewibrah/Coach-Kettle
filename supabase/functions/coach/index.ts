@@ -6,6 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { gateAiRequest } from "../_shared/entitlements.ts";
 import { coachTextStream } from "./coachStream.ts";
 import { COACHING_POLICY, disclosureBlock, readCoachingContext } from "../_shared/coachingPolicy.ts";
+import { NEXT_SET_POLICY, nextSetDecisionBlock, readNextSetDecision } from "../_shared/nextSetDecision.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -31,6 +32,7 @@ interface CoachRequest {
     rows: WorkoutRow[];
     chatHistory?: ChatHistoryMessage[];
     context?: unknown;
+    nextSetDecision?: unknown;
 }
 
 // Transport-safety bounds, not coaching policy: 10 entries is the client's existing
@@ -157,6 +159,16 @@ serve(async (req) => {
         );
     }
     const disclosures = coachingContext ? disclosureBlock(coachingContext) : null;
+    // A2: ignored entirely while adaptiveNextSet is off. Guidance only: prose is NOT enforced
+    // (enforcement is the structured review field and the A3 UI).
+    const nextSetDecision = COACHING_POLICY.adaptiveNextSet && payload.nextSetDecision !== undefined
+        ? readNextSetDecision(payload.nextSetDecision, NEXT_SET_POLICY?.version ?? null) : undefined;
+    if (nextSetDecision === null) {
+        return new Response(
+            JSON.stringify({ error: "Invalid next-set decision." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
 
     // --- Entitlement + AI usage gating (fail closed, atomic) ---
     // After all request validation, so a 4xx never consumes AI quota.
@@ -315,6 +327,7 @@ serve(async (req) => {
             { role: "system", content: `User Context:\n${userContextStr}` },
             // Labeled context, never replayed as chat turns.
             ...(disclosures ? [{ role: "system", content: disclosures }] : []),
+            ...(nextSetDecision ? [{ role: "system", content: nextSetDecisionBlock(nextSetDecision) }] : []),
         ];
 
         // Prior conversation history (bounded and validated above)

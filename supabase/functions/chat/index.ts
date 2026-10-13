@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { gateAiRequest } from "../_shared/entitlements.ts";
 import { COACHING_POLICY, disclosureBlock, readCoachingContext } from "../_shared/coachingPolicy.ts";
+import { NEXT_SET_POLICY, nextSetDecisionBlock, readNextSetDecision } from "../_shared/nextSetDecision.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,7 @@ interface ChatRequest {
     rows: WorkoutRow[];
     lastExercise?: string;
     context?: unknown;
+    nextSetDecision?: unknown;
 }
 
 interface ChatResponse {
@@ -102,6 +104,14 @@ serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const disclosures = coachingContext ? disclosureBlock(coachingContext) : null;
+    // A2: ignored entirely while adaptiveNextSet is off. Guidance only: prose is NOT enforced
+    // (enforcement is the structured review field and the A3 UI).
+    const nextSetDecision = COACHING_POLICY.adaptiveNextSet && payload.nextSetDecision !== undefined
+        ? readNextSetDecision(payload.nextSetDecision, NEXT_SET_POLICY?.version ?? null) : undefined;
+    if (nextSetDecision === null) {
+        return new Response(JSON.stringify({ error: "Invalid next-set decision." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // JWT verification
     const authHeader = req.headers.get("Authorization");
@@ -160,6 +170,7 @@ serve(async (req) => {
                     { role: "system", content: SYSTEM_PROMPT },
                     // Separate from existing_rows so disclosures are never parsed as sets.
                     ...(disclosures ? [{ role: "system", content: disclosures }] : []),
+                    ...(nextSetDecision ? [{ role: "system", content: nextSetDecisionBlock(nextSetDecision) }] : []),
                     { role: "user", content: JSON.stringify(context) },
                 ],
                 response_format: { type: "json_object" },

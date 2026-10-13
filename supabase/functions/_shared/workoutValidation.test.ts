@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as contract from './workoutValidation.ts';
+import * as nextSetDecision from './nextSetDecision.ts';
 import { sourceModule } from '../../../lib/__tests__/workoutIdentityHarness.ts';
 const lift = sourceModule('supabase/functions/_shared/liftMatching.ts', { './workoutValidation.ts': contract });
 const operationErrors = sourceModule('supabase/functions/_shared/operationErrors.ts');
@@ -206,6 +207,8 @@ async function edgeRaw(name: string, body: any, ai?: any, authorized = true, pro
     '../_shared/operationErrors.ts': operationErrors,
     '../_shared/coachingPolicy.ts': sourceModule('supabase/functions/_shared/coachingPolicy.ts'),
     './baseline.ts': sourceModule('supabase/functions/next-set/baseline.ts'),
+    '../_shared/nextSetDecision.ts': nextSetDecision,
+    './evidence.ts': sourceModule('supabase/functions/next-set/evidence.ts', { '../_shared/workoutValidation.ts': contract, '../_shared/nextSetDecision.ts': nextSetDecision }),
     '../_shared/entitlements.ts': { gateAiRequest: async () => { gateCalls++; return { allowed: true }; } },
   };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {

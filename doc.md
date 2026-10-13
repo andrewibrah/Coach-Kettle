@@ -13,6 +13,24 @@ Key fixes:
 
 Gates, per commit in an isolated worktree: lib 3428/0, Edge `_shared` 85/0; tsc, lint with zero warnings and diff-check all exit 0; P4 PG15 suite exit 0. The local Supabase stack (colima) applies 64/65 migrations from scratch. The pre-existing `remote_schema` "chats already exists" failure needs a decision. Curl receipts on all 5 changed functions are as expected. The simulator is BLOCKED (no Xcode). Open: F6 LOW, two non-blocking QUALITY residuals, D08 choices and the production rollout. No push, deploy or remote command. [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
 
+## A2 deterministic next-set decisions: built and wired, inert until D07/D09 (Q1/Q9/Q13/Q14)
+
+`decideNextSet` evaluates in a fixed priority order: safety, clarify, effort, progression, hold. All thresholds come from a versioned `NEXT_SET_POLICY`, which ships as null, so the result is `unavailable`.
+
+Invariants:
+- Pain or a conflict never yields an increase; a 696-decision sweep checks this.
+- Skipped or unknown is never treated as no-pain.
+- Foreign-session, foreign-exercise and baseline-mismatch evidence fails closed.
+- Invalid sets are ignored, and an invalid target fails closed.
+
+Wiring, behind `adaptiveNextSet: false`:
+- next-set validates POST evidence: keys are whitelisted, aliases are resolved, and the server baseline wins. It returns the decision.
+- The review keeps a structured `nextSet` only on exact agreement.
+- Coach and chat accept only policy-versioned, code-valid decisions. A forged decision gets a 400 before the quota gate.
+- **Coach and chat prose is explicitly not enforced.** Enforcement comes from the structured review field plus the A3 UI.
+
+With the flag off, the next-set, review, coach and chat bytes are SHA-identical to HEAD. Reviews: the engine passed SPEC twice (27 mutants) and QUALITY; the wiring passed SPEC after repairs (a forged decision was accepted, the alias failed closed) and QUALITY. Deno itself is unverified. [Evidence](docs/plans/in-session-reliability/evidence/a2-next-set-decision-local.md).
+
 ## A1 structured answers: built and integrated, inert until D09 (Q8/Q11/Q12/Q15)
 
 Built behind `structuredQuestions: false` with `questionnaire: null`, so nothing renders, saves or changes behaviour:

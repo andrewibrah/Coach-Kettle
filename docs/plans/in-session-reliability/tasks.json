@@ -286,8 +286,9 @@
         "H1",
         "P4"
       ],
-      "status": "planned",
-      "classification": "proposed adaptive feature; progression/pain disconnect source verified",
+      "status": "done_local_policy_blocked",
+      "classification": "deterministic engine + wiring built behind COACHING_POLICY.adaptiveNextSet=false with NEXT_SET_POLICY=null pending D07/D09 (Q1, Q9, Q13, Q14)",
+      "latest_gate": "2026-10-13: decideNextSet with fixed priority safety -> clarify -> effort -> progression -> hold; pain/conflict never yields an increase (696-decision sweep), skipped/unknown is never no-pain, stale/foreign/alias/baseline scoping, invalid evidence ignored, exact structured agreesWithDecision (prose never parsed). next-set validates POST evidence (whitelisted, alias-resolved, server baseline wins) and returns decision; review keeps a structured nextSet only on exact agreement; coach/chat accept only policy-versioned, code-valid decisions (forged -> 400 before quota); coach/chat prose explicitly NOT enforced. Flag-off next-set/review/coach/chat bytes identical to HEAD (sha256). Engine SPEC PASS x2 (27 mutants), QUALITY APPROVED; wiring SPEC PASS (12/13 mutants) + repairs, QUALITY APPROVED + cleanups. Evidence: evidence/a2-next-set-decision-local.md.",
       "decision_ids": [
         "D07",
         "D09"

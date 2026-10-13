@@ -1,5 +1,7 @@
 // Workout programming domain types — multi-week personalized programs.
 
+import type { NextSetDecision } from '../lib/nextSetDecision.ts';
+
 export type GoalType =
   | 'muscle_building'
   | 'leaning_out'
@@ -137,4 +139,6 @@ export interface NextSetBaseline {
 export type NextSetResult =
   | { status: 'suggestion'; suggestion: NextSetSuggestion; baseline: NextSetBaseline | null }
   | { status: 'no_history' }
-  | { status: 'unavailable'; reason: string; baseline: NextSetBaseline | null };
+  | { status: 'unavailable'; reason: string; baseline: NextSetBaseline | null }
+  // A2: only when the server sent a deterministic decision (COACHING_POLICY.adaptiveNextSet on).
+  | { status: 'decision'; decision: NextSetDecision; baseline: NextSetBaseline | null };

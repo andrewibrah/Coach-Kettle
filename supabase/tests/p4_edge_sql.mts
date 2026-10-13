@@ -6,6 +6,7 @@ import ts from 'typescript';
 import vm from 'node:vm';
 import * as validation from '../../lib/workoutValidation.ts';
 import { isPerformedRow } from '../../lib/performedSets.ts';
+import * as nextSetDecision from '../../lib/nextSetDecision.ts';
 const base = process.env.P4_FIXTURE!;
 assert.ok(process.env.P4_SCRATCH && base.startsWith(`${process.env.P4_SCRATCH}/p4-pg-`), 'only the disposable cluster created by p4_session_sql.py');
 assert.equal(realpathSync(base),base);
@@ -54,7 +55,7 @@ let loseDeleteAck=false;
 let committedDeleteReceipt:any;
 const deleteBodies:any[]=[];
 const apiDependencies={
-  './performedSets':{isPerformedRow},'./supabase':{supabaseUrl:'https://offline.invalid'},
+  './performedSets':{isPerformedRow},'./nextSetDecision':nextSetDecision,'./supabase':{supabaseUrl:'https://offline.invalid'},
   './auth':{fetchWithAuth:async(url:string,options:any)=>{
     const path=new URL(url).pathname;
     const name=path.includes('/history')?'history':path.split('/').at(-1)!;

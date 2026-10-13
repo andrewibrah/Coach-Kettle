@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { isPerformedRow } from '../performedSets.ts';
 import { sourceClosure, sourceModule } from './workoutIdentityHarness.ts';
+import * as nextSetDecision from '../nextSetDecision.ts';
 
 export function offlineReviewApi(fetchWithAuth: (...args: any[]) => any) {
   return sourceModule('lib/api.ts', {
-    './performedSets': { isPerformedRow },
+    './performedSets': { isPerformedRow }, './nextSetDecision': nextSetDecision,
     './supabase': { supabaseUrl: 'https://offline.invalid' }, './auth': { fetchWithAuth },
     './profile': { fetchProfile: async () => null }, './entitlements': { parseFeatureGateError: () => null },
     './nutrition': {}, './coaching': {}, './programming': {}, './bodyMetrics': {}, './exerciseLibrary': {},

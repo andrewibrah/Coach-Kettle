@@ -3,6 +3,8 @@ import { supabaseUrl } from './supabase';
 import type { LogRow } from '../types/workout';
 import type { CoachingContext } from './coachingContext';
 import type { COACHING_POLICY } from './coachingPolicy';
+import { agreesWithDecision } from './nextSetDecision';
+import type { NextSetDecision, NextSetProposal } from './nextSetDecision';
 import { fetchWithAuth } from './auth';
 import { fetchProfile, UserProfile } from './profile';
 import { parseFeatureGateError } from './entitlements';
@@ -253,12 +255,19 @@ export const api = {
     },
 
     // Q2a/Q4a switches; omitted policy means off (pre-policy prompt and payload).
-    generateSessionReview: async (rows: ApiWorkoutRow[], workoutPart: string, policy?: Pick<typeof COACHING_POLICY, 'reviewSetPolicy' | 'suppressReviewLoadAdvice'>): Promise<{
+    // A2: with adaptiveNextSet on and a decision, the model must copy it into a structured
+    // `nextSet` field, kept only if agreesWithDecision; otherwise dropped (never retried or
+    // fabricated). Prose such as nextSessionNote is NOT enforced.
+    generateSessionReview: async (rows: ApiWorkoutRow[], workoutPart: string,
+        policy?: Pick<typeof COACHING_POLICY, 'reviewSetPolicy' | 'suppressReviewLoadAdvice'> & Partial<Pick<typeof COACHING_POLICY, 'adaptiveNextSet'>>,
+        decision?: NextSetDecision): Promise<{
         rating: number;
         strengths: string[];
         weakness: string;
         nextSessionNote: string;
+        nextSet?: NextSetProposal;
     }> => {
+        const nextSetDecision = policy?.adaptiveNextSet ? decision : undefined;
         rows = rows.filter(row => !row.isCardio && row.setKind !== 'cardio' && isPerformedRow(row) &&
             !(policy?.reviewSetPolicy && row.setKind === 'warmup'));
         if (!rows.length) throw new Error('Session review unavailable');
@@ -283,12 +292,20 @@ STRENGTHS (array of 2-3 strings): Cite specific numbers from current_session_row
 
 WEAKNESS (string): Name the specific problem and its evidence. Example: "Bench dropped from 185 to 165 on set 3 — cut to 2 working sets at this intensity next time." Do not write abstract feedback like "fatigue risk."
 
-${policy?.suppressReviewLoadAdvice
+${nextSetDecision
+    // A2: the legacy overload instruction (and its "try 190x8" example) would contradict the decision.
+    ? `NEXT_SESSION_NOTE (string): Name one specific focus for next ${workoutPart || 'session'} using evidence from this session (rep completion, set quality). Give no load or rep number other than the NEXT_SET decision's action, and none at all if it has no action.`
+    : policy?.suppressReviewLoadAdvice
     ? `NEXT_SESSION_NOTE (string): Name one specific focus for next ${workoutPart || 'session'} using evidence from this session (rep completion, set quality). Do not prescribe any weight, load or load increase.`
     : `NEXT_SESSION_NOTE (string): Give a specific progressive overload instruction using actual numbers from this session. Example: "All reps completed at 185lbs — try 190x8 next ${workoutPart || 'session'}." If reps were missed, suggest dropping volume instead of adding weight.`}
 
 JSON shape — respond with exactly this structure:
-{"rating": <number>,"strengths": [<string>, <string>],"weakness": <string>,"nextSessionNote": <string>}`;
+{"rating": <number>,"strengths": [<string>, <string>],"weakness": <string>,"nextSessionNote": <string>${nextSetDecision
+    ? `,"nextSet": {"code": <decision code>, "loadLbs": <action.loadLbs or null>, "reps": <action.reps or null>}}
+
+NEXT_SET (object): the app computed this next-set decision deterministically: ${JSON.stringify(nextSetDecision)}
+"nextSet" must copy it exactly. Never change or add a value.`
+    : '}'}`;
 
         try {
             const res = await fetchWithAuth(`${API_BASE}/coach`, {
@@ -315,6 +332,13 @@ JSON shape — respond with exactly this structure:
                 throw new Error('Invalid session review');
             }
 
+            const proposal = parsed.nextSet;
+            const action = nextSetDecision?.action;
+            const agreed = !!nextSetDecision && !!proposal && typeof proposal === 'object' && !Array.isArray(proposal) &&
+                agreesWithDecision(nextSetDecision, proposal);
+            const nextSet: NextSetProposal | undefined = agreed && nextSetDecision
+                ? { code: nextSetDecision.code, ...(action?.loadLbs !== undefined && { loadLbs: action.loadLbs }), ...(action?.reps && { reps: { ...action.reps } }) }
+                : undefined;
             return {
                 rating: parsed.rating,
                 strengths: parsed.strengths.slice(0, 3),
@@ -322,6 +346,7 @@ JSON shape — respond with exactly this structure:
                 // Q4a enforcement: a numeric load in the note is dropped, never rewritten.
                 nextSessionNote: policy?.suppressReviewLoadAdvice && /\d+(\.\d+)?\s*(lb|lbs|kg|pounds|%)/i.test(parsed.nextSessionNote)
                     ? '' : parsed.nextSessionNote,
+                ...(nextSet && { nextSet }),
             };
         } catch {
             // Optional AI failure must not manufacture evidence of completion.
