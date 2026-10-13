@@ -25,7 +25,7 @@ type Props = {
     activeDragIndex: SharedValue<number>;
     dragTranslationY: SharedValue<number>;
     measuredRowHeight: SharedValue<number>;
-    onReorderRow: (from: number, to: number) => void;
+    onReorderRow: (from: number, to: number, rowId: string) => void;
     onDragStart: () => void;
     onDragEnd: () => void;
     onDoubleTap: () => void;
@@ -131,7 +131,7 @@ export function WorkoutCard({
             const h = measuredRowHeight.value > 0 ? measuredRowHeight.value : rowHeight;
             const movedSlots = Math.round(e.translationY / h);
             if (movedSlots !== 0) {
-                runOnJS(onReorderRow)(rowIndex, rowIndex + movedSlots);
+                runOnJS(onReorderRow)(rowIndex, rowIndex + movedSlots, row.id);
             }
         })
         .onFinalize(() => {

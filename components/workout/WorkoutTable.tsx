@@ -60,7 +60,7 @@ type Props = {
   onCommitEditCell: () => void;
   onDeleteRow: (rowId: string) => void;
   onDuplicateRow: (rowId: string) => void;
-  onReorderRow: (fromIndex: number, toIndex: number) => void;
+  onReorderRow: (fromIndex: number, toIndex: number, rowId: string) => void;
   onIncrementSet: (rowId: string) => void;
   onEditSet: (rowId: string) => void;
 };

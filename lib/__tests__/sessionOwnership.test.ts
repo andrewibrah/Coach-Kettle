@@ -75,8 +75,8 @@ function aiFixture(question = false) {
   });
   f.ctx.api.chat = () => chat.promise;
   f.ctx.api.logSet = async (payload: any) => { f.calls.push([payload.operation === 'drop' ? 'drop' : 'log', payload]); return { pr: payload.operation === 'drop' ? null : { liftName: 'Bench' } }; };
-  f.ctx.withPendingRows = sourceClosure('withPendingRows', f.ctx);
   f.ctx.invalidateResponses = () => sourceClosure('invalidateResponses', f.ctx)();
+  f.ctx.withPendingRows = sourceClosure('withPendingRows', f.ctx);
   Object.assign(f.ctx, Object.fromEntries(['setCoachLoading','setCoachAnswer','setCoachError','setCoachOpen','setRestPrompt'].map(name => [name, () => {}])));
   return { ...f, chat, send: () => sourceClosure('sendMessage', f.ctx)() };
 }
@@ -187,7 +187,7 @@ test('owner change and unmount invalidate pending End without unlocking another 
 
 for (const [name, args] of [
   ['onClearRows', []], ['deleteRow', ['set-original']], ['beginCellEdit', ['set-original', 'notes', 'changed']],
-  ['commitCellEdit', []], ['handleReorderRow', [0, 1]], ['handleImportRoutine', [{ name: 'Routine' }, []]],
+  ['commitCellEdit', []], ['handleReorderRow', [0, 1, 'set-original']], ['handleImportRoutine', [{ name: 'Routine' }, []]],
   ['handleOpenEditSet', ['set-original']], ['openCoach', []], ['sendMessage', []],
 ] as const) {
   test(`actual ${name} cannot mutate a finalizing session`, async () => {
@@ -287,7 +287,7 @@ test('real storage old remote acknowledgement cannot overwrite a newer owner loc
 for (const [name, args] of [
   ['handleImportRoutine', [{ name: 'Routine' }, []]],
   ['beginCellEdit', ['set-original', 'notes', 'edited']],
-  ['handleReorderRow', [0, 0]],
+  ['handleReorderRow', [0, 0, 'set-original']],
   ['withPendingRows', [(rows: any[]) => rows]],
 ] as const) test(`actual ${name} invalidates stale parse context and preserves editable input`, async () => {
   const f = aiFixture(); const pending = f.send();

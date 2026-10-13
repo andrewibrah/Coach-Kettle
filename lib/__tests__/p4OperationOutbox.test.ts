@@ -109,10 +109,12 @@ test('repeating durable drop intent preserves its original retry identity',async
 test('actual reorder reconciles changed set ordinals with unchanged row identities',async()=>{
   const {sourceClosure}=await import('./workoutIdentityHarness.ts');const ops:any[]=[];
   const original=[row,{...row,id:'second',set:2}];
-  const run=sourceClosure('handleReorderRow',{useCallback:(fn:any)=>fn,
+  const context:any={useCallback:(fn:any)=>fn,draftRowsRef:{current:original},editingCell:null,applyPendingEdit:(r:any)=>({nextRows:r}),
     setRows:(fn:any)=>fn(original),resequenceSets:(r:any[])=>r.map((v,i)=>({...v,set:i+1})),
-    queueLiveRows:async(r:any)=>ops.push(r)});
-  run(0,1);await Promise.resolve();assert.equal(ops.length,1);
+    queueLiveRows:async(r:any)=>ops.push(r)};
+  context.withPendingRows=sourceClosure('withPendingRows',context);
+  const run=sourceClosure('handleReorderRow',context);
+  run(0,1,'r');await Promise.resolve();assert.equal(ops.length,1);
   assert.deepEqual(Array.from(ops[0],(r:any)=>[r.id,r.set]),[['second',1],['r',2]]);
 });
 

@@ -320,8 +320,9 @@
         "C1",
         "A3"
       ],
-      "status": "planned",
-      "classification": "risk experiments; not confirmed user-visible defects",
+      "status": "partial",
+      "classification": "risk schedules executed; reorder/import defects reproduced and fixed; pill/questionnaire association completes after A3; rename grouping and undo are policy (D10/Q10)",
+      "latest_gate": "2026-10-13: reproduced+fixed: reorder by stale index after delete/rename moved the wrong row or spliced undefined (TypeError); reorder did not commit the pending inline edit first; import repeated ordinals. Fix: handleReorderRow(from,to,rowId) by id + delta via withPendingRows with own auth/busy guard; import numbers only new rows via nextSetNumberForExercise (performed history never renumbered, nothing silently unqueued). Not reproduced (kept as guards): modal save during reorder/delete, import identity, pending edit row id. Policy-pending: rename grouping, undo (Q10). SPEC FAIL (import renumbered performed rows without queueing) -> repaired -> SPEC PASS; QUALITY changes applied. risk file 24/0. Evidence: evidence/v1-risk-schedules-local.md.",
       "decision_ids": [
         "D10"
       ],

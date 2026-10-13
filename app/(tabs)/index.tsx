@@ -749,7 +749,13 @@ export default function HomeScreen() {
       setRows(skeletonRows);
     } else {
       // Append to current rows
-      setRows((prev) => [...prev, ...skeletonRows]);
+      // Number only the appended rows after each exercise's highest set; existing
+      // (possibly performed) rows keep their ordinals, so no live change is hidden.
+      setRows((prev) => {
+        const added: LogRow[] = [];
+        for (const row of skeletonRows) added.push({ ...row, set: nextSetNumberForExercise([...prev, ...added], row.exercise) });
+        return [...prev, ...added];
+      });
     }
 
     if (Platform.OS === "ios") {
@@ -1093,22 +1099,22 @@ export default function HomeScreen() {
     scrollToBottom();
   };
 
-  const handleReorderRow = useCallback((fromIndex: number, toIndex: number) => {
+  const handleReorderRow = useCallback((fromIndex: number, toIndex: number, rowId: string) => {
     if (!canUseSession() || ownership.busy) return;
-    invalidateResponses();
-    setRows(prev => {
-      const clamped = Math.max(0, Math.min(toIndex, prev.length - 1));
-      if (fromIndex === clamped) return prev;
+    // Commits a pending inline edit first and reconciles live changes (withPendingRows).
+    withPendingRows(prev => {
+      // A render-time index can be stale after a delete/regroup: resolve the dragged row by
+      // id and apply the gesture's slot offset from where that row is now.
+      const from = prev.findIndex(row => row.id === rowId);
+      if (from === -1) return prev;
+      const clamped = Math.max(0, Math.min(from + toIndex - fromIndex, prev.length - 1));
+      if (from === clamped) return prev;
       const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
+      const [moved] = next.splice(from, 1);
       next.splice(clamped, 0, moved);
-      const changed = resequenceSets(next);
-      const updates = changed.filter(row => isPerformedRow(row) &&
-        JSON.stringify(row) !== JSON.stringify(prev.find(old => old.id === row.id)));
-      if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
-      return changed;
+      return resequenceSets(next);
     });
-  }, [invalidateResponses, ownership, setRows, queueLiveRows, showToast, canUseSession]);
+  }, [withPendingRows, canUseSession, ownership]);
 
   const handleOpenEditSet = (rowId: string) => {
     if (!canUseSession() || ownership.busy) return;

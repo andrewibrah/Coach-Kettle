@@ -13,6 +13,21 @@ Key fixes:
 
 Gates, per commit in an isolated worktree: lib 3428/0, Edge `_shared` 85/0; tsc, lint with zero warnings and diff-check all exit 0; P4 PG15 suite exit 0. The local Supabase stack (colima) applies 64/65 migrations from scratch. The pre-existing `remote_schema` "chats already exists" failure needs a decision. Curl receipts on all 5 changed functions are as expected. The simulator is BLOCKED (no Xcode). Open: F6 LOW, two non-blocking QUALITY residuals, D08 choices and the production rollout. No push, deploy or remote command. [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
 
+## V1 risk schedules: reorder/import defects reproduced and fixed (V1 partial until A3)
+
+Real-code barrier schedules reproduced three bugs:
+- Reordering with a stale index after a delete or rename moved the **wrong row**, or spliced in `undefined` and threw.
+- A reorder did not commit the pending inline edit first.
+- Import repeated set ordinals.
+
+The fixes:
+- `handleReorderRow(from, to, rowId)` resolves the row by id, moves it by the gesture delta through `withPendingRows`, and keeps its own auth/busy guard.
+- Import numbers only the new rows, via `nextSetNumberForExercise`.
+
+The SPEC review caught that the first import fix silently renumbered performed history without queueing it. The repaired version never renumbers existing rows.
+
+Not reproduced (kept as guards): a modal save during a reorder or delete, import identity, and the row id of a pending edit. Rename grouping and undo are policy (Q10). The pill and questionnaire association is verified after A3. [Evidence](docs/plans/in-session-reliability/evidence/v1-risk-schedules-local.md).
+
 ## A2 deterministic next-set decisions: built and wired, inert until D07/D09 (Q1/Q9/Q13/Q14)
 
 `decideNextSet` evaluates in a fixed priority order: safety, clarify, effort, progression, hold. All thresholds come from a versioned `NEXT_SET_POLICY`, which ships as null, so the result is `unavailable`.
