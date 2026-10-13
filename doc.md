@@ -13,6 +13,23 @@ Key fixes:
 
 Gates, per commit in an isolated worktree: lib 3428/0, Edge `_shared` 85/0; tsc, lint with zero warnings and diff-check all exit 0; P4 PG15 suite exit 0. The local Supabase stack (colima) applies 64/65 migrations from scratch. The pre-existing `remote_schema` "chats already exists" failure needs a decision. Curl receipts on all 5 changed functions are as expected. The simulator is BLOCKED (no Xcode). Open: F6 LOW, two non-blocking QUALITY residuals, D08 choices and the production rollout. No push, deploy or remote command. [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
 
+## A1 structured answers: built and integrated, inert until D09 (Q8/Q11/Q12/Q15)
+
+Built behind `structuredQuestions: false` with `questionnaire: null`, so nothing renders, saves or changes behaviour:
+- Typed answer log: answered, skipped or unknown, with session, exercise and row scope.
+- Validation and applicability checks.
+- `currentAnswer`, which surfaces conflicts and keeps excluded evidence, so pain is never silently outvoted. A skip never counts as no-pain.
+- A durable append-only draft log with P1 R2 restore parity.
+- A per-session route log and one inert mount.
+- Dated excluded history (placeholder copy).
+
+Reviews:
+- Lane A SPEC FAILED: a clock-dependent filter could erase pain. Repaired RED-first, then SPEC PASS.
+- Lane B SPEC PASS: 11/12 mutants killed, and flag-off draft bytes are identical to HEAD.
+- QUALITY APPROVED, with LOW repairs applied.
+
+Open: answers bind to session and exercise, not to a set (LogRow has no revision), and they are kept only until End. [Evidence](docs/plans/in-session-reliability/evidence/a1-structured-answers-local.md).
+
 ## C3 honest coach errors, review and rest: SPEC PASS after repair; rest/review policy flagged off (D03/D07)
 
 Unflagged:

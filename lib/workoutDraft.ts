@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type LogRow } from '@/types/workout';
+import type { CoachingAnswer } from '@/types/coachingAnswers';
 
 const WORKOUT_DRAFT_KEY = 'workout_draft_v1';
 
@@ -26,6 +27,8 @@ export interface WorkoutDraft {
   createdAt: number;
   rows: LogRow[];
   updatedAt: number;
+  /** Structured coaching answers (A1, flag-gated): append-only log, saved as-is. */
+  coachingAnswers?: CoachingAnswer[];
 }
 
 type OptionalLogMetadata = Omit<LogRow, 'id' | 'exercise' | 'set' | 'weightLbs' | 'reps' | 'notes' | 'timestamp'>;
@@ -62,6 +65,17 @@ function isDraftLogRow(value: unknown): value is LogRow {
     Object.entries(metadataValidators).every(([field, validate]) => !(field in value) || validate(value[field]));
 }
 
+// Shape only (policy checks happen at use). Like other known fields, one corrupt entry
+// rejects the whole read and the stored bytes are kept.
+function isDraftCoachingAnswer(value: unknown): value is CoachingAnswer {
+  const text = (v: unknown) => typeof v === 'string' && v.length > 0;
+  return isRecord(value) && text(value.answerId) && text(value.sessionId) && text(value.exerciseKey) && text(value.questionId) &&
+    (!('rowId' in value) || text(value.rowId)) && (!('rowRevision' in value) || Number.isSafeInteger(value.rowRevision)) &&
+    Number.isFinite(value.capturedAt) && value.provenance === 'user' &&
+    (value.state === 'answered' ? typeof value.value === 'string' || Number.isFinite(value.value)
+      : (value.state === 'skipped' || value.state === 'unknown') && !('value' in value));
+}
+
 /** Read the current in-progress workout draft (if any). */
 export async function getWorkoutDraft(): Promise<WorkoutDraft | null> {
   const generation = draftGeneration;
@@ -74,7 +88,8 @@ export async function getWorkoutDraft(): Promise<WorkoutDraft | null> {
           typeof draft.dateISO !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(draft.dateISO) ||
           !Number.isFinite(draft.createdAt) || !Number.isFinite(draft.updatedAt) ||
           !Array.isArray(draft.bodyParts) || !draft.bodyParts.every((part: unknown) => typeof part === 'string') ||
-          !Array.isArray(draft.rows) || !draft.rows.every(isDraftLogRow)) {
+          !Array.isArray(draft.rows) || !draft.rows.every(isDraftLogRow) ||
+          ('coachingAnswers' in draft && (!Array.isArray(draft.coachingAnswers) || !draft.coachingAnswers.every(isDraftCoachingAnswer)))) {
         throw new Error('Invalid workout draft');
       }
       return draft as WorkoutDraft;
@@ -94,11 +109,35 @@ export async function saveWorkoutDraft(draft: WorkoutDraft, generation = draftGe
       if (generation !== draftGeneration) return;
       const stored = await AsyncStorage.getItem(WORKOUT_DRAFT_KEY);
       if (generation !== draftGeneration) return;
-      if (stored && JSON.parse(stored).ownerId !== draft.ownerId) throw new Error('Recovery owner mismatch');
-      await AsyncStorage.setItem(WORKOUT_DRAFT_KEY, snapshot);
+      const previous = stored ? JSON.parse(stored) : null;
+      if (stored && previous.ownerId !== draft.ownerId) throw new Error('Recovery owner mismatch');
+      // A rows save never drops the same session's append-only answers log (kept as-is).
+      const carry = isRecord(previous) && previous.workoutId === draft.workoutId && 'coachingAnswers' in previous && !('coachingAnswers' in draft);
+      await AsyncStorage.setItem(WORKOUT_DRAFT_KEY, carry ? JSON.stringify({ ...JSON.parse(snapshot), coachingAnswers: previous.coachingAnswers }) : snapshot);
     });
   } catch {
     throw new Error('Workout draft could not be saved.');
+  }
+}
+
+/** Append one structured coaching answer to this session's draft log (A1). Refuses, without
+ * writing, an invalid answer, a corrupt stored log or another owner's/session's draft. */
+export async function appendWorkoutDraftAnswer(ownerId: string, workoutId: string, answer: CoachingAnswer, generation = draftGeneration): Promise<void> {
+  if (generation !== draftGeneration) return;
+  try {
+    if (!isDraftCoachingAnswer(answer)) throw new Error('Invalid answer');
+    await enqueueDraftOperation(async () => {
+      if (generation !== draftGeneration) return;
+      const stored = await AsyncStorage.getItem(WORKOUT_DRAFT_KEY);
+      if (generation !== draftGeneration) return;
+      const draft = stored ? JSON.parse(stored) : null;
+      if (!isRecord(draft) || draft.ownerId !== ownerId || draft.workoutId !== workoutId) throw new Error('No matching draft');
+      const log = draft.coachingAnswers ?? [];
+      if (!Array.isArray(log) || !log.every(isDraftCoachingAnswer)) throw new Error('Corrupt answers log');
+      await AsyncStorage.setItem(WORKOUT_DRAFT_KEY, JSON.stringify({ ...draft, coachingAnswers: [...log, answer] }));
+    });
+  } catch {
+    throw new Error('Coaching answer could not be saved.');
   }
 }
 

@@ -46,7 +46,7 @@ import { decideAndParse, type ParsedRow } from "@/lib/structuredGate";
 import { expandTemplateToRows, getLastExerciseFromRows, makeId, makeRestRow, nextSetNumberForExercise, normalizeExercise, resequenceSets } from "@/lib/workoutRules";
 import { saveWorkout as saveWorkoutLocalFirst, type SessionReview } from "@/lib/workoutStorage";
 import { type LogRow } from "@/types/workout";
-import { clearWorkoutDraft, getWorkoutDraft, getWorkoutDraftGeneration, saveWorkoutDraft } from "@/lib/workoutDraft";
+import { appendWorkoutDraftAnswer, clearWorkoutDraft, getWorkoutDraft, getWorkoutDraftGeneration, saveWorkoutDraft } from "@/lib/workoutDraft";
 import { TutorialModal } from "@/components/tutorial/TutorialModal";
 import { Toast } from "@/components/ui/Toast";
 import { useToast } from "@/hooks/useToast";
@@ -69,6 +69,8 @@ import { createSubmitGuard } from '@/lib/submitGuard';
 import { sessionOperations } from '@/lib/sessionOperationDelivery';
 import { buildCoachingContext, coachingRecordFor, observeCoaching, type CoachingRecord } from '@/lib/coachingContext';
 import { COACHING_POLICY } from '@/lib/coachingPolicy';
+import { CoachingQuestions } from '@/components/workout/CoachingQuestions';
+import type { CoachingAnswer } from '@/types/coachingAnswers';
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
@@ -200,6 +202,8 @@ export default function HomeScreen() {
   // Current-session coach Q/A and (flag-gated) append-only disclosures, keyed by session
   // owner. The cross-session archive is display-only.
   const coachingRecordRef = useRef<CoachingRecord | null>(null);
+  // Structured coaching answers (A1, flag-gated): append-only log keyed by session owner.
+  const [coachingAnswers, setCoachingAnswers] = useState<{ owner: string; log: CoachingAnswer[] }>({ owner: '', log: [] });
   const [nameModalVisible, setNameModalVisible] = useState(false);
   const [editSetModalVisible, setEditSetModalVisible] = useState(false);
   const [targetRowId, setTargetRowId] = useState<string | null>(null);
@@ -774,6 +778,36 @@ export default function HomeScreen() {
     if (!COACHING_POLICY.contextualDisclosures) return;
     observeCoaching(COACHING_POLICY, coachingRecordFor(coachingRecordRef, sessionOwnerKey), workoutId, rows, []);
   }, [rows, sessionOwnerKey, workoutId]);
+
+  // Structured coaching answers (A1, flag-gated). Empty after End or an owner change.
+  const coachingExerciseKey = normalizeExercise(getLastExerciseFromRows(rows) ?? '');
+  const coachingAnswerLog = workoutActive && coachingAnswers.owner === sessionOwnerKey ? coachingAnswers.log : [];
+  const onCoachingAnswer = (answer: CoachingAnswer) => {
+    if (!COACHING_POLICY.structuredQuestions || !canUseSession() || !draftChecked || finalizing || !workoutId) return;
+    const owner = sessionOwnerKey;
+    setCoachingAnswers((prev) => ({ owner, log: [...(prev.owner === owner ? prev.log : []), answer] }));
+    persistDraftRows(draftRowsRef.current);
+    appendWorkoutDraftAnswer(sessionProvenanceRef.current!.ownerId, workoutId, answer, draftGeneration)
+      .catch(() => showToast('Your answer could not be saved on this device.', 'info'));
+  };
+  const onCoachingSkip = (questionId: string) => onCoachingAnswer({
+    answerId: makeId(), sessionId: workoutId ?? '', exerciseKey: coachingExerciseKey, questionId,
+    state: 'skipped', capturedAt: Date.now(), provenance: 'user',
+  });
+  // Structured coaching answers: restore this session's persisted log (flag-gated).
+  useEffect(() => {
+    if (!COACHING_POLICY.structuredQuestions || !draftChecked || !workoutId) return;
+    let disposed = false;
+    const owner = sessionOwnerKey;
+    const ownerId = session?.user?.id;
+    getWorkoutDraft().then((draft) => {
+      if (disposed || !draft?.coachingAnswers || draft.ownerId !== ownerId || draft.workoutId !== workoutId) return;
+      const stored = draft.coachingAnswers;
+      const seen = new Set(stored.map((a) => JSON.stringify(a)));
+      setCoachingAnswers((prev) => ({ owner, log: [...stored, ...(prev.owner === owner ? prev.log.filter((a) => !seen.has(JSON.stringify(a))) : [])] }));
+    }).catch(() => {}); // The draft restore already reports an unreadable draft and blocks Start.
+    return () => { disposed = true; };
+  }, [draftChecked, workoutId, sessionOwnerKey, session?.user?.id]);
 
   const presentationOwnerRef = useRef(sessionOwnerKey);
   // Session ownership: presentation reset
@@ -1551,6 +1585,12 @@ export default function HomeScreen() {
             />
           )}
         </View>
+
+        {workoutActive && workoutId && coachingExerciseKey ? (
+          <CoachingQuestions enabled={COACHING_POLICY.structuredQuestions} policy={COACHING_POLICY.questionnaire}
+            sessionId={workoutId} exerciseKey={coachingExerciseKey} answers={coachingAnswerLog}
+            now={Date.now} newAnswerId={makeId} onAnswer={onCoachingAnswer} onSkip={onCoachingSkip} />
+        ) : null}
 
         <WorkoutBottomBar
           workoutActive={workoutActive}

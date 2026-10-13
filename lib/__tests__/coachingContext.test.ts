@@ -12,7 +12,7 @@ const FLAG_ON = { ...COACHING_POLICY, contextualDisclosures: true };
 const row = (id: string, notes: string) => ({ id, exercise: 'Bench', set: 1, weightLbs: '100', reps: '5', notes, performance: 'performed', timestamp: 1 });
 
 test('policy ships unapproved with every adaptive switch off', () => {
-  assert.deepEqual(COACHING_POLICY, { version: 'unapproved', contextualDisclosures: false, adaptiveNextSet: false, structuredQuestions: false, reviewSetPolicy: false, suppressReviewLoadAdvice: false, restWorkSetsOnly: false });
+  assert.deepEqual(COACHING_POLICY, { version: 'unapproved', contextualDisclosures: false, adaptiveNextSet: false, structuredQuestions: false, reviewSetPolicy: false, suppressReviewLoadAdvice: false, restWorkSetsOnly: false, questionnaire: null });
   assert.deepEqual(readFileSync(new URL('../../supabase/functions/_shared/coachingPolicy.ts', import.meta.url), 'utf8').match(/COACHING_POLICY = (\{[^}]*\})/)?.[1],
     readFileSync(new URL('../coachingPolicy.ts', import.meta.url), 'utf8').match(/COACHING_POLICY = (\{[^}]*\})/)?.[1]);
 });

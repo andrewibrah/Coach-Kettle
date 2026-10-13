@@ -268,8 +268,9 @@
         "P2",
         "C1"
       ],
-      "status": "planned",
-      "classification": "proposed feature; architecture gap verified, not existing functionality",
+      "status": "done_local_policy_blocked",
+      "classification": "built and integrated behind COACHING_POLICY.structuredQuestions=false with questionnaire=null pending D09 (Q8, Q11, Q12, Q15)",
+      "latest_gate": "2026-10-13: typed answers (answered/skipped/unknown, provenance, session/exercise/row scope), validateAnswer/isApplicable/currentAnswer with conflict + excluded evidence so pain can never be silently outvoted (clock-skew/stale/revision), skip never equals no-pain; durable append-only draft log with P1 R2 restore parity; per-session route log, one inert mount, dated excluded history. lane A SPEC FAIL (pain erased by clock-dependent filter) -> repaired -> SPEC PASS; lane B SPEC PASS (11/12 mutants, flag-off draft bytes identical to HEAD) + 3 LOW repairs; QUALITY APPROVED + 4 LOW repairs. coachingAnswers 23/0, integration 16/0. Evidence: evidence/a1-structured-answers-local.md.",
       "decision_ids": [
         "D01",
         "D09"
