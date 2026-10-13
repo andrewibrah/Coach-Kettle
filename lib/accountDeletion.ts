@@ -58,6 +58,8 @@ export async function runAccountDeletion(deps: {
     /** Put the pre-re-auth session back (re-auth landed on another account). */
     restoreSession: () => Promise<void>;
     deleteAccount: (options: { appleAuthorizationCode?: string }) => Promise<unknown>;
+    /** Removes the deleted user's saved workout (owner-checked, so it runs before signOut). */
+    clearLocalDraft: () => Promise<void>;
     cancelLocalNotifications: () => Promise<void>;
     /** AuthProvider.signOut: clearAllCaches, RevenueCat logout, Supabase sign-out. */
     signOut: () => Promise<void>;
@@ -90,7 +92,7 @@ export async function runAccountDeletion(deps: {
     }
 
     // The account is gone server-side; every local step runs even if one fails.
-    for (const step of [deps.cancelLocalNotifications, deps.signOut, deps.signOutLocal]) {
+    for (const step of [deps.clearLocalDraft, deps.cancelLocalNotifications, deps.signOut, deps.signOutLocal]) {
         try {
             await step();
         } catch {

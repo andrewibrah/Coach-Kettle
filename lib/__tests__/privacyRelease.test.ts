@@ -551,7 +551,9 @@ test('a saved workout owned by another account (or no owner) is never removed, a
     find(render(), 'Type DELETE to confirm').props.onChangeText('DELETE');
     await find(render(), 'Delete account permanently').props.onPress();
     assert.equal(storage.get('workout_draft_v1'), draft);
-    assert.deepEqual(plain(calls.find(([name]: any[]) => name === 'clearDraft')), ['clearDraft', 'user-1']);
+    const clear = calls.find(([name]: any[]) => name === 'clearDraft');
+    assert.ok(clear, 'the clear is attempted for the deleted user');
+    assert.deepEqual(plain(clear), ['clearDraft', 'user-1']);
     assert.deepEqual(plain(calls.slice(-3)), [['signOut'], ['signOutLocal'], ['replace', '/auth/sign-in']]);
   }
 });

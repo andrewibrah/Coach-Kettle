@@ -96,7 +96,7 @@ over an in-memory AsyncStorage, so the owner check runs for real.
 
 Gates: `node --test --test-timeout=20000 "lib/__tests__/*.test.ts"` **3385 pass / 0 fail** (+4). `npm run
 lint` exits 0 with no warnings; `tsc --noEmit` and `git diff --check` both exit 0.
-Independent reviewer: REVIEWER_VERDICT. No commit, push or remote Supabase command.
+Independent reviewer: PASS (read-only subagent: requirements 1-8 OK and mutation-checked; no reachable autosave race. 3 LOW: #1 RED on SyntaxError not an assertion, fixed with assert.ok and re-verified; #2 legacy/corrupt drafts stay by design; #3 refusal reason not asserted, covered by the (d)/(e) pair). No commit, push or remote Supabase command.
 
 ## Behaviour change flagged for review (superseded P1 assertion)
 

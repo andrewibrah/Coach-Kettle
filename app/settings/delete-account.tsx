@@ -23,6 +23,7 @@ import { api } from '@/lib/api';
 import { useIAP } from '@/lib/iap';
 import { cancelAllLocal } from '@/lib/notifications';
 import { reauthenticate, restoreSession, signOutLocal } from '@/lib/reauth';
+import { clearWorkoutDraft } from '@/lib/workoutDraft';
 
 const DELETED_ITEMS = [
   'Your profile and body metrics',
@@ -81,6 +82,7 @@ export default function DeleteAccountScreen() {
         reauthenticate: () => reauthenticate(method, { email: session.user.email, password }),
         restoreSession: () => restoreSession(previous),
         deleteAccount: (options) => api.deleteAccount(options),
+        clearLocalDraft: () => clearWorkoutDraft(session.user.id),
         cancelLocalNotifications: cancelAllLocal,
         signOut,
         signOutLocal,

@@ -4,7 +4,7 @@
 
 Once the server confirms the deletion, `runAccountDeletion` runs a new best-effort `clearLocalDraft` step, the first local step and ahead of `signOut` (which fences the draft). The screen wires it to `clearWorkoutDraft(session.user.id)`. The owner check keeps any other account's draft and any legacy draft unchanged, and sign-out still completes. On cancelled or failed re-auth, wrong account, or server failure, nothing is cleared. `clearWorkoutDraft` impact is HIGH, so it is called but unchanged.
 
-Strict RED **5 fail** against the pre-change sources, then GREEN. The screen tests drive the real draft module over an in-memory store. Full lib **3385/0** (+4), lint exits 0 with no warnings, and tsc and diff-check both exit 0. Independent reviewer: REVIEWER_VERDICT. No commit or remote. [Evidence](docs/plans/in-session-reliability/evidence/p4-auth-provenance-local.md).
+Strict RED **5 fail** against the pre-change sources, then GREEN. The screen tests drive the real draft module over an in-memory store. Full lib **3385/0** (+4), lint exits 0 with no warnings, and tsc and diff-check both exit 0. Independent reviewer: PASS (read-only subagent: requirements 1-8 OK and mutation-checked; no reachable autosave race. 3 LOW: #1 RED on SyntaxError not an assertion, fixed with assert.ok and re-verified; #2 legacy/corrupt drafts stay by design; #3 refusal reason not asserted, covered by the (d)/(e) pair). No commit or remote. [Evidence](docs/plans/in-session-reliability/evidence/p4-auth-provenance-local.md).
 
 ## P4 Edge `_shared` identity drift repaired: SPEC PASS / QUALITY APPROVED, local commit 958b0c0
 
