@@ -14,12 +14,15 @@ type Dependencies = {
   send: (operation: SessionOperation) => Promise<OperationReceipt | null>;
 };
 type OperationReceipt = { ok?: boolean; pr?: LogSetPR | null; terminal?: boolean; code?: string };
-/** 403/409 are deterministic server rejections (retrying cannot succeed); anything else non-2xx is transient. */
+// Stable codes from supabase/functions/_shared/operationErrors.ts. Only these prove a
+// deterministic rejection; a gateway/WAF 403 or an unknown body stays transient.
+const TERMINAL_CODES = new Set(['forbidden', 'session_finalized', 'session_deleted', 'operation_conflict', 'stale_revision', 'legacy_session', 'invalid_operation']);
+/** 403/409 with a known stable code are deterministic server rejections; anything else non-2xx is transient. */
 export function classifyOperationResponse(status: number, body: unknown): OperationReceipt | null {
   if (status >= 200 && status < 300) return body as OperationReceipt;
-  if (status === 403 || status === 409) {
-    const code = (body as { code?: unknown } | null)?.code;
-    return { ok: false, terminal: true, code: typeof code === 'string' ? code : 'rejected' };
+  const code = (body as { code?: unknown } | null)?.code;
+  if ((status === 403 || status === 409) && typeof code === 'string' && TERMINAL_CODES.has(code)) {
+    return { ok: false, terminal: true, code };
   }
   return null;
 }
@@ -61,7 +64,12 @@ export function createSessionOperationOutbox(deps: Dependencies) {
   const flush = async (owner: string, onReceipt?: (receipt: { ok?: boolean; pr?: LogSetPR | null }) => void) => {
     const snapshot = await enqueue(read);
     let acknowledged = 0;
+    // A session delete depends on every earlier op of that session (e.g. the abandon bootstrap
+    // row opens the session). Once one is not acknowledged, the delete waits for the next pass
+    // instead of racing ahead and being rejected as terminal. Independent row ops still go.
+    const blocked = new Set<string>();
     for (const op of snapshot.pending.filter(op => op.owner === owner)) {
+      if (op.kind === 'delete' && blocked.has(op.sessionId)) continue;
       // A concurrent Clear/edit/abandon may have superseded this snapshot.
       const current = await enqueue(read);
       if (!current.pending.some(item => item.owner===owner && item.payload.operationKey===op.payload.operationKey && item.sessionId===op.sessionId)) continue;
@@ -76,18 +84,25 @@ export function createSessionOperationOutbox(deps: Dependencies) {
           });
           continue;
         }
-        if (receipt?.ok !== true) continue;
+        if (receipt?.ok !== true) { blocked.add(op.sessionId); continue; }
         const wasCurrent = await enqueue(async () => {
           const latest = await read();
           const matched = latest.pending.some(item => item.owner===owner && item.sessionId===op.sessionId && item.payload.operationKey===op.payload.operationKey);
           latest.pending = latest.pending.filter(item => !(item.owner===owner && item.sessionId===op.sessionId && item.payload.operationKey===op.payload.operationKey));
-          if (op.kind === 'delete') latest.pending = latest.pending.filter(item => !(item.owner===owner && item.sessionId===op.sessionId));
+          if (op.kind === 'delete') {
+            latest.pending = latest.pending.filter(item => !(item.owner===owner && item.sessionId===op.sessionId));
+            // The server tombstone now fences the session; its row fingerprints are no longer needed.
+            // The abandon entry stays as the local write fence.
+            latest.seen = Object.fromEntries(Object.entries(latest.seen).filter(([key]) => {
+              try { const [o, sid] = JSON.parse(key); return !(o === owner && sid === op.sessionId); } catch { return true; }
+            }));
+          }
           await deps.write(JSON.stringify(latest));
           return matched;
         });
         if (wasCurrent) onReceipt?.(receipt);
         acknowledged++;
-      } catch { /* Keep exact committed identity for network/lost-ack/storage retry. */ }
+      } catch { blocked.add(op.sessionId); /* Keep exact committed identity for network/lost-ack/storage retry. */ }
     }
     return acknowledged;
   };

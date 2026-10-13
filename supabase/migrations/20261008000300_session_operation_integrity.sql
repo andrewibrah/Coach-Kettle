@@ -14,32 +14,35 @@ CREATE VIEW public.i3_workout_numeric_quarantine WITH (security_invoker = true) 
  FROM public.workout_log WHERE NOT public.i3_strength_eligible(workout_log);
 CREATE TABLE public.workout_operation_sessions (
     session_id text PRIMARY KEY,
-    user_id uuid NOT NULL,
+    -- Cascades with the account, like every other per-user table; a late write for a deleted
+    -- user fails (23503) instead of leaving private session state behind.
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     date_iso text NOT NULL,
     state text NOT NULL DEFAULT 'open' CHECK (state IN ('open','finalized','deleted')),
     revision bigint NOT NULL DEFAULT 0
 );
 CREATE TABLE public.workout_operation_rows (
-    session_id text NOT NULL REFERENCES public.workout_operation_sessions(session_id),
+    session_id text NOT NULL REFERENCES public.workout_operation_sessions(session_id) ON DELETE CASCADE,
     row_id text NOT NULL,
     revision bigint NOT NULL,
     deleted boolean NOT NULL DEFAULT false,
     PRIMARY KEY (session_id,row_id)
 );
 CREATE TABLE public.workout_operation_receipts (
-    session_id text NOT NULL REFERENCES public.workout_operation_sessions(session_id),
+    session_id text NOT NULL REFERENCES public.workout_operation_sessions(session_id) ON DELETE CASCADE,
     operation_key text NOT NULL,
     request jsonb NOT NULL,
     receipt jsonb NOT NULL,
     PRIMARY KEY (session_id,operation_key)
 );
-ALTER TABLE public.workout_log ADD COLUMN p4_session_id text REFERENCES public.workout_operation_sessions(session_id);
+ALTER TABLE public.workout_log ADD COLUMN p4_session_id text REFERENCES public.workout_operation_sessions(session_id) ON DELETE CASCADE;
 ALTER TABLE public.workout_log ADD COLUMN p4_row_id text;
 CREATE UNIQUE INDEX workout_log_p4_row ON public.workout_log(p4_session_id,p4_row_id);
 ALTER TABLE public.workout_operation_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workout_operation_rows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workout_operation_receipts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY p4_session_read ON public.workout_operation_sessions FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
+REVOKE ALL ON public.workout_operation_sessions FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.workout_operation_sessions TO authenticated;
 REVOKE ALL ON public.workout_operation_rows, public.workout_operation_receipts FROM PUBLIC, anon, authenticated;
 

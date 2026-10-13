@@ -107,7 +107,7 @@ async function roundtrip(rows: any[], offline = false, failFirstLocal = false) {
   }
   const first = plain(await storage.listWorkouts());
   disconnected = false;
-  const retried = await storage.syncPendingWorkouts();
+  const retried = await storage.syncPendingWorkouts('u');
   const local = plain(await storage.listWorkouts());
   const response = await edge.request('GET'); assert.equal(response.status, 200);
   return { first, local, remote: await response.json(), edge, posts, writes, retried, reviews, displayedReview, phases, ended, cleared };
@@ -128,10 +128,10 @@ test('actual history insert failure returns non-2xx and preserves local pending 
   assert.deepEqual(plain(await storage.saveWorkout(session)), { synced: false });
   assert.equal((await storage.listWorkouts())[0].pendingSync, true);
   assert.deepEqual(plain((await storage.listWorkouts())[0].rows), [cardio]);
-  assert.equal(await storage.syncPendingWorkouts(), 0);
+  assert.equal(await storage.syncPendingWorkouts('u'), 0);
   assert.equal((await storage.listWorkouts())[0].pendingSync, true);
   failure.stage = undefined;
-  assert.equal(await storage.syncPendingWorkouts(), 1);
+  assert.equal(await storage.syncPendingWorkouts('u'), 1);
   assert.equal((await storage.listWorkouts())[0].pendingSync, false);
   assert.deepEqual(plain((await storage.listWorkouts())[0].rows), [cardio]);
 });
@@ -186,4 +186,13 @@ for (const failLocal of [false, true]) test(`actual AI ingestion -> mixed End ->
   assert.equal(result.edge.inserted[1].is_cardio, true); assert.equal(result.edge.inserted[1].duration_mins, 0);
   assert.equal(result.edge.inserted[1].calories, 0); assert.equal(result.edge.inserted[1].level, 0);
   assert.equal('durationMins' in result.remote[0].rows[2], false);
+});
+
+test('QUALITY HIGH: api.saveWorkout forwards the expected owner to the owner-bound auth fetch', async () => {
+  const calls: any[] = [];
+  const api = actualApi(async (...args: any[]) => { calls.push(args); return new Response('{}', { status: 200 }); });
+  await api.saveWorkout({ id: 'w' }, 'user-a');
+  await api.saveWorkout({ id: 'w' });
+  assert.equal(calls[0][3], 'user-a');
+  assert.equal(calls[1][3], undefined);
 });

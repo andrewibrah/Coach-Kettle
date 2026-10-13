@@ -164,20 +164,22 @@ export async function saveWorkout(session: WorkoutSession, options?: { review?: 
   }
 }
 
+// Stable codes from supabase/functions/_shared/operationErrors.ts.
+const TERMINAL_CODES = new Set(['forbidden', 'session_finalized', 'session_deleted', 'operation_conflict', 'stale_revision', 'legacy_session', 'invalid_operation']);
 /**
  * The stable code of a deterministic server rejection thrown by api.saveWorkout /
  * api.deleteWorkout ("Failed to ... workout: <status> - <body>"), or null when retrying can help.
- * 403/409 are SQL rejections; 400 is Edge pre-validation of this exact payload (e.g. a pre-P4
- * row without an id), which no retry can change. 401/5xx/network stay retryable.
+ * 403/409 count only with a known stable code. A 400 counts only with the Edge's JSON error body
+ * (pre-validation of this exact payload, e.g. a pre-P4 row without an id). Gateway pages,
+ * unknown codes, 401, 5xx and network failures stay retryable.
  */
 export function terminalRejectionCode(error: unknown): string | null {
   const match = /^Failed to (?:save|delete) workout: (400|403|409) - ([\s\S]*)$/.exec(String((error as { message?: unknown } | null)?.message ?? ''));
   if (!match) return null;
-  const fallback = match[1] === '400' ? 'invalid_session' : 'rejected';
-  try {
-    const code = JSON.parse(match[2])?.code;
-    return typeof code === 'string' ? code : fallback;
-  } catch { return fallback; }
+  let body: { code?: unknown; error?: unknown } | null = null;
+  try { body = JSON.parse(match[2]); } catch { return null; }
+  if (match[1] === '400') return typeof body?.error === 'string' ? 'invalid_session' : null;
+  return typeof body?.code === 'string' && TERMINAL_CODES.has(body.code) ? body.code : null;
 }
 
 /** User-facing History delete failure: terminal rejections are explained, not "try again". */
@@ -190,8 +192,14 @@ export function deleteFailureMessage(error: unknown): string {
   return 'Failed to delete workout. Please try again.';
 }
 
-/** Retry any locally-saved workouts that never reached Supabase. */
-export async function syncPendingWorkouts(): Promise<number> {
+/**
+ * Retry any locally-saved workouts that never reached Supabase, as `owner` only. A sign-out
+ * (clearWorkouts) during the loop stops it, and each request is owner-bound, so the remaining
+ * workouts can never be sent under the next account's token.
+ */
+export async function syncPendingWorkouts(owner: string): Promise<number> {
+  if (!owner) return 0;
+  const generation = historyGeneration;
   // Pre-P4 pending sessions carry no transport identity. Assign one inside the queued,
   // generation-fenced write so it is durable before any request and reused on every retry.
   const pending = await withHistory(async (existing, write) => {
@@ -207,9 +215,10 @@ export async function syncPendingWorkouts(): Promise<number> {
   });
   let synced = 0;
   for (const session of pending) {
+    if (generation !== historyGeneration) break;
     try {
       const { pendingSync: _p, media: _m, syncBlocked: _b, ...payload } = session;
-      await api.saveWorkout(payload);
+      await api.saveWorkout(payload, owner);
       await patchRevision(session.id, session.revision, { pendingSync: false });
       synced += 1;
     } catch (error) {

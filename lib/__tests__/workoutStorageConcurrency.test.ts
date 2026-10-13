@@ -53,7 +53,7 @@ test('old retry acknowledgement after a newer pending revision does not overwrit
   let calls = 0;
   const { mod, read, seed } = harness(async () => { calls += 1; if (calls === 1) return gate.promise; throw new Error('offline'); });
   seed([session('x', { revision: 1, operationKey: 'finalize:x:1', pendingSync: true })]);
-  const retry = mod.syncPendingWorkouts();
+  const retry = mod.syncPendingWorkouts('u');
   while (calls === 0) await tick();
   const newer = session('x', { revision: 2, operationKey: 'finalize:x:2',
     rows: [{ id: 'x-r1', exercise: 'Bench', set: 1, weightLbs: '105', reps: '5', notes: '' }] });
@@ -82,7 +82,7 @@ test('slow acknowledgement of an older save cannot replace a newer save of the s
 test('matching acknowledgement still clears pendingSync for that revision', async () => {
   const { mod, read, seed } = harness(async () => ({}));
   seed([session('z', { revision: 3, operationKey: 'finalize:z:3', pendingSync: true })]);
-  assert.equal(await mod.syncPendingWorkouts(), 1);
+  assert.equal(await mod.syncPendingWorkouts('u'), 1);
   assert.equal(read()[0].pendingSync, false);
   assert.equal(read()[0].revision, 3);
 });

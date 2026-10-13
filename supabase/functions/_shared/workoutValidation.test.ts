@@ -274,6 +274,9 @@ test('terminal SQL rejections map to 403/409 with a stable code; infrastructure 
     ['P0001', 'Invalid performed row', 409, 'invalid_operation'],
     ['42501', 'Session ownership required', 403, 'forbidden'],
     ['08006', 'connection failure', 500, null],
+    // A privilege error from a misdeployed grant is not an ownership rejection: stay transient.
+    ['42501', 'permission denied for table workouts', 500, null],
+    ['42501', 'Authentication required', 403, 'forbidden'],
   ];
   try {
     for (const [code, message, status, stable] of cases) {

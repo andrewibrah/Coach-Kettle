@@ -36,7 +36,7 @@ test('legacy pending session gets a P4 identity persisted before HTTP, then sync
     sent.push(payload);
   });
   h.seed([legacy('old')]);
-  assert.equal(await h.mod.syncPendingWorkouts(), 1);
+  assert.equal(await h.mod.syncPendingWorkouts('u'), 1);
   assert.equal(sent.length, 1);
   assert.ok(Number.isSafeInteger(sent[0].revision) && sent[0].revision > 0);
   assert.match(sent[0].operationKey, /^finalize:old:\d+$/);
@@ -48,11 +48,11 @@ test('terminal 409 keeps the local copy, flags it and never retries it', async (
   let calls = 0;
   const h = harness(async () => { calls++; throw rejected(409, 'legacy_session'); });
   h.seed([legacy('old')]);
-  assert.equal(await h.mod.syncPendingWorkouts(), 0);
+  assert.equal(await h.mod.syncPendingWorkouts('u'), 0);
   const [stored] = h.read();
   assert.equal(stored.syncBlocked, 'legacy_session');
   assert.equal(stored.pendingSync, true, 'stays pending so a server refresh cannot replace the local copy');
-  assert.equal(await h.mod.syncPendingWorkouts(), 0);
+  assert.equal(await h.mod.syncPendingWorkouts('u'), 0);
   assert.equal(calls, 1, 'not retried');
   const merged = await h.mod.mergeServerHistory([{ ...legacy('old'), pendingSync: undefined, part: 'Server copy' }]);
   assert.equal(merged.find((w: any) => w.id === 'old').part, 'Push');
@@ -61,15 +61,15 @@ test('terminal 409 keeps the local copy, flags it and never retries it', async (
 test('403 is terminal too; 500, 401 and network failures stay retryable with the same identity', async () => {
   const forbidden = harness(async () => { throw rejected(403, 'forbidden'); });
   forbidden.seed([legacy('f')]);
-  await forbidden.mod.syncPendingWorkouts();
+  await forbidden.mod.syncPendingWorkouts('u');
   assert.equal(forbidden.read()[0].syncBlocked, 'forbidden');
 
   for (const failure of [new Error('Failed to save workout: 500 - {"error":"Database error"}'), new Error('Failed to save workout: 401 - x'), new TypeError('Network request failed')]) {
     const keys: string[] = [];
     const h = harness(async (payload) => { keys.push(payload.operationKey); throw failure; });
     h.seed([legacy('t')]);
-    await h.mod.syncPendingWorkouts();
-    await h.mod.syncPendingWorkouts();
+    await h.mod.syncPendingWorkouts('u');
+    await h.mod.syncPendingWorkouts('u');
     assert.equal(keys.length, 2, failure.message);
     assert.equal(keys[0], keys[1], 'retry reuses the persisted identity');
     assert.equal(h.read()[0].syncBlocked, undefined);
@@ -80,7 +80,12 @@ test('terminalRejectionCode reads the delete error shape for the History message
   const { mod } = harness(async () => {});
   assert.equal(mod.terminalRejectionCode(new Error('Failed to delete workout: 409 - {"error":"Operation rejected","code":"legacy_session"}')), 'legacy_session');
   assert.equal(mod.terminalRejectionCode(new Error('Failed to delete workout: 500 - {"error":"Database error"}')), null);
-  assert.equal(mod.terminalRejectionCode(new Error('Failed to delete workout: 409 - not json')), 'rejected');
+  // Only a known stable code (or an Edge-shaped 400 JSON error) is terminal; gateway pages are not.
+  assert.equal(mod.terminalRejectionCode(new Error('Failed to delete workout: 409 - not json')), null);
+  assert.equal(mod.terminalRejectionCode(new Error('Failed to save workout: 403 - <html>blocked</html>')), null);
+  assert.equal(mod.terminalRejectionCode(new Error('Failed to save workout: 409 - {"code":"unknown_code"}')), null);
+  assert.equal(mod.terminalRejectionCode(new Error('Failed to save workout: 400 - <html>bad request</html>')), null);
+  assert.equal(mod.terminalRejectionCode(new Error('Failed to save workout: 400 - {"error":"rows must be an array"}')), 'invalid_session');
   assert.equal(mod.terminalRejectionCode('nope'), null);
 });
 
@@ -96,7 +101,7 @@ test('N1: a deterministic 400 from history pre-validation (pre-P4 row without id
   let calls = 0;
   const h = harness(async () => { calls++; throw new Error('Failed to save workout: 400 - {"error":"Session operation identity and unique row IDs required."}'); });
   h.seed([{ ...legacy('noid'), rows: [{ exercise: 'Bench', set: 1, weightLbs: '100', reps: '5', notes: '' }] }]);
-  await h.mod.syncPendingWorkouts(); await h.mod.syncPendingWorkouts();
+  await h.mod.syncPendingWorkouts('u'); await h.mod.syncPendingWorkouts('u');
   assert.equal(calls, 1);
   const [stored] = h.read();
   assert.equal(stored.syncBlocked, 'invalid_session'); assert.equal(stored.pendingSync, true);
@@ -106,4 +111,29 @@ test('N2: deleting a never-synced workout (403 forbidden: no server session yet)
   const { mod } = harness(async () => {});
   assert.equal(mod.deleteFailureMessage(new Error('Failed to delete workout: 403 - {"error":"Operation not allowed","code":"forbidden"}')),
     "This workout hasn't synced yet. Try deleting it again after it syncs.");
+});
+
+test('QUALITY HIGH: sign-out during sync never sends the remaining workouts under the next account', async () => {
+  const sent: string[] = [];
+  let release!: () => void; let started!: () => void;
+  const inFlight = new Promise<void>(r => { started = r; });
+  const h = harness(async (payload: any, owner?: string) => {
+    sent.push(`${payload.id}@${owner}`);
+    if (payload.id === 'a1') { started(); await new Promise<void>(r => { release = r; }); }
+  });
+  h.seed([{ ...legacy('a1'), revision: 5, operationKey: 'finalize:a1:5' }, { ...legacy('a2'), revision: 6, operationKey: 'finalize:a2:6' }]);
+  const sync = h.mod.syncPendingWorkouts('user-a');
+  await inFlight;
+  await h.mod.clearWorkouts(); // sign-out; the next account signs in after this
+  release();
+  await sync;
+  assert.deepEqual(sent, ['a1@user-a']);
+});
+
+test('sync without a signed-in owner sends nothing', async () => {
+  let calls = 0;
+  const h = harness(async () => { calls++; });
+  h.seed([legacy('x')]);
+  assert.equal(await h.mod.syncPendingWorkouts(''), 0);
+  assert.equal(calls, 0);
 });

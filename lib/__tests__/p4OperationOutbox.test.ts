@@ -49,10 +49,11 @@ test('explicit abandon is durable before cleanup and prevents subsequent writes 
   const before=f.calls.length; await box.flush('other-user'); assert.equal(f.calls.length,before);
 });
 test('owner-bound HTTP refuses a replacement login before sending the operation',async()=>{
-  let sent=0;
   const auth=sourceModule('lib/auth.ts',{'./supabase':{supabaseAnonKey:'offline',supabase:{auth:{getSession:async()=>({data:{session:{user:{id:'other'},access_token:'offline'}},error:null})}}}});
-  await assert.rejects(auth.getAuthHeaders('owner'),/owner/);
-  assert.equal(sent,0);
+  await assert.rejects(auth.getAuthHeaders('owner'),/Session operation owner changed/);
+  // fetch is not defined in this offline context: reaching the network would throw a
+  // ReferenceError instead of the owner error, so this proves the request never starts.
+  await assert.rejects(auth.fetchWithAuth('https://offline.invalid/log-set',{method:'POST'},1,'owner'),/Session operation owner changed/);
 });
 test('actual modal edit gateway reconciles a changed performed row without replacing its identity',async()=>{
   const {sourceClosure}=await import('./workoutIdentityHarness.ts');
@@ -194,6 +195,39 @@ test('operation HTTP classification: 403/409 terminal, 5xx/429/network transient
   const classifyOperationResponse=(status:number,body:unknown)=>JSON.parse(JSON.stringify(raw(status,body)));
   assert.deepEqual(classifyOperationResponse(409,{error:'x',code:'legacy_session'}),{ok:false,terminal:true,code:'legacy_session'});
   assert.deepEqual(classifyOperationResponse(403,{error:'x',code:'forbidden'}),{ok:false,terminal:true,code:'forbidden'});
+  // Only a known stable code is terminal: a gateway/WAF 403 page or an unknown code stays transient.
+  for (const body of [null,'<html>forbidden</html>',{error:'x'},{error:'x',code:'something_else'}]) {
+    assert.equal(classifyOperationResponse(403,body),null,JSON.stringify(body));
+    assert.equal(classifyOperationResponse(409,body),null,JSON.stringify(body));
+  }
   for (const status of [500,502,503,429,401]) assert.equal(classifyOperationResponse(status,{error:'x'}),null,String(status));
   assert.deepEqual(classifyOperationResponse(200,{ok:true,pr:null}),{ok:true,pr:null});
+});
+
+test('QUALITY: a transient failure blocks later operations of the same session in that pass (abandon delete waits for its bootstrap)',async()=>{
+  const f=fixture(); const box=f.create();
+  await box.abandon('u','s','2026-10-08');
+  await box.rows('u','other','2026-10-08',[row]);
+  const kinds:string[]=[];
+  f.send(async(op:any)=>{kinds.push(`${op.sessionId}:${op.kind}`); return null;});
+  await box.flush('u');
+  assert.deepEqual(kinds,['s:row','other:row'],'delete not sent after its bootstrap failed; other sessions continue');
+  assert.equal(JSON.parse(f.raw()!).pending.length,3);
+  f.send(async(op:any)=>{kinds.push(`${op.sessionId}:${op.kind}`); return {ok:true};});
+  await box.flush('u');
+  assert.deepEqual(kinds.slice(2),['s:row','s:delete','other:row']);
+  assert.equal(JSON.parse(f.raw()!).pending.length,0);
+});
+test('QUALITY: an acknowledged session delete prunes that session from the seen ledger; the abandon fence stays',async()=>{
+  const f=fixture(); const box=f.create();
+  await box.rows('u','s','2026-10-08',[row,{...row,id:'r2'}]);
+  await box.abandon('u','s','2026-10-08');
+  await box.rows('u','keep','2026-10-08',[row]);
+  f.send(async()=>({ok:true}));
+  await box.flush('u');
+  const state=JSON.parse(f.raw()!);
+  assert.deepEqual(Object.keys(state.seen).filter(k=>JSON.parse(k)[1]==='s'),[]);
+  assert.ok(Object.keys(state.seen).some(k=>JSON.parse(k)[1]==='keep'));
+  assert.ok(state.abandoned.includes(JSON.stringify(['u','s',''])));
+  await assert.rejects(box.rows('u','s','2026-10-08',[row]),/abandoned/);
 });

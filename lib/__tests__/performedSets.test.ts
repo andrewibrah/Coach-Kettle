@@ -202,7 +202,7 @@ test('actual local-first storage readback preserves warmup identity through succ
   assert.equal((await storage.listWorkouts())[0].rows[0].setKind, 'warmup');
   assert.equal((await storage.listWorkouts())[0].rows[0].id, result.rows[0].id);
   offline = false;
-  assert.equal(await storage.syncPendingWorkouts(), 1);
+  assert.equal(await storage.syncPendingWorkouts('u'), 1);
   assert.equal((await storage.listWorkouts())[0].pendingSync, false);
   assert.equal(sends[1].rows[0].setKind, 'warmup');
 });

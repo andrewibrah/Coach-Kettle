@@ -22,6 +22,19 @@ SET LOCAL ROLE service_role;
 SELECT public.delete_user_data('00000000-0000-0000-0000-0000000000a1');
 RESET ROLE;
 
+-- QUALITY race: an operation that commits after the purge (in-flight flush, or a still-valid JWT
+-- calling the RPC directly) must not survive the auth.users delete that follows it.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+DO $$
+BEGIN
+  PERFORM public.apply_workout_operation('purge-late', 'drop:x:1', 1, 'drop', 'x',
+    '{"dateISO":"2026-10-08","row":{"id":"x","exercise":"Bench","set":1,"weightLbs":"","reps":"","notes":"late private note"}}'::jsonb);
+EXCEPTION WHEN OTHERS THEN NULL; -- rejected is also acceptable; surviving is not
+END $$;
+RESET ROLE;
+DELETE FROM auth.users WHERE id = '00000000-0000-0000-0000-0000000000a1';
+
 DO $$
 DECLARE a_left int; b_left int;
 BEGIN
@@ -29,6 +42,9 @@ BEGIN
        + (SELECT count(*) FROM public.workout_operation_rows WHERE session_id = 'purge-sa')
        + (SELECT count(*) FROM public.workout_operation_sessions WHERE session_id = 'purge-sa')
        + (SELECT count(*) FROM public.workout_log WHERE p4_session_id = 'purge-sa')
+       + (SELECT count(*) FROM public.workout_operation_sessions WHERE user_id = '00000000-0000-0000-0000-0000000000a1')
+       + (SELECT count(*) FROM public.workout_operation_receipts WHERE session_id = 'purge-late')
+       + (SELECT count(*) FROM public.workout_operation_rows WHERE session_id = 'purge-late')
     INTO a_left;
   SELECT (SELECT count(*) FROM public.workout_operation_receipts WHERE session_id = 'purge-sb')
        + (SELECT count(*) FROM public.workout_operation_rows WHERE session_id = 'purge-sb')

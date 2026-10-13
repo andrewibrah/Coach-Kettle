@@ -9,6 +9,7 @@ import { ScreenHeader } from "@/components/ui/screen-header";
 import { ThemedView } from "@/components/ui/themed-view";
 import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useAuth } from "@/contexts/AuthProvider";
 import { useToast } from "@/hooks/useToast";
 import { api } from "@/lib/api";
 import {
@@ -71,6 +72,7 @@ export default function HistoryScreen() {
   const chevronColor = useThemeColor({}, 'icon');
   const tintColor = useThemeColor({}, 'tint');
   const dangerColor = useThemeColor({}, 'danger');
+  const { session } = useAuth();
   const successColor = useThemeColor({}, 'success');
   const warningColor = useThemeColor({}, 'warning');
 
@@ -79,7 +81,8 @@ export default function HistoryScreen() {
       setLoadError(false);
 
       // Push any locally-saved workouts that never reached the server.
-      await syncPendingWorkouts().catch(() => 0);
+      // Owner-bound: a sign-out/account switch mid-sync cannot send these under another account.
+      await syncPendingWorkouts(session?.user.id ?? '').catch(() => 0);
 
       const data = await api.getHistory();
       // Merge: server is truth, but still-pending local sessions win so an

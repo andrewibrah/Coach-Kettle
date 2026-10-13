@@ -57,6 +57,8 @@ try:
     sql("INSERT INTO workout_log(user_id,workout_id,workout_date,exercise,set_number,weight_lbs,reps,notes) VALUES ('%s','pre-p4-raw','2026-10-07','Pre-P4 Raw',2147483647,'NaN','bad','untouched before proposal');" % OWNER)
     legacy_before=sql("SELECT json_build_array(weight_lbs,reps,notes,set_number)::text FROM workout_log WHERE workout_id='pre-p4-raw';")
     if os.environ.get('P4_APPLY') == 'true':
+        # Minimal auth.users stub for the proposal's ON DELETE CASCADE owner FK.
+        sql("CREATE TABLE auth.users (id uuid PRIMARY KEY); INSERT INTO auth.users VALUES ('%s'),('%s');" % (OWNER, OTHER))
         sql('\\ir '+str(ROOT/'supabase/migrations/20261008000300_session_operation_integrity.sql'))
         assert sql("SELECT json_build_array(weight_lbs,reps,notes,set_number)::text FROM workout_log WHERE workout_id='pre-p4-raw';")==legacy_before
         assert sql("SELECT reason FROM i3_workout_numeric_quarantine WHERE workout_id='pre-p4-raw';")=='unknown_or_invalid_load'

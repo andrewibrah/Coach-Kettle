@@ -30,7 +30,7 @@ test('actual local-first storage persists final operation identity before HTTP a
   const session = { id: 's', dateISO: '2026-10-08', part: 'Push', createdAt: 1, rows: [{ id:'r',exercise:'Bench',set:1,weightLbs:'100',reps:'8',notes:'' }] };
   assert.equal((await storage.saveWorkout(session)).synced, false);
   assert.ok(captures[0].operationKey); assert.ok(Number.isSafeInteger(captures[0].revision));
-  assert.equal(await storage.syncPendingWorkouts(), 1);
+  assert.equal(await storage.syncPendingWorkouts('u'), 1);
   assert.equal(captures[0].operationKey, captures[1].operationKey); assert.equal(captures[0].revision,captures[1].revision);
 });
 test('actual history delete requires an operation identity and uses the session tombstone RPC', async () => {

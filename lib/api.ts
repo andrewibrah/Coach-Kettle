@@ -311,11 +311,12 @@ JSON shape — respond with exactly this structure:
         };
     },
 
-    saveWorkout: async (session: unknown) => {
+    /** `expectedOwner` refuses to send under a different signed-in account (background sync). */
+    saveWorkout: async (session: unknown, expectedOwner?: string) => {
         const res = await fetchWithAuth(`${API_BASE}/history`, {
             method: 'POST',
             body: JSON.stringify(session),
-        });
+        }, 1, expectedOwner);
 
         if (!res.ok) {
             const body = await res.text();
