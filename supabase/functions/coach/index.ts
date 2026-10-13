@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { gateAiRequest } from "../_shared/entitlements.ts";
 import { coachTextStream } from "./coachStream.ts";
+import { COACHING_POLICY, disclosureBlock, readCoachingContext } from "../_shared/coachingPolicy.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,14 @@ interface CoachRequest {
     question: string;
     rows: WorkoutRow[];
     chatHistory?: ChatHistoryMessage[];
+    context?: unknown;
 }
+
+// Transport-safety bounds, not coaching policy: 10 entries is the client's existing
+// window and 5000 chars matches lib/chatStorage sanitizeContent. Older turns fall out
+// of this window, which is why disclosures travel separately (flag-gated).
+const MAX_HISTORY_ENTRIES = 10;
+const MAX_HISTORY_CONTENT = 5000;
 
 const SYSTEM_PROMPT = `You are Coach, a direct, knowledgeable strength coach for Coach Kettle, a workout tracking app.
 
@@ -142,12 +150,31 @@ serve(async (req) => {
     }
 
     const { question, rows = [], chatHistory = [] } = payload;
-    if (!question) {
+    if (typeof question !== "string" || !question) {
         return new Response(
             JSON.stringify({ error: "question is required" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
+    // Ignored entirely while the D09 policy flag is off.
+    const coachingContext = COACHING_POLICY.contextualDisclosures && payload.context !== undefined
+        ? readCoachingContext(payload.context) : undefined;
+    if (coachingContext === null) {
+        return new Response(
+            JSON.stringify({ error: "Invalid coaching context." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+    const disclosures = coachingContext ? disclosureBlock(coachingContext) : null;
+
+    // Drop malformed entries (bad role, non-string, empty or oversized content), keep the last 10.
+    const priorMessages = (Array.isArray(chatHistory) ? chatHistory : [])
+        .filter((m): m is ChatHistoryMessage => !!m && (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string" && m.content.trim().length > 0 && m.content.length <= MAX_HISTORY_CONTENT)
+        .slice(-MAX_HISTORY_ENTRIES);
+    // Clients append the current question last; it is re-added below with the session rows.
+    const lastMessage = priorMessages[priorMessages.length - 1];
+    if (lastMessage?.role === "user" && lastMessage.content.trim() === question.trim()) priorMessages.pop();
 
     // Fetch user context from DB (errors are non-blocking)
     let userContext: {
@@ -229,6 +256,9 @@ serve(async (req) => {
         const workoutSummaries = userContext.recentWorkouts.map((w: any) => {
             const date = w.createdAt ? new Date(Number(w.createdAt)).toLocaleDateString() : "unknown date";
             const part = w.part || "General";
+            // Flag-gated: past notes are labeled by date and never presented as current symptoms.
+            const historicalNote = (notes: unknown) => COACHING_POLICY.contextualDisclosures && typeof notes === "string" && notes.trim()
+                ? ` [note from ${date}, historical, not current: ${JSON.stringify(notes)}]` : "";
 
             let parsedRows: any[] = [];
             if (w.rows_json) {
@@ -257,12 +287,12 @@ serve(async (req) => {
                     if (firstSet.heartRate) parts.push(`HR ${firstSet.heartRate} bpm`);
                     if (firstSet.calories) parts.push(`${firstSet.calories} cal`);
                     if (firstSet.level) parts.push(`level ${firstSet.level}`);
-                    exerciseLines.push(`  ${name}: ${parts.length > 0 ? parts.join(", ") : "(cardio)"}`);
+                    exerciseLines.push(`  ${name}: ${parts.length > 0 ? parts.join(", ") : "(cardio)"}${historicalNote(firstSet.notes)}`);
                 } else {
                     const setStrings = sets.map((s: any, i: number) => {
                         const w = s.weightLbs || "BW";
                         const r = s.reps || "?";
-                        return `Set ${i + 1}: ${w}x${r}`;
+                        return `Set ${i + 1}: ${w}x${r}${historicalNote(s.notes)}`;
                     });
                     exerciseLines.push(`  ${name}: ${setStrings.join(", ")}`);
                 }
@@ -282,17 +312,13 @@ serve(async (req) => {
         const messages: { role: string; content: string }[] = [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "system", content: `User Context:\n${userContextStr}` },
+            // Labeled context, never replayed as chat turns.
+            ...(disclosures ? [{ role: "system", content: disclosures }] : []),
         ];
 
-        // Add prior conversation history (already limited to last 10 by client)
-        if (chatHistory.length > 0) {
-            // Exclude the current question (last user message) since we add it below
-            const priorMessages = chatHistory.slice(0, -1);
-            for (const msg of priorMessages) {
-                if (msg.role === 'user' || msg.role === 'assistant') {
-                    messages.push({ role: msg.role, content: msg.content });
-                }
-            }
+        // Prior conversation history (bounded and validated above)
+        for (const msg of priorMessages) {
+            messages.push({ role: msg.role, content: msg.content });
         }
 
         // Add current question with session context

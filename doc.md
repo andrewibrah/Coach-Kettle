@@ -13,6 +13,24 @@ Key fixes:
 
 Gates, per commit in an isolated worktree: lib 3428/0, Edge `_shared` 85/0; tsc, lint with zero warnings and diff-check all exit 0; P4 PG15 suite exit 0. The local Supabase stack (colima) applies 64/65 migrations from scratch. The pre-existing `remote_schema` "chats already exists" failure needs a decision. Curl receipts on all 5 changed functions are as expected. The simulator is BLOCKED (no Xcode). Open: F6 LOW, two non-blocking QUALITY residuals, D08 choices and the production rollout. No push, deploy or remote command. [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
 
+## C1 scoped coaching context: SPEC PASS after repair; disclosure carriage flagged off (D09)
+
+Unflagged, from now on:
+- The coach sends only the current session's Q&A, never the all-time archive.
+- The coach Edge function validates and bounds client history (10 entries × 5000 chars, numbers already in the code).
+
+Behind `COACHING_POLICY.contextualDisclosures` (default false):
+- Literal pain and effort disclosures from rows, coach questions and composer messages.
+- Disclosures are append-only per session and survive later edits or deletes.
+- The preceding composer clarification exchange is included.
+- All of it is sent as labelled context blocks, never as chat turns, and parse mode never re-emits rows.
+- Historical notes carry a date and the label "historical, not current".
+- Truncation is explicit through `omittedCount`.
+
+The first SPEC review FAILED: the composer route was still broken with the flag on, disclosures were recomputed rather than retained, scope fields were missing, and the client didn't mirror the caps. All four were repaired with RED-first tests, then SPEC PASS.
+
+Receipts: lib 3464/0, edge 121/0, tsc 0. ck-p5 smoke 6/6: with the flag off, hostile history is handled exactly like a clean request and provider failures are sanitized. No precedence, TTL or retention invented. [Evidence](docs/plans/in-session-reliability/evidence/c1-coaching-context-local.md).
+
 ## H1 history baseline: SPEC PASS / QUALITY APPROVED; progression stays disabled (D07)
 
 Repaired:

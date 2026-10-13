@@ -67,6 +67,8 @@ import { serializeWorkoutRows } from '@/lib/workoutSerialization';
 import { numericText, validateWorkoutRow } from '@/lib/workoutValidation';
 import { createSubmitGuard } from '@/lib/submitGuard';
 import { sessionOperations } from '@/lib/sessionOperationDelivery';
+import { buildCoachingContext, coachingRecordFor, observeCoaching, type CoachingRecord } from '@/lib/coachingContext';
+import { COACHING_POLICY } from '@/lib/coachingPolicy';
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
@@ -195,6 +197,9 @@ export default function HomeScreen() {
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachAnswer, setCoachAnswer] = useState<string | null>(null);
   const [coachError, setCoachError] = useState<string | null>(null);
+  // Current-session coach Q/A and (flag-gated) append-only disclosures, keyed by session
+  // owner. The cross-session archive is display-only.
+  const coachingRecordRef = useRef<CoachingRecord | null>(null);
   const [nameModalVisible, setNameModalVisible] = useState(false);
   const [editSetModalVisible, setEditSetModalVisible] = useState(false);
   const [targetRowId, setTargetRowId] = useState<string | null>(null);
@@ -547,7 +552,7 @@ export default function HomeScreen() {
     setCoachOpen(false);
   }, []);
 
-  const submitCoachQuestion = async (chatHistory?: { role: string; content: string }[]) => {
+  const submitCoachQuestion = async () => {
     const q = coachQuestion.trim();
     if (!canUseSession() || !q || coachLoading || ownership.busy || !ownership.isSession(renderOwner)) return;
     const request = ownership.beginRequest('coach');
@@ -562,20 +567,22 @@ export default function HomeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    // Build recent conversation context (last 10 messages for token efficiency)
-    const recentHistory = (chatHistory || [])
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .slice(-10)
-      .map(m => ({ role: m.role, content: m.content }));
+    // Only this session's Q/A plus the current question (last 10 for token efficiency).
+    const coaching = coachingRecordFor(coachingRecordRef, renderOwner.owner);
+    const sessionTurns = coaching.turns;
+    const history = [...sessionTurns, { role: 'user' as const, content: q }];
+    observeCoaching(COACHING_POLICY, coaching, workoutId, rows, [{ source: 'coach_question', text: q }]);
 
     try {
       // Stream the response
       const res = await api.askCoach(q, toApiRows(rows), (chunk) => {
         if (ownsRequest()) setCoachAnswer((prev) => (prev || "") + chunk);
-      }, recentHistory);
+      }, history.slice(-10), buildCoachingContext(COACHING_POLICY, workoutId, coaching));
       if (!ownsRequest()) return;
-      const answerText = res.answer?.trim() || "Coach had no response.";
+      const answer = res.answer?.trim();
+      const answerText = answer || "Coach had no response.";
       setCoachAnswer(answerText);
+      sessionTurns.push({ role: 'user', content: q }, ...(answer ? [{ role: 'assistant' as const, content: answer }] : []));
 
       // Save to Supabase chat history
       saveCoachChatQA(q, answerText, Date.now()).catch(err =>
@@ -754,6 +761,12 @@ export default function HomeScreen() {
     setAiBubbleText(null); setCoachAnswer(null); setCoachError(null);
     setCoachOpen(false); setRestPrompt(null);
   }, [ownership, setRows]);
+
+  // Observe disclosures as rows change so a later edit/delete cannot erase them (flag-gated).
+  useEffect(() => {
+    if (!COACHING_POLICY.contextualDisclosures) return;
+    observeCoaching(COACHING_POLICY, coachingRecordFor(coachingRecordRef, sessionOwnerKey), workoutId, rows, []);
+  }, [rows, sessionOwnerKey, workoutId]);
 
   const presentationOwnerRef = useRef(sessionOwnerKey);
   // Session ownership: presentation reset
@@ -1413,10 +1426,15 @@ export default function HomeScreen() {
 
       try {
         const lastExercise = getLastExerciseFromRows(currentRows);
-        const res = await api.chat(message, toApiRows(currentRows), lastExercise);
+        const coaching = coachingRecordFor(coachingRecordRef, renderOwner.owner);
+        observeCoaching(COACHING_POLICY, coaching, workoutId, currentRows, [{ source: 'composer_message', text: message }]);
+        const res = await api.chat(message, toApiRows(currentRows), lastExercise, buildCoachingContext(COACHING_POLICY, workoutId, coaching));
         if (!ownsRequest()) return;
         if (ghostId && !draftRowsRef.current.some(r => r.id === ghostId && r.status === 'syncing')) return;
 
+        // The latest answered exchange (e.g. a clarifying question) travels as labeled context;
+        // a parse-mode reply ends it so a stale exchange is never resent.
+        if (COACHING_POLICY.contextualDisclosures) coaching.exchange = res.answer ? { question: message, answer: res.answer } : undefined;
         if (res.answer) {
           // AI answered a question or couldn't parse — show the response bubble
           setAiBubbleText(res.answer);

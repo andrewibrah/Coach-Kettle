@@ -6,6 +6,8 @@ import { performedRows, isPendingSet, isPerformedRow, resolveEditedPerformance }
 import { numericValue, numericText, validateWorkoutRow } from '../workoutValidation.ts';
 import { createSessionOwnership, settleOptionalReview } from '../sessionOwnership.ts';
 import { createSubmitGuard } from '../submitGuard.ts';
+import { buildCoachingContext, coachingRecordFor, observeCoaching } from '../coachingContext.ts';
+import { COACHING_POLICY } from '../coachingPolicy.ts';
 const { serializeWorkoutRows } = sourceModule('lib/workoutSerialization.ts', { './performedSets': { performedRows } });
 
 export function sourceModule(path: string, dependencies: Record<string, any> = {}) {
@@ -32,6 +34,12 @@ export function sourceClosure(name: string, context: Record<string, any>) {
   // Retained fixtures double only the durable IO boundary; dedicated P4 tests
   // execute the real ledger/transport. Preserve their original effect captures.
   context.queueAbandon ??= async () => {};
+  // C1 session coaching record: real helpers, shipped (default-off) policy.
+  context.coachingRecordRef ??= { current: null };
+  context.COACHING_POLICY ??= COACHING_POLICY;
+  context.buildCoachingContext ??= buildCoachingContext;
+  context.coachingRecordFor ??= coachingRecordFor;
+  context.observeCoaching ??= observeCoaching;
   context.queueLiveRows ??= async (rows: any[], operation = 'put') => {
     for (const row of rows) {
       const receipt = await context.api?.logSet?.({ ...row, sessionId:context.workoutId,

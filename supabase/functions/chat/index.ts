@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { gateAiRequest } from "../_shared/entitlements.ts";
+import { COACHING_POLICY, disclosureBlock, readCoachingContext } from "../_shared/coachingPolicy.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -24,6 +25,7 @@ interface ChatRequest {
     message: string;
     rows: WorkoutRow[];
     lastExercise?: string;
+    context?: unknown;
 }
 
 interface ChatResponse {
@@ -92,6 +94,14 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Invalid set values in context." }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    // Ignored entirely while the D09 policy flag is off.
+    const coachingContext = COACHING_POLICY.contextualDisclosures && payload.context !== undefined
+        ? readCoachingContext(payload.context) : undefined;
+    if (coachingContext === null) {
+        return new Response(JSON.stringify({ error: "Invalid coaching context." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const disclosures = coachingContext ? disclosureBlock(coachingContext) : null;
 
     // JWT verification
     const authHeader = req.headers.get("Authorization");
@@ -148,6 +158,8 @@ serve(async (req) => {
                 model: "gpt-4o-mini",
                 messages: [
                     { role: "system", content: SYSTEM_PROMPT },
+                    // Separate from existing_rows so disclosures are never parsed as sets.
+                    ...(disclosures ? [{ role: "system", content: disclosures }] : []),
                     { role: "user", content: JSON.stringify(context) },
                 ],
                 response_format: { type: "json_object" },

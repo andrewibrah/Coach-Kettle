@@ -1,6 +1,7 @@
 import { isPerformedRow } from './performedSets';
 import { supabaseUrl } from './supabase';
 import type { LogRow } from '../types/workout';
+import type { CoachingContext } from './coachingContext';
 import { fetchWithAuth } from './auth';
 import { fetchProfile, UserProfile } from './profile';
 import { parseFeatureGateError } from './entitlements';
@@ -158,13 +159,15 @@ export class DeleteAccountError extends Error {
 }
 
 export const api = {
-    chat: async (message: string, rows: ApiWorkoutRow[], lastExercise?: string) => {
+    // `context` is supplied only while COACHING_POLICY.contextualDisclosures is on.
+    chat: async (message: string, rows: ApiWorkoutRow[], lastExercise?: string, context?: CoachingContext) => {
         const res = await fetchWithAuth(`${API_BASE}/chat`, {
             method: 'POST',
             body: JSON.stringify({
                 message,
                 rows,
                 ...(lastExercise ? { lastExercise } : {}),
+                ...(context ? { context } : {}),
             }),
         });
         
@@ -183,7 +186,8 @@ export const api = {
         question: string,
         rows: ApiWorkoutRow[],
         onChunk?: (chunk: string) => void,
-        chatHistory?: { role: string; content: string }[]
+        chatHistory?: { role: string; content: string }[],
+        context?: CoachingContext
     ) => {
         // Profile context is now fetched server-side by the coach edge function
         const res = await fetchWithAuth(`${API_BASE}/coach`, {
@@ -192,6 +196,7 @@ export const api = {
                 question,
                 rows,
                 ...(chatHistory && chatHistory.length > 0 ? { chatHistory } : {}),
+                ...(context ? { context } : {}),
             }),
         });
 

@@ -213,8 +213,9 @@
         "I2",
         "P2"
       ],
-      "status": "planned",
-      "classification": "executed follow-up context loss; source-verified scope gaps",
+      "status": "done_local_policy_blocked",
+      "classification": "context loss repaired; durable disclosure carriage built behind COACHING_POLICY.contextualDisclosures=false pending D09 (Q5-Q7)",
+      "latest_gate": "2026-10-13: unflagged: coach sends only current-session Q/A (no cross-session archive); server validates/bounds history (10 x 5000, existing numbers). Flagged off: append-only per-session disclosures from rows, coach and composer (survive edit/delete), preceding composer exchange, labeled context blocks (never turns, never re-emitted rows), dated historical notes, explicit omittedCount. RED->GREEN coachingContext 16/0, chat+coach 17/0; lib 3464/0, edge 121/0, tsc 0; ck-p5 serve smoke 6/6 (flag-off sanitized, bounded). SPEC FAIL (composer path, retention, scope, caps) -> repaired -> SPEC PASS. Evidence: evidence/c1-coaching-context-local.md.",
       "decision_ids": [
         "D09"
       ],

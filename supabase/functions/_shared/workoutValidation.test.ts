@@ -204,6 +204,7 @@ async function edgeRaw(name: string, body: any, ai?: any, authorized = true, pro
     'https://esm.sh/@supabase/supabase-js@2.50.1': { createClient: () => client },
     '../_shared/liftMatching.ts': lift, '../_shared/workoutValidation.ts': contract,
     '../_shared/operationErrors.ts': operationErrors,
+    '../_shared/coachingPolicy.ts': sourceModule('supabase/functions/_shared/coachingPolicy.ts'),
     './baseline.ts': sourceModule('supabase/functions/next-set/baseline.ts'),
     '../_shared/entitlements.ts': { gateAiRequest: async () => { gateCalls++; return { allowed: true }; } },
   };

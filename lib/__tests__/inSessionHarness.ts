@@ -9,6 +9,8 @@ import { createSessionOwnership } from '../sessionOwnership.ts';
 import { createSubmitGuard } from '../submitGuard.ts';
 import { performedRows, isPendingSet, resolveEditedPerformance } from '../performedSets.ts';
 import { sourceModule, sourceClosure } from './workoutIdentityHarness.ts';
+import { buildCoachingContext, coachingRecordFor, observeCoaching } from '../coachingContext.ts';
+import { COACHING_POLICY } from '../coachingPolicy.ts';
 
 const rules = sourceModule('lib/workoutRules.ts');
 const buildRowsFromApi = sourceClosure('buildRowsFromApi', {});
@@ -76,6 +78,8 @@ export async function runWorkoutRoute(input: string, initialRows: any[] = [], ch
     toApiRows,
     buildRowsFromApi: (r: any[]) => { calls.push({ method: 'buildRowsFromApi' }); return buildRowsFromApi(r); },
     console: { warn: diagnostic('warning'), error: diagnostic('error') },
+    // C1: real helpers, shipped (default-off) policy, empty session coaching record.
+    coachingRecordRef: { current: null }, COACHING_POLICY, buildCoachingContext, coachingRecordFor, observeCoaching,
     ...overrides,
   });
   assert.ok(exports.send);
