@@ -7,10 +7,10 @@ import vm from 'node:vm';
 import * as validation from '../../lib/workoutValidation.ts';
 import { isPerformedRow } from '../../lib/performedSets.ts';
 const base = process.env.P4_FIXTURE!;
-assert.ok(base.startsWith('/Users/me/.hermes/profiles/telegramlite/cache/scratch/p4-pg-'));
+assert.ok(process.env.P4_SCRATCH && base.startsWith(`${process.env.P4_SCRATCH}/p4-pg-`), 'only the disposable cluster created by p4_session_sql.py');
 assert.equal(realpathSync(base),base);
 assert.equal(readFileSync(`${base}/data/PG_VERSION`,'utf8').trim(),'15');
-const sql = (text: string) => execFileSync('/opt/homebrew/opt/postgresql@15/bin/psql', ['-h',`${base}/socket`,'-p','55484','-d','postgres','-At','-v','ON_ERROR_STOP=1'], {input:text,encoding:'utf8'}).trim();
+const sql = (text: string) => execFileSync('/opt/homebrew/opt/postgresql@15/bin/psql', ['-h',`${base}/socket`,'-p','55484','-d','postgres','-At','-v','ON_ERROR_STOP=1','-v','VERBOSITY=verbose'], {input:text,encoding:'utf8',stdio:['pipe','pipe','pipe']}).trim();
 assert.equal(sql('SHOW listen_addresses;'),'');
 function module(path: string, dependencies: any) {
   const exports: any = {};
@@ -31,7 +31,11 @@ const client = {
     try {
       const result=sql(`SET ROLE authenticated; SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000001'; SELECT public.apply_workout_operation(${q(args.p_session_id)},${q(args.p_operation_key)},${args.p_revision},${q(args.p_kind)},${q(args.p_row_id)},${q(JSON.stringify(args.p_payload))}::jsonb);`);
       return {data:JSON.parse(result.split('\n').at(-1)!),error:null};
-    } catch { return {data:null,error:{message:'real SQL rejection'}}; }
+    } catch (error:any) {
+      // Pass the real SQLSTATE through, as PostgREST does (psql VERBOSITY verbose: "ERROR:  P0001: msg").
+      const match=/ERROR:\s+([0-9A-Z]{5}):\s+([^\n]*)/.exec(String(error?.stderr ?? ''));
+      return {data:null,error:match?{code:match[1],message:match[2]}:{message:'real SQL rejection'}};
+    }
   },
   from:(table:string)=>{
     assert.equal(table,'pr_tracked_lifts');
@@ -44,6 +48,7 @@ for(const name of ['log-set','history']) module(`supabase/functions/${name}/inde
   'https://deno.land/std@0.168.0/http/server.ts':{serve:(fn:any)=>handlers[name]=fn},
   'https://esm.sh/@supabase/supabase-js@2.50.1':{createClient:()=>client},
   '../_shared/liftMatching.ts':lift,'../_shared/workoutValidation.ts':validation,
+  '../_shared/operationErrors.ts':module('supabase/functions/_shared/operationErrors.ts',{}),
 });
 let loseDeleteAck=false;
 let committedDeleteReceipt:any;
@@ -200,7 +205,7 @@ for(const [index,[name,input,patch]] of tamperCases.entries()) {
     if(existing) await api.saveWorkout(snapshot);
     const before=effects(sid);
     corruptProjection=payload=>Object.assign(payload.logRows[0],patch);
-    try { await assert.rejects(api.saveWorkout({...snapshot,revision:2,operationKey:'bad:2'}),/500/); }
+    try { await assert.rejects(api.saveWorkout({...snapshot,revision:2,operationKey:'bad:2'}),/409/); }
     finally { corruptProjection=undefined; }
     assert.equal(effects(sid),before,`${name}: all persistence surfaces unchanged (${existing})`);
     projectionNoEffects++;
@@ -331,7 +336,7 @@ for(const [name,value,normalized] of [
   if(existing) await api.saveWorkout(snapshot);
   const before=effects(sid);
   corruptProjection=payload=>payload.logRows[0].weightLbs=normalized;
-  try { await assert.rejects(api.saveWorkout({...snapshot,revision:2,operationKey:'tamper:2'}),/500/); }
+  try { await assert.rejects(api.saveWorkout({...snapshot,revision:2,operationKey:'tamper:2'}),/409/); }
   finally { corruptProjection=undefined; }
   assert.equal(effects(sid),before);
   rawNormalizationNoEffects++;

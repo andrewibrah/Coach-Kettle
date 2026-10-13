@@ -161,3 +161,39 @@ test('actual performed-to-incomplete edit retracts evidence without terminally d
   await Promise.resolve();assert.equal(ops.length,1);assert.equal(ops[0].op,'revise');assert.equal(ops[0].r[0].id,'r');
 });
 
+test('account-deletion purge removes only the deleted owner pending, seen and abandoned entries',async()=>{
+  const f=fixture(); const box=f.create();
+  await box.rows('a','sa','2026-10-08',[row]); await box.rows('b','sb','2026-10-08',[row]);
+  await box.abandon('a','sa-old','2026-10-08'); await box.abandon('b','sb-old','2026-10-08');
+  await box.purge('a');
+  const state=JSON.parse(f.raw()!);
+  assert.deepEqual(state.pending.map((op:any)=>op.owner).filter((o:string)=>o==='a'),[]);
+  assert.ok(state.pending.some((op:any)=>op.owner==='b'));
+  assert.deepEqual(Object.keys(state.seen).filter(k=>JSON.parse(k)[0]==='a'),[]);
+  assert.ok(Object.keys(state.seen).some(k=>JSON.parse(k)[0]==='b'));
+  assert.deepEqual(state.abandoned.filter((k:string)=>JSON.parse(k)[0]==='a'),[]);
+  assert.deepEqual(state.abandoned,[JSON.stringify(['b','sb-old',''])]);
+  f.send(async(op:any)=>{f.calls.push(op);return {ok:true};});
+  assert.equal(await f.create().flush('a'),0);
+  assert.ok(f.calls.every((op:any)=>op.owner!=='a'));
+});
+test('terminal server rejection leaves the queue; transient failure keeps the exact identity',async()=>{
+  const f=fixture(); const box=f.create();
+  await box.rows('u','s','2026-10-08',[row]); await box.rows('u','s2','2026-10-08',[row]);
+  f.send(async(op:any)=>{f.calls.push(op); return op.sessionId==='s' ? {ok:false,terminal:true,code:'legacy_session'} : null;});
+  let receipts=0;
+  await box.flush('u',()=>{receipts++;});
+  assert.equal(receipts,0);
+  const pending=JSON.parse(f.raw()!).pending;
+  assert.deepEqual(pending.map((op:any)=>op.sessionId),['s2']);
+  const before=f.calls.length; await box.flush('u');
+  assert.deepEqual(f.calls.slice(before).map((op:any)=>op.sessionId),['s2']);
+});
+test('operation HTTP classification: 403/409 terminal, 5xx/429/network transient, 2xx receipt',()=>{
+  const { classifyOperationResponse: raw }=sourceModule('lib/sessionOperationOutbox.ts');
+  const classifyOperationResponse=(status:number,body:unknown)=>JSON.parse(JSON.stringify(raw(status,body)));
+  assert.deepEqual(classifyOperationResponse(409,{error:'x',code:'legacy_session'}),{ok:false,terminal:true,code:'legacy_session'});
+  assert.deepEqual(classifyOperationResponse(403,{error:'x',code:'forbidden'}),{ok:false,terminal:true,code:'forbidden'});
+  for (const status of [500,502,503,429,401]) assert.equal(classifyOperationResponse(status,{error:'x'}),null,String(status));
+  assert.deepEqual(classifyOperationResponse(200,{ok:true,pr:null}),{ok:true,pr:null});
+});

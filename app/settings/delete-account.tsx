@@ -23,6 +23,7 @@ import { api } from '@/lib/api';
 import { useIAP } from '@/lib/iap';
 import { cancelAllLocal } from '@/lib/notifications';
 import { reauthenticate, restoreSession, signOutLocal } from '@/lib/reauth';
+import { sessionOperations } from '@/lib/sessionOperationDelivery';
 import { clearWorkoutDraft } from '@/lib/workoutDraft';
 
 const DELETED_ITEMS = [
@@ -83,6 +84,7 @@ export default function DeleteAccountScreen() {
         restoreSession: () => restoreSession(previous),
         deleteAccount: (options) => api.deleteAccount(options),
         clearLocalDraft: () => clearWorkoutDraft(session.user.id),
+        clearLocalOperations: () => sessionOperations.purge(session.user.id),
         cancelLocalNotifications: cancelAllLocal,
         signOut,
         signOutLocal,

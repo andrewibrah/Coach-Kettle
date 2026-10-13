@@ -7,6 +7,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { resolveTrackedLift } from "../_shared/liftMatching.ts";
 import { numericText, validateWorkoutRow } from '../_shared/workoutValidation.ts';
+import { operationRejection } from '../_shared/operationErrors.ts';
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -151,6 +152,12 @@ serve(async (req) => {
         });
         // PR precheck is not an acknowledgement. Only the committed RPC can acknowledge.
         pr = receipt?.pr ?? null;
+        const rejection = operationRejection(error);
+        if (rejection) {
+            console.warn(`[log-set] operation rejected: ${rejection.body.code}`);
+            return new Response(JSON.stringify(rejection.body),
+                { status: rejection.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
         if (!error && receipt?.ok !== true) throw new Error('Missing committed operation receipt');
         if (error) {
             console.error("[log-set] DB insert error:", error);

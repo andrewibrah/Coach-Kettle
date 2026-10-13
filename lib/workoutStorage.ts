@@ -66,6 +66,8 @@ export type WorkoutSession = {
   media?: WorkoutMediaRecord[];
   /** True while the workout exists locally but hasn't reached Supabase. */
   pendingSync?: boolean;
+  /** Server permanently rejected this revision (403/409 code); kept locally, not retried. */
+  syncBlocked?: string;
   /** How this session was started (#1). Omitted = freestyle. */
   source?: WorkoutSource;
 };
@@ -104,7 +106,7 @@ function withHistory<T>(fn: (existing: WorkoutSession[], write: HistoryWrite) =>
 }
 
 /** Patch the stored session only if it still holds `revision`; never re-inserts a deleted one. */
-function patchRevision(id: string, revision: number | undefined, patch: Partial<Pick<WorkoutSession, 'review' | 'pendingSync'>>, isCurrent = () => true) {
+function patchRevision(id: string, revision: number | undefined, patch: Partial<Pick<WorkoutSession, 'review' | 'pendingSync' | 'syncBlocked'>>, isCurrent = () => true) {
   return withHistory(async (existing, write) => {
     if (!isCurrent()) return false;
     const index = existing.findIndex((w) => w.id === id && w.revision === revision);
@@ -162,19 +164,60 @@ export async function saveWorkout(session: WorkoutSession, options?: { review?: 
   }
 }
 
+/**
+ * The stable code of a deterministic server rejection thrown by api.saveWorkout /
+ * api.deleteWorkout ("Failed to ... workout: <status> - <body>"), or null when retrying can help.
+ * 403/409 are SQL rejections; 400 is Edge pre-validation of this exact payload (e.g. a pre-P4
+ * row without an id), which no retry can change. 401/5xx/network stay retryable.
+ */
+export function terminalRejectionCode(error: unknown): string | null {
+  const match = /^Failed to (?:save|delete) workout: (400|403|409) - ([\s\S]*)$/.exec(String((error as { message?: unknown } | null)?.message ?? ''));
+  if (!match) return null;
+  const fallback = match[1] === '400' ? 'invalid_session' : 'rejected';
+  try {
+    const code = JSON.parse(match[2])?.code;
+    return typeof code === 'string' ? code : fallback;
+  } catch { return fallback; }
+}
+
+/** User-facing History delete failure: terminal rejections are explained, not "try again". */
+export function deleteFailureMessage(error: unknown): string {
+  const code = terminalRejectionCode(error);
+  if (code === 'legacy_session') return 'This workout was saved before sync updates and can no longer be changed or deleted.';
+  // No server session yet (never synced): deletable once it syncs.
+  if (code === 'forbidden') return "This workout hasn't synced yet. Try deleting it again after it syncs.";
+  if (code) return 'This workout can no longer be deleted.';
+  return 'Failed to delete workout. Please try again.';
+}
+
 /** Retry any locally-saved workouts that never reached Supabase. */
 export async function syncPendingWorkouts(): Promise<number> {
-  const existing = await listWorkouts();
-  const pending = existing.filter((w) => w.pendingSync);
+  // Pre-P4 pending sessions carry no transport identity. Assign one inside the queued,
+  // generation-fenced write so it is durable before any request and reused on every retry.
+  const pending = await withHistory(async (existing, write) => {
+    let assigned = false;
+    const next = existing.map((w) => {
+      if (!w.pendingSync || w.syncBlocked || (w.operationKey && w.revision)) return w;
+      assigned = true;
+      const revision = Math.max(Date.now(), (w.revision ?? 0) + 1);
+      return { ...w, revision, operationKey: `finalize:${w.id}:${revision}` };
+    });
+    if (assigned) await write(next);
+    return next.filter((w) => w.pendingSync && !w.syncBlocked);
+  });
   let synced = 0;
   for (const session of pending) {
     try {
-      const { pendingSync: _p, media: _m, ...payload } = session;
+      const { pendingSync: _p, media: _m, syncBlocked: _b, ...payload } = session;
       await api.saveWorkout(payload);
       await patchRevision(session.id, session.revision, { pendingSync: false });
       synced += 1;
-    } catch {
-      // Still offline — retry on next call.
+    } catch (error) {
+      // A deterministic rejection (e.g. a legacy server ID) can never succeed: keep the local
+      // copy pending (so a server refresh cannot replace it) and stop retrying it.
+      const code = terminalRejectionCode(error);
+      if (code) await patchRevision(session.id, session.revision, { syncBlocked: code });
+      // Otherwise still offline — retry on next call with the same identity.
     }
   }
   return synced;

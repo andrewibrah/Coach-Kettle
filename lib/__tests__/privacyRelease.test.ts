@@ -215,6 +215,7 @@ function deletionDeps(overrides: Record<string, any> = {}) {
     restoreSession: async () => { calls.push('restore'); },
     deleteAccount: async (opts: any) => { calls.push(`delete:${JSON.stringify(opts)}`); return { ok: true }; },
     clearLocalDraft: async () => { calls.push('clearDraft'); },
+    clearLocalOperations: async () => { calls.push('clearOps'); },
     cancelLocalNotifications: async () => { calls.push('cancelAllLocal'); },
     signOut: async () => { calls.push('signOut'); },
     signOutLocal: async () => { calls.push('signOutLocal'); },
@@ -227,7 +228,7 @@ test('success: re-auth, delete with the Apple code, clear the saved workout, the
   const { deps, calls } = deletionDeps();
   assert.deepEqual(await accountDeletion.runAccountDeletion(deps), { ok: true });
   // The draft clear is owner-checked, so it runs first, while the deleted user's session is still live.
-  assert.deepEqual(calls, ['reauth', 'delete:{"appleAuthorizationCode":"apple-code"}', 'clearDraft', 'cancelAllLocal', 'signOut', 'signOutLocal']);
+  assert.deepEqual(calls, ['reauth', 'delete:{"appleAuthorizationCode":"apple-code"}', 'clearDraft', 'clearOps', 'cancelAllLocal', 'signOut', 'signOutLocal']);
   // signOut is AuthProvider.signOut: it fences the draft, then runs clearAllCaches() before touching Supabase.
   assert.match(read('contexts/AuthProvider.tsx'), /const signOut = async \(\) => \{\s*(?:\/\/[^\n]*\n\s*)*fenceWorkoutDraft\(\);\s*try \{\s*\/\/[^\n]*\n\s*await clearAllCaches\(\);/);
 });
@@ -246,7 +247,7 @@ test('success: a throwing draft clear does not stop notification cleanup or sign
     clearLocalDraft: async () => { calls.push('clearDraft'); throw new Error('Workout draft could not be cleared.'); },
   });
   assert.deepEqual(await accountDeletion.runAccountDeletion(deps), { ok: true });
-  assert.deepEqual(calls.slice(2), ['clearDraft', 'cancelAllLocal', 'signOut', 'signOutLocal']);
+  assert.deepEqual(calls.slice(2), ['clearDraft', 'clearOps', 'cancelAllLocal', 'signOut', 'signOutLocal']);
 });
 
 test('cancelled or failed re-auth never calls deleteAccount and never signs out', async () => {
@@ -436,6 +437,7 @@ function renderDeleteScreen(opts: { provider?: string; reauthResult?: any; delet
     '@/lib/iap': { useIAP: () => ({ presentCustomerCenter: async () => { calls.push(['customerCenter']); } }) },
     '@/lib/api': { api: { deleteAccount: async (o: any) => { calls.push(['deleteAccount', o]); if (opts.deleteError) throw opts.deleteError; return { ok: true }; } } },
     '@/lib/notifications': { cancelAllLocal: async () => { calls.push(['cancelAllLocal']); } },
+    '@/lib/sessionOperationDelivery': { sessionOperations: { purge: async (owner: string) => { calls.push(['clearOps', owner]); } } },
     '@/lib/workoutDraft': { clearWorkoutDraft: (...args: any[]) => { calls.push(['clearDraft', ...args]); return workoutDraft.clearWorkoutDraft(...args); } },
     '@/lib/accountDeletion': accountDeletion,
     '@/lib/reauth': {
@@ -492,6 +494,7 @@ test('password user: button disabled until DELETE and a password are entered; su
     ['reauth', 'password', { email: 'a@b.c', password: 'pw' }],
     ['deleteAccount', {}],
     ['clearDraft', 'user-1'],
+    ['clearOps', 'user-1'],
     ['cancelAllLocal'],
     ['signOut'],
     ['signOutLocal'],
@@ -542,7 +545,7 @@ test('after a confirmed deletion the deleted user\'s saved workout is removed fr
   find(render(), 'Type DELETE to confirm').props.onChangeText('DELETE');
   await find(render(), 'Delete account permanently').props.onPress();
   assert.equal(storage.has('workout_draft_v1'), false);
-  assert.deepEqual(plain(calls.map(([name]: any[]) => name)), ['reauth', 'deleteAccount', 'clearDraft', 'cancelAllLocal', 'signOut', 'signOutLocal', 'replace']);
+  assert.deepEqual(plain(calls.map(([name]: any[]) => name)), ['reauth', 'deleteAccount', 'clearDraft', 'clearOps', 'cancelAllLocal', 'signOut', 'signOutLocal', 'replace']);
 });
 
 test('a saved workout owned by another account (or no owner) is never removed, and sign-out still happens', async () => {
@@ -571,7 +574,7 @@ test('the saved workout is kept when deletion does not happen (re-auth cancelled
     find(render(), 'Type DELETE to confirm').props.onChangeText('DELETE');
     await find(render(), 'Delete account permanently').props.onPress();
     assert.equal(storage.get('workout_draft_v1'), draft, JSON.stringify(opts));
-    assert.equal(calls.some(([name]: any[]) => name === 'clearDraft'), false, JSON.stringify(opts));
+    assert.equal(calls.some(([name]: any[]) => name === 'clearDraft' || name === 'clearOps'), false, JSON.stringify(opts));
   }
 });
 

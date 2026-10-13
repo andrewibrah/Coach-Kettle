@@ -11,8 +11,18 @@ type State = { version: 1; sequence: number; pending: SessionOperation[]; seen: 
 type Dependencies = {
   read: () => Promise<string | null>;
   write: (value: string) => Promise<void>;
-  send: (operation: SessionOperation) => Promise<{ ok?: boolean; pr?: LogSetPR | null } | null>;
+  send: (operation: SessionOperation) => Promise<OperationReceipt | null>;
 };
+type OperationReceipt = { ok?: boolean; pr?: LogSetPR | null; terminal?: boolean; code?: string };
+/** 403/409 are deterministic server rejections (retrying cannot succeed); anything else non-2xx is transient. */
+export function classifyOperationResponse(status: number, body: unknown): OperationReceipt | null {
+  if (status >= 200 && status < 300) return body as OperationReceipt;
+  if (status === 403 || status === 409) {
+    const code = (body as { code?: unknown } | null)?.code;
+    return { ok: false, terminal: true, code: typeof code === 'string' ? code : 'rejected' };
+  }
+  return null;
+}
 /** One serialized local ledger; HTTP never holds the storage lock. */
 export function createSessionOperationOutbox(deps: Dependencies) {
   let queue: Promise<unknown> = Promise.resolve();
@@ -57,6 +67,15 @@ export function createSessionOperationOutbox(deps: Dependencies) {
       if (!current.pending.some(item => item.owner===owner && item.payload.operationKey===op.payload.operationKey && item.sessionId===op.sessionId)) continue;
       try {
         const receipt = await deps.send(op);
+        if (receipt?.terminal === true) {
+          // Deterministic rejection: stop retrying this exact operation; local data is untouched.
+          await enqueue(async () => {
+            const latest = await read();
+            latest.pending = latest.pending.filter(item => !(item.owner===owner && item.sessionId===op.sessionId && item.payload.operationKey===op.payload.operationKey));
+            await deps.write(JSON.stringify(latest));
+          });
+          continue;
+        }
         if (receipt?.ok !== true) continue;
         const wasCurrent = await enqueue(async () => {
           const latest = await read();
@@ -91,5 +110,15 @@ export function createSessionOperationOutbox(deps: Dependencies) {
     } });
     await deps.write(JSON.stringify(state));
   });
-  return { rows, flush, abandon };
+  /** Account deletion: drop every ledger entry of that owner; other accounts are untouched. */
+  const purge = (owner: string) => enqueue(async () => {
+    if (!owner) throw new Error('Session operation owner required');
+    const state = await read();
+    const ownedBy = (key: string) => { try { return JSON.parse(key)[0] === owner; } catch { return false; } };
+    state.pending = state.pending.filter(op => op.owner !== owner);
+    state.seen = Object.fromEntries(Object.entries(state.seen).filter(([key]) => !ownedBy(key)));
+    state.abandoned = state.abandoned.filter(key => !ownedBy(key));
+    await deps.write(JSON.stringify(state));
+  });
+  return { rows, flush, abandon, purge };
 }

@@ -50,6 +50,7 @@ function historyEdge(failure: { stage?: 'delete' | 'insert' | 'pr' } = {}) {
     'https://esm.sh/@supabase/supabase-js@2.50.1': { createClient: () => client },
     '../_shared/liftMatching.ts': { resolveTrackedLift: () => null },
     '../_shared/workoutValidation.ts': { numericText, validateWorkoutRow },
+    '../_shared/operationErrors.ts': sourceModule('supabase/functions/_shared/operationErrors.ts'),
   };
   const source = readFileSync(new URL('../../supabase/functions/history/index.ts', import.meta.url), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {

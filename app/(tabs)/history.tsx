@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/useToast";
 import { api } from "@/lib/api";
 import {
   deleteWorkout as deleteWorkoutLocal,
+  deleteFailureMessage,
   listWorkouts as listLocalWorkouts,
   mergeServerHistory,
   syncPendingWorkouts,
@@ -133,7 +134,7 @@ export default function HistoryScreen() {
     } catch (e) {
       console.warn('[history] delete failed', e);
       setItems(previousItems);
-      showToast('Failed to delete workout. Please try again.', 'error');
+      showToast(deleteFailureMessage(e), 'error');
     }
   };
 

@@ -2,10 +2,11 @@
 Fixture uses legacy numeric/PR fixture + actual workouts initial/RLS columns.
 Not a full migration-chain/auth.users/RLS deployment proof.
 """
-import json, os, pathlib, subprocess, time, uuid
+import json, os, pathlib, subprocess, tempfile, time, uuid
 os.environ['LC_ALL'] = 'C'
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SCRATCH = pathlib.Path('/Users/me/.hermes/profiles/telegramlite/cache/scratch')
+# Short default path: the unix socket path must stay under the 103-byte limit.
+SCRATCH = pathlib.Path(os.environ.get('P4_SCRATCH') or tempfile.mkdtemp(prefix='p4s', dir='/tmp')).resolve()
 BIN = pathlib.Path('/opt/homebrew/opt/postgresql@15/bin')
 BASE = SCRATCH / ('p4-pg-' + uuid.uuid4().hex[:10])
 DATA, SOCKET = BASE / 'data', BASE / 'socket'
@@ -60,7 +61,7 @@ try:
         assert sql("SELECT json_build_array(weight_lbs,reps,notes,set_number)::text FROM workout_log WHERE workout_id='pre-p4-raw';")==legacy_before
         assert sql("SELECT reason FROM i3_workout_numeric_quarantine WHERE workout_id='pre-p4-raw';")=='unknown_or_invalid_load'
     # Actual API/Edge success is derived from this cluster's RPC and readback.
-    subprocess.run(['node','--experimental-strip-types','supabase/tests/p4_edge_sql.mts'], cwd=ROOT, env=dict(os.environ,P4_FIXTURE=str(BASE)),check=True)
+    subprocess.run(['node','--experimental-strip-types','supabase/tests/p4_edge_sql.mts'], cwd=ROOT, env=dict(os.environ,P4_FIXTURE=str(BASE),P4_SCRATCH=str(SCRATCH)),check=True)
     # Direct authenticated RPC must validate before creating any session or evidence.
     invalid_rows = [dict(row, performance='unknown-enum'), dict(row, weightLbs='NaN'),
         None, [], dict(row, exercise=[]), dict(row, exercise=' '), dict(row, id=1),

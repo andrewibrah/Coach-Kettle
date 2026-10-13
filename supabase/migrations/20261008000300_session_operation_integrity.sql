@@ -341,3 +341,62 @@ GRANT EXECUTE ON FUNCTION public.apply_workout_operation(text,text,bigint,text,t
 REVOKE INSERT,UPDATE,DELETE ON public.workouts,public.workout_log FROM anon,authenticated;
 GRANT UPDATE(reflection) ON public.workouts TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.save_workout(text,text,text,bigint,jsonb),public.delete_workout(text) FROM PUBLIC,anon,authenticated;
+
+-- Account deletion must also purge P4 session state: receipts hold full row payloads,
+-- review and reflection text. Same contract as 20260924000900 plus the P4 tables, deleted
+-- child-first (log rows, receipts, rows, then sessions). CREATE OR REPLACE keeps the
+-- service_role-only grants. No other dollar signs inside the body (CLI statement splitter).
+CREATE OR REPLACE FUNCTION public.delete_user_data(p_user_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  t text;
+  n bigint;
+  result jsonb := '{}'::jsonb;
+  skipped jsonb := '[]'::jsonb;
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'delete_user_data: user id is required' USING ERRCODE = '22004';
+  END IF;
+
+  FOREACH t IN ARRAY ARRAY['workout_log', 'workouts', 'chats', 'chat_history'] LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = t AND column_name = 'user_id'
+    ) THEN
+      EXECUTE format('DELETE FROM public.%I WHERE user_id = %L', t, p_user_id);
+      GET DIAGNOSTICS n = ROW_COUNT;
+      result := result || jsonb_build_object(t, n);
+    ELSE
+      result := result || jsonb_build_object(t, NULL);
+      IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
+        skipped := skipped || to_jsonb(t);
+      END IF;
+    END IF;
+  END LOOP;
+
+  DELETE FROM public.workout_log WHERE p4_session_id IN
+    (SELECT session_id FROM public.workout_operation_sessions WHERE user_id = p_user_id);
+  DELETE FROM public.workout_operation_receipts WHERE session_id IN
+    (SELECT session_id FROM public.workout_operation_sessions WHERE user_id = p_user_id);
+  DELETE FROM public.workout_operation_rows WHERE session_id IN
+    (SELECT session_id FROM public.workout_operation_sessions WHERE user_id = p_user_id);
+  DELETE FROM public.workout_operation_sessions WHERE user_id = p_user_id;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  result := result || jsonb_build_object('workout_operation_sessions', n);
+
+  DELETE FROM public.event_logs WHERE user_id = p_user_id;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  result := result || jsonb_build_object('event_logs', n);
+
+  UPDATE public.subscription_events SET raw_payload = NULL
+  WHERE user_id = p_user_id AND raw_payload IS NOT NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  result := result || jsonb_build_object('subscription_events_scrubbed', n);
+
+  RETURN result || jsonb_build_object('skipped', skipped);
+END;
+$$;

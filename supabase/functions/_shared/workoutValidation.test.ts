@@ -6,6 +6,10 @@ import ts from 'typescript';
 import * as contract from './workoutValidation.ts';
 import { sourceModule } from '../../../lib/__tests__/workoutIdentityHarness.ts';
 const lift = sourceModule('supabase/functions/_shared/liftMatching.ts', { './workoutValidation.ts': contract });
+const operationErrors = sourceModule('supabase/functions/_shared/operationErrors.ts');
+// Set per test to make the mocked apply_workout_operation fail like PostgREST does.
+let rpcFailure: { code: string; message: string } | null = null;
+let requestMethod = 'POST';
 const valid = { exercise: 'Bench', set: 1, weightLbs: '100', reps: '8', notes: '' };
 test('epley rejects invalid or zero-rep performance rather than manufacturing a PR value', () => {
   for (const [weight, reps] of [[100, 0], [100, 8.5], [NaN, 8], [Infinity, 8], [-1, 8], [Number.MAX_VALUE, 8]]) {
@@ -190,12 +194,13 @@ async function edgeRaw(name: string, body: any, ai?: any, authorized = true, pro
     };
   } });
   const client = { auth: { getUser: async () => ({ data: { user: authorized ? { id: 'offline-user' } : null }, error: null }) }, from: (name: string) => { table = name; return query; },
-    rpc: async (...args: any[]) => { writes.push({ method: 'rpc', args }); return { data: sqlReceipt(args[1]), error: null }; } };
+    rpc: async (...args: any[]) => { writes.push({ method: 'rpc', args }); return rpcFailure ? { data: null, error: rpcFailure } : { data: sqlReceipt(args[1]), error: null }; } };
   const source = readFileSync(new URL(`../${name}/index.ts`, import.meta.url), 'utf8');
   const dependencies: any = {
     'https://deno.land/std@0.168.0/http/server.ts': { serve: (fn: any) => handler = fn },
     'https://esm.sh/@supabase/supabase-js@2.50.1': { createClient: () => client },
     '../_shared/liftMatching.ts': lift, '../_shared/workoutValidation.ts': contract,
+    '../_shared/operationErrors.ts': operationErrors,
     '../_shared/entitlements.ts': { gateAiRequest: async () => { gateCalls++; return { allowed: true }; } },
   };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {
@@ -203,7 +208,7 @@ async function edgeRaw(name: string, body: any, ai?: any, authorized = true, pro
     Deno: { env: { get: () => 'offline-fixture' } }, Response, URL, console: { log: () => {}, warn: () => {}, error: () => {} },
     fetch: async () => { providerCalls++; return new Response(JSON.stringify(providerEnvelope === undefined ? { choices: [{ message: { content: JSON.stringify(ai) } }] } : providerEnvelope)); },
   });
-  const response = await handler(new Request(`https://offline.invalid/${name}`, { method: 'POST', headers: { Authorization: 'Bearer offline-fixture', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+  const response = await handler(new Request(`https://offline.invalid/${name}`, { method: requestMethod, headers: { Authorization: 'Bearer offline-fixture', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: response.status, body: await response.json(), writes, providerCalls, gateCalls };
 }
 for (const [field, value] of [['weightLbs', 'NaN'], ['weightLbs', 'Infinity'], ['weightLbs', '-1'], ['weightLbs', '100kg'], ['reps', '8.5'], ['reps', '8oops'], ['reps', '-1'], ['exercise', ' '], ['set', '1oops']] as const) {
@@ -253,4 +258,34 @@ test('P4 identity-less log-set and history requests are still rejected before an
   }
   const history = await edgeRaw('history', { id: 'offline', part: 'Push', dateISO: '2026-10-08', rows: [{ ...valid, id: 'r1' }] });
   assert.equal(history.status, 400); assert.deepEqual(history.body, { error: IDENTITY_ERRORS[1] }); assert.equal(history.writes.length, 0);
+});
+
+test('terminal SQL rejections map to 403/409 with a stable code; infrastructure errors stay 500', async () => {
+  const cases: [string, string, number, string | null][] = [
+    ['P0001', 'Session finalized', 409, 'session_finalized'],
+    ['P0001', 'Session deleted', 409, 'session_deleted'],
+    ['P0001', 'Operation key payload conflict', 409, 'operation_conflict'],
+    ['P0001', 'Stale session revision', 409, 'stale_revision'],
+    ['P0001', 'Legacy or foreign session identity', 409, 'legacy_session'],
+    ['P0001', 'Invalid performed row', 409, 'invalid_operation'],
+    ['42501', 'Session ownership required', 403, 'forbidden'],
+    ['08006', 'connection failure', 500, null],
+  ];
+  try {
+    for (const [code, message, status, stable] of cases) {
+      rpcFailure = { code, message };
+      for (const [name, body] of [['log-set', valid], ['history', { id: 'offline', part: 'Push', dateISO: '2026-10-08', rows: [{ ...valid, id: 'r1' }] }]] as const) {
+        const result = await edge(name, body);
+        assert.equal(result.status, status, `${name} ${code} ${message}`);
+        assert.equal(rpcCall(result, name === 'log-set' ? 'put' : 'finalize').p_session_id !== undefined, true);
+        if (stable) assert.equal(result.body.code, stable, `${name} ${message}`);
+        else assert.equal(result.body.code, undefined);
+        assert.equal(JSON.stringify(result.body).includes(message), false, 'raw SQL text is not echoed');
+      }
+    }
+    requestMethod = 'DELETE';
+    rpcFailure = { code: 'P0001', message: 'Legacy or foreign session identity' };
+    const del = await edgeRaw('history', { id: 'legacy-1', revision: 9, operationKey: 'delete:legacy-1:terminal:v1' });
+    assert.equal(del.status, 409); assert.equal(del.body.code, 'legacy_session');
+  } finally { rpcFailure = null; requestMethod = 'POST'; }
 });

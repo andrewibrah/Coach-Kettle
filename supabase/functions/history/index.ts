@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.50.1";
 import { resolveTrackedLift } from "../_shared/liftMatching.ts";
 import { validateWorkoutRow } from '../_shared/workoutValidation.ts';
+import { operationRejection } from '../_shared/operationErrors.ts';
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -139,6 +140,11 @@ async function saveWorkout(session: WorkoutSession, supabase: SupabaseClient, us
         p_payload: { dateISO: session.dateISO, part: session.part, createdAt: session.createdAt,
             rows, logRows, review: session.review ?? null, reflection: session.reflection ?? null },
     });
+    const rejection = operationRejection(error);
+    if (rejection) {
+        console.warn(`[history] finalize rejected: ${rejection.body.code}`);
+        return respondJson(rejection.body, rejection.status);
+    }
     if (error || receipt?.ok !== true) {
         console.error('[history] Transaction failed:', error);
         return respondJson({ error: 'Database error' }, 500);
@@ -272,7 +278,15 @@ async function deleteWorkout(workoutId: string, supabase: SupabaseClient, operat
         p_session_id: workoutId, p_operation_key: operation.operationKey, p_revision: operation.revision,
         p_kind: 'delete', p_row_id: null, p_payload: {},
     });
-    if (error || receipt?.ok !== true) return respondJson({ error: 'Database error' }, 500);
+    const rejection = operationRejection(error);
+    if (rejection) {
+        console.warn(`[history] delete rejected: ${rejection.body.code}`);
+        return respondJson(rejection.body, rejection.status);
+    }
+    if (error || receipt?.ok !== true) {
+        console.error('[history] Delete failed:', error);
+        return respondJson({ error: 'Database error' }, 500);
+    }
     return respondJson(receipt);
 }
 
