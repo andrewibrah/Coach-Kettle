@@ -11,7 +11,8 @@ const corsHeaders = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-interface WorkoutRow {
+import type { LogRow } from '../../../types/workout.ts';
+interface WorkoutRow extends Partial<LogRow> {
     exercise: string;
     set: number;
     weightLbs: string;
@@ -74,6 +75,24 @@ serve(async (req) => {
         return new Response("ok", { headers: corsHeaders });
     }
 
+    if (req.method !== "POST") return new Response(JSON.stringify({ error: "Method not allowed" }),
+        { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    let payload: ChatRequest;
+    try { payload = await req.json(); }
+    catch { return new Response(JSON.stringify({ error: "Invalid JSON" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
+        typeof payload.message !== 'string' || !payload.message.trim() ||
+        payload.lastExercise !== undefined && typeof payload.lastExercise !== 'string') {
+        return new Response(JSON.stringify({ error: "Invalid chat request." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { message, rows = [], lastExercise } = payload;
+    if (!Array.isArray(rows) || rows.some(row => validateWorkoutRow(row))) {
+        return new Response(JSON.stringify({ error: "Invalid set values in context." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // JWT verification
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -106,37 +125,10 @@ serve(async (req) => {
         );
     }
 
-    if (req.method !== "POST") {
-        return new Response(
-            JSON.stringify({ error: "Method not allowed" }),
-            { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
-
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiApiKey) {
-        return new Response(
-            JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
-
-    let payload: ChatRequest;
-    try {
-        payload = await req.json();
-    } catch {
-        return new Response(
-            JSON.stringify({ error: "Invalid JSON" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
-
-    const { message, rows = [], lastExercise } = payload;
-    if (!message?.trim()) {
-        return new Response(
-            JSON.stringify({ error: "message is required" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "AI service unavailable" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const context = {
@@ -175,46 +167,48 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
+        const content = data?.choices?.[0]?.message?.content;
 
-        if (!content) {
+        if (typeof content !== "string" || !content) {
             return new Response(
                 JSON.stringify({ error: "No response from model" }),
-                { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
         let parsed: ChatResponse;
-        try {
-            parsed = JSON.parse(content);
-        } catch {
-            console.error("[chat] openai_response_parse_error");
-            return new Response(
-                JSON.stringify({ answer: "I couldn't understand that. Try: Exercise Weight Reps." }),
-                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // Validate: must have rows OR answer
-        if (!parsed.rows && !parsed.answer) {
-            console.error("[chat] openai_response_shape_error");
-            return new Response(
-                JSON.stringify({ answer: "I couldn't understand that. Try: Exercise Weight Reps." }),
-                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+        try { parsed = JSON.parse(content); }
+        catch { return new Response(JSON.stringify({ error: "Invalid model response. Input has not been logged." }),
+            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) ||
+            (parsed.rows === undefined) === (parsed.answer === undefined) ||
+            parsed.answer !== undefined && (typeof parsed.answer !== 'string' || !parsed.answer.trim())) {
+            return new Response(JSON.stringify({ error: "Invalid model response. Input has not been logged." }),
+                { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         // Sanitize rows if present
-        if (parsed.rows) {
+        if (parsed.rows !== undefined) {
+            if (!Array.isArray(parsed.rows) || parsed.rows.some(row => validateWorkoutRow(row))) {
+                return new Response(JSON.stringify({ error: 'Model returned invalid set values. Input has not been logged.' }),
+                    { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
             parsed.rows = parsed.rows
                 .filter((r) => r.exercise?.trim())
-                .map((r) => ({
-                    exercise: String(r.exercise).trim(),
-                    set: Number.isInteger(r.set) && r.set > 0 ? r.set : 1,
-                    weightLbs: String(r.weightLbs ?? "").trim(),
-                    reps: String(r.reps ?? "").trim(),
-                    notes: String(r.notes ?? "").trim(),
-                }));
+                .map((r) => {
+                    const metadata: Partial<WorkoutRow> = {};
+                    for (const key of ['id', 'timestamp', 'status', 'pendingInput', 'performance', 'plannedTarget', 'setKind', 'isRest', 'isCardio', 'durationMins', 'distance', 'distanceUnit', 'heartRate', 'calories', 'level'] as const) {
+                        if (r[key] !== undefined) Object.assign(metadata, { [key]: r[key] });
+                    }
+                    return {
+                        ...metadata,
+                        exercise: r.exercise.trim(),
+                        set: r.set === undefined ? 1 : Number(r.set),
+                        weightLbs: r.isCardio ? (r.weightLbs ?? '') : numericText(r.weightLbs),
+                        reps: r.isCardio ? (r.reps ?? '') : numericText(r.reps),
+                        notes: (r.notes ?? '').trim(),
+                    };
+                });
         }
 
         return new Response(
@@ -229,3 +223,4 @@ serve(async (req) => {
         );
     }
 });
+import { numericText, validateWorkoutRow } from '../_shared/workoutValidation.ts';

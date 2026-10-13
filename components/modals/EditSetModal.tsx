@@ -1,6 +1,7 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { LogRow } from "@/types/workout";
+import { validateWorkoutRow } from '@/lib/workoutValidation';
 import React, { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 
@@ -16,6 +17,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
     const [weight, setWeight] = useState("");
     const [reps, setReps] = useState("");
     const [notes, setNotes] = useState("");
+    const [error, setError] = useState<string | null>(null);
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -26,6 +28,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
 
     useEffect(() => {
         if (visible && row) {
+            setError(null);
             setExercise(row.exercise);
             setWeight(row.weightLbs);
             setReps(row.reps);
@@ -35,6 +38,9 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
 
     const handleSave = () => {
         if (!row) return;
+        const error = validateWorkoutRow({ ...row, exercise, weightLbs: weight, reps });
+        if (error) { setError(error); return; }
+        setError(null);
         onSave({
             ...row,
             exercise: exercise.trim(),
@@ -50,7 +56,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
             animationType="slide"
             transparent={true}
             visible={visible}
-            onRequestClose={onClose}
+            onRequestClose={handleSave}
         >
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -66,6 +72,7 @@ export function EditSetModal({ visible, row, onClose, onSave }: Props) {
                         </View>
 
                         <View style={styles.formContext}>
+                            {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
                             <View style={styles.inputGroup}>
                                 <ThemedText style={[styles.label, { color: placeholderColor }]}>Exercise</ThemedText>
                                 <TextInput

@@ -54,7 +54,8 @@ export function resolveTrackedLift(typed: string, trackedNames: string[]): strin
 }
 
 /** Epley e1RM — must stay in sync with public.epley_1rm in the DB. */
-export function epley1rm(weightLbs: number, reps: number): number {
-  if (reps <= 0) return weightLbs;
-  return Math.round(weightLbs * (1 + reps / 30) * 10) / 10;
+export function epley1rm(weightLbs: number, reps: number): number | null {
+  if (!Number.isFinite(weightLbs) || weightLbs < 0 || !Number.isSafeInteger(reps) || reps <= 0) return null;
+  const estimate = Math.round(weightLbs * (1 + reps / 30) * 10) / 10;
+  return Number.isFinite(estimate) ? estimate : null;
 }
