@@ -11,11 +11,12 @@ const QUESTION = 'my-private-question-text';
 function host(provider: (url?: any, init?: any) => Promise<Response>, opts: { policy?: Record<string, unknown>; tables?: Record<string, any[]> } = {}) {
   let handler: (req: Request) => Promise<Response>;
   const logs: unknown[][] = [];
+  const rpcCalls: string[] = []; // entitlement/quota RPCs reached via the real gate
   const query = (table: string) => { const q: any = { select: () => q, eq: () => q, order: () => q, limit: () => q,
     single: async () => ({ data: null, error: null }), then: (yes: any, no: any) => Promise.resolve({ data: opts.tables?.[table] ?? [], error: null }).then(yes, no) }; return q; };
   const client = {
     auth: { getUser: async () => ({ data: { user: { id: 'verified-owner' } }, error: null }) },
-    rpc: async () => ({ data: [{ entitlement_status: 'sub_active' }], error: null }),
+    rpc: async (name: string) => { rpcCalls.push(name); return { data: [{ entitlement_status: 'sub_active' }], error: null }; },
     from: query,
   };
   const record = (...args: unknown[]) => { logs.push(args); };
@@ -33,7 +34,7 @@ function host(provider: (url?: any, init?: any) => Promise<Response>, opts: { po
     return exports;
   }
   load(new URL('./index.ts', import.meta.url));
-  return { logs, request: (body: unknown = { question: QUESTION, rows: [] }) => handler!(new Request('https://fixture.invalid/', { method: 'POST', headers: { Authorization: 'Bearer fixture' }, body: JSON.stringify(body) })) };
+  return { logs, rpcCalls, request: (body: unknown = { question: QUESTION, rows: [] }, raw?: string) => handler!(new Request('https://fixture.invalid/', { method: 'POST', headers: { Authorization: 'Bearer fixture' }, body: raw ?? JSON.stringify(body) })) };
 }
 function assertNoLeak(text: string, where: string) {
   for (const s of [SECRET, PROVIDER_TEXT, QUESTION]) assert.equal(text.includes(s), false, `${where} leaked ${s}`);
@@ -146,4 +147,13 @@ test('flag on: a full 100-disclosure context with omittedCount is accepted and t
   const res = await c.ask({ question: 'Q?', rows: [], context: { ...context, omittedCount: 7, disclosures: Array.from({ length: 100 }, () => context.disclosures[0]) } });
   assert.equal(res.status, 200);
   assert.match(c.sent[0][2].content, /7 earlier disclosures omitted/);
+});
+
+test('invalid request consumes no AI quota', async () => {
+  const api = host(async () => { throw new Error('provider must not be called'); }, { policy: FLAG_ON });
+  for (const bad of [{}, { question: '' }, { question: 7 }, { question: 'Q?', rows: [], context: { sessionId: 's1' } }]) assert.equal((await api.request(bad)).status, 400, JSON.stringify(bad));
+  assert.equal((await api.request(undefined, '{not json')).status, 400);
+  assert.deepEqual(api.rpcCalls, [], 'no entitlement/quota RPC for a 4xx');
+  await api.request({ question: 'Q?', rows: [] }).catch(() => undefined);
+  assert.ok(api.rpcCalls.length > 0, 'a valid request still reaches the gate');
 });

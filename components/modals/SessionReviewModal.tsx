@@ -266,18 +266,20 @@ export function SessionReviewModal({
                 </ThemedText>
               </View>
 
-              {/* Next Session Note */}
-              <View style={[styles.section, { backgroundColor: cardBg }]}>
-                <View style={styles.sectionHeader}>
-                  <IconSymbol name="pencil" size={14} color={tint} />
-                  <ThemedText style={styles.sectionTitle}>
-                    For Next Session
+              {/* Next Session Note — omitted when empty (e.g. load advice suppressed) */}
+              {review.nextSessionNote?.trim() ? (
+                <View style={[styles.section, { backgroundColor: cardBg }]}>
+                  <View style={styles.sectionHeader}>
+                    <IconSymbol name="pencil" size={14} color={tint} />
+                    <ThemedText style={styles.sectionTitle}>
+                      For Next Session
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={styles.noteText}>
+                    {review.nextSessionNote}
                   </ThemedText>
                 </View>
-                <ThemedText style={styles.noteText}>
-                  {review.nextSessionNote}
-                </ThemedText>
-              </View>
+              ) : null}
 
               {/* ── NEW: Media Picker ── */}
               <MediaPickerBubble

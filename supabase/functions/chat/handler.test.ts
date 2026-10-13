@@ -11,9 +11,10 @@ const MESSAGE = 'my-private-message-text';
 function host(provider: (url?: any, init?: any) => Promise<Response>, opts: { policy?: Record<string, unknown> } = {}) {
   let handler: (req: Request) => Promise<Response>;
   const logs: unknown[][] = [];
+  const rpcCalls: string[] = []; // entitlement/quota RPCs reached via the real gate
   const client = {
     auth: { getUser: async () => ({ data: { user: { id: 'verified-owner' } }, error: null }) },
-    rpc: async () => ({ data: [{ entitlement_status: 'sub_active' }], error: null }),
+    rpc: async (name: string) => { rpcCalls.push(name); return { data: [{ entitlement_status: 'sub_active' }], error: null }; },
   };
   const record = (...args: unknown[]) => { logs.push(args); };
   function load(url: URL): any {
@@ -30,7 +31,7 @@ function host(provider: (url?: any, init?: any) => Promise<Response>, opts: { po
     return exports;
   }
   load(new URL('./index.ts', import.meta.url));
-  return { logs, request: (body: unknown = { message: MESSAGE, rows: [] }) => handler!(new Request('https://fixture.invalid/', { method: 'POST', headers: { Authorization: 'Bearer fixture' }, body: JSON.stringify(body) })) };
+  return { logs, rpcCalls, request: (body: unknown = { message: MESSAGE, rows: [] }, raw?: string) => handler!(new Request('https://fixture.invalid/', { method: 'POST', headers: { Authorization: 'Bearer fixture' }, body: raw ?? JSON.stringify(body) })) };
 }
 const logText = (logs: unknown[][]) => logs.flat().map(a => a instanceof Error ? `${a.message} ${a.stack}` : typeof a === 'string' ? a : JSON.stringify(a) ?? String(a)).join('\n');
 const completion = (content: string) => async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }));
@@ -112,4 +113,13 @@ test('flag on: preceding clarification exchange and omittedCount are labeled con
   assert.ok(block.includes('"Where exactly? Does it hurt when pressing?"'));
   assert.match(block, /3 earlier disclosures omitted/);
   assert.equal(c.sent[0][2].content, JSON.stringify({ message: 'Only on the way down', existing_rows: [] }));
+});
+
+test('invalid request consumes no AI quota', async () => {
+  const api = host(async () => { throw new Error('provider must not be called'); }, { policy: FLAG_ON });
+  for (const bad of [{}, { message: '' }, { message: 7 }, { message: 'squat 100 5', rows: [], context: { sessionId: 's1' } }]) assert.equal((await api.request(bad)).status, 400, JSON.stringify(bad));
+  assert.equal((await api.request(undefined, '{not json')).status, 400);
+  assert.deepEqual(api.rpcCalls, [], 'no entitlement/quota RPC for a 4xx');
+  await api.request({ message: 'squat 100 5', rows: [] }).catch(() => undefined);
+  assert.ok(api.rpcCalls.length > 0, 'a valid request still reaches the gate');
 });

@@ -249,8 +249,9 @@
         "P2",
         "P3"
       ],
-      "status": "planned",
-      "classification": "runtime/source-verified defects plus rest/review policy gaps",
+      "status": "done_local_policy_blocked",
+      "classification": "defects repaired; rest/review policy built behind COACHING_POLICY flags (all false) pending D03/D07 (Q2-Q4)",
+      "latest_gate": "2026-10-13: unflagged: readable/retryable coach errors with no raw HTTP text, question restored, partial stream never committed or shown after reopen, empty answer is an error not archived coaching, 20 s idle deadline so a stalled stream never stays Loading, invalid coach requests consume no AI quota (real local ai_usage RED 0->4, GREEN 0->0), empty next-session card hidden, rest-prompt clearing covered, Leg press/Lat pulldown characterized. Flagged off: reviewSetPolicy (Q2a), suppressReviewLoadAdvice (Q4a, with output filter), restWorkSetsOnly (Q3a); flag-off review bodies sha256-identical to HEAD. Independent SPEC FAIL (partial reappears, stalled Loading) -> repaired -> SPEC PASS. lib 3486/0, edge 133/0. Evidence: evidence/c3-feedback-local.md.",
       "decision_ids": [
         "D03",
         "D07"

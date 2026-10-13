@@ -13,6 +13,21 @@ Key fixes:
 
 Gates, per commit in an isolated worktree: lib 3428/0, Edge `_shared` 85/0; tsc, lint with zero warnings and diff-check all exit 0; P4 PG15 suite exit 0. The local Supabase stack (colima) applies 64/65 migrations from scratch. The pre-existing `remote_schema` "chats already exists" failure needs a decision. Curl receipts on all 5 changed functions are as expected. The simulator is BLOCKED (no Xcode). Open: F6 LOW, two non-blocking QUALITY residuals, D08 choices and the production rollout. No push, deploy or remote command. [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
 
+## C3 honest coach errors, review and rest: SPEC PASS after repair; rest/review policy flagged off (D03/D07)
+
+Unflagged:
+- Coach errors use readable, retryable copy and never show raw `HTTP …`. The question is restored, and the retry copy says so only when that is true.
+- A partial streamed answer is never archived and never reappears after reopening.
+- An empty answer is a visible error, not archived coaching.
+- A 20 s idle deadline ends a stalled stream: no more infinite Loading. This is a client responsiveness deadline, not policy.
+- Invalid coach requests no longer consume the free daily AI quota. Real local `ai_usage`: RED 0→4, GREEN 0→0.
+- An empty "For Next Session" card is hidden.
+- Rest-prompt clearing has test coverage, and Leg press and Lat pulldown classification is pinned for D07.
+
+Flagged off, built to recommendations Q2a, Q3a and Q4a: `reviewSetPolicy`, `restWorkSetsOnly`, and `suppressReviewLoadAdvice` (which includes an output filter). With the flags off, the review request bodies are sha256-identical to HEAD.
+
+The first SPEC review FAILED: a partial answer reappeared after reopening, and a stalled stream left Loading on screen. Both were repaired RED-first, then SPEC PASS. [Evidence](docs/plans/in-session-reliability/evidence/c3-feedback-local.md).
+
 ## C1 scoped coaching context: SPEC PASS after repair; disclosure carriage flagged off (D09)
 
 Unflagged, from now on:

@@ -580,12 +580,17 @@ export default function HomeScreen() {
       }, history.slice(-10), buildCoachingContext(COACHING_POLICY, workoutId, coaching));
       if (!ownsRequest()) return;
       const answer = res.answer?.trim();
-      const answerText = answer || "Coach had no response.";
-      setCoachAnswer(answerText);
-      sessionTurns.push({ role: 'user', content: q }, ...(answer ? [{ role: 'assistant' as const, content: answer }] : []));
+      if (!answer) {
+        // An empty stream is unavailable coaching, not an answer to archive.
+        setCoachAnswer(null);
+        setCoachError("Coach didn't answer that one.");
+        return;
+      }
+      setCoachAnswer(answer);
+      sessionTurns.push({ role: 'user', content: q }, { role: 'assistant', content: answer });
 
       // Save to Supabase chat history
-      saveCoachChatQA(q, answerText, Date.now()).catch(err =>
+      saveCoachChatQA(q, answer, Date.now()).catch(err =>
         console.warn("[Coach] Failed to save chat history:", err)
       );
 
@@ -594,6 +599,8 @@ export default function HomeScreen() {
       }
     } catch (err) {
       if (!ownsRequest()) return;
+      // A partial stream is not an answer; never leave it to reappear on reopen.
+      setCoachAnswer(null);
       if (err instanceof FeatureGateError && err.code === "AI_LIMIT_REACHED") {
         setCoachError("You've hit today's free message limit.");
         showAiLimitAlert();
@@ -1179,7 +1186,7 @@ export default function HomeScreen() {
         id: r.id, timestamp: r.timestamp, performance: r.performance,
         isCardio: r.isCardio, setKind: r.setKind, plannedTarget: r.plannedTarget,
         exercise: r.exercise, set: r.set, weightLbs: r.weightLbs, reps: r.reps, notes: r.notes,
-      })), selectedPart)
+      })), selectedPart, COACHING_POLICY)
         .then(data => ({ ...data, generatedAt: Date.now() })))
       : Promise.resolve(null);
     let cleanupGeneration: number | null = null;
@@ -1246,7 +1253,9 @@ export default function HomeScreen() {
         .catch(() => { if (ownership.isCurrent(effectOwner) && getWorkoutDraftGeneration() === effectsDraftGeneration) showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'); });
 
       // Start rest timer for the last logged non-cardio set
-      const lastWorking = [...eligible].reverse().find((r) => !r.isCardio);
+      // Q3a (off until approved): only performed work sets trigger rest.
+      const lastWorking = [...eligible].reverse().find((r) => !r.isCardio &&
+        (!COACHING_POLICY.restWorkSetsOnly || !r.setKind || r.setKind === 'work'));
       if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
         const reps = Number(lastWorking.reps);
         triggerRestTimer({

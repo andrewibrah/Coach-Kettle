@@ -1,6 +1,6 @@
-// D09 is unresolved: contextual coaching ships disabled. Mirrors lib/coachingPolicy.ts;
+// D03/D07/D09 are unresolved (DECISIONS Q2-Q4, Q5-Q8): every switch ships disabled. Mirrors lib/coachingPolicy.ts;
 // change both together.
-export const COACHING_POLICY = { version: 'unapproved', contextualDisclosures: false, adaptiveNextSet: false, structuredQuestions: false } as const;
+export const COACHING_POLICY = { version: 'unapproved', contextualDisclosures: false, adaptiveNextSet: false, structuredQuestions: false, reviewSetPolicy: false, suppressReviewLoadAdvice: false, restWorkSetsOnly: false } as const;
 
 // Transport-safety bounds, not coaching policy; mirrored in lib/coachingContext.ts.
 // 5000 chars matches lib/chatStorage sanitizeContent; 100 disclosures and 200-char ids

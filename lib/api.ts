@@ -2,6 +2,7 @@ import { isPerformedRow } from './performedSets';
 import { supabaseUrl } from './supabase';
 import type { LogRow } from '../types/workout';
 import type { CoachingContext } from './coachingContext';
+import type { COACHING_POLICY } from './coachingPolicy';
 import { fetchWithAuth } from './auth';
 import { fetchProfile, UserProfile } from './profile';
 import { parseFeatureGateError } from './entitlements';
@@ -82,6 +83,10 @@ function buildAIContextString(profile: UserProfile | null): string {
 }
 
 const API_BASE = `${supabaseUrl}/functions/v1`;
+// Client responsiveness deadline, not coaching policy: max silence (no response
+// or chunk) before a coach request is aborted as retryable. Longer than P2's 5000 ms
+// optional-review wait because first token includes server context fetch + provider latency.
+const COACH_IDLE_MS = 20000;
 
 export type ApiWorkoutRow = {
     // Optional canonical evidence; legacy/parse responses may omit it.
@@ -187,53 +192,75 @@ export const api = {
         rows: ApiWorkoutRow[],
         onChunk?: (chunk: string) => void,
         chatHistory?: { role: string; content: string }[],
-        context?: CoachingContext
+        context?: CoachingContext,
+        clock = { setTimeout, clearTimeout }
     ) => {
-        // Profile context is now fetched server-side by the coach edge function
-        const res = await fetchWithAuth(`${API_BASE}/coach`, {
-            method: 'POST',
-            body: JSON.stringify({
-                question,
-                rows,
-                ...(chatHistory && chatHistory.length > 0 ? { chatHistory } : {}),
-                ...(context ? { context } : {}),
-            }),
-        });
+        // A stalled request or stream must not leave the coach Loading forever:
+        // abort when nothing arrives for COACH_IDLE_MS.
+        const controller = new AbortController();
+        let expire!: (error: Error) => void;
+        const stalled = new Promise<never>((_, reject) => { expire = reject; });
+        stalled.catch(() => undefined);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const arm = () => {
+            clock.clearTimeout(timer);
+            // Settle the readable error first: real fetch rejects a pending read on abort.
+            timer = clock.setTimeout(() => { expire(new Error('Coach stopped responding.')); controller.abort(); }, COACH_IDLE_MS);
+        };
+        try {
+            arm();
+            // Profile context is now fetched server-side by the coach edge function
+            const res = await Promise.race([fetchWithAuth(`${API_BASE}/coach`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    question,
+                    rows,
+                    ...(chatHistory && chatHistory.length > 0 ? { chatHistory } : {}),
+                    ...(context ? { context } : {}),
+                }),
+                signal: controller.signal,
+            }), stalled]);
 
-        if (!res.ok) {
-            const body = await res.text();
-            const gateError = parseFeatureGateError(res.status, body);
-            if (gateError) throw gateError;
-            throw new Error(`HTTP ${res.status}: ${body}`);
-        }
-
-        if (onChunk && res.body) {
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let fullText = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                fullText += chunk;
-                onChunk(chunk);
+            if (!res.ok) {
+                const body = await Promise.race([res.text(), stalled]);
+                const gateError = parseFeatureGateError(res.status, body);
+                if (gateError) throw gateError;
+                throw new Error(`HTTP ${res.status}: ${body}`);
             }
 
-            return { answer: fullText } as CoachResponse;
-        } else {
-            const text = await res.text();
-            return { answer: text } as CoachResponse;
+            if (onChunk && res.body) {
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = '';
+
+                while (true) {
+                    const { done, value } = await Promise.race([reader.read(), stalled]);
+                    if (done) break;
+                    arm();
+                    const chunk = decoder.decode(value, { stream: true });
+                    fullText += chunk;
+                    onChunk(chunk);
+                }
+
+                return { answer: fullText } as CoachResponse;
+            } else {
+                const text = await Promise.race([res.text(), stalled]);
+                return { answer: text } as CoachResponse;
+            }
+        } finally {
+            clock.clearTimeout(timer);
         }
     },
 
-    generateSessionReview: async (rows: ApiWorkoutRow[], workoutPart: string): Promise<{
+    // Q2a/Q4a switches; omitted policy means off (pre-policy prompt and payload).
+    generateSessionReview: async (rows: ApiWorkoutRow[], workoutPart: string, policy?: Pick<typeof COACHING_POLICY, 'reviewSetPolicy' | 'suppressReviewLoadAdvice'>): Promise<{
         rating: number;
         strengths: string[];
         weakness: string;
         nextSessionNote: string;
     }> => {
-        rows = rows.filter(row => !row.isCardio && row.setKind !== 'cardio' && isPerformedRow(row));
+        rows = rows.filter(row => !row.isCardio && row.setKind !== 'cardio' && isPerformedRow(row) &&
+            !(policy?.reviewSetPolicy && row.setKind === 'warmup'));
         if (!rows.length) throw new Error('Session review unavailable');
         const profile = await getCachedProfile('');
         const profileContext = buildAIContextString(profile);
@@ -248,7 +275,7 @@ RATING (1-10):
 - +1 if rep ranges match the user's goal: strength=3-6 reps, hypertrophy=8-12 reps, endurance=12+ reps.
 - +1 if total volume (sets x reps x weight) on the primary lift equals or exceeds the most recent same-part session in history.
 - +1 if compound-to-isolation set ratio is 60% or higher.
-- -1 if a late set shows a significant weight drop (20+ lbs) suggesting early failure.
+- -1 if a late set shows a significant weight drop (20+ lbs) suggesting early failure.${policy?.reviewSetPolicy ? ' Rows with setKind "backoff" or "drop" are prescribed lighter sets: never apply this penalty to them.' : ''}
 - -1 if fewer than 3 exercises were logged for a strength session.
 - Cap at 10, floor at 1.
 
@@ -256,7 +283,9 @@ STRENGTHS (array of 2-3 strings): Cite specific numbers from current_session_row
 
 WEAKNESS (string): Name the specific problem and its evidence. Example: "Bench dropped from 185 to 165 on set 3 — cut to 2 working sets at this intensity next time." Do not write abstract feedback like "fatigue risk."
 
-NEXT_SESSION_NOTE (string): Give a specific progressive overload instruction using actual numbers from this session. Example: "All reps completed at 185lbs — try 190x8 next ${workoutPart || 'session'}." If reps were missed, suggest dropping volume instead of adding weight.
+${policy?.suppressReviewLoadAdvice
+    ? `NEXT_SESSION_NOTE (string): Name one specific focus for next ${workoutPart || 'session'} using evidence from this session (rep completion, set quality). Do not prescribe any weight, load or load increase.`
+    : `NEXT_SESSION_NOTE (string): Give a specific progressive overload instruction using actual numbers from this session. Example: "All reps completed at 185lbs — try 190x8 next ${workoutPart || 'session'}." If reps were missed, suggest dropping volume instead of adding weight.`}
 
 JSON shape — respond with exactly this structure:
 {"rating": <number>,"strengths": [<string>, <string>],"weakness": <string>,"nextSessionNote": <string>}`;
@@ -290,7 +319,9 @@ JSON shape — respond with exactly this structure:
                 rating: parsed.rating,
                 strengths: parsed.strengths.slice(0, 3),
                 weakness: parsed.weakness,
-                nextSessionNote: parsed.nextSessionNote,
+                // Q4a enforcement: a numeric load in the note is dropped, never rewritten.
+                nextSessionNote: policy?.suppressReviewLoadAdvice && /\d+(\.\d+)?\s*(lb|lbs|kg|pounds|%)/i.test(parsed.nextSessionNote)
+                    ? '' : parsed.nextSessionNote,
             };
         } catch {
             // Optional AI failure must not manufacture evidence of completion.

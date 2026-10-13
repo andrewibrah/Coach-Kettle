@@ -79,3 +79,13 @@ test('actual BottomBar freezes composer and End callback during finalization', (
   assert.equal(end.props.disabled, true);
   assert.equal(nodes.find(n => n.type === 'TextInput').props.editable, false);
 });
+
+test('an empty next-session note renders no empty "For Next Session" card', () => {
+  const render = (nextSessionNote: string) => descendants(sourceModule('components/modals/SessionReviewModal.tsx', common).SessionReviewModal({
+    visible: true, loading: false, workoutTitle: 'Push', savePhase: 'saved', onClose: () => {}, onRetry: () => {},
+    review: { rating: 6, strengths: [], weakness: '', nextSessionNote, generatedAt: 1 } }));
+  const hasCard = (nodes: any[]) => nodes.some(n => [n.props?.children].flat().some((c: any) => typeof c === 'string' && c.includes('For Next Session')));
+  assert.equal(hasCard(render('Repeat the same load.')), true);
+  assert.equal(hasCard(render('')), false);
+  assert.equal(hasCard(render('   ')), false);
+});

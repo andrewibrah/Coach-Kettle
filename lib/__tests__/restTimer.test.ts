@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { decideRestTimerAction, isGenuineRestCompletion } from '../restTimer.ts';
+import { decideRestTimerAction, isCompoundExercise, isGenuineRestCompletion, suggestRestSeconds } from '../restTimer.ts';
 
 // ---------- #3: no auto-start when auto_start_rest_timer is off ----------
 
@@ -31,4 +31,16 @@ test('isGenuineRestCompletion: paused -> done, idle -> idle, and other transitio
   assert.equal(isGenuineRestCompletion('idle', 'idle'), false);
   assert.equal(isGenuineRestCompletion('running', 'running'), false);
   assert.equal(isGenuineRestCompletion('done', 'done'), false);
+});
+
+// ---------- D07 pending: pin today's name heuristic, not approved policy ----------
+
+test('characterization (D07 pending): Leg press is classified isolation with isolation rest', () => {
+  assert.equal(isCompoundExercise('Leg press'), false);
+  assert.equal(suggestRestSeconds({ repsLastSet: 8, isCompound: isCompoundExercise('Leg press') }), 90);
+});
+
+test('characterization (D07 pending): Lat pulldown is classified isolation with isolation rest', () => {
+  assert.equal(isCompoundExercise('Lat pulldown'), false);
+  assert.equal(suggestRestSeconds({ repsLastSet: 10, isCompound: isCompoundExercise('Lat pulldown') }), 75);
 });

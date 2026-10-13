@@ -122,15 +122,6 @@ serve(async (req) => {
         );
     }
 
-    // --- Entitlement + AI usage gating (fail closed, atomic) ---
-    const gate = await gateAiRequest(supabaseAdmin, userId, "coach");
-    if (!gate.allowed) {
-        return new Response(
-            JSON.stringify(gate.body),
-            { status: gate.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
-
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiApiKey) {
         return new Response(
@@ -166,6 +157,16 @@ serve(async (req) => {
         );
     }
     const disclosures = coachingContext ? disclosureBlock(coachingContext) : null;
+
+    // --- Entitlement + AI usage gating (fail closed, atomic) ---
+    // After all request validation, so a 4xx never consumes AI quota.
+    const gate = await gateAiRequest(supabaseAdmin, userId, "coach");
+    if (!gate.allowed) {
+        return new Response(
+            JSON.stringify(gate.body),
+            { status: gate.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
 
     // Drop malformed entries (bad role, non-string, empty or oversized content), keep the last 10.
     const priorMessages = (Array.isArray(chatHistory) ? chatHistory : [])

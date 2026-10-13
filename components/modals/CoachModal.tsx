@@ -30,9 +30,14 @@ type Props = {
   loading: boolean;
   answer: string | null;
   error: string | null;
-  onSubmit: (chatHistory: ChatMessage[]) => void;
+  onSubmit: () => void;
   onClose: () => void;
 };
+
+// Transport errors arrive as "HTTP 500: {json}"; never show raw payloads.
+function readableCoachError(error: string): string {
+  return /^HTTP \d|[{}<]/.test(error) ? "Coach couldn't answer right now." : error;
+}
 
 export function CoachModal({
   visible,
@@ -55,6 +60,7 @@ export function CoachModal({
   const { toast, showToast, hideToast } = useToast();
   const placeholderColor = useThemeColor({}, 'placeholder');
   const chatBackground = useThemeColor({}, 'secondaryBackground');
+  const dangerColor = useThemeColor({}, 'danger');
 
   // Fix: Ensure internal content contrasts with the container background
   const sendBtnColor = isDark ? '#FFFFFF' : '#111827';
@@ -67,6 +73,9 @@ export function CoachModal({
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  // Last sent question, restored into the input if the request fails.
+  const lastSentRef = useRef<ChatMessage | null>(null);
+  const [questionRestored, setQuestionRestored] = useState(false);
 
   // Fetch history when modal opens
   useEffect(() => {
@@ -128,9 +137,10 @@ export function CoachModal({
     };
     const updatedHistory = [...history, userMsg];
     setHistory(updatedHistory);
+    lastSentRef.current = userMsg;
+    setQuestionRestored(false);
 
-    // Call parent submit logic with chat history for multi-turn context
-    onSubmit(updatedHistory);
+    onSubmit();
     // Input is cleared by parent
     onChangeQuestion("");
   };
@@ -172,7 +182,19 @@ export function CoachModal({
   // Effect to commit the answer to history once streaming is done
   const wasLoading = useRef(loading);
   useEffect(() => {
-    if (wasLoading.current && !loading && answer) {
+    if (wasLoading.current && !loading && error) {
+      // Failed request: never archive a partial stream; drop the unanswered
+      // question from history and give it back to the input for resend.
+      const failed = lastSentRef.current;
+      lastSentRef.current = null;
+      // Settle the stale partial so it stays hidden even after the error clears.
+      committedRef.current = true;
+      if (failed) {
+        setHistory(prev => prev.filter(m => m !== failed));
+        onChangeQuestion(failed.content);
+        setQuestionRestored(true);
+      }
+    } else if (wasLoading.current && !loading && answer) {
       // Just finished loading a valid answer — commit to history
       committedRef.current = true;
       const aiMsg: ChatMessage = {
@@ -184,13 +206,13 @@ export function CoachModal({
       setHistory(prev => [...prev, aiMsg]);
     }
     wasLoading.current = loading;
-  }, [loading, answer]);
+  }, [loading, answer, error, onChangeQuestion]);
 
   // Combine history with current streaming answer
   // Only append streaming answer if it hasn't been committed to history yet
   const displayData = [...history];
   if ((loading || answer) && !committedRef.current) {
-    if (answer) {
+    if (answer && !error) {
       displayData.push({
         role: 'assistant',
         content: answer,
@@ -244,6 +266,12 @@ export function CoachModal({
                 }
               />
             )}
+
+            {error && !loading ? (
+              <ThemedText accessibilityRole="alert" style={[styles.errorText, { color: dangerColor }]}>
+                {readableCoachError(error) + (questionRestored ? " Your question is back in the box — tap send to retry." : "")}
+              </ThemedText>
+            ) : null}
 
             <ThemedView style={[styles.inputFooter, { backgroundColor, borderTopColor: borderColor }]}>
               <TextInput
@@ -323,6 +351,11 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  errorText: {
+    fontSize: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   inputFooter: {
     flexDirection: "row",

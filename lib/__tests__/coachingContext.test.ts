@@ -12,7 +12,7 @@ const FLAG_ON = { ...COACHING_POLICY, contextualDisclosures: true };
 const row = (id: string, notes: string) => ({ id, exercise: 'Bench', set: 1, weightLbs: '100', reps: '5', notes, performance: 'performed', timestamp: 1 });
 
 test('policy ships unapproved with every adaptive switch off', () => {
-  assert.deepEqual(COACHING_POLICY, { version: 'unapproved', contextualDisclosures: false, adaptiveNextSet: false, structuredQuestions: false });
+  assert.deepEqual(COACHING_POLICY, { version: 'unapproved', contextualDisclosures: false, adaptiveNextSet: false, structuredQuestions: false, reviewSetPolicy: false, suppressReviewLoadAdvice: false, restWorkSetsOnly: false });
   assert.deepEqual(readFileSync(new URL('../../supabase/functions/_shared/coachingPolicy.ts', import.meta.url), 'utf8').match(/COACHING_POLICY = (\{[^}]*\})/)?.[1],
     readFileSync(new URL('../coachingPolicy.ts', import.meta.url), 'utf8').match(/COACHING_POLICY = (\{[^}]*\})/)?.[1]);
 });
@@ -132,7 +132,8 @@ test('fenced or failed coach requests add no turn', async () => {
   await r.ask('Next?');
   assert.deepEqual(r.sent[0].chatHistory, [{ role: 'user', content: 'Next?' }]);
   await r.ask('Then?');
-  assert.deepEqual(r.sent[1].chatHistory, [{ role: 'user', content: 'Next?' }, { role: 'user', content: 'Then?' }], 'no fabricated assistant turn');
+  // C3: an empty answer is a failed request (question restored for resend), so it adds no turn either.
+  assert.deepEqual(r.sent[1].chatHistory, [{ role: 'user', content: 'Then?' }], 'no fabricated assistant turn');
 });
 
 test('flag off: coach request carries no context', async () => {
@@ -204,7 +205,8 @@ function realApi() {
   const bodies: any[] = [];
   const exports: any = {};
   vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../api.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {
-    exports, Error, JSON, Response, TextDecoder, require: (name: string) => {
+    // C3: askCoach arms an idle deadline (timers + AbortController); bodies are unchanged.
+    exports, Error, JSON, Response, TextDecoder, setTimeout, clearTimeout, AbortController, require: (name: string) => {
       if (name === './supabase') return { supabaseUrl: 'https://fixture.supabase.co' };
       if (name === './auth') return { fetchWithAuth: async (_url: string, init: RequestInit) => { bodies.push(JSON.parse(String(init.body))); return new Response('{"answer":"ok"}', { status: 200 }); } };
       return {};
