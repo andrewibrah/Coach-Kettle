@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
+import type { WorkoutRow, WorkoutSession } from "@/lib/workoutStorage";
 
 import { getTodayMMDD, makeId, todayISO } from "@/lib/workoutRules";
 
 type UseWorkoutSessionOptions = {
   onResetForNewDay: (nextDate: string) => void;
+  recoveryResolved?: boolean;
 };
 
-export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions) {
+export function useWorkoutSession({ onResetForNewDay, recoveryResolved = true }: UseWorkoutSessionOptions) {
   const [sessionDate, setSessionDate] = useState<string>(getTodayMMDD());
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [workoutActive, setWorkoutActive] = useState(false);
@@ -43,10 +45,12 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
     // Never reset while a workout is in progress — a session crossing
     // midnight must survive until the user ends it. The date rolls over
     // on the next check after the workout ends.
-    if (workoutActive) return;
+    // An inactive hook is not proof there is no session: storage restoration
+    // may still be pending or failed. Only roll over after recovery resolves.
+    if (workoutActive || !recoveryResolved) return;
     const today = getTodayMMDD();
     if (today !== sessionDate) resetSessionState(today);
-  }, [workoutActive, sessionDate, resetSessionState]);
+  }, [workoutActive, recoveryResolved, sessionDate, resetSessionState]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -64,6 +68,7 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
   }, [ensureFreshSession]);
 
   const startWorkoutSession = useCallback((parts: string[]) => {
+    setSessionDate(getTodayMMDD());
     setBodyParts(parts);
     setWorkoutActive(true);
     setWorkoutId(makeId());
@@ -74,6 +79,7 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
   /** Restore a previously persisted draft session without generating new IDs. */
   const restoreWorkoutSession = useCallback(
     (parts: string[], id: string, createdAt: number, dateISO: string) => {
+      setSessionDate(`${dateISO.slice(5, 7)}/${dateISO.slice(8, 10)}`);
       setBodyParts(parts);
       setWorkoutActive(true);
       setWorkoutId(id);
@@ -93,7 +99,7 @@ export function useWorkoutSession({ onResetForNewDay }: UseWorkoutSessionOptions
   }, []);
 
   const buildWorkoutToSave = useCallback(
-    (rows: { exercise: string; weightLbs: string; reps: string; notes: string; timestamp?: number }[]) => ({
+    (rows: WorkoutRow[]): WorkoutSession => ({
       id: workoutId ?? makeId(),
       dateISO: workoutDateISO ?? todayISO(),
       part: selectedPart.trim() || "Workout",
