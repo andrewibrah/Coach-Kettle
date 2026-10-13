@@ -66,7 +66,10 @@ test('actual next-set disables unapproved adaptive RPC without inventing externa
   const result = await edge('next-set', { exercise: 'Pushups' });
   assert.equal(result.status, 200); assert.equal(result.body.suggestion, null);
   assert.equal(result.body.reason, 'policy_unapproved');
-  assert.equal(result.writes.length, 0);
+  assert.equal(result.body.baseline, null);
+  // H1: only the read-only baseline RPC; never legacy suggest_next_set, never a table write.
+  assert.deepEqual(result.writes.map((w: any) => [w.method, w.args[0]]), [['rpc', 'exercise_history_baseline']]);
+  assert.deepEqual([...result.writes[0].args[1].p_names], ['pushups']);
 });
 test('actual chat converts finite JSON load into canonical decimal pounds', async () => {
   const result = await edge('chat', { message: 'Bench and squat' }, { rows: [{ ...valid, weightLbs: 1e22 }] });
@@ -194,13 +197,14 @@ async function edgeRaw(name: string, body: any, ai?: any, authorized = true, pro
     };
   } });
   const client = { auth: { getUser: async () => ({ data: { user: authorized ? { id: 'offline-user' } : null }, error: null }) }, from: (name: string) => { table = name; return query; },
-    rpc: async (...args: any[]) => { writes.push({ method: 'rpc', args }); return rpcFailure ? { data: null, error: rpcFailure } : { data: sqlReceipt(args[1]), error: null }; } };
+    rpc: async (...args: any[]) => { writes.push({ method: 'rpc', args }); if (args[0] === 'exercise_history_baseline') return { data: [], error: null }; return rpcFailure ? { data: null, error: rpcFailure } : { data: sqlReceipt(args[1]), error: null }; } };
   const source = readFileSync(new URL(`../${name}/index.ts`, import.meta.url), 'utf8');
   const dependencies: any = {
     'https://deno.land/std@0.168.0/http/server.ts': { serve: (fn: any) => handler = fn },
     'https://esm.sh/@supabase/supabase-js@2.50.1': { createClient: () => client },
     '../_shared/liftMatching.ts': lift, '../_shared/workoutValidation.ts': contract,
     '../_shared/operationErrors.ts': operationErrors,
+    './baseline.ts': sourceModule('supabase/functions/next-set/baseline.ts'),
     '../_shared/entitlements.ts': { gateAiRequest: async () => { gateCalls++; return { allowed: true }; } },
   };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {

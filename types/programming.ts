@@ -119,3 +119,22 @@ export interface NextSetSuggestion {
   strategy: 'no_history' | 'hold' | 'increase_weight' | 'micro_load' | 'deload_set';
   rationale: string;
 }
+
+/** Prior completed session's eligible sets (H1). Not a recommendation. */
+export interface NextSetBaseline {
+  workoutId: string;
+  date: string | null;
+  exercise: string;
+  sets: {
+    setNumber: number;
+    setKind: string | null;
+    weightLbs: number;
+    reps: number;
+    e1rm: number | null;
+  }[];
+}
+
+export type NextSetResult =
+  | { status: 'suggestion'; suggestion: NextSetSuggestion; baseline: NextSetBaseline | null }
+  | { status: 'no_history' }
+  | { status: 'unavailable'; reason: string; baseline: NextSetBaseline | null };

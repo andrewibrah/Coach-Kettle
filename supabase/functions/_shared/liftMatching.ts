@@ -21,6 +21,15 @@ export function normalizeLiftName(name: string): string {
 }
 
 /**
+ * Normalized names that history may hold for one canonical lift: the canonical
+ * name plus its known ALIASES entries. Never guesses beyond the alias table.
+ */
+export function liftNameVariants(canonical: string): string[] {
+  const name = normalizeLiftName(canonical);
+  return [name, ...(ALIASES[name] ?? [])];
+}
+
+/**
  * Resolve a typed exercise name to a canonical tracked lift name.
  * Match order (all comparisons on normalized strings):
  *   1. exact equality

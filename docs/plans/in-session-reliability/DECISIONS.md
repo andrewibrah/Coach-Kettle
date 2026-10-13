@@ -1,5 +1,22 @@
 # Product decisions — implementation blockers
 
+## Owed by the product owner: questions raised during P5→V2 (2026-10-13)
+
+Everything not blocked by these is built and gated. Blocked behaviour ships disabled through `COACHING_POLICY` (`lib/coachingPolicy.ts`, mirrored in `supabase/functions/_shared/coachingPolicy.ts`, all flags `false`, `version: 'unapproved'`). Recommendations are proposals, not approvals.
+
+| # | Decision | Question | Options | Recommendation |
+|---|---|---|---|---|
+| Q1 | D07 | Next-set progression: which deterministic rule table and increments may the app show? | (a) keep disabled; (b) legacy `suggest_next_set` heuristics (+5/10 lb at 12+ clean reps, +2.5/5 at 10+, back off at ≤4); (c) a goal- and equipment-specific table you supply | (a) until you supply (c). H1 now provides the clean baseline it would consume. |
+| Q2 | D03 | Session review: should warmups be excluded, and should the "-1 for a 20+ lb drop" rule exempt prescribed backoff/drop sets? | (a) exclude warmups and exempt backoff/drop; (b) exclude warmups only; (c) no change | (a) |
+| Q3 | D07 | Rest timer: which performed sets trigger rest, and may auto-start restart an already-running timer? | (a) work sets only; a new set restarts the timer; (b) every performed set; never restart a running timer; (c) keep current behaviour | (a). Also decide whether Leg press and Lat pulldown count as compound; they are currently non-compound and pinned by characterization tests. |
+| Q4 | D07 | The review's `nextSessionNote` can prescribe a load increase, which conflicts with "adaptive disabled". Should it be suppressed until Q1 is approved? | (a) suppress the numeric-load advice; (b) keep it | (a) |
+| Q5 | D09 | How long does a pain disclosure apply after its session ends? | (a) that session only; (b) N days with a freshness label; (c) until an explicit "no pain" | (a), with earlier disclosures shown only as dated, labelled history. |
+| Q6 | D09 | Contradictory answers: which wins? | (a) the latest explicit answer, and any contradiction triggers clarification; (b) pain wins until explicitly cleared | (b) for safety. A skip never means "no pain" under either option. |
+| Q7 | D09 | Should a session-scoped coach archive be persisted server-side? | (a) client memory only; (b) add a session column to `chats` via a migration | (a) |
+| Q8 | D09 | Structured questionnaire (A1): exact wording, trigger cadence, pain scale (0–10 vs descriptive flags), readiness scale, RPE vs RIR (or both), and answer freshness | You supply the copy and scales; qualified review recommended | Pain as a descriptive flag plus optional 0–10, RPE only, asked at most once per exercise, fresh for that exercise only within the session |
+| Q9 | D09 | Safety stop/clarify copy and thresholds (A2/A3): what painful-set signal triggers "stop this exercise", and what does the copy say? | Provide the wording and a qualified reviewer | Any explicit pain disclosure on the current exercise → stop/clarify with no load increase. The copy must not diagnose. |
+| Q10 | D10 | Should modal and inline rename grouping match, and is undo wanted? | (a) match, no undo; (b) match, add undo; (c) leave as is | (a) |
+
 ## P4 recovered live-delivery integrity defaults — pending independent SPEC then QUALITY
 
 Parent reports the prior bounded first/transactional checkpoints approved. This continuation delivers durable owner-scoped live edits/deletes/Clear/explicit abandon without changing retention/clinical/coaching policy. Reversible `revise` retracts incomplete evidence while permitting higher-revision completion of the same stable row; permanent drop forbids ID reuse. Clear tombstones captured old rows but keeps original empty active identity/date and permits later different row IDs; abandon uses deterministic permanent session deletion, with a no-performance bootstrap for never-sent IDs. Cancellation queues nothing; confirmed nonempty End retains authoritative finalization/P2 freeze. No TTL, cross-device overwrite, legacy conversion or final-outbox retirement/pruning is invented. Actual delivery/Edge/disposable SQL728 RPC calls and3 new observed lock barriers;352 focused/3357 full, lint/app tsc pass. This slice remains implementation_pending_review: SPEC first, then QUALITY; migration UNAPPLIED and native/Deno/full-chain/RLS/rollout gates open. Historical pending live-delivery statements below are superseded only for this bounded local implementation. [Evidence](evidence/p4-live-delivery-recovery.md).

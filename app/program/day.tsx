@@ -6,11 +6,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { lastSessionLabel } from '@/components/workout/NextSetSuggestion';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useProgram } from '@/contexts/ProgramContext';
 import { fetchNextSetSuggestion } from '@/lib/programming';
 import { formatProgramDayLabel } from '@/lib/programFormat';
-import type { NextSetSuggestion, ProgramExercise } from '@/types/programming';
+import type { NextSetResult, ProgramExercise } from '@/types/programming';
 
 export default function ProgramDayScreen() {
   const insets = useSafeAreaInsets();
@@ -40,22 +41,17 @@ export default function ProgramDayScreen() {
     return null;
   }, [currentWeek, dayId, dayIndex]);
 
-  const [suggestions, setSuggestions] = useState<Record<string, NextSetSuggestion | null>>({});
+  const [suggestions, setSuggestions] = useState<Record<string, NextSetResult>>({});
 
   useEffect(() => {
     if (!day) return;
     let cancelled = false;
     (async () => {
       for (const ex of day.exercises) {
-        try {
-          const s = await fetchNextSetSuggestion(ex.exercise_name);
-          if (cancelled) return;
-          setSuggestions((prev) => ({ ...prev, [ex.id]: s }));
-        } catch (e) {
-          console.warn('[program/day] suggestion failed for', ex.id, e);
-          if (cancelled) return;
-          setSuggestions((prev) => ({ ...prev, [ex.id]: null }));
-        }
+        // Never throws: failures resolve to an explicit 'unavailable' result.
+        const s = await fetchNextSetSuggestion(ex.exercise_name);
+        if (cancelled) return;
+        setSuggestions((prev) => ({ ...prev, [ex.id]: s }));
       }
     })();
     return () => {
@@ -104,13 +100,22 @@ export default function ProgramDayScreen() {
                 {rest}
               </ThemedText>
               <View style={[styles.suggestPill, { borderColor: tint }]}>
-                {s ? (
+                {s?.status === 'suggestion' ? (
                   <>
                     <ThemedText style={[styles.suggestText, { color: tint }]}>
-                      Suggest: {s.suggested_weight_lbs ?? '—'} lb × {s.suggested_reps_low}-{s.suggested_reps_high}
+                      Suggest: {s.suggestion.suggested_weight_lbs ?? '—'} lb × {s.suggestion.suggested_reps_low}-{s.suggestion.suggested_reps_high}
                     </ThemedText>
-                    <ThemedText style={{ fontSize: 12, opacity: 0.7 }}>{s.rationale}</ThemedText>
+                    <ThemedText style={{ fontSize: 12, opacity: 0.7 }}>{s.suggestion.rationale}</ThemedText>
                   </>
+                ) : s?.status === 'no_history' ? (
+                  <ThemedText style={[styles.suggestText, { color: tint }]}>No previous session</ThemedText>
+                ) : s?.status === 'unavailable' && s.baseline && lastSessionLabel(s.baseline) ? (
+                  <>
+                    <ThemedText style={[styles.suggestText, { color: tint }]}>{lastSessionLabel(s.baseline)}</ThemedText>
+                    <ThemedText style={{ fontSize: 12, opacity: 0.7 }}>Suggestions off</ThemedText>
+                  </>
+                ) : s?.status === 'unavailable' ? (
+                  <ThemedText style={[styles.suggestText, { color: tint }]}>Suggestions unavailable</ThemedText>
                 ) : (
                   <ThemedText style={[styles.suggestText, { color: tint }]}>
                     Suggest: loading…

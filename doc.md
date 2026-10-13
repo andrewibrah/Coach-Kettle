@@ -1,5 +1,25 @@
 # Development log
 
+## H1 history baseline: SPEC PASS / QUALITY APPROVED; progression stays disabled (D07)
+
+Repaired:
+- One canonical identity at log and query time, using only the existing alias table.
+- A new RLS-scoped `exercise_history_baseline` RPC (migration `20261008000400`). It returns the single newest *completed* workout, never MAX(date) and never a merged day, excludes the current, open and deleted sessions, and drops warmup, cardio, planned and invalid sets.
+- next-set returns that baseline while `suggestion` stays null (`policy_unapproved`).
+- The app shows explicit "No previous session", "Last session … / Suggestions off" and "Suggestions unavailable" states.
+- The hardcoded `+2.5 lb` label is replaced with a computed delta.
+- The casing-only edit that left the pill on "Loading…" forever is fixed.
+
+Receipts:
+- RED→GREEN: liftMatching 4/4, baseline 10/10, nextSetBaseline 12/12. SQL fixture 24/24, including the reviewer-found NULL-`createdAt` tie-break. Real-HTTP local smoke 7/7.
+- QUALITY: name-first filtering cut a 50k-row lookup from 859 ms to 236 ms.
+
+Residual:
+- Unlabeled legacy warmups still count (D03).
+- The in-session pill mount and session wiring are A3.
+
+[Evidence](docs/plans/in-session-reliability/evidence/h1-history-baseline-local.md).
+
 ## P5 local history concurrency: repaired, SPEC PASS / QUALITY re-reviewed
 
 All 9 barrier schedules in the plan reproduced over the real `lib/workoutStorage.ts`:

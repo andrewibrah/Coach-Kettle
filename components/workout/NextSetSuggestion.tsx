@@ -4,13 +4,13 @@
 // Designed to be dropped under (or beside) the inline workout row in
 // `app/(tabs)/index.tsx`. Re-fetches when the exercise name changes.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui/themed-text';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { fetchNextSetSuggestion } from '@/lib/programming';
-import type { NextSetSuggestion } from '@/types/programming';
+import type { NextSetBaseline, NextSetResult, NextSetSuggestion } from '@/types/programming';
 
 type Props = {
   exercise: string;
@@ -24,35 +24,50 @@ const STRATEGY_LABEL: Record<NextSetSuggestion['strategy'], string> = {
   no_history:       'no history',
   hold:             'hold',
   increase_weight:  '↑ load',
-  micro_load:       '+2.5 lb',
+  micro_load:       'micro load',
   deload_set:       '↓ back off',
 };
 
+/** Signed load change the suggestion actually returns, or null when either load is unknown. */
+export function loadDeltaLabel(s: Pick<NextSetSuggestion, 'suggested_weight_lbs' | 'last_top_weight_lbs'>): string | null {
+  if (s.suggested_weight_lbs == null || s.last_top_weight_lbs == null) return null;
+  const delta = Math.round((s.suggested_weight_lbs - s.last_top_weight_lbs) * 10) / 10;
+  return `${delta > 0 ? '+' : ''}${delta} lb`;
+}
+
+/** Heaviest set of the prior completed session (ties: most reps). Load is shown unrounded. */
+export function lastSessionLabel(baseline: NextSetBaseline): string | null {
+  let top: NextSetBaseline['sets'][number] | null = null;
+  for (const set of baseline.sets) {
+    if (!top || set.weightLbs > top.weightLbs || (set.weightLbs === top.weightLbs && set.reps > top.reps)) top = set;
+  }
+  return top ? `Last session: ${top.weightLbs} lb × ${top.reps}` : null;
+}
+
 export function NextSetSuggestionPill({ exercise, onUseWeight, compact = true }: Props) {
-  const [data, setData] = useState<NextSetSuggestion | null>(null);
+  const [result, setResult] = useState<NextSetResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const lastExerciseRef = useRef<string>('');
+  // Keyed on the normalized name: a casing-only edit neither refetches nor
+  // cancels the in-flight request (which previously left Loading forever).
+  const exerciseKey = exercise.trim().toLowerCase();
   const cardBg = useThemeColor({}, 'cardBackground');
   const textColor = useThemeColor({}, 'text');
   const tint = useThemeColor({}, 'tint');
 
   useEffect(() => {
-    const trimmed = exercise.trim();
-    if (!trimmed) {
-      setData(null);
+    if (!exerciseKey) {
+      setResult(null);
+      setLoading(false);
       return;
     }
-    if (trimmed.toLowerCase() === lastExerciseRef.current) return;
-    lastExerciseRef.current = trimmed.toLowerCase();
 
     let cancelled = false;
     setLoading(true);
-    fetchNextSetSuggestion(trimmed)
-      .then((r) => { if (!cancelled) setData(r); })
-      .catch(() => { if (!cancelled) setData(null); })
+    fetchNextSetSuggestion(exerciseKey)
+      .then((r) => { if (!cancelled) setResult(r); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [exercise]);
+  }, [exerciseKey]);
 
   if (loading) {
     return (
@@ -62,11 +77,28 @@ export function NextSetSuggestionPill({ exercise, onUseWeight, compact = true }:
     );
   }
 
-  if (!data) return null;
+  if (!result) return null;
 
+  if (result.status !== 'suggestion') {
+    const last = result.status === 'unavailable' && result.baseline ? lastSessionLabel(result.baseline) : null;
+    return (
+      <View style={[styles.pill, { backgroundColor: cardBg }]}>
+        <View style={{ flex: 1 }}>
+          <ThemedText style={[styles.label, { color: textColor }]}>
+            {result.status === 'no_history' ? 'No previous session' : last ?? 'Suggestions unavailable'}
+          </ThemedText>
+          {last && (
+            <ThemedText style={[styles.rationale, { color: textColor }]}>Suggestions off</ThemedText>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  const data = result.suggestion;
   const weight = data.suggested_weight_lbs;
   const reps = `${data.suggested_reps_low}–${data.suggested_reps_high}`;
-  const strategy = STRATEGY_LABEL[data.strategy] ?? data.strategy;
+  const strategy = (data.strategy === 'micro_load' && loadDeltaLabel(data)) || (STRATEGY_LABEL[data.strategy] ?? data.strategy);
 
   return (
     <View style={[styles.pill, { backgroundColor: cardBg }]}>

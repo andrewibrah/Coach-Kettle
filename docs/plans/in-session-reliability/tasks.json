@@ -101,8 +101,9 @@
       "dependencies": [
         "I3"
       ],
-      "status": "planned",
-      "classification": "source-verified bugs plus proposed policy",
+      "status": "done_local_policy_blocked",
+      "classification": "source-verified bugs repaired; progression policy (D07/Q1) still blocked and disabled",
+      "latest_gate": "2026-10-13: canonical alias variants (existing table only), RLS-scoped exercise_history_baseline RPC (single newest completed workout by createdAt then date, excludes current/open/deleted sessions, I3 eligibility, backoff kept with set_kind), next-set returns baseline with adaptive off, client discriminated suggestion/no_history/unavailable states, computed delta label, casing-refresh stuck-Loading fixed. RED->GREEN liftMatching 0/4->4/4, baseline 1/10->10/10, nextSetBaseline 0/12->12/12, SQL fixture 24/24 (incl. reviewer-found null-createdAt tie-break). ck-p5 functions-serve smoke 7/7. Independent SPEC PASS, QUALITY APPROVED (name-first SQL 859->236 ms on 50k rows). Evidence: evidence/h1-history-baseline-local.md.",
       "decision_ids": [
         "D03",
         "D07"

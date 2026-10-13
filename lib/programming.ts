@@ -10,7 +10,7 @@ import type {
   GoalType,
   SplitType,
   Periodization,
-  NextSetSuggestion,
+  NextSetResult,
 } from '@/types/programming';
 
 const API = `${supabaseUrl}/functions/v1`;
@@ -95,17 +95,23 @@ export async function archiveProgram(programId: string): Promise<WorkoutProgram>
 }
 
 // ---------- Next-set suggestion ----------
-export async function fetchNextSetSuggestion(exercise: string): Promise<NextSetSuggestion | null> {
-  const res = await fetchWithAuth(
-    `${API}/next-set?exercise=${encodeURIComponent(exercise)}`,
-    { method: 'GET' }
-  );
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('Unauthorized');
-    return null;
+export async function fetchNextSetSuggestion(exercise: string, sessionId?: string): Promise<NextSetResult> {
+  const session = sessionId ? `&session=${encodeURIComponent(sessionId)}` : '';
+  try {
+    const res = await fetchWithAuth(
+      `${API}/next-set?exercise=${encodeURIComponent(exercise)}${session}`,
+      { method: 'GET' }
+    );
+    if (!res.ok) return { status: 'unavailable', reason: 'error', baseline: null };
+    const data = await res.json();
+    const baseline = data?.baseline ?? null;
+    if (data?.suggestion) return { status: 'suggestion', suggestion: data.suggestion, baseline };
+    // A response without a baseline field (older server) is not evidence of no history.
+    if (data && 'baseline' in data && data.baseline === null) return { status: 'no_history' };
+    return { status: 'unavailable', reason: String(data?.reason ?? 'error'), baseline };
+  } catch {
+    return { status: 'unavailable', reason: 'error', baseline: null };
   }
-  const data = await res.json();
-  return data?.suggestion ?? null;
 }
 
 // ---------- Default templates ----------
