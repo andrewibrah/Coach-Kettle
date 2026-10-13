@@ -196,8 +196,9 @@
         "P3",
         "P4"
       ],
-      "status": "planned",
-      "classification": "unverified storage races",
+      "status": "done_local",
+      "classification": "reproduced in-process storage races (9 schedules), repaired; cross-process/native atomicity not claimed",
+      "latest_gate": "2026-10-13: history-key queue + clear generation fence + revision-matched acks + mergeServerHistory. RED 1/9 (+2 sign-out) -> GREEN 13/0; lib 3404/0, edge _shared 80/0, expo lint + direct eslint max-warnings 0, tsc, diff check exit 0; local ck-p5 reset 63/63 (remote_schema excluded, pre-existing chain defect) + functions serve smoke 8/8. Independent SPEC PASS, QUALITY changes applied and re-reviewed. Evidence: evidence/p5-history-concurrency-local.md.",
       "decision_ids": [],
       "section": "02_SESSION_PERSISTENCE.md"
     },

@@ -14,11 +14,10 @@ import { api } from "@/lib/api";
 import {
   deleteWorkout as deleteWorkoutLocal,
   listWorkouts as listLocalWorkouts,
+  mergeServerHistory,
   syncPendingWorkouts,
-  WORKOUT_HISTORY_KEY,
   type WorkoutSession,
 } from "@/lib/workoutStorage";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function formatDateHeader(dateISO: string) {
   const date = new Date(dateISO);
@@ -82,15 +81,10 @@ export default function HistoryScreen() {
       await syncPendingWorkouts().catch(() => 0);
 
       const data = await api.getHistory();
-      // Merge: server is truth, but keep local-only (still-pending) sessions
-      // so an offline save is never invisible to the user.
-      const local = await listLocalWorkouts().catch(() => [] as WorkoutSession[]);
-      const serverIds = new Set((data as WorkoutSession[]).map((w) => w.id));
-      const localOnly = local.filter((w) => w.pendingSync && !serverIds.has(w.id));
-      const merged = [...(data as WorkoutSession[]), ...localOnly];
-
-      // Refresh the offline cache with the merged view.
-      AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(merged)).catch(() => undefined);
+      // Merge: server is truth, but still-pending local sessions win so an
+      // offline save or unacknowledged edit is never invisible or dropped.
+      // Serialized with every other history write (refreshes the offline cache).
+      const merged = await mergeServerHistory(data as WorkoutSession[]).catch(() => data as WorkoutSession[]);
 
       // newest first
       const sorted = merged.sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));

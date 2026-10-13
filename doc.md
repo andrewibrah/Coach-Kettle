@@ -1,5 +1,21 @@
 # Development log
 
+## P5 local history concurrency: repaired, SPEC PASS / QUALITY re-reviewed
+
+All 9 barrier schedules in the plan reproduced over the real `lib/workoutStorage.ts`:
+- concurrent saves of different workouts, and save ∥ delete;
+- a stale retry ack, or a slow older ack, overwriting a newer pending revision;
+- an ack or review re-inserting a deleted workout;
+- duplicate identity-less revisions;
+- the history refresh dropping concurrent saves and pending local edits;
+- sign-out clear being undone by queued writes (found by the SPEC reviewer).
+
+Repair: one in-process queue for every history read-modify-write, a clear-generation fence, revision-matched acks via `patchRevision` (which never re-inserts), and `mergeServerHistory` (pending local wins), wired into `history.tsx`.
+
+RED 1/9 → GREEN 13/0. lib 3404/0, Edge `_shared` 80/0. Lint, direct eslint, tsc and diff check exit 0. Local ck-p5 stack: 63/63 migrations, with `remote_schema` excluded because of a pre-existing chain defect. `functions serve` smoke: 8/8.
+
+No cross-process atomicity claim. Terminal-rejection 500s and legacy identity-less pending sessions are handed to the P4 owner. [Evidence](docs/plans/in-session-reliability/evidence/p5-history-concurrency-local.md).
+
 ## Account deletion clears the deleted user's saved workout (closes P4 auth MEDIUM privacy item)
 
 Once the server confirms the deletion, `runAccountDeletion` runs a new best-effort `clearLocalDraft` step, the first local step and ahead of `signOut` (which fences the draft). The screen wires it to `clearWorkoutDraft(session.user.id)`. The owner check keeps any other account's draft and any legacy draft unchanged, and sign-out still completes. On cancelled or failed re-auth, wrong account, or server failure, nothing is cleared. `clearWorkoutDraft` impact is HIGH, so it is called but unchanged.

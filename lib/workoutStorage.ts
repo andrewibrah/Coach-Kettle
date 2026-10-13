@@ -83,12 +83,37 @@ export async function listWorkouts(): Promise<WorkoutSession[]> {
   }
 }
 
-async function upsertLocal(session: WorkoutSession, isCurrent = () => true) {
-  if (!isCurrent()) return;
-  const existing = await listWorkouts();
-  if (!isCurrent()) return;
-  const next = [session, ...existing.filter((w) => w.id !== session.id)];
-  await AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(next));
+// Every read-modify-write of the history key runs through this queue so two
+// in-process writers cannot interleave and drop each other's sessions. This is
+// in-process serialization only; it makes no cross-process atomicity claim.
+// fn must not call another history-queued function (that would deadlock).
+let historyQueue: Promise<unknown> = Promise.resolve();
+// Bumped by clearWorkouts (sign-out). Writes requested before a clear are
+// dropped so a previous user's history cannot reappear for the next user.
+let historyGeneration = 0;
+type HistoryWrite = (sessions: WorkoutSession[]) => Promise<void>;
+function withHistory<T>(fn: (existing: WorkoutSession[], write: HistoryWrite) => Promise<T>): Promise<T> {
+  const generation = historyGeneration;
+  const write = async (sessions: WorkoutSession[]) => {
+    if (generation !== historyGeneration) return;
+    await AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(sessions));
+  };
+  const run = historyQueue.then(async () => fn(await listWorkouts(), write));
+  historyQueue = run.catch(() => undefined);
+  return run;
+}
+
+/** Patch the stored session only if it still holds `revision`; never re-inserts a deleted one. */
+function patchRevision(id: string, revision: number | undefined, patch: Partial<Pick<WorkoutSession, 'review' | 'pendingSync'>>, isCurrent = () => true) {
+  return withHistory(async (existing, write) => {
+    if (!isCurrent()) return false;
+    const index = existing.findIndex((w) => w.id === id && w.revision === revision);
+    if (index < 0) return false;
+    const next = [...existing];
+    next[index] = { ...next[index], ...patch };
+    await write(next);
+    return true;
+  });
 }
 
 /**
@@ -98,13 +123,19 @@ async function upsertLocal(session: WorkoutSession, isCurrent = () => true) {
  */
 export async function saveWorkout(session: WorkoutSession, options?: { review?: Promise<SessionReview | null>; isCurrent?: () => boolean }): Promise<{ synced: boolean }> {
   const isCurrent = options?.isCurrent ?? (() => true);
-  if (!session.operationKey || !session.revision) {
-    const prior = (await listWorkouts()).find(item => item.id === session.id);
-    const revision = Math.max(Date.now(), (prior?.revision ?? 0) + 1);
-    session = { ...session, revision, operationKey: `finalize:${session.id}:${revision}` };
-  }
   // 1. Local Write (Upsert) — never wait for optional coaching before recovery.
-  await upsertLocal({ ...session, pendingSync: true }, isCurrent);
+  // Identity is assigned inside the same queued step so concurrent saves of one
+  // workout cannot read the same prior revision and collide.
+  session = await withHistory(async (existing, write) => {
+    let next = session;
+    if (!next.operationKey || !next.revision) {
+      const prior = existing.find(item => item.id === next.id);
+      const revision = Math.max(Date.now(), (prior?.revision ?? 0) + 1);
+      next = { ...next, revision, operationKey: `finalize:${next.id}:${revision}` };
+    }
+    if (isCurrent()) await write([{ ...next, pendingSync: true }, ...existing.filter((w) => w.id !== next.id)]);
+    return next;
+  });
   if (!isCurrent()) return { synced: false };
   if (options?.review) {
     const review = await options.review.catch(() => null);
@@ -112,7 +143,7 @@ export async function saveWorkout(session: WorkoutSession, options?: { review?: 
     if (review) {
       session = { ...session, review };
       // Optional enrichment failure must not undo the already-durable performance.
-      try { await upsertLocal({ ...session, pendingSync: true }, isCurrent); }
+      try { await patchRevision(session.id, session.revision, { review }, isCurrent); }
       catch (error) { console.warn('[saveWorkout] Review could not be saved locally.', error); }
     }
   }
@@ -122,7 +153,8 @@ export async function saveWorkout(session: WorkoutSession, options?: { review?: 
     if (!isCurrent()) return { synced: false };
     await api.saveWorkout(session);
     if (!isCurrent()) return { synced: false };
-    await upsertLocal({ ...session, pendingSync: false }, isCurrent);
+    // The ack clears only the revision it acknowledges; a newer local save stays pending.
+    await patchRevision(session.id, session.revision, { pendingSync: false }, isCurrent);
     return { synced: true };
   } catch (e) {
     console.warn("[saveWorkout] Supabase sync failed, saved locally only.", e);
@@ -139,7 +171,7 @@ export async function syncPendingWorkouts(): Promise<number> {
     try {
       const { pendingSync: _p, media: _m, ...payload } = session;
       await api.saveWorkout(payload);
-      await upsertLocal({ ...session, pendingSync: false });
+      await patchRevision(session.id, session.revision, { pendingSync: false });
       synced += 1;
     } catch {
       // Still offline — retry on next call.
@@ -148,12 +180,28 @@ export async function syncPendingWorkouts(): Promise<number> {
   return synced;
 }
 
-export async function deleteWorkout(id: string) {
-  const existing = await listWorkouts();
-  const next = existing.filter((w) => w.id !== id);
-  await AsyncStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(next));
+export function deleteWorkout(id: string) {
+  return withHistory((existing, write) => write(existing.filter((w) => w.id !== id)));
 }
 
-export async function clearWorkouts() {
-  await AsyncStorage.removeItem(WORKOUT_HISTORY_KEY);
+/**
+ * Refresh the offline cache from server history. Server is truth for synced
+ * sessions; a still-pending local session (server GET carries no revision) wins
+ * over the server copy so an unacknowledged edit is never dropped.
+ */
+export function mergeServerHistory(server: WorkoutSession[]): Promise<WorkoutSession[]> {
+  return withHistory(async (local, write) => {
+    const pending = local.filter((w) => w.pendingSync);
+    const pendingIds = new Set(pending.map((w) => w.id));
+    const merged = [...server.filter((w) => !pendingIds.has(w.id)), ...pending];
+    await write(merged);
+    return merged;
+  });
+}
+
+export function clearWorkouts() {
+  historyGeneration += 1;
+  const run = historyQueue.then(() => AsyncStorage.removeItem(WORKOUT_HISTORY_KEY));
+  historyQueue = run.catch(() => undefined);
+  return run;
 }
