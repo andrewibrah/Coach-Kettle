@@ -1,0 +1,424 @@
+{
+  "schema_version": 1,
+  "planning_only": false,
+  "implementation_scope": "Prior bounded D1/I1,I2,P1,P2 SPEC/QUALITY approved; latest bounded P3 QUALITY APPROVED and C2 SPEC/QUALITY APPROVED22 tests per parent. I3 single cardio SQL-capacity QUALITY blocker locally repaired:183 focused/3322 full,16 actual handler cardio SQL readbacks and65 retained strength parity cases. Pending independent SPEC first then QUALITY; separate unapplied migration proposal, no deploy/migration approval.",
+  "repository": "/Users/me/Desktop/partner/11_Codebases/Coach-Kettle",
+  "head": "e9f96fe6190187472c4ada2f584e8526fec13e41",
+  "exclusive_owner_files": [
+    "app/(tabs)/index.tsx"
+  ],
+  "tasks": [
+    {
+      "id": "D1",
+      "title": "Lock contracts and failing regression harness",
+      "audit_ids": [],
+      "dependencies": [],
+      "status": "partial",
+      "progress": "Offline real-parser and AST-extracted actual workout-route harness verified; quality follow-up adds captured async chat-history storage and surfaces unexpected caught exceptions while retaining deliberate provider-error fixtures; successful answer verified without catch; broader contracts and policy gates remain open; independent spec regression gate then quality re-review pending; Prior bounded repair independently SPEC PASS / QUALITY APPROVED per parent handoff, not whole-task completion. I2 local implementation now pending independent review.",
+      "classification": "planning prerequisite",
+      "decision_ids": [
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05",
+        "D06",
+        "D07",
+        "D08",
+        "D09"
+      ],
+      "section": "01_INPUT_INTEGRITY.md"
+    },
+    {
+      "id": "I1",
+      "title": "Stop parser corruption and preserve disclosed effort/pain",
+      "audit_ids": [
+        "S1",
+        "S2",
+        "S6",
+        "Q1"
+      ],
+      "dependencies": [
+        "D1"
+      ],
+      "status": "partial",
+      "classification": "runtime-verified bugs",
+      "progress": "Quality-review R1 attached colon/equal numeric-attempt boundaries fixed structurally before bodyweight fallback; arbitrary unit labels with spaced/attached signs and x/× clarify without AI or set effects; literal annotation/custom/bodyweight/narrative/mode controls retained; storage seam and hidden-catch harness visibility strengthened failure-first; 2191 targeted / 2906 full lib tests pass; standalone four-reviewer-input and successful-answer repro 9/9 pass; prior 10/64/345 probes pass; direct app typecheck/lint/diff checks pass; graph remains HIGH with stale/truncated coverage; D1/I1 partial, parent independent spec regression gate then quality re-review pending; structured effort, comma grammar, revised bare-number policy and I2 deferred; limitations and vertical TDD receipts in doc.md; Prior bounded repair independently SPEC PASS / QUALITY APPROVED per parent handoff, not whole-task completion. I2 local implementation now pending independent review.",
+      "decision_ids": [
+        "D01",
+        "D02"
+      ],
+      "section": "01_INPUT_INTEGRITY.md"
+    },
+    {
+      "id": "I2",
+      "title": "Separate planned targets, performed sets and warmup identity",
+      "audit_ids": [
+        "S3",
+        "S4",
+        "S5",
+        "F7"
+      ],
+      "dependencies": [
+        "I1"
+      ],
+      "status": "partial",
+      "latest_gate": "Parent handoff subsequently reports bounded I2 local SPEC PASS / QUALITY APPROVED:119 targeted /3008 full /26 matrix at that gate. Not whole I2 server/native completion. P1 authorized next; original progress below retained as historical receipts.",
+      "classification": "runtime/source-verified bugs; SQL downstream predicted",
+      "decision_ids": [
+        "D03"
+      ],
+      "section": "01_INPUT_INTEGRITY.md",
+      "progress": "Parent I2 SPEC PASS then recurring QUALITY provenance request. Single/batch shorthand and named composer fills now use the same actual-vs-metadata-free-legacy transition as inline/modal. Real AI actual8 plus185/0 retains ID/actual8 and no invented target; explicit actual6 replaces8 without target fabrication; genuine target10 stays separate. Strict vertical RED10/1->GREEN11/0 and RED11/1->GREEN12/0; 19 new integrated composer/End/local serializer regressions (29 quality total). Final119 targeted /3008 full /2191 retained first-slice pass; lint/direct app tsc/diff exit0 without bypass. Fixture-only compatibility correction receipts in doc.md; prior independent probe status remains historical, not revalidated. CRITICAL stale/truncated graph10 tracked files/34 symbols/27 flows. implementation_pending_review: independent spec regression then quality re-review. No native/real DB/provider/Edge/deploy approval; I3/H1/P3/P4 remain open."
+    },
+    {
+      "id": "I3",
+      "title": "One numeric contract across parser, inline/modal, Edge and SQL",
+      "audit_ids": [
+        "S7",
+        "S8",
+        "F6"
+      ],
+      "dependencies": [
+        "I2"
+      ],
+      "status": "partial",
+      "latest_gate": "Parent reports bounded I3 SPEC/QUALITY APPROVED:183 focused/65 strength SQL/16 cardio SQL/3322 full, lint and worker app tsc passed; reviewer final typecheck guard BLOCKED/no bypass. Earlier pending receipts below historical; Deno/native/full-schema/RLS/prodDB/rollout remain unverified.",
+      "classification": "runtime/source-verified bugs; database effects predicted",
+      "decision_ids": [
+        "D01",
+        "D03"
+      ],
+      "section": "01B_NUMERIC_HISTORY.md",
+      "progress": "Single QUALITY decimal-vs-INTEGER blocker repaired by separate UNAPPLIED 20261008000200 proposal widening heart_rate/calories/level to unconstrained NUMERIC with legacy-preserving casts and NOT VALID finite-capacity guards. Strict pre-change decimal SQL JSON projection RED;16 actual log-set/history SQL readbacks GREEN including fractions/zero/omission/int32 overflow/MAX_VALUE/MIN_VALUE, exact raw legacy preservation and real guard rejection. Retained65 strength trigger/quarantine/reconcile parity cases,183 focused/3322 full tests pass; lint/direct app tsc/diff exit0. Scratch-only PG15 TCP disabled, all transactions rollback, schema absence/stopped verified. General history HTTP200 after failed insert remains explicitly exposed by negative control, not a P4 repair claim. Evidence: evidence/i3-cardio-storage-local.md. I3 implementation_pending_review: independent SPEC first then QUALITY. Graph UNKNOWN/aggregate CRITICAL stale/truncated; Deno/native/full schema/RLS/coordinated separately approved rollout gates open. No production migration/deploy/install/commit/live provider/real DB; previous dirty approved sources preserved."
+    },
+    {
+      "id": "H1",
+      "title": "Correct aliases, completed-session history and progression baseline",
+      "audit_ids": [
+        "S9"
+      ],
+      "dependencies": [
+        "I3"
+      ],
+      "status": "planned",
+      "classification": "source-verified bugs plus proposed policy",
+      "decision_ids": [
+        "D03",
+        "D07"
+      ],
+      "section": "01B_NUMERIC_HISTORY.md"
+    },
+    {
+      "id": "P1",
+      "title": "Serialize drafts and restore active sessions",
+      "audit_ids": [
+        "F2",
+        "F8",
+        "F9"
+      ],
+      "dependencies": [
+        "I2"
+      ],
+      "status": "partial",
+      "latest_gate": "Parent reports latest bounded P1 local SPEC PASS / QUALITY APPROVED; reviewer3127 full /144 P1+schedule /10 extra checks and lint/typecheck/diff exit0. Not native/provider/DB or whole P1 checklist completion; earlier progress below is historical.",
+      "progress": "Historical implementation receipt: Authorized after parent-reported bounded I2 local SPEC/QUALITY approval, not server/native completion. F2/F8/F9 and proven write/clear/restore/import schedules integrated with real draft helper and actual route/hook offline boundaries: empty active context, serialized operations and cleanup generations, original date/identity/title, interrupted editable planned recovery with exact pending input/no auto retry, all Start/import gates, malformed/error preservation. 28 P1 /53 with schedule /119 retained I2 /2191 first-slice /3036 full pass; lint/direct app tsc/diff exit0. Original scratch30-case matrix29/1 missing delete-boundary fixture; separate assertion-preserving adapted30/0. Existing v1 model retained; schema-version/recovery-picker/TTL decisions deferred. Independent SPEC then QUALITY required; P2 and native/DB/provider/release gates remain open. Evidence: evidence/p1-draft-integrity-local.md.",
+      "classification": "executed F2; source-verified F8/F9; ordering risks",
+      "decision_ids": [
+        "D04",
+        "D05"
+      ],
+      "section": "02_SESSION_PERSISTENCE.md"
+    },
+    {
+      "id": "P2",
+      "title": "Fence End/save and late responses",
+      "audit_ids": [
+        "F3",
+        "F4"
+      ],
+      "dependencies": [
+        "I2",
+        "P1"
+      ],
+      "status": "partial",
+      "progress": "F3/F4 locally repaired after parent-reported bounded P1 approval: synchronous End before confirmation, stable-ID/revision/owner snapshot, explicit phases and visible freeze/dismiss guards, same typed/button End, immediate durable performance with optional5000ms review deadline and no synthetic API fallback, honest save/cleanup retry retaining original metadata, request/owner/lifecycle and pre/post-clear P1 generation fences. Actual route/helpers/storage/API and JSX guard tests77/0; P1+schedule144/0; retainedI2 119/0; input2191/0; full3204/0, no skips; lint(no warnings)/direct app tsc/diff exit0. Original retained assertions preserved, missing-dependency fixture receipts explicit. Independent SPEC then QUALITY required. Graph CRITICAL14 tracked files/73 range-attributed symbols/37 flows, stale/truncated. P3/P4/P5/global C1/native/provider/DB/release remain deferred. Evidence: evidence/p2-session-ownership-local.md. Interrupted-run recovery freshly reproduced77 P2/144 P1+schedule/119 I2/2191 input/3204 full, zero failures/skips and lint/direct app tsc/diff exit0; prior worker had completed local edits/evidence before model-wait interruption, so recovery retained all production code and changed documentation only. Fresh logs: active-profile scratch ck-p2-recovery-*.log; independent SPEC/QUALITY still pending.",
+      "classification": "executed local route/helper/storage defects and controlled callback schedules; native/server races remain unverified",
+      "decision_ids": [
+        "D06"
+      ],
+      "section": "02_SESSION_PERSISTENCE.md",
+      "latest_gate": "Parent latest bounded P2 SPEC/QUALITY APPROVED. Earlier pending statements are historical, not whole P2/native/server completion."
+    },
+    {
+      "id": "P3",
+      "title": "Cardio and performance final-save roundtrip",
+      "audit_ids": [
+        "F1"
+      ],
+      "dependencies": [
+        "I2",
+        "I3",
+        "P2"
+      ],
+      "status": "partial",
+      "progress": "Real AI builder preserves canonical ID/time, cardio metrics/units, zero/false, classification and targets with existing performed/planned semantics. Actual End saves all performed rows while strength-only review excludes cardio/planned/incomplete; direct API no-data calls reject before provider IO. Combined actual send/End/hook/local/API/history Edge offline mixed/legacy/zero/missing-optional, local failure+End retry and pending-sync retry verified. Final31 P3/202 retained P2+I2/3216 full pass; lint/diff exit0. App tsc BLOCKED by lifecycle scan cap, no verdict/bypass. Evidence p3-cardio-spec-repairs-local.md; independent SPEC then QUALITY pending; native/SQL/provider/deployed/P4/P5 unclaimed.",
+      "classification": "executed payload loss; backend replacement source verified",
+      "decision_ids": [],
+      "section": "02_SESSION_PERSISTENCE.md",
+      "latest_gate": "Parent latest bounded P3 QUALITY APPROVED with3216 full; historical app typecheck scan-cap BLOCKED/no verdict. Current I3 direct app tsc separately exit0; no Deno/native/server approval."
+    },
+    {
+      "id": "P4",
+      "title": "Idempotent submissions and transactional finalization",
+      "audit_ids": [
+        "F5"
+      ],
+      "dependencies": [
+        "I3",
+        "P2",
+        "P3"
+      ],
+      "status": "implementation_pending_review",
+      "progress": "Historical session-operation checkpoint receipt, superseded by latest_gate and evidence/p4-live-delivery-recovery.md: Session-operation checkpoint pending independent SPEC then QUALITY. Preserved parent-approved first checkpoint guard/local-pending behavior. Actual composer/row-delete/API/Edge carries sessionId,rowId,revision,operationKey; JWT-owned RPC is sole write path, missing RPC sanitized500 no fallback. UNAPPLIED chronological 20261008000300 proposal: session/PR locks, exact receipts, row/session tombstones, authoritative transactional snapshot/log/PR reconciliation. Real scratch PG both commit-order barriers, retries, owner/new-session RLS/bypass rejection, two same-day sessions, raw legacy preservation, drop-before-put, real insert/delete/PR-trigger rollback; actual API/Edge/SQL23 calls and16 cardio numeric readbacks.214 focused/3338 full pass, lint/diff0; current app tsc guard BLOCKED/no verdict/no bypass, Deno unavailable. Whole P4 not done: broader live-edit/Clear/abandon delivery policy, P5 concurrency, full-schema/RLS/native/rollout unresolved. Evidence evidence/p4-session-operations-local.md; no production rollout/install/commit or applied migration.",
+      "classification": "executed callback and real disposable SQL races; full schema/native rollout unverified",
+      "latest_gate": "Account deletion draft clear (2026-10-13, closes auth/provenance MEDIUM privacy item): runAccountDeletion clearLocalDraft runs first after server-confirmed deletion, before signOut fence; screen wires clearWorkoutDraft(session.user.id); foreign/legacy drafts kept, non-deletion paths never clear, throwing clear still signs out. RED 5 fail -> GREEN; lib 3385/0, lint no warnings, tsc/diff exit0. Independent reviewer: REVIEWER_VERDICT. No commit/remote. Evidence: evidence/p4-auth-provenance-local.md. Prior gate: Edge _shared identity drift repaired (test-only, local commit 958b0c0): 66/13 -> 80/0. All 13 proven stale I3 fixtures (P4 identity 400, then RPC write-shape/SQL-owned PR), no log-set regression; identity helper + anti-vacuous guard + SQL-eligibility receipt model + identity-less 400/0-RPC negative; real Edge->disposable PG15 apply_workout_operation parity 15/15. 3381/0 lib, lint no warnings, tsc/diff exit0; staged graph LOW. Independent SPEC PASS / QUALITY APPROVED (re-approved after nits). supabase start BLOCKED (no Docker); no remote/deploy. Evidence: evidence/p4-edge-fixture-identity-local.md. Prior gate (auth/provenance, pending SPEC then QUALITY): evidence/p4-auth-provenance-local.md. ",
+      "decision_ids": [
+        "D08"
+      ],
+      "section": "02_SESSION_PERSISTENCE.md"
+    },
+    {
+      "id": "P5",
+      "title": "Local history concurrency experiments and repair",
+      "audit_ids": [],
+      "dependencies": [
+        "P3",
+        "P4"
+      ],
+      "status": "planned",
+      "classification": "unverified storage races",
+      "decision_ids": [],
+      "section": "02_SESSION_PERSISTENCE.md"
+    },
+    {
+      "id": "C1",
+      "title": "Scoped coaching conversation and durable pain context",
+      "audit_ids": [
+        "Q2"
+      ],
+      "dependencies": [
+        "I2",
+        "P2"
+      ],
+      "status": "planned",
+      "classification": "executed follow-up context loss; source-verified scope gaps",
+      "decision_ids": [
+        "D09"
+      ],
+      "section": "03_COACHING_TRANSPORT_CONTEXT.md"
+    },
+    {
+      "id": "C2",
+      "title": "Lossless provider SSE chunk assembly",
+      "audit_ids": [
+        "Q5"
+      ],
+      "dependencies": [
+        "D1"
+      ],
+      "status": "partial",
+      "classification": "offline real-handler runtime-verified bug",
+      "decision_ids": [],
+      "section": "03_COACHING_TRANSPORT_CONTEXT.md",
+      "latest_gate": "Latest parent handoff reports bounded C2 SPEC/QUALITY APPROVED,22 tests. Coach folder untouched by I3; older pending statements historical, not whole C2/native/deployed release completion."
+    },
+    {
+      "id": "C3",
+      "title": "Visible errors, honest review and uniform rest effects",
+      "audit_ids": [
+        "S10",
+        "Q3",
+        "Q4"
+      ],
+      "dependencies": [
+        "I2",
+        "P2",
+        "P3"
+      ],
+      "status": "planned",
+      "classification": "runtime/source-verified defects plus rest/review policy gaps",
+      "decision_ids": [
+        "D03",
+        "D07"
+      ],
+      "section": "03_COACHING_TRANSPORT_CONTEXT.md"
+    },
+    {
+      "id": "A1",
+      "title": "Structured readiness, pain and effort answers with applicability",
+      "audit_ids": [],
+      "dependencies": [
+        "I3",
+        "P1",
+        "P2",
+        "C1"
+      ],
+      "status": "planned",
+      "classification": "proposed feature; architecture gap verified, not existing functionality",
+      "decision_ids": [
+        "D01",
+        "D09"
+      ],
+      "section": "04_ADAPTIVE_COACHING.md"
+    },
+    {
+      "id": "A2",
+      "title": "Deterministic next-set decisions and aligned explanations",
+      "audit_ids": [],
+      "dependencies": [
+        "A1",
+        "H1",
+        "P4"
+      ],
+      "status": "planned",
+      "classification": "proposed adaptive feature; progression/pain disconnect source verified",
+      "decision_ids": [
+        "D07",
+        "D09"
+      ],
+      "section": "04_ADAPTIVE_COACHING.md"
+    },
+    {
+      "id": "A3",
+      "title": "Mounted, refreshed in-session next-set decision UI",
+      "audit_ids": [],
+      "dependencies": [
+        "A2",
+        "C2",
+        "C3"
+      ],
+      "status": "planned",
+      "classification": "proposed feature; dormant component mount/refresh gap verified",
+      "decision_ids": [
+        "D09"
+      ],
+      "section": "04_ADAPTIVE_COACHING.md"
+    },
+    {
+      "id": "V1",
+      "title": "Close unverified gesture, restore and association risks",
+      "audit_ids": [],
+      "dependencies": [
+        "P5",
+        "C1",
+        "A3"
+      ],
+      "status": "planned",
+      "classification": "risk experiments; not confirmed user-visible defects",
+      "decision_ids": [
+        "D10"
+      ],
+      "section": "05_VERIFICATION_RELEASE.md"
+    },
+    {
+      "id": "V2",
+      "title": "Offline, local DB and real-device release matrix",
+      "audit_ids": [],
+      "dependencies": [
+        "V1"
+      ],
+      "status": "planned",
+      "classification": "verification; not implementation",
+      "decision_ids": [],
+      "section": "05_VERIFICATION_RELEASE.md"
+    },
+    {
+      "id": "V3",
+      "title": "Human-controlled staged rollout and release signoff",
+      "audit_ids": [],
+      "dependencies": [
+        "V2"
+      ],
+      "status": "planned",
+      "classification": "release authorization gate",
+      "decision_ids": [],
+      "section": "05_VERIFICATION_RELEASE.md"
+    }
+  ],
+  "audit_coverage": {
+    "S1": [
+      "I1"
+    ],
+    "S2": [
+      "I1"
+    ],
+    "S3": [
+      "I2"
+    ],
+    "S4": [
+      "I2"
+    ],
+    "S5": [
+      "I2"
+    ],
+    "S6": [
+      "I1"
+    ],
+    "S7": [
+      "I3"
+    ],
+    "S8": [
+      "I3"
+    ],
+    "S9": [
+      "H1"
+    ],
+    "S10": [
+      "C3"
+    ],
+    "Q1": [
+      "I1"
+    ],
+    "Q2": [
+      "C1"
+    ],
+    "Q3": [
+      "C3"
+    ],
+    "Q4": [
+      "C3"
+    ],
+    "Q5": [
+      "C2"
+    ],
+    "F1": [
+      "P3"
+    ],
+    "F2": [
+      "P1"
+    ],
+    "F3": [
+      "P2"
+    ],
+    "F4": [
+      "P2"
+    ],
+    "F5": [
+      "P4"
+    ],
+    "F6": [
+      "I3"
+    ],
+    "F7": [
+      "I2"
+    ],
+    "F8": [
+      "P1"
+    ],
+    "F9": [
+      "P1"
+    ]
+  },
+  "decision_document": "DECISIONS.md"
+}
