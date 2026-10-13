@@ -1,5 +1,18 @@
 # Development log
 
+## P4 approved: SPEC then QUALITY passed after repairs (local only)
+
+An independent SPEC review failed with 1 HIGH, 3 MEDIUM and 3 LOW findings, plus 1 decision. All were repaired RED-first in 72191e4, and a fresh re-SPEC passed. A separate QUALITY review then required changes (1 HIGH, 1 MEDIUM, 4 LOW, 1 NIT). Those were repaired in 5963350 and 5f675c6, and the QUALITY re-review **APPROVED**.
+
+Key fixes:
+- Account deletion now purges the P4 tables (cascading from `auth.users`) and the device operation queue.
+- Pending-history sync is owner-bound, so it can't upload under the next account.
+- Deterministic rejections return 409/403 with stable codes and are not retried.
+- Pre-P4 pending sessions get a durable identity. Legacy workouts stay server read-only with a clear History message (user decisions).
+- Rollout runbook: `P4_ROLLOUT_RUNBOOK.md`.
+
+Gates, per commit in an isolated worktree: lib 3428/0, Edge `_shared` 85/0; tsc, lint with zero warnings and diff-check all exit 0; P4 PG15 suite exit 0. The local Supabase stack (colima) applies 64/65 migrations from scratch. The pre-existing `remote_schema` "chats already exists" failure needs a decision. Curl receipts on all 5 changed functions are as expected. The simulator is BLOCKED (no Xcode). Open: F6 LOW, two non-blocking QUALITY residuals, D08 choices and the production rollout. No push, deploy or remote command. [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
+
 ## H1 history baseline: SPEC PASS / QUALITY APPROVED; progression stays disabled (D07)
 
 Repaired:
