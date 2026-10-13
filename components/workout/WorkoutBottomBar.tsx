@@ -12,6 +12,7 @@ import { useLargeTextLayout } from "@/hooks/useLargeTextLayout";
 type Props = {
   workoutActive: boolean;
   loading: boolean;
+  finalizing?: boolean;
   messageInput: string;
   setMessageInput: Dispatch<SetStateAction<string>>;
   sendMessage: () => void;
@@ -27,6 +28,7 @@ type Props = {
 export function WorkoutBottomBar({
   workoutActive,
   loading,
+  finalizing = false,
   messageInput,
   setMessageInput,
   sendMessage,
@@ -45,7 +47,7 @@ export function WorkoutBottomBar({
   const borderColor = useThemeColor({}, 'border');
   const dangerFill = useThemeColor({}, 'dangerFill');
 
-  const disabledSend = !workoutActive || loading || !messageInput.trim();
+  const disabledSend = finalizing || !workoutActive || loading || !messageInput.trim();
 
   const handleSend = () => {
     // Debug log to trace button presses
@@ -65,6 +67,7 @@ export function WorkoutBottomBar({
   };
 
   const handleEndWorkout = () => {
+    if (finalizing) return;
     if (Platform.OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
@@ -110,13 +113,15 @@ export function WorkoutBottomBar({
           ]}
           returnKeyType="send"
           onSubmitEditing={handleSend}
-          editable={workoutActive && !loading}
+          editable={workoutActive && !loading && !finalizing}
         />
       </View>
 
       <View style={[styles.bottomButtons, isHugeText && styles.bottomButtonsStacked]}>
         <Pressable
           onPress={workoutActive ? handleEndWorkout : handleStartWorkout}
+          disabled={finalizing}
+          accessibilityState={{ disabled: finalizing }}
           accessibilityRole="button"
           accessibilityLabel={workoutActive ? "End workout" : "Start workout"}
           accessibilityHint={workoutActive ? "Finishes and saves this session" : "Begins a new workout session"}
@@ -125,16 +130,18 @@ export function WorkoutBottomBar({
             { backgroundColor: textColor, borderColor: textColor, minHeight: scaleSpace(44) },
             isHugeText && styles.pillButtonStacked,
             workoutActive && { backgroundColor: dangerFill, borderColor: dangerFill },
+            finalizing && styles.pillDisabled,
             pressed && styles.pillPressed,
           ]}
         >
           <Text style={[styles.pillText, { color: workoutActive ? '#FFFFFF' : bgColor }]}>
-            {workoutActive ? "End" : "Start"}
+            {finalizing ? "Saving…" : workoutActive ? "End" : "Start"}
           </Text>
         </Pressable>
 
         <Pressable
           onPress={handleSend}
+          disabled={disabledSend}
           accessibilityRole="button"
           accessibilityLabel="Send set"
           accessibilityState={{ disabled: disabledSend }}

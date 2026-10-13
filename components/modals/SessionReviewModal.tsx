@@ -7,6 +7,7 @@ import { Toast } from "@/components/ui/Toast";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useToast } from "@/hooks/useToast";
 import { getSignedUrl, pickMedia, uploadAndRecordMedia } from "@/lib/mediaUpload";
+import type { SavePhase } from '@/lib/sessionOwnership';
 import { SessionReview } from "@/lib/workoutStorage";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -28,6 +29,8 @@ type Props = {
   workoutId?: string | null;
   userId?: string;
   onClose: () => void;
+  savePhase?: SavePhase;
+  onRetry?: () => void;
   onSaveReflection?: (reflection: string) => void;
 };
 
@@ -40,7 +43,10 @@ export function SessionReviewModal({
   userId,
   onClose,
   onSaveReflection,
+  savePhase = 'saved',
+  onRetry,
 }: Props) {
+  const finalizing = savePhase === 'saving' || savePhase === 'confirming';
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeColor({}, "background");
   const textColor = useThemeColor({}, "text");
@@ -153,6 +159,8 @@ export function SessionReviewModal({
   }, []);
 
   const handleDone = useCallback(async () => {
+    if (finalizing) return;
+    if (savePhase !== 'saved') { onClose(); return; }
     const trimmed = reflection.trim();
     if (trimmed && onSaveReflection) {
       setSaving(true);
@@ -166,10 +174,10 @@ export function SessionReviewModal({
     setReflection("");
     setMediaItems([]);
     onClose();
-  }, [reflection, onSaveReflection, onClose]);
+  }, [reflection, onSaveReflection, onClose, finalizing, savePhase]);
 
   return (
-    <Modal visible={visible} animationType="slide">
+    <Modal visible={visible} animationType="slide" onRequestClose={handleDone} allowSwipeDismissal={!finalizing}>
       <ThemedView
         style={[
           styles.container,
@@ -181,6 +189,8 @@ export function SessionReviewModal({
         <View style={styles.header}>
           <Pressable
             onPress={handleDone}
+            disabled={finalizing}
+            accessibilityState={{ disabled: finalizing }}
             style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
             accessibilityRole="button"
             accessibilityLabel="Close session review"
@@ -196,11 +206,18 @@ export function SessionReviewModal({
           <View style={styles.headerSpacer} />
         </View>
 
-        {loading ? (
+        {savePhase === 'failed' ? (
+          <View style={styles.errorContainer}>
+            <ThemedText style={styles.errorText}>Workout could not be finished. Your session and recovery data were kept. Retry saving or close to continue editing.</ThemedText>
+            <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry saving workout" style={styles.doneButton}>
+              <ThemedText>Retry saving</ThemedText>
+            </Pressable>
+          </View>
+        ) : loading || finalizing ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={textColor} />
             <ThemedText style={styles.loadingText}>
-              Analyzing your workout...
+              Saving your workout — optional review may be unavailable...
             </ThemedText>
           </View>
         ) : review ? (
