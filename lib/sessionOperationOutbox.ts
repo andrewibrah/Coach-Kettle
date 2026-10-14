@@ -47,6 +47,14 @@ export function createSessionOperationOutbox(deps: Dependencies) {
     if (!owner || !sessionId || !dateISO) throw new Error('Session operation owner required');
     const state = await read();
     if (state.abandoned.includes(identity(owner,sessionId))) throw new Error('Session was abandoned');
+    // One live session per owner: an earlier session of this owner with nothing pending has ended
+    // (End/abandon), so its row fingerprints can go. Pending sessions keep theirs for retries.
+    state.seen = Object.fromEntries(Object.entries(state.seen).filter(([key]) => {
+      try {
+        const [o, sid] = JSON.parse(key);
+        return o !== owner || sid === sessionId || state.pending.some(op => op.owner === owner && op.sessionId === sid);
+      } catch { return true; }
+    }));
     for (const row of changed) {
       const key = identity(owner,sessionId,row.id);
       const fingerprint = JSON.stringify({ operation, row });

@@ -1358,7 +1358,7 @@ export default function HomeScreen() {
     const endOwner = sessionProvenanceRef.current?.ownerId;
     try {
       // Local history must be written before waiting for optional AI review.
-      const { synced } = await saveWorkoutLocalFirst(buildWorkoutToSave(storedRows), { review: reviewPromise, isCurrent: ownsSave });
+      const { synced } = await saveWorkoutLocalFirst(buildWorkoutToSave(storedRows), { review: reviewPromise, isCurrent: ownsSave, owner: endOwner });
       if (!ownsSave()) return;
       const cleanup = clearWorkoutDraft(endOwner, draftGeneration);
       cleanupGeneration = getWorkoutDraftGeneration();

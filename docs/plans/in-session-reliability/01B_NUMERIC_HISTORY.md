@@ -95,4 +95,3 @@
 **Acceptance gate / expected result:** Aliases resolve same valid historical lift; prior session never silently means today live or merged day. Warmup/cardio/unknown values excluded; backoff policy approved; labels match returned deltas. No in-session adaptive claim yet. Test exit must be zero after fix, with these assertions exercised and no unexplained exclusions.
 
 **Rollback:** Version RPC response/additive migration, keep old clients readable; disable suggestion display if contract mismatch, never return confident invented load.
-

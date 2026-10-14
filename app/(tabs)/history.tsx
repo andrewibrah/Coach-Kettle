@@ -12,9 +12,10 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 import { useAuth } from "@/contexts/AuthProvider";
 import { useToast } from "@/hooks/useToast";
 import { api } from "@/lib/api";
+import { deleteHistoryWorkout } from "@/lib/historyDelete";
+import { sessionOperations } from "@/lib/sessionOperationDelivery";
 import {
   deleteWorkout as deleteWorkoutLocal,
-  deleteFailureMessage,
   listWorkouts as listLocalWorkouts,
   mergeServerHistory,
   syncPendingWorkouts,
@@ -131,16 +132,18 @@ export default function HistoryScreen() {
     setSelectedId(null);
     setItems((prev) => prev.filter((item) => item.id !== deleteId));
 
-    try {
-      await api.deleteWorkout(deleteId);
-      // Keep the offline cache consistent so the workout can't resurrect on
-      // next sync — via the existing helper rather than hand-rolling the
-      // AsyncStorage read/filter/write here.
-      await deleteWorkoutLocal(deleteId).catch(() => undefined);
-    } catch (e) {
-      console.warn('[history] delete failed', e);
+    const target = previousItems.find((item) => item.id === deleteId);
+    if (!target) return;
+    const result = await deleteHistoryWorkout(target, ownerRef.current, {
+      remoteDelete: (id) => api.deleteWorkout(id),
+      localDelete: (id) => deleteWorkoutLocal(id),
+      abandon: (owner, id, dateISO) => sessionOperations.abandon(owner, id, dateISO),
+      flush: (owner) => sessionOperations.flush(owner),
+    });
+    if (!result.ok) {
+      console.warn('[history] delete failed', result.message);
       setItems(previousItems);
-      showToast(deleteFailureMessage(e), 'error');
+      showToast(result.message, 'error');
     }
   };
 

@@ -199,7 +199,7 @@ BEGIN
                 AND LOWER(TRIM(wl.exercise)) = r.norm
                 AND wl.workout_date = p_date
                 AND public.i3_strength_eligible(wl)
-                
+
                 AND public.i3_load(wl.weight_lbs) = ph.weight_lbs
                 AND public.i3_pr_reps(wl.reps) = ph.reps
           );
@@ -217,7 +217,7 @@ BEGIN
                     AND LOWER(TRIM(wl.exercise)) = r.norm
                     AND wl.workout_date = p_date
                     AND public.i3_strength_eligible(wl)
-                    
+
                     AND public.i3_load(wl.weight_lbs) = pl.weight_lbs
                     AND public.i3_pr_reps(wl.reps) = pl.reps
               )
@@ -251,7 +251,7 @@ BEGIN
                 WHERE wl.user_id = p_user_id
                   AND LOWER(TRIM(wl.exercise)) = r.norm
                   AND public.i3_strength_eligible(wl)
-                  
+
                 ORDER BY public.i3_epley(public.i3_load(wl.weight_lbs), public.i3_pr_reps(wl.reps)) DESC
                 LIMIT 1;
 

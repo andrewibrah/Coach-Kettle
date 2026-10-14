@@ -107,11 +107,6 @@ test('N1: a deterministic 400 from history pre-validation (pre-P4 row without id
   assert.equal(stored.syncBlocked, 'invalid_session'); assert.equal(stored.pendingSync, true);
 });
 
-test('N2: deleting a never-synced workout (403 forbidden: no server session yet) says to retry after it syncs', () => {
-  const { mod } = harness(async () => {});
-  assert.equal(mod.deleteFailureMessage(new Error('Failed to delete workout: 403 - {"error":"Operation not allowed","code":"forbidden"}')),
-    "This workout hasn't synced yet. Try deleting it again after it syncs.");
-});
 
 test('QUALITY HIGH: sign-out during sync never sends the remaining workouts under the next account', async () => {
   const sent: string[] = [];
@@ -136,4 +131,31 @@ test('sync without a signed-in owner sends nothing', async () => {
   h.seed([legacy('x')]);
   assert.equal(await h.mod.syncPendingWorkouts(''), 0);
   assert.equal(calls, 0);
+});
+
+test('QUALITY residual: the End save is owner-bound when the caller passes its owner', async () => {
+  const owners: (string | undefined)[] = [];
+  const h = harness(async (_payload: any, owner?: string) => { owners.push(owner); });
+  await h.mod.saveWorkout({ ...legacy('end'), pendingSync: undefined }, { owner: 'user-a' });
+  await h.mod.saveWorkout({ ...legacy('end2'), pendingSync: undefined });
+  assert.deepEqual(owners, ['user-a', undefined]);
+});
+
+test('QUALITY L3: a pending copy the server reports as deleted is removed locally, not left blocked', async () => {
+  const h = harness(async (payload: any) => {
+    if (payload.id === 'gone') throw new Error('Failed to save workout: 409 - {"error":"Operation rejected","code":"session_deleted"}');
+    throw new Error('Failed to save workout: 500 - x');
+  });
+  h.seed([legacy('gone'), legacy('keep')]);
+  await h.mod.syncPendingWorkouts('u');
+  assert.deepEqual(h.read().map((w: any) => w.id), ['keep']);
+  assert.equal(h.read()[0].syncBlocked, undefined);
+  assert.equal(h.read()[0].pendingSync, true, 'a transient failure keeps the other workout pending');
+});
+
+test('QUALITY L4: forbidden on a synced workout no longer claims it will work after syncing', () => {
+  const { mod } = harness(async () => {});
+  const message = mod.deleteFailureMessage(new Error('Failed to delete workout: 403 - {"error":"Operation not allowed","code":"forbidden"}'));
+  assert.doesNotMatch(message, /after it syncs/);
+  assert.equal(message, 'This workout can no longer be deleted.');
 });

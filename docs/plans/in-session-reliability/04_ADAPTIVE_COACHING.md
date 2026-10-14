@@ -118,4 +118,3 @@
 **Acceptance gate / expected result:** Real mounted UI responds to new evidence, rejects stale tap/response, never stuck on casing-only change and explains deterministic action. Device verification V2 is mandatory; component-only tests cannot prove session integration. Test exit must be zero after fix, with these assertions exercised and no unexplained exclusions.
 
 **Rollback:** Feature-switch mount off without losing evidence/performance; fail unavailable rather than show stale load.
-

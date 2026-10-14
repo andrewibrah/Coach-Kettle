@@ -233,3 +233,21 @@ test('QUALITY: an acknowledged session delete prunes that session from the seen 
   assert.ok(state.abandoned.includes(JSON.stringify(['u','s',''])));
   await assert.rejects(box.rows('u','s','2026-10-08',[row]),/abandoned/);
 });
+test('QUALITY residual: starting a new session prunes ended sessions with nothing pending; pending ones keep their ledger',async()=>{
+  const f=fixture(); const box=f.create();
+  await box.rows('u','ended','2026-10-08',[row,{...row,id:'r2'}]);
+  await box.rows('u','offline','2026-10-08',[row]);
+  await box.rows('v','other-owner','2026-10-08',[row]);
+  f.send(async(op:any)=>op.sessionId==='ended'?{ok:true}:null);
+  await box.flush('u');
+  await box.rows('u','next','2026-10-09',[row]);
+  const sessions=Object.keys(JSON.parse(f.raw()!).seen).map(k=>JSON.parse(k).slice(0,2).join('/'));
+  assert.equal(sessions.includes('u/ended'),false,'acked, ended session pruned');
+  assert.ok(sessions.includes('u/offline'),'session with pending ops keeps its ledger');
+  assert.ok(sessions.includes('v/other-owner'),'other owners untouched');
+  assert.ok(sessions.includes('u/next'));
+  // Growth is bounded by live sessions, not by history.
+  for (let i=0;i<50;i++) { await box.rows('u',`s${i}`,'2026-10-10',[row,{...row,id:'r2'}]); f.send(async()=>({ok:true})); await box.flush('u'); }
+  const owned=Object.keys(JSON.parse(f.raw()!).seen).filter(k=>JSON.parse(k)[0]==='u');
+  assert.ok(owned.length<=4, `ledger kept ${owned.length} entries`);
+});

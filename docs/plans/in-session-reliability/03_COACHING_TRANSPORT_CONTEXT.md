@@ -111,4 +111,3 @@
 **Acceptance gate / expected result:** No fake7/10 or praise; unavailable review clearly marked and raw workout saved. Coach error visible/retryable. Routine and normal paths offer consistent rest without duplicate timer or cross-session prompt. Test exit must be zero after fix, with these assertions exercised and no unexplained exclusions.
 
 **Rollback:** Disable AI rating/review rather than restore fabrication; storage keeps older reviews readable and labels unknown legacy provenance.
-

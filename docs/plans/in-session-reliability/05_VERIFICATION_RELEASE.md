@@ -117,4 +117,3 @@
 **Acceptance gate / expected result:** No release until verification report, product decisions, compatible migration/server/client rollout and human signoff are complete. Post-write readback proves deployment effect; success exit alone insufficient. Test exit must be zero after fix, with these assertions exercised and no unexplained exclusions.
 
 **Rollback:** Disable affected UI/remote features and roll back compatible app/functions; forward-fix additive schema instead of destructive data rollback. User controls deployments.
-

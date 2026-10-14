@@ -123,7 +123,7 @@ function patchRevision(id: string, revision: number | undefined, patch: Partial<
  * best-effort. Returns whether the remote sync succeeded — unsynced sessions
  * are flagged pendingSync and retried by syncPendingWorkouts().
  */
-export async function saveWorkout(session: WorkoutSession, options?: { review?: Promise<SessionReview | null>; isCurrent?: () => boolean }): Promise<{ synced: boolean }> {
+export async function saveWorkout(session: WorkoutSession, options?: { review?: Promise<SessionReview | null>; isCurrent?: () => boolean; /** Refuse to send under a different signed-in account. */ owner?: string }): Promise<{ synced: boolean }> {
   const isCurrent = options?.isCurrent ?? (() => true);
   // 1. Local Write (Upsert) — never wait for optional coaching before recovery.
   // Identity is assigned inside the same queued step so concurrent saves of one
@@ -153,7 +153,7 @@ export async function saveWorkout(session: WorkoutSession, options?: { review?: 
   // 2. Remote Sync (Best Effort)
   try {
     if (!isCurrent()) return { synced: false };
-    await api.saveWorkout(session);
+    await api.saveWorkout(session, options?.owner);
     if (!isCurrent()) return { synced: false };
     // The ack clears only the revision it acknowledges; a newer local save stays pending.
     await patchRevision(session.id, session.revision, { pendingSync: false }, isCurrent);
@@ -186,8 +186,6 @@ export function terminalRejectionCode(error: unknown): string | null {
 export function deleteFailureMessage(error: unknown): string {
   const code = terminalRejectionCode(error);
   if (code === 'legacy_session') return 'This workout was saved before sync updates and can no longer be changed or deleted.';
-  // No server session yet (never synced): deletable once it syncs.
-  if (code === 'forbidden') return "This workout hasn't synced yet. Try deleting it again after it syncs.";
   if (code) return 'This workout can no longer be deleted.';
   return 'Failed to delete workout. Please try again.';
 }
@@ -225,7 +223,12 @@ export async function syncPendingWorkouts(owner: string): Promise<number> {
       // A deterministic rejection (e.g. a legacy server ID) can never succeed: keep the local
       // copy pending (so a server refresh cannot replace it) and stop retrying it.
       const code = terminalRejectionCode(error);
-      if (code) await patchRevision(session.id, session.revision, { syncBlocked: code });
+      if (code === 'session_deleted') {
+        // The user deleted this workout (deleted IDs never return): drop the stale local copy.
+        await withHistory((existing, write) => write(existing.filter((w) => !(w.id === session.id && w.revision === session.revision))));
+      } else if (code) {
+        await patchRevision(session.id, session.revision, { syncBlocked: code });
+      }
       // Otherwise still offline — retry on next call with the same identity.
     }
   }

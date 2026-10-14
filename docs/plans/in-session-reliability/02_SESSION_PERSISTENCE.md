@@ -193,4 +193,3 @@
 **Acceptance gate / expected result:** No newer pending revision or separate workout lost in barrier schedules; do not infer cross-process atomicity from JS queue. Test exit must be zero after fix, with these assertions exercised and no unexplained exclusions.
 
 **Rollback:** Keep history backup/revisions; revert without restoring stale snapshots. HIGH saveWorkout graph risk warrants review.
-
