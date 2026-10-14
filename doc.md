@@ -13,6 +13,19 @@ Key fixes:
 
 Gates, per commit in an isolated worktree: lib 3428/0, Edge `_shared` 85/0; tsc, lint with zero warnings and diff-check all exit 0; P4 PG15 suite exit 0. The local Supabase stack (colima) applies 64/65 migrations from scratch. The pre-existing `remote_schema` "chats already exists" failure needs a decision. Curl receipts on all 5 changed functions are as expected. The simulator is BLOCKED (no Xcode). Open: F6 LOW, two non-blocking QUALITY residuals, D08 choices and the production rollout. No push, deploy or remote command. [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
 
+## A3 in-session next-set UI: mounted behind `adaptiveNextSet: false`; device verification blocked (V2)
+
+One pill binds to the exercise of the latest-timestamp performed set. That binding survives reloads and reorders; the rule is recorded under Q15.
+
+How it works:
+- **Evidence sent:** the bound exercise's performed sets, A1's current answers, and the next planned target.
+- **Refresh:** keyed by a revision over session, rows, answers and policy, with a 300 ms debounce. A stale response is dropped, and the pill falls back to unavailable with Retry. A 15 s deadline means it never sticks on "Loading".
+- **Use:** fills only the **next planned** target load and never touches a performed row. It is fenced at tap time and absent on stop or clarify.
+
+With the flag off, rendering and network calls are identical to HEAD. The SPEC review FAILED first: "Checking…" could stick forever, the stop guard and arrival fence were untested, and binding broke on reload. After the repair, SPEC PASS with 19/20 mutants killed; the survivor is equivalent.
+
+Even with the flag on, every decision stays "unavailable" until Q1 and Q9 exist. Without equipment data the engine holds, and a reduce carries no load. [Evidence](docs/plans/in-session-reliability/evidence/a3-next-set-ui-local.md).
+
 ## V1 risk schedules: reorder/import defects reproduced and fixed (V1 partial until A3)
 
 Real-code barrier schedules reproduced three bugs:

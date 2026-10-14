@@ -304,8 +304,9 @@
         "C2",
         "C3"
       ],
-      "status": "planned",
-      "classification": "proposed feature; dormant component mount/refresh gap verified",
+      "status": "done_local_policy_blocked",
+      "classification": "in-session decision UI mounted behind COACHING_POLICY.adaptiveNextSet=false; shows unavailable until Q1/Q9 policy; device verification is V2 (blocked)",
+      "latest_gate": "2026-10-13: one NextSetSuggestionPill bound to the exercise of the latest-timestamp performed strength set (ties later row, non-finite ignored; fallback first planned, then last row); evidence = bound exercise performed sets + A1 current answers + next planned target; revision counter over session/rows/answers/policy, syncing rows excluded, 300 ms debounce; stale-on-arrival dropped -> unavailable+Retry; 15 s deadline; explicit loading/unavailable/no_history/stop/clarify/stale/hold/increase/reduce; Use only for hold/increase/reduce with a load, fills NEXT planned target (never performed rows), tap-time fence; coach/chat get the current decision; program day handles decision. Flag-off render/calls identical to HEAD. SPEC FAIL (stuck Checking, untested stop guard + arrival fence, reload binding) -> repaired -> SPEC PASS (19/20 mutants, survivor equivalent). nextSetUi 26/0, lib 3650/0. Evidence: evidence/a3-next-set-ui-local.md.",
       "decision_ids": [
         "D09"
       ],

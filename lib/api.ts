@@ -166,8 +166,9 @@ export class DeleteAccountError extends Error {
 }
 
 export const api = {
-    // `context` is supplied only while COACHING_POLICY.contextualDisclosures is on.
-    chat: async (message: string, rows: ApiWorkoutRow[], lastExercise?: string, context?: CoachingContext) => {
+    // `context` is supplied only while COACHING_POLICY.contextualDisclosures is on;
+    // `nextSetDecision` (A2 contract) only while adaptiveNextSet is on (A3).
+    chat: async (message: string, rows: ApiWorkoutRow[], lastExercise?: string, context?: CoachingContext, nextSetDecision?: NextSetDecision) => {
         const res = await fetchWithAuth(`${API_BASE}/chat`, {
             method: 'POST',
             body: JSON.stringify({
@@ -175,6 +176,7 @@ export const api = {
                 rows,
                 ...(lastExercise ? { lastExercise } : {}),
                 ...(context ? { context } : {}),
+                ...(nextSetDecision ? { nextSetDecision } : {}),
             }),
         });
         
@@ -195,7 +197,8 @@ export const api = {
         onChunk?: (chunk: string) => void,
         chatHistory?: { role: string; content: string }[],
         context?: CoachingContext,
-        clock = { setTimeout, clearTimeout }
+        clock = { setTimeout, clearTimeout },
+        nextSetDecision?: NextSetDecision
     ) => {
         // A stalled request or stream must not leave the coach Loading forever:
         // abort when nothing arrives for COACH_IDLE_MS.
@@ -219,6 +222,7 @@ export const api = {
                     rows,
                     ...(chatHistory && chatHistory.length > 0 ? { chatHistory } : {}),
                     ...(context ? { context } : {}),
+                    ...(nextSetDecision ? { nextSetDecision } : {}),
                 }),
                 signal: controller.signal,
             }), stalled]);

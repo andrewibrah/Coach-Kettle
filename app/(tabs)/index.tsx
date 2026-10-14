@@ -70,7 +70,12 @@ import { sessionOperations } from '@/lib/sessionOperationDelivery';
 import { buildCoachingContext, coachingRecordFor, observeCoaching, type CoachingRecord } from '@/lib/coachingContext';
 import { COACHING_POLICY } from '@/lib/coachingPolicy';
 import { CoachingQuestions } from '@/components/workout/CoachingQuestions';
-import type { CoachingAnswer } from '@/types/coachingAnswers';
+import type { CoachingAnswer, CurrentAnswer } from '@/types/coachingAnswers';
+import { currentAnswer } from '@/lib/coachingAnswers';
+import { NextSetSuggestionPill } from '@/components/workout/NextSetSuggestion';
+import { fetchNextSetDecision } from '@/lib/programming';
+import type { NextSetDecision, NextSetEvidenceInput } from '@/lib/nextSetDecision';
+import type { NextSetResult } from '@/types/programming';
 
 type EditableField = "exercise" | "set" | "weightLbs" | "reps" | "notes";
 
@@ -109,6 +114,78 @@ function buildRowsFromApi(apiRows: ApiWorkoutRow[]): LogRow[] {
 
 const toApiRows = (sourceRows: LogRow[]): ApiWorkoutRow[] =>
   serializeWorkoutRows(sourceRows);
+
+// ── A3 next-set decision surface (COACHING_POLICY.adaptiveNextSet only) ───────
+// Binding rule (durable, so it survives reload/draft restore): the exercise of the
+// performed set with the latest `timestamp` (composer adds/fills and duplicates stamp
+// Date.now(); reorders and cell edits keep it; ties go to the later row). If there is
+// no performed strength set: the first planned set's exercise; else the last row's
+// (the HEAD/A1 rule). One normalizer (normalizeExercise) for binding, rows and keys.
+const NEXT_SET_DEBOUNCE_MS = 300;
+// Transport bound of the next-set Edge (A2): newest sets are kept.
+const NEXT_SET_MAX_SETS = 100;
+type NextSetTracking = { signature: string; revision: number };
+
+function rowContent(row: LogRow): string {
+  return JSON.stringify([row.exercise, row.weightLbs, row.reps, row.notes, row.performance ?? null, row.setKind ?? null, row.plannedTarget ?? null, row.isCardio ?? false]);
+}
+
+function nextPlannedRowIndex(rows: LogRow[], exerciseKey: string): number {
+  return rows.findIndex((row) => !row.isRest && !row.isCardio && normalizeExercise(row.exercise) === exerciseKey &&
+    isPendingSet(row) && !isPerformedRow(row));
+}
+
+function nextSetExercise(rows: LogRow[]): string | undefined {
+  // Non-finite timestamps rank lowest, so they never beat a finite one; ties go to the later row.
+  const rank = (row: LogRow) => Number.isFinite(row.timestamp) ? row.timestamp : -Infinity;
+  let latest: LogRow | undefined;
+  for (const row of rows) {
+    if (row.isRest || row.isCardio || !row.exercise.trim() || !isPerformedRow(row)) continue;
+    if (!latest || rank(row) >= rank(latest)) latest = row;
+  }
+  if (latest) return latest.exercise.trim();
+  const planned = rows.find((row) => !row.isRest && !row.isCardio && row.exercise.trim() && isPendingSet(row));
+  return planned ? planned.exercise.trim() : getLastExerciseFromRows(rows);
+}
+
+/** Evidence-relevant state. Optimistic (syncing) rows are excluded: their commit is the change. */
+function nextSetSignature(sessionId: string, rows: LogRow[], answers: CoachingAnswer[], policyVersion: string): string {
+  return JSON.stringify([sessionId, policyVersion, answers.length, answers[answers.length - 1]?.answerId ?? null,
+    rows.filter((row) => row.status !== 'syncing').map((row) => [row.id, row.isRest ?? false, rowContent(row)])]);
+}
+
+/** Render-time tracking; the revision is monotonic and bumps on any row/answer/session/policy change. */
+function trackNextSet(state: NextSetTracking, rows: LogRow[], sessionId: string, answers: CoachingAnswer[], policyVersion: string) {
+  const signature = nextSetSignature(sessionId, rows, answers, policyVersion);
+  if (signature !== state.signature) Object.assign(state, { signature, revision: state.revision + 1 });
+  const exercise = nextSetExercise(rows);
+  if (!exercise) return null;
+  const exerciseKey = normalizeExercise(exercise);
+  return { exercise, exerciseKey, revision: state.revision, refreshKey: `${sessionId}|${exerciseKey}|${state.revision}`,
+    hasPlannedRow: nextPlannedRowIndex(rows, exerciseKey) >= 0 };
+}
+
+function nextSetEvidence(rows: LogRow[], exerciseKey: string, sessionId: string, revision: number, answers: Record<string, CurrentAnswer>): NextSetEvidenceInput {
+  const sessionSets = performedRows(rows.filter((row) => !row.isRest && !row.isCardio && normalizeExercise(row.exercise) === exerciseKey))
+    .slice(-NEXT_SET_MAX_SETS)
+    .map((row) => ({ id: row.id, ...(row.setKind !== undefined && { setKind: row.setKind }), weightLbs: Number(row.weightLbs), reps: Number(row.reps) }));
+  const planned = rows[nextPlannedRowIndex(rows, exerciseKey)];
+  const range = planned?.plannedTarget?.reps.trim().match(/^(\d+)(?:\s*[-–]\s*(\d+))?$/);
+  const target = range ? { reps: { low: Number(range[1]), high: Number(range[2] ?? range[1]) } } : null;
+  // Equipment is not recorded on LogRow: unknown is sent as null (the Edge requires the key).
+  return { sessionId, revision, request: { sessionId, revision }, exerciseKey, equipment: null, sessionSets, answers, target };
+}
+
+/** Fill only the NEXT PLANNED set's target load; actual values and performed rows are never touched. */
+function applyNextSetLoad(rows: LogRow[], exerciseKey: string, decision: NextSetDecision): LogRow[] | null {
+  const load = ['hold', 'increase', 'reduce'].includes(decision.code) ? decision.action?.loadLbs : undefined;
+  if (load === undefined || !Number.isFinite(load) || load < 0) return null;
+  const index = nextPlannedRowIndex(rows, exerciseKey);
+  if (index < 0) return null;
+  const next = [...rows];
+  next[index] = { ...rows[index], plannedTarget: { reps: rows[index].plannedTarget?.reps ?? '', weightLbs: String(load) } };
+  return next;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -579,9 +656,15 @@ export default function HomeScreen() {
 
     try {
       // Stream the response
-      const res = await api.askCoach(q, toApiRows(rows), (chunk) => {
+      const onChunk = (chunk: string) => {
         if (ownsRequest()) setCoachAnswer((prev) => (prev || "") + chunk);
-      }, history.slice(-10), buildCoachingContext(COACHING_POLICY, workoutId, coaching));
+      };
+      const apiRows = toApiRows(rows);
+      const context = buildCoachingContext(COACHING_POLICY, workoutId, coaching);
+      // Flag off: the exact HEAD call. Flag on: also the current decision (A2 contract).
+      const res = await (COACHING_POLICY.adaptiveNextSet
+        ? api.askCoach(q, apiRows, onChunk, history.slice(-10), context, undefined, currentNextSetDecision())
+        : api.askCoach(q, apiRows, onChunk, history.slice(-10), context));
       if (!ownsRequest()) return;
       const answer = res.answer?.trim();
       if (!answer) {
@@ -786,8 +869,15 @@ export default function HomeScreen() {
   }, [rows, sessionOwnerKey, workoutId]);
 
   // Structured coaching answers (A1, flag-gated). Empty after End or an owner change.
-  const coachingExerciseKey = normalizeExercise(getLastExerciseFromRows(rows) ?? '');
   const coachingAnswerLog = workoutActive && coachingAnswers.owner === sessionOwnerKey ? coachingAnswers.log : [];
+  // A3 next-set decision surface (flag-gated; binding rule above trackNextSet).
+  const nextSetStateRef = useRef<NextSetTracking>({ signature: '', revision: 0 });
+  const nextSetDecisionRef = useRef<{ revision: number; decision: NextSetDecision } | null>(null);
+  // `as boolean`: the shipped flag is the literal false, which would narrow nextSet to never.
+  const nextSet = (COACHING_POLICY.adaptiveNextSet as boolean) && workoutActive && !!workoutId &&
+    trackNextSet(nextSetStateRef.current, rows, workoutId, coachingAnswerLog, COACHING_POLICY.version);
+  // With the flag on, A1 answers bind to the same exercise (and key) as the decision.
+  const coachingExerciseKey = normalizeExercise(((COACHING_POLICY.adaptiveNextSet as boolean) && nextSet ? nextSet.exercise : getLastExerciseFromRows(rows)) ?? '');
   const onCoachingAnswer = (answer: CoachingAnswer) => {
     if (!COACHING_POLICY.structuredQuestions || !canUseSession() || !draftChecked || finalizing || !workoutId) return;
     const owner = sessionOwnerKey;
@@ -814,6 +904,41 @@ export default function HomeScreen() {
     }).catch(() => {}); // The draft restore already reports an unreadable draft and blocks Start.
     return () => { disposed = true; };
   }, [draftChecked, workoutId, sessionOwnerKey, session?.user?.id]);
+
+  const loadNextSet = (revision: number): Promise<NextSetResult> => {
+    if (!nextSet || !workoutId) return Promise.resolve({ status: 'unavailable', reason: 'error', baseline: null });
+    const answers = currentAnswer(coachingAnswerLog, { sessionId: workoutId, exerciseKey: nextSet.exerciseKey }, COACHING_POLICY.questionnaire, Date.now());
+    return fetchNextSetDecision(nextSet.exercise, nextSetEvidence(rows, nextSet.exerciseKey, workoutId, revision, answers));
+  };
+  // Ownership fence: the revision still matches AND the synchronous rows/answers produce it.
+  const isNextSetCurrent = (revision: number) => nextSetStateRef.current.revision === revision &&
+    nextSetStateRef.current.signature === nextSetSignature(workoutId ?? '', draftRowsRef.current, coachingAnswerLog, COACHING_POLICY.version);
+  const onNextSetResult = (result: NextSetResult, revision: number) => {
+    nextSetDecisionRef.current = result.status === 'decision' ? { revision, decision: result.decision } : null;
+  };
+  // Coach/chat accept at most 50 evidence ids (A2): omit the decision rather than truncate it.
+  const currentNextSetDecision = () => {
+    const current = nextSetDecisionRef.current;
+    return current && isNextSetCurrent(current.revision) && current.decision.evidenceIds.length <= 50 ? current.decision : undefined;
+  };
+  // Re-checked at tap time: a stale decision is rejected, never applied.
+  const onUseNextSet = (decision: NextSetDecision, revision: number) => {
+    if (!(COACHING_POLICY.adaptiveNextSet as boolean) || !nextSet || !canUseSession() || ownership.busy || editingCell || !isNextSetCurrent(revision)) {
+      showToast('That suggestion is out of date. It will refresh.', 'info');
+      return;
+    }
+    const next = applyNextSetLoad(draftRowsRef.current, nextSet.exerciseKey, decision);
+    if (!next) {
+      showToast('There is no planned set to apply this to.', 'info');
+      return;
+    }
+    setRows(next);
+  };
+  const nextSetPill = nextSet ? (
+    <NextSetSuggestionPill exercise={nextSet.exercise} compact={false} refreshKey={nextSet.refreshKey} revision={nextSet.revision}
+      load={loadNextSet} isCurrent={isNextSetCurrent} onResult={onNextSetResult}
+      onUseDecision={nextSet.hasPlannedRow ? onUseNextSet : undefined} debounceMs={NEXT_SET_DEBOUNCE_MS} />
+  ) : null;
 
   const presentationOwnerRef = useRef(sessionOwnerKey);
   // Session ownership: presentation reset
@@ -1477,7 +1602,12 @@ export default function HomeScreen() {
         const lastExercise = getLastExerciseFromRows(currentRows);
         const coaching = coachingRecordFor(coachingRecordRef, renderOwner.owner);
         observeCoaching(COACHING_POLICY, coaching, workoutId, currentRows, [{ source: 'composer_message', text: message }]);
-        const res = await api.chat(message, toApiRows(currentRows), lastExercise, buildCoachingContext(COACHING_POLICY, workoutId, coaching));
+        const apiRows = toApiRows(currentRows);
+        const context = buildCoachingContext(COACHING_POLICY, workoutId, coaching);
+        // Flag off: the exact HEAD call. Flag on: also the current decision (A2 contract).
+        const res = await (COACHING_POLICY.adaptiveNextSet
+          ? api.chat(message, apiRows, lastExercise, context, currentNextSetDecision())
+          : api.chat(message, apiRows, lastExercise, context));
         if (!ownsRequest()) return;
         if (ghostId && !draftRowsRef.current.some(r => r.id === ghostId && r.status === 'syncing')) return;
 
@@ -1591,6 +1721,8 @@ export default function HomeScreen() {
             />
           )}
         </View>
+
+        {nextSetPill}
 
         {workoutActive && workoutId && coachingExerciseKey ? (
           <CoachingQuestions enabled={COACHING_POLICY.structuredQuestions} policy={COACHING_POLICY.questionnaire}

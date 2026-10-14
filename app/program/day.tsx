@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/ui/themed-view';
 import { ThemedText } from '@/components/ui/themed-text';
 import { ScreenHeader } from '@/components/ui/screen-header';
-import { lastSessionLabel } from '@/components/workout/NextSetSuggestion';
+import { decisionLabel, lastSessionLabel } from '@/components/workout/NextSetSuggestion';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useProgram } from '@/contexts/ProgramContext';
 import { fetchNextSetSuggestion } from '@/lib/programming';
@@ -107,6 +107,8 @@ export default function ProgramDayScreen() {
                     </ThemedText>
                     <ThemedText style={{ fontSize: 12, opacity: 0.7 }}>{s.suggestion.rationale}</ThemedText>
                   </>
+                ) : s?.status === 'decision' ? (
+                  <ThemedText style={[styles.suggestText, { color: tint }]}>{decisionLabel(s.decision)}</ThemedText>
                 ) : s?.status === 'no_history' ? (
                   <ThemedText style={[styles.suggestText, { color: tint }]}>No previous session</ThemedText>
                 ) : s?.status === 'unavailable' && s.baseline && lastSessionLabel(s.baseline) ? (
