@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { sourceModule } from '../../lib/__tests__/workoutIdentityHarness.ts';
 import * as contract from '../../lib/workoutValidation.ts';
-const scratch = '/Users/me/.hermes/profiles/telegramlite/cache/scratch';
+const scratch = process.env.I3_SCRATCH ?? '/Users/me/.hermes/profiles/telegramlite/cache/scratch';
 assert.equal(realpathSync(`${scratch}/i3-pg-data`), `${scratch}/i3-pg-data`);
 assert.equal(readFileSync(`${scratch}/i3-pg-data/PG_VERSION`, 'utf8').trim(), '15');
 const lift = sourceModule('supabase/functions/_shared/liftMatching.ts', { './workoutValidation.ts': contract });

@@ -321,9 +321,9 @@
         "C1",
         "A3"
       ],
-      "status": "partial",
-      "classification": "risk schedules executed; reorder/import defects reproduced and fixed; pill/questionnaire association completes after A3; rename grouping and undo are policy (D10/Q10)",
-      "latest_gate": "2026-10-13: reproduced+fixed: reorder by stale index after delete/rename moved the wrong row or spliced undefined (TypeError); reorder did not commit the pending inline edit first; import repeated ordinals. Fix: handleReorderRow(from,to,rowId) by id + delta via withPendingRows with own auth/busy guard; import numbers only new rows via nextSetNumberForExercise (performed history never renumbered, nothing silently unqueued). Not reproduced (kept as guards): modal save during reorder/delete, import identity, pending edit row id. Policy-pending: rename grouping, undo (Q10). SPEC FAIL (import renumbered performed rows without queueing) -> repaired -> SPEC PASS; QUALITY changes applied. risk file 24/0. Evidence: evidence/v1-risk-schedules-local.md.",
+      "status": "done_local",
+      "classification": "risk schedules closed: reorder/import defects reproduced and fixed (6772246); pill/questionnaire association covered by A3 binding tests (R4/R7/R8) and A1 7a-c; rename grouping and undo policy-pending (Q10)",
+      "latest_gate": "2026-10-14: V1 risk file 24/0 plus A3 nextSetUi binding tests 26/0 (reload/reorder/tie/non-finite). Nothing marked accepted; Q10 owns the policy items. Device gestures are part of the V2 blocked device matrix.",
       "decision_ids": [
         "D10"
       ],
@@ -336,8 +336,9 @@
       "dependencies": [
         "V1"
       ],
-      "status": "planned",
-      "classification": "verification; not implementation",
+      "status": "done_local_device_blocked",
+      "classification": "local/offline/DB matrix green; on-device matrix BLOCKED (no Xcode, 8.5 GB disk; web substitute stopped by the user)",
+      "latest_gate": "2026-10-14 final HEAD (4b0923c + V2 test-only edits): lib 3747/0, edge 494/0, tsc/expo lint/diff 0; iOS production bundle builds and points at prod; ck-p5 fresh reset 66/66 (excluding remote_schema); every supabase/tests fixture green, or superseded (i3_cardio_storage handler phase -> p4_edge_sql) or expected-red control; onboarding concurrency 3/3 (bash 3.2 trap fixed); real-HTTP smokes p5 8/8, h1 7/7, c1 6/6, c3 5/5, a2 4/4, auto-rest 11/11. Evidence: release-results.md.",
       "decision_ids": [],
       "section": "05_VERIFICATION_RELEASE.md"
     },

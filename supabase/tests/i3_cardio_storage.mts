@@ -7,7 +7,7 @@ import ts from 'typescript';
 import { decideAndParse } from '../../lib/structuredGate.ts';
 import * as contract from '../../lib/workoutValidation.ts';
 import { sourceModule } from '../../lib/__tests__/workoutIdentityHarness.ts';
-const scratch = '/Users/me/.hermes/profiles/telegramlite/cache/scratch';
+const scratch = process.env.I3_SCRATCH ?? '/Users/me/.hermes/profiles/telegramlite/cache/scratch';
 assert.equal(realpathSync(`${scratch}/i3-pg-data`), `${scratch}/i3-pg-data`);
 assert.equal(readFileSync(`${scratch}/i3-pg-data/PG_VERSION`, 'utf8').trim(), '15');
 const psql = (sql: string) => execFileSync('/opt/homebrew/opt/postgresql@15/bin/psql', ['-h', `${scratch}/i3-pg-socket`, '-p', '55483', '-d', 'postgres', '-At', '-v', 'ON_ERROR_STOP=1', '-v', 'i3_apply_proposal=true'], { input: sql, encoding: 'utf8' });
@@ -22,6 +22,9 @@ assert.equal(parsed.rows[0].level, 1.5);
 const base = { exercise: 'Run', set: 1, isCardio: true, durationMins: 5, weightLbs: '', reps: '', notes: 'literal raw evidence' };
 const cases = [parsed.rows[0], ...[0, 2147483648, Number.MAX_SAFE_INTEGER, 1e100, Number.MAX_VALUE, Number.MIN_VALUE].map(value => ({ ...base, heartRate: value, calories: value, level: value })), base];
 let checks = 0;
+// SUPERSEDED (handler phase) since P4: log-set/history now write through the apply_workout_operation RPC,
+// which this runner mocks. The same 8-value cardio matrix runs through the REAL Edge handlers and the REAL RPC
+// in supabase/tests/p4_edge_sql.mts (capacity-row loop) on disposable PG15; use that as the cardio storage gate.
 const handlers = process.env.I3_CARDIO_HANDLER ? [process.env.I3_CARDIO_HANDLER] : ['log-set', 'history'];
 assert.ok(handlers.every(name => ['log-set', 'history'].includes(name)));
 for (const name of handlers) for (const row of cases) {
@@ -85,6 +88,7 @@ ROLLBACK;`);
     'https://deno.land/std@0.168.0/http/server.ts': { serve: (fn: any) => handler = fn },
     'https://esm.sh/@supabase/supabase-js@2.50.1': { createClient: () => client },
     '../_shared/liftMatching.ts': lift, '../_shared/workoutValidation.ts': contract,
+    '../_shared/operationErrors.ts': sourceModule('supabase/functions/_shared/operationErrors.ts'),
   };
   vm.runInNewContext(ts.transpileModule(readFileSync(`supabase/functions/${name}/index.ts`, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {
     exports: {}, require: (key: string) => { assert.ok(key in dependencies, key); return dependencies[key]; },

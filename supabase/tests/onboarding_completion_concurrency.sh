@@ -19,8 +19,8 @@ db() { psql -X -w -qAt -v ON_ERROR_STOP=1 "$@"; }
 cleanup() {
     rc=$?
     trap - EXIT
-    for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
-    for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null || true; done
+    for pid in ${pids[@]+"${pids[@]}"}; do kill "$pid" 2>/dev/null || true; done
+    for pid in ${pids[@]+"${pids[@]}"}; do wait "$pid" 2>/dev/null || true; done
     if [[ $owned == 1 ]]; then
         if ! db -c "DELETE FROM auth.users WHERE id IN ($user_list)" >"$work/cleanup" 2>&1; then
             echo 'Fixture cleanup failed; remove only the four UUIDs declared in this script.' >&2

@@ -1,5 +1,24 @@
 # Development log
 
+## V2 local release matrix: GREEN; on-device BLOCKED (V1 closed)
+
+Final HEAD (4b0923c plus V2's test-only edits):
+- lib 3747/0, edge 494/0, tsc, expo lint and diff check 0.
+- The iOS production JS bundle builds with the prod project ref and no local-stack URL.
+- `expo-doctor` 20/21; the one failure is patch-level SDK 57 drift and does not block.
+
+Fresh ck-p5 reset (66/66 migrations, excluding the pre-existing `remote_schema` chain defect):
+- Every `supabase/tests` fixture is green, including P4 auto-close, auto-rest, purge, history baseline and onboarding concurrency 3/3.
+- Real-HTTP smokes: p5 8/8, h1 7/7, c1 6/6, c3 5/5, a2 4/4, auto-rest 11/11.
+
+V2 test-only repairs:
+- `i3_cardio_storage.mts` handler phase is marked superseded by `p4_edge_sql.mts`, which runs the same 8-value cardio matrix through the real RPC; the scratch path is overridable and the P4 dependency is added.
+- `onboarding_completion_concurrency.sh`: fixed the macOS bash 3.2 empty-array trap crash.
+
+V1 is closed: A3's binding tests cover pill and questionnaire association; Q10 owns rename grouping and undo.
+
+The **on-device matrix is BLOCKED**: no Xcode, 8.5 GB free disk, and the web substitute was stopped by the user. The human TestFlight checklist is in [release-results.md](docs/plans/in-session-reliability/release-results.md).
+
 ## Auto-rest duration and notification recovery (authored by the user's Hermes agent): independently reviewed and committed
 
 What it does:
