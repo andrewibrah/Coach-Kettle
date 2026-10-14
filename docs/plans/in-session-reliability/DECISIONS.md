@@ -1,5 +1,35 @@
 # Product decisions — implementation blockers
 
+## Q1 + Q9 research-backed proposal (2026-10-14): needs your "approve" before it ships
+
+This is a proposal. Nothing is switched on. Once approved, it becomes `NEXT_SET_POLICY` and the questionnaire config, and the `adaptiveNextSet` flag can be turned on for testing.
+
+**Q1: when to change the weight (double progression, ACSM-based)**
+- **Increase** the load next set or session when the lifter does **1–2 reps more than the target**, or hits the **top of the rep range on all working sets**, with **no pain** answered. ACSM 2009: increase 2–10% when the current load can be done for 1–2 reps over the desired number.
+- **How much:** about 2.5–5% for upper-body lifts and 5–10% for lower-body lifts, rounded **down** to the equipment step:
+  - barbell upper body (bench, press, row): +5 lb
+  - barbell lower body (squat, deadlift): +10 lb
+  - dumbbells: the next dumbbell, usually +5 lb per hand
+  - machines and cables: one stack plate
+- **Hold** while reps are inside the target range.
+- **Reduce** about 5–10% (one equipment step) when the lifter **misses the bottom of the range on 2 consecutive working sets**.
+- **Deload:** keep the app's existing programming rule of every 4th week at 70% intensity and 60% volume.
+- **Bodyweight or unknown load:** never invent a load. Add reps only.
+- **Missing equipment data** (rows don't record it): infer the step from the exercise name (barbell/dumbbell/machine keywords) using the existing compound-lift classifier. If it can't be inferred, hold. This also needs your OK.
+
+**Q9: pain (0–10 scale, the "pain monitoring model")**
+- **0–2:** continue normally.
+- **3–5:** continue, but **no increase** (hold).
+- **6+**, or pain that lasted until the next day: **stop this exercise**, show no load, and show a neutral line such as "Stop this exercise. If pain persists, check with a qualified professional." No diagnosis.
+- **Skipped pain question:** treated as unknown, so **no increase**, consistent with Q13(a).
+- **Caveat:** these thresholds are a widely used clinical heuristic (Thomeé 1997), **not** trial-proven. A physio or qualified reviewer should sign off on the copy.
+
+**Sources**
+- ACSM 2009, *Progression Models in Resistance Training for Healthy Adults*: https://sfu.ca/~ryand/kin343/ACSMresistance.pdf
+- ACSM 2026 update. Progressive overload is "the single most important variable"; the specific numbers weren't publicly summarized, so check the full paper: https://acsm.org/science-spotlight-acsm-releases-new-position-stand-on-resistance-training/ and https://clubsolutionsmagazine.com/2026/04/acsm-has-a-new-position-stand-for-resistance-training-heres-what-you-need-to-know/
+- RIR/RPE load methods performed similarly to %1RM in an 11-week trial of older adults: https://search.pedro.org.au/search-results/record-detail/61283
+- Pain monitoring model zones and their weak evidence base: https://www.physiotutors.com/?p=8188 and https://www.stgeorges.nhs.uk/wp-content/uploads/2025/01/PHY_EGMI.pdf
+
 ## Owed by the product owner: questions raised during P5→V2 (2026-10-13)
 
 Everything not blocked by these is built and gated. Blocked behaviour ships disabled through `COACHING_POLICY` (`lib/coachingPolicy.ts`, mirrored in `supabase/functions/_shared/coachingPolicy.ts`, all flags `false`, `version: 'unapproved'`). Recommendations are proposals, not approvals.
