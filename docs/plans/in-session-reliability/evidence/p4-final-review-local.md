@@ -75,3 +75,27 @@ production.
 F6 (LOW) and the D08 product choices (abandon TTL, cross-device overwrite, deleted-ID restore, legacy
 backfill) are open by decision. So are native process-death durability, the simulator E2E and the
 production rollout (see `P4_ROLLOUT_RUNBOOK.md`).
+
+## Follow-ups closed in 05c1459 (2026-10-14)
+
+User D08 decisions: auto-close after 24 h, keeping sets; higher revision wins; deleted IDs never return; no legacy backfill.
+
+| Item | Fix | Test |
+|---|---|---|
+| D08 abandon policy | `20261008000500`: `expire_open_workout_sessions()` plus pg_cron every 15 min (guarded on available + preloaded). It finalizes through `apply_workout_operation` as the owner, from the latest receipts. | `supabase/tests/p4_session_expiry.sql` (local stack): 24 h boundary, sets kept, phone End wins, late set rejected, H1 baseline counts it |
+| Retracted-only session (SPEC F1) | locked only when there are no performed sets; no history row | `exp-ret` |
+| Exercise interleaving (QUALITY M1) | grouped by exercise first appearance, then row first revision | `exp-order`, `exp-group` |
+| Failing session starves the queue (L2) | `expire_failed_at`, sorted last | `exp-stuck` with batch-1 runs |
+| `service_role` could force-close sessions (F3) | `REVOKE` from every API role | test asserts all three API roles are denied |
+| F6, never-synced delete | `lib/historyDelete.ts`: durable abandon before the local delete; `session_deleted` sync drops the stale copy | `p4HistoryDelete`, `p4LegacySync` |
+| `seen` growth (residual LOW) | pruned when a new session logs | `p4OperationOutbox` |
+| End save owner (residual NIT) | `saveWorkout({owner})`; index.tsx passes `endOwner` | `p4LegacySync` |
+| Prod pre-check | `supabase/tests/prod_precheck_p4.sql`, read-only; columns, tables, functions, result types, dependent views, pg_cron | exits 0 on migrated and empty databases; reviewer mutation-checked |
+
+Reviews: SPEC FAIL, repaired, SPEC PASS (mutation-checked); QUALITY CHANGES REQUIRED, repaired, QUALITY APPROVED.
+
+Gates, isolated staged snapshot: lib 3657/0, `_shared` 113/0, tsc 0, lint `--max-warnings 0` exit 0, P4 PG15 suite exit 0. 0500 applied through the real CLI (`supabase migration up --local`). 24 curl receipts as expected.
+
+Accepted: L1 (the batch holds owner PR locks until commit; batch of 100). Not done:
+- `remote_schema` rebaseline (needs the prod schema; use the pre-check, then a user-run `db pull`);
+- simulator flows (no Xcode).

@@ -1,5 +1,22 @@
 # Development log
 
+## P4 follow-ups closed: 24h auto-close, F6 delete, residuals (05c1459)
+
+Your D08 calls are implemented:
+- A session still open 24 hours after creation is auto-closed, keeping its sets like an End (`20261008000500`, pg_cron every 15 minutes). A later End from the phone still wins.
+- Higher revision wins.
+- Deleted IDs never return.
+- No legacy backfill.
+
+Also closed:
+- Never-synced History delete (F6), through the abandon tombstone.
+- The outbox ledger no longer grows without bound.
+- The End save is owner-bound.
+- A read-only production pre-check (`supabase/tests/prod_precheck_p4.sql`).
+- Whitespace.
+
+SPEC then QUALITY both passed after repairs: retracted-only sessions, the 24 h boundary, exercise ordering, queue starvation and grants. 0500 applies through the real Supabase CLI. Gates on an isolated snapshot: lib 3657/0, `_shared` 113/0, tsc and lint with zero warnings, SQL suites exit 0. Open: the `remote_schema` rebaseline (needs the production schema) and the simulator (no Xcode). [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
+
 ## P4 approved: SPEC then QUALITY passed after repairs (local only)
 
 An independent SPEC review failed with 1 HIGH, 3 MEDIUM and 3 LOW findings, plus 1 decision. All were repaired RED-first in 72191e4, and a fresh re-SPEC passed. A separate QUALITY review then required changes (1 HIGH, 1 MEDIUM, 4 LOW, 1 NIT). Those were repaired in 5963350 and 5f675c6, and the QUALITY re-review **APPROVED**.
