@@ -1,5 +1,6 @@
 -- READ-ONLY pre-check to run against PRODUCTION before `supabase db push` of the
--- in-session reliability migrations (20261008000100 … 20261008000500). It changes nothing.
+-- in-session reliability migrations (20261008000100 … 20261008000500) and the auto-rest
+-- migration 20261013000100. It changes nothing.
 --   psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/prod_precheck_p4.sql
 -- Every row should say ok = true. Any false row blocks the push until resolved. It checks the
 -- known schema dependencies; it is not a full proof that the push succeeds (Edge/runtime tables
@@ -16,7 +17,8 @@ cols(tbl, col) AS (VALUES
   ('workout_log','id'), ('workout_log','reps'), ('workout_log','notes'), ('workout_log','created_at'),
   ('workout_log','is_cardio'),
   ('workout_log','duration_mins'), ('workout_log','distance'), ('workout_log','distance_unit'),
-  ('workout_log','heart_rate'), ('workout_log','calories'), ('workout_log','level')),
+  ('workout_log','heart_rate'), ('workout_log','calories'), ('workout_log','level'),
+  ('notification_preferences','user_id'), ('notification_preferences','auto_start_rest_timer')),
 checks(check_name, ok, detail) AS (
   SELECT 'column public.' || c.tbl || '.' || c.col,
          EXISTS (SELECT 1 FROM information_schema.columns i
@@ -65,6 +67,12 @@ checks(check_name, ok, detail) AS (
   SELECT 'pg_cron available and preloaded', EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_cron')
          AND current_setting('shared_preload_libraries', true) LIKE '%pg_cron%',
          'needed to schedule the 24h auto-close (0500); without it the job is not scheduled'
+  UNION ALL
+  SELECT 'notification_preferences has no auto_rest_duration_sec yet',
+         NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'notification_preferences'
+                       AND column_name = 'auto_rest_duration_sec'),
+         '20261013000100 adds it (nullable, no default)'
   UNION ALL
   SELECT 'migration history table present', to_regclass('supabase_migrations.schema_migrations') IS NOT NULL,
          'db push compares local files against it'
