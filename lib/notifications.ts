@@ -40,28 +40,35 @@ async function loadNotifications(): Promise<NotificationsModule | null> {
 }
 
 // ---------- API ----------
-export async function fetchPreferences(): Promise<NotificationPreferences | null> {
-  const res = await fetchWithAuth(`${API}?action=prefs`, { method: 'GET' });
-  if (!res.ok) return null;
+export async function fetchPreferences(expectedOwner?: string): Promise<NotificationPreferences> {
+  const res = await fetchWithAuth(`${API}?action=prefs`, { method: 'GET' }, 1, expectedOwner);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  return data?.prefs ?? null;
+  if (!data?.prefs) throw new Error('Preferences could not be confirmed.');
+  return data.prefs;
 }
 
-export async function updatePreferences(patch: Partial<NotificationPreferences>): Promise<NotificationPreferences | null> {
+export async function updatePreferences(patch: Partial<NotificationPreferences>, expectedOwner?: string): Promise<NotificationPreferences | null> {
   const res = await fetchWithAuth(API, {
     method: 'POST',
     body: JSON.stringify({ action: 'update_prefs', ...patch }),
-  });
+  }, 1, expectedOwner);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  return data?.prefs ?? null;
+  if (!data?.prefs) throw new Error('Preferences could not be confirmed.');
+  for (const key of ['auto_start_rest_timer', 'auto_rest_duration_sec'] as const) {
+    if (patch[key] !== undefined && data.prefs[key] !== patch[key]) {
+      throw new Error('Auto-rest preferences could not be confirmed.');
+    }
+  }
+  return data.prefs;
 }
 
-export async function registerPushToken(token: string, platform: 'ios' | 'android' | 'web', extras: { device_id?: string; app_version?: string } = {}): Promise<boolean> {
+export async function registerPushToken(token: string, platform: 'ios' | 'android' | 'web', extras: { device_id?: string; app_version?: string } = {}, expectedOwner?: string): Promise<boolean> {
   const res = await fetchWithAuth(API, {
     method: 'POST',
     body: JSON.stringify({ action: 'register_token', expo_push_token: token, platform, ...extras }),
-  });
+  }, 1, expectedOwner);
   return res.ok;
 }
 
@@ -82,7 +89,7 @@ export async function sendTestPush(): Promise<{ ok: boolean; sent_to: number }> 
 }
 
 // ---------- Permissions + push token bootstrap ----------
-export async function requestPermissionsAndRegisterToken(): Promise<{ granted: boolean; token: string | null }> {
+export async function requestPermissionsAndRegisterToken(expectedOwner?: string): Promise<{ granted: boolean; token: string | null }> {
   if ((Platform.OS as string) === 'web') return { granted: false, token: null };
 
   const N = await loadNotifications();
@@ -111,7 +118,7 @@ export async function requestPermissionsAndRegisterToken(): Promise<{ granted: b
       const nativePlatform = Platform.OS as string;
       await registerPushToken(token, nativePlatform === 'android' ? 'android' : 'ios', {
         app_version: Constants.expoConfig?.version,
-      });
+      }, expectedOwner);
     }
     return { granted: true, token };
   } catch (e) {

@@ -41,11 +41,12 @@ async function verify(req: Request): Promise<string> {
 }
 
 async function getPrefs(userId: string) {
-  const { data } = await admin
+  const { data, error } = await admin
     .from("notification_preferences")
     .select("*")
     .eq("user_id", userId)
     .maybeSingle();
+  if (error) throw error;
   if (data) return data;
   // Defaults — match DB defaults
   return {
@@ -53,6 +54,7 @@ async function getPrefs(userId: string) {
     permission_granted: false,
     rest_timer_enabled: true,
     auto_start_rest_timer: false,
+    auto_rest_duration_sec: null, // null = client rest classifier
     workout_reminder_enabled: true,
     workout_reminder_hour: 8,
     workout_reminder_minute: 0,
@@ -170,9 +172,18 @@ serve(async (req) => {
       }
 
       if (action === "update_prefs") {
+        // undefined = unchanged, null = reset to the classifier, else 15–600 s in 5-s steps.
+        const d = body.auto_rest_duration_sec;
+        if (d !== undefined && d !== null &&
+          (typeof d !== "number" || !Number.isInteger(d) || d < 15 || d > 600 || d % 5 !== 0)) {
+          return jsonRes({ error: "Auto-rest duration must be 15–600 seconds in 5-second steps" }, 400);
+        }
+        if (body.auto_start_rest_timer !== undefined && typeof body.auto_start_rest_timer !== "boolean") {
+          return jsonRes({ error: "auto_start_rest_timer must be a boolean" }, 400);
+        }
         const allowed = [
           "permission_granted",
-          "rest_timer_enabled", "auto_start_rest_timer",
+          "rest_timer_enabled", "auto_start_rest_timer", "auto_rest_duration_sec",
           "workout_reminder_enabled", "workout_reminder_hour", "workout_reminder_minute",
           "nutrition_midday_enabled", "nutrition_midday_hour", "daily_feedback_enabled", "daily_feedback_hour",
           "pr_celebration_enabled", "streak_milestones_enabled", "harshness_escalation_enabled",

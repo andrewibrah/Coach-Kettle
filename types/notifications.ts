@@ -20,6 +20,8 @@ export interface NotificationPreferences {
   permission_granted: boolean;
   rest_timer_enabled: boolean;
   auto_start_rest_timer: boolean;
+  /** Fixed auto-rest seconds (15–600, 5-s steps); null = classifier (suggestRestSeconds). */
+  auto_rest_duration_sec: number | null;
   workout_reminder_enabled: boolean;
   workout_reminder_hour: number;
   workout_reminder_minute: number;

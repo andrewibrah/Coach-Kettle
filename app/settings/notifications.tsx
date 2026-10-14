@@ -30,7 +30,7 @@ const KIND_LABELS: { key: keyof NotificationPreferences; label: string; descript
 ];
 
 export default function NotificationsSettingsScreen() {
-  const { prefs, permissionGranted, requestPermission, updatePrefs, sendTestPush, loading } = useNotifications();
+  const { prefs, permissionGranted, requestPermission, updatePrefs, sendTestPush, loading, saving, error, reloadPrefs } = useNotifications();
   const insets = useSafeAreaInsets();
   const bg = useThemeColor({}, 'background');
   const cardBg = useThemeColor({}, 'cardBackground');
@@ -65,14 +65,17 @@ export default function NotificationsSettingsScreen() {
   };
 
   const setToggle = (key: keyof NotificationPreferences) => async (val: boolean) => {
-    await updatePrefs({ [key]: val } as Partial<NotificationPreferences>);
+    try { await updatePrefs({ [key]: val } as Partial<NotificationPreferences>); }
+    catch { showToast('Preferences were not saved. Please retry.', 'error'); }
   };
 
   const adjustHour = async (key: 'workout_reminder_hour' | 'nutrition_midday_hour' | 'daily_feedback_hour', delta: number) => {
     if (!prefs) return;
     const current = (prefs as unknown as Record<string, number>)[key] ?? 0;
     const next = ((current + delta) + 24) % 24;
-    await updatePrefs({ [key]: next } as Partial<NotificationPreferences>);
+    if (loading || saving) return;
+    try { await updatePrefs({ [key]: next } as Partial<NotificationPreferences>); }
+    catch { showToast('Preferences were not saved. Please retry.', 'error'); }
   };
 
   return (
@@ -121,15 +124,15 @@ export default function NotificationsSettingsScreen() {
             <ThemedText type="subtitle">Reminder times</ThemedText>
             <View style={styles.row}>
               <ThemedText style={{ flex: 1 }}>Workout reminder</ThemedText>
-              <Stepper value={prefs.workout_reminder_hour} onDec={() => adjustHour('workout_reminder_hour', -1)} onInc={() => adjustHour('workout_reminder_hour', 1)} suffix=":00" tint={tint} label="workout reminder hour" />
+              <Stepper value={prefs.workout_reminder_hour} onDec={() => adjustHour('workout_reminder_hour', -1)} onInc={() => adjustHour('workout_reminder_hour', 1)} suffix=":00" tint={tint} disabled={loading || saving} label="workout reminder hour" />
             </View>
             <View style={styles.row}>
               <ThemedText style={{ flex: 1 }}>Mid-day check</ThemedText>
-              <Stepper value={prefs.nutrition_midday_hour} onDec={() => adjustHour('nutrition_midday_hour', -1)} onInc={() => adjustHour('nutrition_midday_hour', 1)} suffix=":00" tint={tint} label="midday nutrition reminder hour" />
+              <Stepper value={prefs.nutrition_midday_hour} onDec={() => adjustHour('nutrition_midday_hour', -1)} onInc={() => adjustHour('nutrition_midday_hour', 1)} suffix=":00" tint={tint} disabled={loading || saving} label="midday nutrition reminder hour" />
             </View>
             <View style={styles.row}>
               <ThemedText style={{ flex: 1 }}>Daily coach report</ThemedText>
-              <Stepper value={prefs.daily_feedback_hour} onDec={() => adjustHour('daily_feedback_hour', -1)} onInc={() => adjustHour('daily_feedback_hour', 1)} suffix=":00" tint={tint} label="daily feedback hour" />
+              <Stepper value={prefs.daily_feedback_hour} onDec={() => adjustHour('daily_feedback_hour', -1)} onInc={() => adjustHour('daily_feedback_hour', 1)} suffix=":00" tint={tint} disabled={loading || saving} label="daily feedback hour" />
             </View>
           </View>
         )}
@@ -148,10 +151,10 @@ export default function NotificationsSettingsScreen() {
                   value={Boolean((prefs as unknown as Record<string, boolean>)[key as string])}
                   onValueChange={setToggle(key)}
                   trackColor={{ true: tint, false: undefined }}
-                  disabled={!permissionGranted}
+                  disabled={!permissionGranted || loading || saving}
                   accessibilityLabel={label}
                   accessibilityHint={description}
-                  accessibilityState={{ disabled: !permissionGranted }}
+                  accessibilityState={{ disabled: !permissionGranted || loading || saving }}
                 />
               </View>
             ))}
@@ -172,6 +175,8 @@ export default function NotificationsSettingsScreen() {
                 value={Boolean(prefs.auto_start_rest_timer)}
                 onValueChange={setToggle('auto_start_rest_timer')}
                 trackColor={{ true: tint, false: undefined }}
+                disabled={loading || saving}
+                accessibilityState={{ disabled: loading || saving }}
                 accessibilityLabel="Auto-start rest timer"
                 accessibilityHint="Start resting the moment you log a set"
               />
@@ -179,13 +184,15 @@ export default function NotificationsSettingsScreen() {
           </View>
         )}
 
-        {loading && <ActivityIndicator color={tint} />}
+        {error && <ThemedText accessibilityRole="alert">{error}</ThemedText>}
+        {error && <Pressable onPress={reloadPrefs} disabled={loading || saving} accessibilityState={{ disabled: loading || saving }} accessibilityRole="button" accessibilityLabel="Retry loading preferences" style={styles.btnGhost}><ThemedText style={{ color: tint }}>Retry</ThemedText></Pressable>}
+        {(loading || saving) && <ActivityIndicator color={tint} />}
       </ScrollView>
     </ThemedView>
   );
 }
 
-function Stepper({ value, onDec, onInc, suffix, tint, label }: { value: number; onDec: () => void; onInc: () => void; suffix?: string; tint: string; label: string }) {
+function Stepper({ value, onDec, onInc, suffix, tint, label, disabled }: { value: number; onDec: () => void; onInc: () => void; suffix?: string; tint: string; label: string; disabled?: boolean }) {
   const display = `${value.toString().padStart(2, '0')}${suffix ?? ''}`;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -193,6 +200,8 @@ function Stepper({ value, onDec, onInc, suffix, tint, label }: { value: number; 
           pairs are indistinguishable to VoiceOver on this screen. */}
       <Pressable
         onPress={onDec}
+        disabled={disabled}
+        accessibilityState={{ disabled }}
         hitSlop={8}
         style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]}
         accessibilityRole="button"
@@ -204,6 +213,8 @@ function Stepper({ value, onDec, onInc, suffix, tint, label }: { value: number; 
       <ThemedText style={{ minWidth: 50, textAlign: 'center', fontWeight: '600' }} accessibilityLabel={`${label} is ${display}`}>{display}</ThemedText>
       <Pressable
         onPress={onInc}
+        disabled={disabled}
+        accessibilityState={{ disabled }}
         hitSlop={8}
         style={({ pressed }) => [styles.stepBtn, pressed && { opacity: 0.6 }]}
         accessibilityRole="button"

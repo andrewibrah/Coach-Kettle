@@ -45,6 +45,7 @@ test('actual route cannot label A session rows as B in actual durable outbox',as
   let raw:string|null=null;
   const outbox=sourceModule('lib/sessionOperationOutbox.ts').createSessionOperationOutbox({read:async()=>raw,write:async(v:string)=>raw=v,send:async()=>({ok:true})});
   const context:any={session:{user:{id:'owner-b'}},workoutId:draft.workoutId,workoutDateISO:draft.dateISO,sessionProvenanceRef:{current:{ownerId:'owner-a',generation:0}},sessionOperations:outbox,useCallback:(fn:any)=>fn,celebratePR:()=>{},canUseSession:()=>false};
+  context.triggerRestTimer = () => assert.fail('foreign session must not trigger rest');
   const run=sourceClosure('queueLiveRows',context);await assert.rejects(run(draft.rows));assert.equal(raw,null);
 });
 test('owned save cannot overwrite foreign or legacy unknown bytes',async()=>{

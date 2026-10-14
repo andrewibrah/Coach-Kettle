@@ -1,5 +1,25 @@
 # Development log
 
+## Auto-rest duration and notification recovery (authored by the user's Hermes agent): independently reviewed and committed
+
+What it does:
+- **Timer tab:** gets an Auto rest switch plus a duration picker: Auto (the suggested classifier), presets, or a 15–600 s dial in 5 s steps.
+- **Storage:** the choice is saved in the new nullable `notification_preferences.auto_rest_duration_sec`, through the validated notifications Edge function.
+- **Preferences:** NotificationsProvider scopes preferences to the account and uses only server-confirmed values.
+- **When rest starts:** after a durable local write. Planned→performed edits also trigger rest, a new trigger source recorded under Q3.
+
+Independent review:
+- The first SPEC review FAILED with two reproduced regressions:
+  - the migration's `NOT NULL DEFAULT 60` silently replaced the committed classifier for every existing user (a 5-rep compound lift went from 180 s to 60 s);
+  - the manual Start Rest prompt vanished whenever preferences were unloaded (offline, loading or a failed fetch).
+- Both were repaired RED-first:
+  - the column is nullable, and NULL means the classifier;
+  - unconfirmed preferences mean auto off, with the HEAD prompt.
+- Then SPEC PASS, with every mutant caught.
+- QUALITY: the requested cleanups were applied. The shared `isRestEligible` extraction was deferred because harness isolation broke 56 tests; the Timer sheet extraction was skipped because it is UI-only and unverifiable without a device.
+
+Receipts: auto-rest 130/130 focused, lib 3747/0, edge 203/0. The SQL fixture is green in 3 modes inside a rollback. The notifications Edge function's service-role use for preferences is pre-existing and documented. The entries below are the author agent's own log, kept as written; where they claim SPEC PASS for earlier states, that is superseded by this entry. [Evidence](docs/auto-rest-local-evidence.md).
+
 ## P4 follow-ups closed: 24h auto-close, F6 delete, residuals (05c1459)
 
 Your D08 calls are implemented:
@@ -16,6 +36,46 @@ Also closed:
 - Whitespace.
 
 SPEC then QUALITY both passed after repairs: retracted-only sessions, the 24 h boundary, exercise ordering, queue starvation and grants. 0500 applies through the real Supabase CLI. Gates on an isolated snapshot: lib 3657/0, `_shared` 113/0, tsc and lint with zero warnings, SQL suites exit 0. Open: the `remote_schema` rebaseline (needs the production schema) and the simulator (no Xcode). [Evidence](docs/plans/in-session-reliability/evidence/p4-final-review-local.md).
+
+## Auto-rest overlapping save/deferred-refresh race — repaired locally, awaiting independent review
+
+The final QUALITY source hypothesis is now execution-confirmed: a retained ready-render `updatePrefs` could start save B while save A's permission refresh GET was held, advance the owner revision, and leave `loading=true` permanently when GET cleanup skipped. Before repair, both GET-success and GET-failure schedules failed the explicit settled-loading assertion (**0 passed / 2 failed**).
+
+`NotificationsProvider` now uses an owner-scoped `idle` / `saving` / `refreshing` lane and current confirmed readiness, not render-captured loading. Saves reject during refresh before IO; reload/permission intent coalesces during saves and GETs and drains before lane release. Finally cleanup is exact-scope fenced; stale callbacks are rejected after switch/unmount, including A→B→A. Existing authentication owner propagation, zero-B-write retries, timer and ingestion behavior remain unchanged.
+
+Added eight regressions to `lib/__tests__/notificationOwnership.test.ts`. Final verification: focused **67 passed**, full lib **3723 passed**, Edge shared **113 passed**; lint, app tsc and diff-check exit 0. Fresh iOS export succeeded (**2164 modules**, Hermes bundle; not device verification). [Execution receipts and state-machine matrix](docs/auto-rest-local-evidence.md#overlapping-savedeferred-refresh-state-machine-repair). Only provider, ownership test, this log and evidence were changed in this dispatch; no commit/deploy/production writes. Independent final review and existing native/remote release gates remain open; no approval claim.
+
+## Auto-rest QUALITY transport/permission repairs — awaiting re-review
+
+Independent QUALITY correctly reproduced a HIGH cross-account preference write after awaited authentication and a MEDIUM permission refresh lost behind a pending save. Both were reproduced RED-first and repaired locally. The provider now threads captured owner identity through preference GET/POST and permission token registration into the existing auth transport owner boundary (including retries); shared auth code is unchanged. Busy reloads coalesce into one owner-scoped deferred refresh, drained after save success/failure and discarded on account change/unmount.
+
+New `lib/__tests__/notificationOwnership.test.ts` executes the real provider → notifications API → `lib/auth.ts` transport with synthetic hooks and IO doubles. It checks zero B writes, not merely stale response rejection, across initial session acquisition, missing-session/proactive refresh, 401 refresh and retried session acquisition; it also verifies permission grants during held successful/failed saves, refresh failure/retry, account/unmount fences and actual local schedule reconciliation.
+
+Verification: focused auto-rest/ownership **59 passed**, full library **3715 passed**, Edge shared **113 passed**; lint, app tsc and diff-check exit 0. Timer UI/duration bounds/defaults/manual separation and rest effect-time/durable edit behavior are unchanged and retained suites pass. Detailed RED receipts, matrix and logs: [local evidence](docs/auto-rest-local-evidence.md#independent-quality-transportpermission-repair-receipts). **SPEC/QUALITY re-review is still required; no approval or production-release claim.** No commit/deploy/production writes; unrelated dirty changes preserved.
+
+## Auto-rest independent review checkpoint
+
+SPEC re-review: PASS after ingestion and ownership/permission repairs. Independent reviewer freshly ran the focused auto-rest/ownership tests (59 passed), full library suite (3715 passed), Edge shared suite (113 passed), lint, app TypeScript and diff-check (exit 0). Final independent SPEC: PASS and QUALITY/integration: APPROVED for local scope, including the final loaded-preference Retry recovery. Fresh final review ran 79 focused tests, full library and Edge shared suites (exit 0; detailed receipts 3735/113), lint, app TypeScript and diff-check (exit 0). iOS Hermes export succeeded. All identified local review defects are resolved. No commit, remote migration, deployment or production write was performed. Native layout/VoiceOver/device lifecycle, real authenticated API-to-DB readback, full-schema/RLS and remote deployment remain open; this is not a production-release approval.
+
+## Independent auto-rest SPEC gaps repaired locally
+
+The independent review correctly reproduced stale render-captured preferences after delayed logging (OFF still started old 60; saving 180 still started 60) and missing rest effects for inline/modal planned-to-performed edits. Both repairs were RED-first: the new regression file initially returned 5 behavioral failures (plus 8 negative controls passing).
+
+`NotificationsProvider.getConfirmedPrefs` now reads the latest server-confirmed, account-scoped value immediately at acknowledgement, before consumer rerender. Every ingestion's existing post-durability trigger uses it; manual timer controls and active timers are not changed by preference updates. Idle OFF prompts remain; OFF with running/paused/done suppresses the prompt. Missing/foreign preferences fail closed.
+
+Edit delivery passes its pre-edit snapshot to `queueLiveRows`. After local durable success, existing incomplete-to-performed valid strength identities may trigger one rest effect, with row/session/generation deduplication and existing ownership fences. Corrections, duplicated/new identities, cardio, invalid rows, failed persistence and stale results do not trigger. The same delivery covers `commitCellEdit`, modal `withPendingRows`, `commitPendingAndGet`, and switching edited cells. `lib/performedSets.ts` was inspected and its legacy-vs-actual transition rules retained unchanged.
+
+Verification: focused auto-rest files **35/0**, complete lib suite **3691/0**, Edge shared suite **113/0**; lint, app tsc and diff-check exit 0. Existing source-extraction fixtures were adapted to the new getter/ref/dependency without weakening their assertions. Node's existing typeless-module warnings and expected offline-fixture logs remain. These are local production-source/IO-double regressions, not native-device or deployment receipts; original native/deployment gates remain open. No commits, deploys or production writes; unrelated dirty work preserved. [Boundary matrix, commands and receipts](docs/auto-rest-local-evidence.md#independent-spec-repair-receipts).
+
+## Auto-rest Timer controls implemented locally; native/deployment gates open
+
+Timer now has a top-right native Auto rest switch and independent duration button. The bottom sheet reuses the existing dial and 60/90/120/180-second presets; explicit Save confirms persistence, while cancel/dismiss preserves the saved value. Manual selection/live timer are unchanged. Timer and Settings share the account-fenced preference provider, with loading/saving gates and visible errors. An additive, unapplied migration adds `auto_rest_duration_sec` (default 60, 15..600 in 5-second steps), wired through types/client API/Edge default, allowlist and validation; existing auto-start values/default false remain intact.
+
+Eligible performed strength ingestion now starts/restarts rest at saved duration only after durable local log intent succeeds, with guarded-submission deduplication and stale-owner/generation fences. Auto off retains Start Rest; cardio/failed persistence do not start rest. Notification permission remains independent.
+
+Executed: `node --test lib/__tests__/autoRest.test.ts` 13/0; `node --test 'lib/__tests__/*.test.ts'` 3669/0; `node --test 'supabase/functions/_shared/*.test.ts'` 113/0; `npm run lint`, `npx tsc --noEmit`, `git diff --check` exit 0. `npx expo export --platform ios --output-dir /Users/me/.hermes/profiles/telegramlite/cache/scratch/auto-rest/ios-export-verified` exit 0 (2164 modules). Actual migration passed a disposable PG15 minimal-schema fixture via scratch `verify_pg.py`/`supabase/tests/auto_rest_duration.sql`; TCP disabled, rollback and server shutdown verified.
+
+Native UI/screenshot is blocked: no Xcode/simctl. Deno check still fails on the unrelated pre-existing `enabledKey` TS2538; the exact original HEAD source reproduces the same failure. Tests are source-executed JSX/hooks/handler IO doubles plus real SQL, not simulator/full-schema/deployed evidence. Native accessibility/lifecycle/alerts, authenticated device relaunch, full-schema/RLS and remote migration/Edge deployment remain gates. No commit/push/deploy or production write by this worker. The checkout HEAD changed externally during execution; unrelated edits were retained. [Detailed evidence and scope](docs/auto-rest-local-evidence.md).
 
 ## P4 approved: SPEC then QUALITY passed after repairs (local only)
 

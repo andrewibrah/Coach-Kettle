@@ -499,26 +499,31 @@ export default function HomeScreen() {
   const { showCelebration } = usePRCelebration();
   const lastCelebratedRef = useRef<string>('');
   const { state: restTimerState, start: startRestTimer, registerRestEntrySink } = useSharedRestTimer();
-  const { prefs: notificationPrefs } = useNotifications();
+  const { getConfirmedPrefs } = useNotifications();
+  const restTimerStateRef = useRef(restTimerState);
+  restTimerStateRef.current = restTimerState;
+  const editedRestRowsRef = useRef(new Set<string>());
   const [restPrompt, setRestPrompt] = useState<RestPromptInfo | null>(null);
 
   // Gate for both "set logged" call sites (#3): auto-start immediately when
   // the user has opted in, otherwise surface a dismissible prompt instead of
-  // silently starting a timer for them. Suppressed entirely while a timer is
-  // already running/paused/done so the prompt and the live indicator never
-  // compete (#8).
+  // silently starting a timer for them. Auto rest restarts the shared timer;
+  // the manual prompt is suppressed while a timer is already active/done.
+  // Unconfirmed prefs (loading, offline; the getter is account-fenced) behave
+  // as auto-start OFF. A null duration means "use the classifier".
   const triggerRestTimer = useCallback((hints: { exercise: string; repsLastSet?: number; isCompound: boolean }) => {
+    const notificationPrefs = getConfirmedPrefs();
     if (decideRestTimerAction(notificationPrefs?.auto_start_rest_timer === true) === 'start') {
-      startRestTimer(hints).catch((err) => console.warn('[restTimer] start failed', err));
+      startRestTimer(hints, notificationPrefs?.auto_rest_duration_sec ?? undefined).catch((err) => console.warn('[restTimer] start failed', err));
       return;
     }
-    if (restTimerState.kind !== 'idle') return;
+    if (restTimerStateRef.current.kind !== 'idle') return;
     setRestPrompt({
       exercise: hints.exercise,
       suggestedSec: suggestRestSeconds(hints),
       at: Date.now(),
     });
-  }, [notificationPrefs?.auto_start_rest_timer, restTimerState.kind, startRestTimer]);
+  }, [getConfirmedPrefs, startRestTimer]);
 
   // Primary celebration path: the log-set response tells us deterministically
   // whether the set was a PR (server-computed, no realtime/race dependency).
@@ -539,17 +544,31 @@ export default function HomeScreen() {
     }
   }, [showCelebration]);
 
-  const queueLiveRows = useCallback(async (changed: LogRow[], operation: 'put' | 'drop' | 'revise' = 'put') => {
+  const queueLiveRows = useCallback(async (changed: LogRow[], operation: 'put' | 'drop' | 'revise' = 'put', previous?: LogRow[]) => {
     const owner = sessionProvenanceRef.current?.ownerId;
     if (!canUseSession() || !owner || !workoutId || !workoutDateISO) throw new Error('Session provenance required');
     const effectOwner = ownership.capture();
     const effectGeneration = getWorkoutDraftGeneration();
     await sessionOperations.rows(owner, workoutId, workoutDateISO, changed, operation);
+    // Edits only start rest when an existing incomplete row becomes performed.
+    // Corrections, duplicated/new rows and updater replays are not new sets.
+    if (operation === 'put' && previous && ownership.isCurrent(effectOwner) && getWorkoutDraftGeneration() === effectGeneration) {
+      const newlyPerformed = changed.filter(row => {
+        const old = previous.find(candidate => candidate.id === row.id);
+        const key = `${owner}:${workoutId}:${effectGeneration}:${row.id}`;
+        return old && !isPerformedRow(old) && isPerformedRow(row) && !row.isCardio && row.setKind !== 'cardio' &&
+          !validateWorkoutRow(row, true) && Number(row.reps) > 0 &&
+          (!COACHING_POLICY.restWorkSetsOnly || !row.setKind || row.setKind === 'work') && !editedRestRowsRef.current.has(key);
+      });
+      newlyPerformed.forEach(row => editedRestRowsRef.current.add(`${owner}:${workoutId}:${effectGeneration}:${row.id}`));
+      const last = newlyPerformed[newlyPerformed.length - 1];
+      if (last) triggerRestTimer({ exercise: last.exercise, repsLastSet: Number(last.reps), isCompound: isCompoundExercise(last.exercise) });
+    }
     // Durable intent precedes HTTP; background/foreground and mount retry it.
     sessionOperations.flush(owner, receipt => {
       if (ownership.isCurrent(effectOwner) && getWorkoutDraftGeneration() === effectGeneration && receipt.pr) celebratePR(receipt.pr);
     }).catch(() => { if (ownership.isCurrent(effectOwner)) showToast('Remote session reconciliation is pending; recovery was kept.', 'info'); });
-  }, [canUseSession, workoutId, workoutDateISO, ownership, celebratePR, showToast]);
+  }, [canUseSession, workoutId, workoutDateISO, ownership, celebratePR, showToast, triggerRestTimer]);
 
   // When a rest timer is started (e.g. from the Timer tab), drop a clear marker
   // into the active workout log between sets — appended, never overwriting input.
@@ -1009,7 +1028,7 @@ export default function HomeScreen() {
       if (changed) {
         const updates = nextRows.filter(row => isPerformedRow(row) && JSON.stringify(row) !== JSON.stringify(rows.find(old => old.id === row.id)));
         const retractions = nextRows.filter(row => !isPerformedRow(row) && isPerformedRow(rows.find(old => old.id === row.id) ?? row));
-        if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+        if (updates.length) queueLiveRows(updates, 'put', rows).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
         if (retractions.length) queueLiveRows(retractions, 'revise').catch(() => showToast('Live corrections could not be queued on this device. Keep the session open and retry.', 'info'));
         setRows(nextRows);
       }
@@ -1133,7 +1152,7 @@ export default function HomeScreen() {
       JSON.stringify(row) !== JSON.stringify(previous.find(old => old.id === row.id)));
     const retractions = result.nextRows.filter(row => !isPerformedRow(row) &&
       isPerformedRow(previous.find(old => old.id === row.id) ?? row));
-    if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+    if (updates.length) queueLiveRows(updates, 'put', previous).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
     if (retractions.length) queueLiveRows(retractions, 'revise').catch(() => showToast('Live corrections could not be queued on this device. Keep the session open and retry.', 'info'));
     setRows(result.nextRows);
     setEditingCell(null);
@@ -1152,7 +1171,7 @@ export default function HomeScreen() {
           JSON.stringify(row) !== JSON.stringify(prev.find(old => old.id === row.id)));
         const retractions = changed.filter(row => !isPerformedRow(row) &&
           isPerformedRow(prev.find(old => old.id === row.id) ?? row));
-        if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+        if (updates.length) queueLiveRows(updates, 'put', prev).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
         if (retractions.length) queueLiveRows(retractions, 'revise').catch(() => showToast('Live corrections could not be queued on this device. Keep the session open and retry.', 'info'));
         return changed;
       });
@@ -1173,7 +1192,7 @@ export default function HomeScreen() {
     if (deliver) {
       const updates = nextRows.filter(row => isPerformedRow(row) && JSON.stringify(row) !== JSON.stringify(previous.find(old => old.id === row.id)));
       const retractions = nextRows.filter(row => !isPerformedRow(row) && isPerformedRow(previous.find(old => old.id === row.id) ?? row));
-      if (updates.length) queueLiveRows(updates).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
+      if (updates.length) queueLiveRows(updates, 'put', previous).catch(() => showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'));
       if (retractions.length) queueLiveRows(retractions, 'revise').catch(() => showToast('Live corrections could not be queued on this device. Keep the session open and retry.', 'info'));
     }
     setRows(nextRows);
@@ -1410,26 +1429,32 @@ export default function HomeScreen() {
     if (!currentRows) return;
     const effectOwner = ownership.capture();
     const effectsDraftGeneration = getWorkoutDraftGeneration();
+    const processedRestRows = new Set<string>();
     const logPerformedRows = (changedRows: LogRow[]) => {
-      // Each actual changed row (fill or append) logs once.
-      const eligible = performedRows(changedRows).filter(row => !validateWorkoutRow(row, true) &&
-        (row.isCardio || Number(row.reps) > 0));
-      if (eligible.length) queueLiveRows(eligible)
-        .catch(() => { if (ownership.isCurrent(effectOwner) && getWorkoutDraftGeneration() === effectsDraftGeneration) showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info'); });
-
-      // Start rest timer for the last logged non-cardio set
-      // Q3a (off until approved): only performed work sets trigger rest.
-      const lastWorking = [...eligible].reverse().find((r) => !r.isCardio &&
-        (!COACHING_POLICY.restWorkSetsOnly || !r.setKind || r.setKind === 'work'));
-      if (lastWorking && lastWorking.weightLbs && lastWorking.reps) {
-        const reps = Number(lastWorking.reps);
-        triggerRestTimer({
-          exercise: lastWorking.exercise,
-          repsLastSet: Number.isFinite(reps) ? reps : undefined,
-          isCompound: isCompoundExercise(lastWorking.exercise),
-        });
-      }
-
+      // Deduplicate processing within this guarded submission, including batches.
+      const eligible = [...new Map(performedRows(changedRows).filter(row => !validateWorkoutRow(row, true) &&
+        (row.isCardio || Number(row.reps) > 0) && !processedRestRows.has(row.id)).map(row => [row.id, row])).values()];
+      if (!eligible.length) return;
+      eligible.forEach(row => processedRestRows.add(row.id));
+      // A successful local durable intent is a logged set; remote sync remains
+      // offline-first. Failed intent or stale session must not start a timer.
+      queueLiveRows(eligible).then(() => {
+        if (!ownership.isCurrent(effectOwner) || getWorkoutDraftGeneration() !== effectsDraftGeneration) return;
+        const lastWorking = [...eligible].reverse().find(r => !r.isCardio &&
+          (!COACHING_POLICY.restWorkSetsOnly || !r.setKind || r.setKind === 'work'));
+        if (lastWorking) {
+          triggerRestTimer({
+            exercise: lastWorking.exercise,
+            repsLastSet: Number(lastWorking.reps),
+            isCompound: isCompoundExercise(lastWorking.exercise),
+          });
+        }
+      }).catch(() => {
+        eligible.forEach(row => processedRestRows.delete(row.id));
+        if (ownership.isCurrent(effectOwner) && getWorkoutDraftGeneration() === effectsDraftGeneration) {
+          showToast('Live changes could not be queued on this device. Keep the session open and retry.', 'info');
+        }
+      });
     };
     // Don't set loading yet, as we try fast parse synchronously
 

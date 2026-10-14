@@ -7,6 +7,8 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
+  Modal,
+  Switch,
   ScrollView,
   StyleSheet,
   View,
@@ -20,6 +22,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useSharedRestTimer } from '@/contexts/RestTimerContext';
 import { formatTime } from '@/lib/restTimer';
+import { useNotifications } from '@/contexts/NotificationsProvider';
 import {
   TIMER_DIAL,
   buildTimerTicks,
@@ -40,6 +43,35 @@ export default function TimerScreen() {
   const tint = useThemeColor({}, 'tint');
   const tintFg = useThemeColor({}, 'tintForeground');
   const placeholder = useThemeColor({}, 'placeholder');
+
+  const { prefs, loading, saving, error, updatePrefs, reloadPrefs } = useNotifications();
+  // seconds null = Auto: the rest classifier picks the duration per set. The
+  // dial keeps its own position so choosing Auto never scrolls (and re-fires) it.
+  const [durationEditor, setDurationEditor] = useState<{ owner: string; seconds: number | null; dial: number } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  React.useEffect(() => {
+    setDurationEditor(null);
+    setSaveError(null);
+  }, [prefs?.user_id]);
+  const controlsDisabled = loading || saving || !prefs;
+  const autoDurationLabel = prefs?.auto_rest_duration_sec == null ? 'Auto (suggested)' : formatTime(prefs.auto_rest_duration_sec);
+  const editorVisible = durationEditor !== null && durationEditor.owner === prefs?.user_id;
+  const closeEditor = () => { if (!saving) { setDurationEditor(null); setSaveError(null); } };
+  const saveDuration = async () => {
+    if (!durationEditor || controlsDisabled) return;
+    setSaveError(null);
+    try {
+      await updatePrefs({ auto_rest_duration_sec: durationEditor.seconds });
+      setDurationEditor(null);
+    } catch {
+      setSaveError('Auto-rest duration was not saved. Please retry.');
+    }
+  };
+  const toggleAutoRest = async (value: boolean) => {
+    setSaveError(null);
+    try { await updatePrefs({ auto_start_rest_timer: value }); }
+    catch { setSaveError('Auto rest was not saved. Please retry.'); }
+  };
 
   const [selected, setSelected] = useState(90);
   const lastHapticSecRef = useRef(90);
@@ -99,9 +131,35 @@ export default function TimerScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <ThemedText style={[styles.eyebrow, { color: placeholder }]}>Rest</ThemedText>
-          <ThemedText style={[styles.heading, { color: textColor }]}>Timer</ThemedText>
+          <View>
+            <ThemedText style={[styles.eyebrow, { color: placeholder }]}>Rest</ThemedText>
+            <ThemedText style={[styles.heading, { color: textColor }]}>Timer</ThemedText>
+          </View>
+          <View style={styles.autoControls}>
+            <View style={styles.autoSwitchRow}>
+              <ThemedText style={styles.autoLabel}>Auto rest</ThemedText>
+              <Switch value={prefs?.auto_start_rest_timer === true} onValueChange={toggleAutoRest}
+                disabled={controlsDisabled} trackColor={{ true: tint }}
+                accessibilityLabel="Auto rest" accessibilityHint="Start rest automatically after logging a strength set"
+                accessibilityState={{ disabled: controlsDisabled }} />
+            </View>
+            <Pressable disabled={controlsDisabled}
+              onPress={() => { if (prefs) { setSaveError(null); setDurationEditor({ owner: prefs.user_id, seconds: prefs.auto_rest_duration_sec, dial: prefs.auto_rest_duration_sec ?? 60 }); } }}
+              style={[styles.autoDuration, { opacity: prefs?.auto_start_rest_timer ? 1 : 0.5 }]}
+              accessibilityRole="button" accessibilityLabel={`Auto-rest duration ${autoDurationLabel}`}
+              accessibilityHint="Opens auto-rest duration settings, also editable when auto rest is off"
+              accessibilityState={{ disabled: controlsDisabled }}>
+              <ThemedText style={{ color: tint, fontWeight: '700' }}>{autoDurationLabel} ⌄</ThemedText>
+            </Pressable>
+          </View>
         </View>
+
+        {(error || saveError) && <View style={{ alignSelf: 'stretch' }}>
+          <ThemedText accessibilityRole="alert">{saveError ?? error}</ThemedText>
+          {error && <Pressable onPress={reloadPrefs} disabled={loading || saving} accessibilityState={{ disabled: loading || saving }} accessibilityRole="button" accessibilityLabel="Retry loading preferences" style={styles.autoDuration}>
+            <ThemedText style={{ color: tint }}>Retry</ThemedText>
+          </Pressable>}
+        </View>}
 
         <CountdownRing
           size={ringSize}
@@ -270,6 +328,45 @@ export default function TimerScreen() {
           )}
         </View>
       </ScrollView>
+      <Modal visible={editorVisible} transparent animationType="slide" onRequestClose={closeEditor}>
+        <View style={styles.sheetOverlay}>
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: border, opacity: 0.75 }]}
+            onPress={closeEditor} disabled={saving} accessibilityRole="button" accessibilityLabel="Dismiss auto-rest duration" />
+          <SafeAreaView edges={['bottom']} accessibilityViewIsModal style={[styles.sheet, { backgroundColor: background }]}>
+            <ScrollView contentContainerStyle={{ gap: 16 }}>
+              <ThemedText accessibilityRole="header" style={{ fontSize: 22, fontWeight: '800' }}>Auto-rest duration</ThemedText>
+              <ThemedText style={{ color: placeholder }}>Applies to the next automatic rest, not the active timer.</ThemedText>
+              <View testID="auto-rest-editor" pointerEvents={saving ? 'none' : 'auto'} accessibilityElementsHidden={saving} importantForAccessibility={saving ? 'no-hide-descendants' : 'auto'} style={{ gap: 14 }}>
+                <Pressable disabled={saving} accessibilityRole="radio" accessibilityLabel="Auto-rest suggested duration"
+                  accessibilityHint="Rest length follows each set's reps and lift type"
+                  accessibilityState={{ selected: durationEditor?.seconds === null, disabled: saving }}
+                  onPress={() => setDurationEditor(prev => prev && { ...prev, seconds: null })}
+                  style={[styles.preset, { borderColor: border, backgroundColor: durationEditor?.seconds === null ? tint : cardBg }]}>
+                  <ThemedText style={[styles.presetText, { color: durationEditor?.seconds === null ? tintFg : textColor }]}>Auto (suggested)</ThemedText>
+                </Pressable>
+                <View style={styles.presetRow}>
+                  {TIMER_DIAL.presets.map(sec => <Pressable key={sec} disabled={saving} accessibilityRole="radio"
+                    accessibilityLabel={`Auto-rest ${formatTime(sec)} preset`} accessibilityState={{ selected: durationEditor?.seconds === sec, disabled: saving }}
+                    onPress={() => setDurationEditor(prev => prev && { ...prev, seconds: sec, dial: sec })}
+                    style={[styles.preset, { borderColor: border, backgroundColor: durationEditor?.seconds === sec ? tint : cardBg }]}>
+                    <ThemedText style={[styles.presetText, { color: durationEditor?.seconds === sec ? tintFg : textColor }]}>{formatTime(sec)}</ThemedText>
+                  </Pressable>)}
+                </View>
+                <Dial value={durationEditor?.dial ?? 60} onChange={seconds => setDurationEditor(prev => prev && { ...prev, seconds, dial: seconds })}
+                  tint={tint} textColor={textColor} placeholder={placeholder} border={border} cardBg={cardBg} />
+              </View>
+              {(saveError || error) && <ThemedText accessibilityRole="alert">{saveError ?? error}</ThemedText>}
+              <Pressable onPress={saveDuration} disabled={controlsDisabled} style={[styles.primaryBtn, { backgroundColor: tint, opacity: controlsDisabled ? 0.5 : 1 }]}
+                accessibilityRole="button" accessibilityLabel="Save auto-rest duration" accessibilityState={{ disabled: controlsDisabled }}>
+                <ThemedText style={[styles.primaryText, { color: tintFg }]}>{saving ? 'Saving…' : 'Save'}</ThemedText>
+              </Pressable>
+              <Pressable onPress={closeEditor} disabled={saving} style={styles.autoDuration} accessibilityRole="button" accessibilityLabel="Cancel auto-rest duration" accessibilityState={{ disabled: saving }}>
+                <ThemedText>Cancel</ThemedText>
+              </Pressable>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -480,8 +577,17 @@ const styles = StyleSheet.create({
     gap: 18,
     alignItems: 'center',
   },
+  autoControls: { alignItems: 'flex-end' },
+  autoSwitchRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  autoLabel: { fontSize: 13, fontWeight: '600' },
+  autoDuration: { minHeight: 44, minWidth: 64, alignItems: 'center', justifyContent: 'center' },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
+  sheet: { padding: 20, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
   header: {
     alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 2,
     marginBottom: 6,
   },

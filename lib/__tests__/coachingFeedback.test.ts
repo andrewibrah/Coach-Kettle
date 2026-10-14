@@ -231,7 +231,7 @@ test('auto-start restarts an already-running timer for a new eligible set', () =
   const starts: any[] = [];
   const trigger = sourceClosure('triggerRestTimer', {
     useCallback: (fn: any) => fn, decideRestTimerAction: (on: boolean) => on ? 'start' : 'prompt', suggestRestSeconds: () => 90,
-    notificationPrefs: { auto_start_rest_timer: true }, restTimerState: { kind: 'running' },
+    getConfirmedPrefs: () => ({ user_id: 'a', auto_start_rest_timer: true }), session: { user: { id: 'a' } }, restTimerStateRef: { current: { kind: 'running' } },
     startRestTimer: async (hints: any) => { starts.push(hints); }, setRestPrompt: () => assert.fail('no prompt in auto-start'),
   });
   trigger({ exercise: 'Squat', repsLastSet: 5, isCompound: true });
