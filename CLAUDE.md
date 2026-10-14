@@ -51,7 +51,7 @@ For multi-step tasks, state a brief plan before touching code.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **WorkoutTracker** (5713 symbols, 8717 relationships, 125 execution flows).
+This project is indexed by GitNexus as **WorkoutTracker** (3956 nodes, 8875 edges, 300 execution flows).
 
 > Index stale? Run `node .gitnexus/run.cjs analyze --index-only` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? Bootstrap with `npx`, `bunx`, or `pnpm dlx` — e.g. `bunx gitnexus@latest analyze` (npm 11 npx crash; #1939).
 

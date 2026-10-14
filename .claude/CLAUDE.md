@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## Project
 
 **Coach Kettle** — Expo SDK 55 / React Native 0.83.6 workout tracker (iOS-first), Supabase backend. Users log sets via natural language ("Bench 185 x 8") parsed locally (regex) or AI fallback. Phase 1 (v1.0.1+) adds: nutrition + meal plans, daily coach with harshness state machine, multi-week programming engine, body metrics + progress, exercise library, notifications.
@@ -22,6 +24,7 @@ npx expo lint                                           # Lint (same as `npm run
 npx tsc --noEmit                                        # Typecheck
 node --test "lib/__tests__/*.test.ts"                   # All tests
 node --test lib/__tests__/entitlements.test.ts          # Single test file
+node --test "supabase/functions/_shared/*.test.ts"     # Edge-function shared-helper tests (not in the lib glob)
 supabase db push                                        # Apply migrations (user runs manually)
 supabase functions deploy <name>                        # Deploy function (user runs manually)
 supabase functions serve <name> --env-file .env.local   # Local function testing
@@ -101,6 +104,12 @@ const supabaseClient = createClient(
 ENV vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`
 
 Adding a new function: `mkdir supabase/functions/<name> && touch supabase/functions/<name>/index.ts`, follow the pattern above, add export to `lib/api.ts`, user deploys.
+
+## Further context
+
+- `AGENTS.md` — agent brief listing the key files for each feature (workout logging, programming, nutrition, daily feedback, form check, RevenueCat)
+- `docs/ai/feature-map.md`, `docs/ai/dev-workflow.md`
+- Edge functions share helpers from `supabase/functions/_shared/` (entitlements, lift matching, meal-plan validation, nutrition-target loading, OpenFoodFacts); import map in `supabase/functions/deno.json`
 
 ## Rules
 
