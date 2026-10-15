@@ -12,7 +12,7 @@ import {
 
 import * as Haptics from "expo-haptics";
 import { Tabs, useRouter } from "expo-router";
-import { Directions, FlatList, Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 
 import { useAuth } from "@/contexts/AuthProvider";
@@ -29,7 +29,7 @@ import { AiResponseBubble } from "@/components/ui/AiResponseBubble";
 import { Header } from "@/components/ui/Header";
 import { BottomTabBarHeightContext } from "expo-router/js-tabs";
 import { WorkoutBottomBar } from "@/components/workout/WorkoutBottomBar";
-import { WorkoutTable } from "@/components/workout/WorkoutTable";
+import { WorkoutTable, type WorkoutTableHandle } from "@/components/workout/WorkoutTable";
 import { useSharedRestTimer } from "@/contexts/RestTimerContext";
 import { useNotifications } from "@/contexts/NotificationsProvider";
 import { decideRestTimerAction, isCompoundExercise, suggestRestSeconds } from "@/lib/restTimer";
@@ -214,7 +214,7 @@ export default function HomeScreen() {
   const successColor = useThemeColor({}, 'success');
   const onTint = useThemeColor({}, 'tintForeground');
 
-  const scrollRef = useRef<FlatList<LogRow> | null>(null);
+  const scrollRef = useRef<WorkoutTableHandle | null>(null);
 
   // ── Post-render scroll system ──────────────────────────────────────────────
   // Queue a scroll target BEFORE setRows, execute it AFTER React commits the
